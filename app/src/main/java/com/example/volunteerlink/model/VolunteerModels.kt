@@ -60,3 +60,16 @@ data class VolunteerOpportunityApplication(
     val applicationSubmittedDate: String,
     val applicationStatus: VolunteerApplicationStatus
 )
+
+// Volunteer Event Details for Map purposes
+data class VolunteerEvent(
+    val id: String,
+    val title: String,
+    val organisation: String,
+    val distanceKm: Double,
+    val date: String,
+    val spotsLeft: Int,
+    val mapX: Float,   // 0f..1f relative position on the map canvas
+    val mapY: Float,
+    val description: String = "Join us and make a difference in your community. Full details and meeting point will be shared in the event chat room."
+)
