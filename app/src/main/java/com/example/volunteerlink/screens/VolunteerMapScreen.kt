@@ -1,8 +1,9 @@
 package com.example.volunteerlink.screens
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,11 +14,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -32,7 +36,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -42,6 +48,7 @@ import com.example.volunteerlink.ui.theme.CardBeige
 import com.example.volunteerlink.ui.theme.CreamBackground
 import com.example.volunteerlink.ui.theme.DeepGreen
 import com.example.volunteerlink.ui.theme.MapBackground
+import com.example.volunteerlink.ui.theme.RiverBlue
 import com.example.volunteerlink.ui.theme.TextDark
 import com.example.volunteerlink.ui.theme.TextMuted
 
@@ -59,7 +66,7 @@ fun MapScreen(
                 date = "15 Aug 2026",
                 spotsLeft = 18,
                 mapX = 0.15f,
-                mapY = 0.18f
+                mapY = 0.20f
             ),
             VolunteerEvent(
                 id = "food_bank_distribution",
@@ -68,7 +75,7 @@ fun MapScreen(
                 distanceKm = 5.1,
                 date = "22 Aug 2026",
                 spotsLeft = 12,
-                mapX = 0.55f,
+                mapX = 0.53f,
                 mapY = 0.38f
             ),
             VolunteerEvent(
@@ -78,13 +85,23 @@ fun MapScreen(
                 distanceKm = 7.4,
                 date = "29 Aug 2026",
                 spotsLeft = 9,
-                mapX = 0.30f,
-                mapY = 0.66f
+                mapX = 0.28f,
+                mapY = 0.68f
+            ),
+            VolunteerEvent(
+                id = "beach_cleanup",
+                title = "Beach Cleanup",
+                organisation = "GreenEarth NGO",
+                distanceKm = 8.6,
+                date = "5 Sep 2026",
+                spotsLeft = 24,
+                mapX = 0.70f,
+                mapY = 0.62f
             )
         )
     }
 
-    var mapSearchQuery by rememberSaveable {
+    var mapSearchText by rememberSaveable {
         mutableStateOf("")
     }
 
@@ -93,17 +110,17 @@ fun MapScreen(
     }
 
     val filteredMapVolunteerEvents =
-        remember(mapSearchQuery, mapVolunteerEvents) {
-            if (mapSearchQuery.isBlank()) {
+        remember(mapSearchText, mapVolunteerEvents) {
+            if (mapSearchText.isBlank()) {
                 mapVolunteerEvents
             } else {
                 mapVolunteerEvents.filter { volunteerEvent ->
                     volunteerEvent.title.contains(
-                        mapSearchQuery,
+                        mapSearchText,
                         ignoreCase = true
                     ) ||
                             volunteerEvent.organisation.contains(
-                                mapSearchQuery,
+                                mapSearchText,
                                 ignoreCase = true
                             )
                 }
@@ -131,7 +148,7 @@ fun MapScreen(
                 )
         ) {
             Text(
-                text = "Nearby Opportunities",
+                text = "NEARBY EVENTS",
                 color = Color.White,
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp
@@ -139,25 +156,25 @@ fun MapScreen(
         }
 
         OutlinedTextField(
-            value = mapSearchQuery,
+            value = mapSearchText,
             onValueChange = {
-                    updatedSearchQuery ->
-                mapSearchQuery = updatedSearchQuery
+                    updatedSearchText ->
+                mapSearchText = updatedSearchText
             },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
             leadingIcon = {
                 Icon(
                     imageVector = Icons.Filled.Search,
-                    contentDescription = "Search location"
+                    contentDescription = "Search"
                 )
             },
             placeholder = {
-                Text("Search nearby opportunities")
+                Text("Search event or organisation")
             },
             singleLine = true,
-            shape = RoundedCornerShape(20.dp)
+            shape = RoundedCornerShape(24.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp)
         )
 
         Box(
@@ -165,131 +182,233 @@ fun MapScreen(
                 .weight(1f)
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp)
-                .clip(RoundedCornerShape(14.dp))
+                .clip(RoundedCornerShape(12.dp))
                 .background(MapBackground)
         ) {
+            Canvas(
+                modifier = Modifier.fillMaxSize()
+            ) {
+                val verticalStreetSpacing =
+                    size.width / 5f
+
+                var streetX = 0f
+
+                while (streetX < size.width) {
+                    drawLine(
+                        color = Color(0xFFD8D2C0),
+                        start = Offset(streetX, 0f),
+                        end = Offset(
+                            streetX,
+                            size.height
+                        ),
+                        strokeWidth = 2f
+                    )
+
+                    streetX += verticalStreetSpacing
+                }
+
+                val horizontalStreetSpacing =
+                    size.height / 8f
+
+                var streetY = 0f
+
+                while (streetY < size.height) {
+                    drawLine(
+                        color = Color(0xFFD8D2C0),
+                        start = Offset(0f, streetY),
+                        end = Offset(
+                            size.width,
+                            streetY
+                        ),
+                        strokeWidth = 2f
+                    )
+
+                    streetY += horizontalStreetSpacing
+                }
+
+                // Main diagonal roads
+                drawLine(
+                    color = Color(0xFFC8C1AF),
+                    start = Offset(
+                        0f,
+                        size.height * 0.25f
+                    ),
+                    end = Offset(
+                        size.width,
+                        size.height * 0.45f
+                    ),
+                    strokeWidth = 5f
+                )
+
+                drawLine(
+                    color = Color(0xFFC8C1AF),
+                    start = Offset(
+                        size.width * 0.15f,
+                        0f
+                    ),
+                    end = Offset(
+                        size.width * 0.72f,
+                        size.height
+                    ),
+                    strokeWidth = 5f
+                )
+
+                // River
+                drawLine(
+                    color = RiverBlue,
+                    start = Offset(
+                        0f,
+                        size.height * 0.68f
+                    ),
+                    end = Offset(
+                        size.width,
+                        size.height * 0.82f
+                    ),
+                    strokeWidth = 26f
+                )
+
+                // User location
+                val userLocation =
+                    Offset(
+                        size.width * 0.38f,
+                        size.height * 0.40f
+                    )
+
+                drawCircle(
+                    color = Color(0xFF3B6FD6),
+                    radius = 14f,
+                    center = userLocation
+                )
+
+                drawCircle(
+                    color = Color.White,
+                    radius = 14f,
+                    center = userLocation,
+                    style = Stroke(width = 3f)
+                )
+            }
+
             Text(
-                text = "George Town, Penang",
+                text = "George Town",
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .padding(12.dp),
-                fontSize = 12.sp,
-                color = TextMuted
+                    .padding(10.dp),
+                color = TextMuted,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium
             )
 
             filteredMapVolunteerEvents.forEach {
                     volunteerEvent ->
 
-                val mapPinIsSelected =
-                    volunteerEvent.id ==
-                            selectedMapVolunteerEvent?.id
-
-                Column(
+                VolunteerMapPin(
+                    volunteerEvent = volunteerEvent,
+                    mapPinIsSelected =
+                        volunteerEvent.id ==
+                                selectedMapVolunteerEvent?.id,
                     modifier = Modifier
+                        .align(Alignment.TopStart)
                         .offset(
-                            x = (volunteerEvent.mapX * 260f).dp,
-                            y = (volunteerEvent.mapY * 380f).dp
+                            x =
+                                (volunteerEvent.mapX *
+                                        270f).dp,
+                            y =
+                                (volunteerEvent.mapY *
+                                        380f).dp
                         )
                         .clickable {
                             selectedMapEventId =
                                 volunteerEvent.id
-                        },
-                    horizontalAlignment =
-                        Alignment.CenterHorizontally
-                ) {
-                    Icon(
-                        imageVector =
-                            Icons.Filled.LocationOn,
-                        contentDescription =
-                            volunteerEvent.title,
-                        tint =
-                            if (mapPinIsSelected) {
-                                DeepGreen
-                            } else {
-                                Color(0xFF4A7C3F)
-                            },
-                        modifier = Modifier.size(
-                            if (mapPinIsSelected) {
-                                34.dp
-                            } else {
-                                28.dp
-                            }
-                        )
-                    )
-
-                    if (mapPinIsSelected) {
-                        Text(
-                            text = volunteerEvent.title,
-                            modifier = Modifier
-                                .background(
-                                    color = Color.White,
-                                    shape =
-                                        RoundedCornerShape(6.dp)
-                                )
-                                .padding(
-                                    horizontal = 6.dp,
-                                    vertical = 3.dp
-                                ),
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = TextDark,
-                            maxLines = 1
-                        )
-                    }
-                }
+                        }
+                )
             }
 
-            Row(
+            Column(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(10.dp)
+                    .padding(8.dp)
                     .background(
-                        color = Color.White.copy(
-                            alpha = 0.92f
-                        ),
-                        shape = RoundedCornerShape(8.dp)
+                        color =
+                            Color.White.copy(
+                                alpha = 0.92f
+                            ),
+                        shape =
+                            RoundedCornerShape(8.dp)
                     )
-                    .padding(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement =
-                    Arrangement.spacedBy(6.dp)
+                    .padding(8.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(9.dp)
-                        .background(
-                            DeepGreen,
-                            CircleShape
-                        )
+                VolunteerMapLegendRow(
+                    legendColour =
+                        Color(0xFF3B6FD6),
+                    legendLabel = "Your location"
                 )
 
-                Text(
-                    text = "Volunteer opportunity",
-                    fontSize = 10.sp,
-                    color = TextMuted
+                VolunteerMapLegendRow(
+                    legendColour = DeepGreen,
+                    legendLabel =
+                        "Volunteer opportunity"
                 )
             }
         }
 
-        Spacer(
-            modifier = Modifier.height(10.dp)
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(
+                    rememberScrollState()
+                )
+                .padding(
+                    horizontal = 8.dp,
+                    vertical = 6.dp
+                )
+        ) {
+            mapVolunteerEvents
+                .filter {
+                        volunteerEvent ->
+                    volunteerEvent.id !=
+                            selectedMapVolunteerEvent?.id
+                }
+                .forEach {
+                        volunteerEvent ->
+
+                    AssistChip(
+                        onClick = {
+                            selectedMapEventId =
+                                volunteerEvent.id
+                        },
+                        label = {
+                            Text(
+                                text =
+                                    "${volunteerEvent.title}  " +
+                                            "${volunteerEvent.distanceKm} km",
+                                maxLines = 1
+                            )
+                        },
+                        modifier =
+                            Modifier.padding(
+                                end = 8.dp
+                            )
+                    )
+                }
+        }
 
         selectedMapVolunteerEvent?.let {
                 volunteerEvent ->
 
             Card(
-                onClick = {
-                    onEventSelected(volunteerEvent.id)
-                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(
                         start = 12.dp,
                         end = 12.dp,
                         bottom = 12.dp
-                    ),
-                shape = RoundedCornerShape(14.dp),
+                    )
+                    .clickable {
+                        onEventSelected(
+                            volunteerEvent.id
+                        )
+                    },
+                shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = Color.White
                 )
@@ -303,7 +422,7 @@ fun MapScreen(
                         modifier = Modifier
                             .size(48.dp)
                             .clip(
-                                RoundedCornerShape(10.dp)
+                                RoundedCornerShape(8.dp)
                             )
                             .background(CardBeige),
                         contentAlignment =
@@ -327,7 +446,7 @@ fun MapScreen(
                         Text(
                             text = volunteerEvent.title,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp,
+                            fontSize = 15.sp,
                             color = TextDark,
                             maxLines = 1,
                             overflow =
@@ -337,28 +456,153 @@ fun MapScreen(
                         Text(
                             text =
                                 volunteerEvent.organisation,
-                            fontSize = 11.sp,
-                            color = TextMuted
+                            fontSize = 12.sp,
+                            color = TextMuted,
+                            maxLines = 1,
+                            overflow =
+                                TextOverflow.Ellipsis
                         )
 
-                        Text(
-                            text =
-                                "${volunteerEvent.distanceKm} km • " +
-                                        volunteerEvent.date,
-                            fontSize = 11.sp,
-                            color = TextMuted
-                        )
+                        Row(
+                            verticalAlignment =
+                                Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector =
+                                    Icons.Filled.LocationOn,
+                                contentDescription = null,
+                                tint = TextMuted,
+                                modifier =
+                                    Modifier.size(13.dp)
+                            )
+
+                            Text(
+                                text =
+                                    "${volunteerEvent.distanceKm} km",
+                                fontSize = 11.sp,
+                                color = TextMuted
+                            )
+
+                            Spacer(
+                                modifier =
+                                    Modifier.size(8.dp)
+                            )
+
+                            Icon(
+                                imageVector =
+                                    Icons.Filled.CalendarMonth,
+                                contentDescription = null,
+                                tint = TextMuted,
+                                modifier =
+                                    Modifier.size(13.dp)
+                            )
+
+                            Text(
+                                text = volunteerEvent.date,
+                                fontSize = 11.sp,
+                                color = TextMuted
+                            )
+                        }
                     }
 
                     Text(
                         text =
                             "${volunteerEvent.spotsLeft} left",
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = DeepGreen
                     )
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun VolunteerMapPin(
+    volunteerEvent: VolunteerEvent,
+    mapPinIsSelected: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .background(
+                color =
+                    if (mapPinIsSelected) {
+                        DeepGreen
+                    } else {
+                        Color.White
+                    },
+                shape = RoundedCornerShape(14.dp)
+            )
+            .padding(
+                horizontal = 8.dp,
+                vertical = 4.dp
+            ),
+        verticalAlignment =
+            Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Filled.LocationOn,
+            contentDescription =
+                volunteerEvent.title,
+            tint =
+                if (mapPinIsSelected) {
+                    Color.White
+                } else {
+                    DeepGreen
+                },
+            modifier = Modifier.size(14.dp)
+        )
+
+        Spacer(
+            modifier = Modifier.size(4.dp)
+        )
+
+        Text(
+            text = volunteerEvent.title,
+            fontSize = 10.sp,
+            maxLines = 1,
+            color =
+                if (mapPinIsSelected) {
+                    Color.White
+                } else {
+                    TextDark
+                },
+            fontWeight = FontWeight.Medium
+        )
+    }
+}
+
+@Composable
+private fun VolunteerMapLegendRow(
+    legendColour: Color,
+    legendLabel: String
+) {
+    Row(
+        modifier = Modifier.padding(
+            vertical = 2.dp
+        ),
+        verticalAlignment =
+            Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(10.dp)
+                .background(
+                    color = legendColour,
+                    shape = CircleShape
+                )
+        )
+
+        Spacer(
+            modifier = Modifier.size(6.dp)
+        )
+
+        Text(
+            text = legendLabel,
+            fontSize = 10.sp,
+            color = TextDark
+        )
     }
 }
