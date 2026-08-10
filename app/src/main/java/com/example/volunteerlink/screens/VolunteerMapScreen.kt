@@ -1,218 +1,364 @@
-package com.example.volunteerapp.ui.screens.applicant
+package com.example.volunteerlink.screens
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.volunteerapp.data.MockRepository
-import com.example.volunteerapp.data.VolunteerEvent
-import com.example.volunteerapp.ui.theme.*
 import com.example.volunteerlink.model.VolunteerEvent
 import com.example.volunteerlink.ui.theme.CardBeige
 import com.example.volunteerlink.ui.theme.CreamBackground
 import com.example.volunteerlink.ui.theme.DeepGreen
 import com.example.volunteerlink.ui.theme.MapBackground
-import com.example.volunteerlink.ui.theme.RiverBlue
 import com.example.volunteerlink.ui.theme.TextDark
 import com.example.volunteerlink.ui.theme.TextMuted
 
 @Composable
-fun MapScreen(onEventSelected: (String) -> Unit) {
-    var searchText by remember { mutableStateOf("GeorgeTown, Penang") }
-    var selectedEvent by remember { mutableStateOf(MockRepository.events.firstOrNull { it.id == "event_poster_design" }) }
-    val events = MockRepository.events
+fun MapScreen(
+    onEventSelected: (String) -> Unit = {}
+) {
+    val mapVolunteerEvents = remember {
+        listOf(
+            VolunteerEvent(
+                id = "charity_fun_run",
+                title = "Charity Fun Run 2026",
+                organisation = "Green Earth Society",
+                distanceKm = 2.3,
+                date = "15 Aug 2026",
+                spotsLeft = 18,
+                mapX = 0.15f,
+                mapY = 0.18f
+            ),
+            VolunteerEvent(
+                id = "food_bank_distribution",
+                title = "Food Bank Distribution",
+                organisation = "Community Food Support",
+                distanceKm = 5.1,
+                date = "22 Aug 2026",
+                spotsLeft = 12,
+                mapX = 0.55f,
+                mapY = 0.38f
+            ),
+            VolunteerEvent(
+                id = "community_health_fair",
+                title = "Community Health Fair",
+                organisation = "Care Malaysia",
+                distanceKm = 7.4,
+                date = "29 Aug 2026",
+                spotsLeft = 9,
+                mapX = 0.30f,
+                mapY = 0.66f
+            )
+        )
+    }
 
-    val filteredEvents = if (searchText.isBlank()) events else events
+    var mapSearchQuery by rememberSaveable {
+        mutableStateOf("")
+    }
 
-    Column(modifier = Modifier.fillMaxSize().background(CreamBackground)) {
+    var selectedMapEventId by rememberSaveable {
+        mutableStateOf(mapVolunteerEvents.first().id)
+    }
 
+    val filteredMapVolunteerEvents =
+        remember(mapSearchQuery, mapVolunteerEvents) {
+            if (mapSearchQuery.isBlank()) {
+                mapVolunteerEvents
+            } else {
+                mapVolunteerEvents.filter { volunteerEvent ->
+                    volunteerEvent.title.contains(
+                        mapSearchQuery,
+                        ignoreCase = true
+                    ) ||
+                            volunteerEvent.organisation.contains(
+                                mapSearchQuery,
+                                ignoreCase = true
+                            )
+                }
+            }
+        }
+
+    val selectedMapVolunteerEvent =
+        filteredMapVolunteerEvents.firstOrNull {
+                volunteerEvent ->
+            volunteerEvent.id == selectedMapEventId
+        } ?: filteredMapVolunteerEvents.firstOrNull()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(CreamBackground)
+    ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(DeepGreen)
-                .padding(vertical = 16.dp, horizontal = 16.dp)
+                .padding(
+                    horizontal = 16.dp,
+                    vertical = 16.dp
+                )
         ) {
-            Text("NEARBY EVENTS", color = CardBeige, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Text(
+                text = "Nearby Opportunities",
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp
+            )
         }
 
-        // Search bar
         OutlinedTextField(
-            value = searchText,
-            onValueChange = { searchText = it },
-            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = "Search") },
-            placeholder = { Text("Search location") },
-            singleLine = true,
-            shape = RoundedCornerShape(24.dp),
+            value = mapSearchQuery,
+            onValueChange = {
+                    updatedSearchQuery ->
+                mapSearchQuery = updatedSearchQuery
+            },
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp)
+                .padding(12.dp),
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Filled.Search,
+                    contentDescription = "Search location"
+                )
+            },
+            placeholder = {
+                Text("Search nearby opportunities")
+            },
+            singleLine = true,
+            shape = RoundedCornerShape(20.dp)
         )
 
-        // Map area
         Box(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp)
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(14.dp))
                 .background(MapBackground)
         ) {
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                // simple street grid to mimic the screenshot
-                val step = size.width / 5f
-                var x = 0f
-                while (x < size.width) {
-                    drawLine(Color(0xFFD8D2C0), Offset(x, 0f), Offset(x, size.height), strokeWidth = 2f)
-                    x += step
-                }
-                var y = 0f
-                val stepY = size.height / 8f
-                while (y < size.height) {
-                    drawLine(Color(0xFFD8D2C0), Offset(0f, y), Offset(size.width, y), strokeWidth = 2f)
-                    y += stepY
-                }
-                // river
-                drawLine(
-                    RiverBlue,
-                    Offset(0f, size.height * 0.65f),
-                    Offset(size.width, size.height * 0.8f),
-                    strokeWidth = 26f
-                )
-                // "your location" dot
-                drawCircle(Color(0xFF3B6FD6), radius = 14f, center = Offset(size.width * 0.38f, size.height * 0.4f))
-                drawCircle(Color.White, radius = 14f, center = Offset(size.width * 0.38f, size.height * 0.4f), style = Stroke(width = 3f))
-            }
+            Text(
+                text = "George Town, Penang",
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(12.dp),
+                fontSize = 12.sp,
+                color = TextMuted
+            )
 
-            filteredEvents.forEach { event ->
-                MapPin(
-                    event = event,
-                    selected = event.id == selectedEvent?.id,
+            filteredMapVolunteerEvents.forEach {
+                    volunteerEvent ->
+
+                val mapPinIsSelected =
+                    volunteerEvent.id ==
+                            selectedMapVolunteerEvent?.id
+
+                Column(
                     modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(
-                            start = (event.mapX * 260).dp,
-                            top = (event.mapY * 380).dp
+                        .offset(
+                            x = (volunteerEvent.mapX * 260f).dp,
+                            y = (volunteerEvent.mapY * 380f).dp
                         )
-                        .clickable { selectedEvent = event }
-                )
+                        .clickable {
+                            selectedMapEventId =
+                                volunteerEvent.id
+                        },
+                    horizontalAlignment =
+                        Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        imageVector =
+                            Icons.Filled.LocationOn,
+                        contentDescription =
+                            volunteerEvent.title,
+                        tint =
+                            if (mapPinIsSelected) {
+                                DeepGreen
+                            } else {
+                                Color(0xFF4A7C3F)
+                            },
+                        modifier = Modifier.size(
+                            if (mapPinIsSelected) {
+                                34.dp
+                            } else {
+                                28.dp
+                            }
+                        )
+                    )
+
+                    if (mapPinIsSelected) {
+                        Text(
+                            text = volunteerEvent.title,
+                            modifier = Modifier
+                                .background(
+                                    color = Color.White,
+                                    shape =
+                                        RoundedCornerShape(6.dp)
+                                )
+                                .padding(
+                                    horizontal = 6.dp,
+                                    vertical = 3.dp
+                                ),
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = TextDark,
+                            maxLines = 1
+                        )
+                    }
+                }
             }
 
-            // Legend
-            Column(
+            Row(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(8.dp)
-                    .background(Color.White.copy(alpha = 0.9f), RoundedCornerShape(8.dp))
-                    .padding(8.dp)
+                    .padding(10.dp)
+                    .background(
+                        color = Color.White.copy(
+                            alpha = 0.92f
+                        ),
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                    .padding(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement =
+                    Arrangement.spacedBy(6.dp)
             ) {
-                LegendRow(color = Color(0xFF3B6FD6), label = "Your location")
-                LegendRow(color = DeepGreen, label = "Volunteer event")
-            }
-        }
+                Box(
+                    modifier = Modifier
+                        .size(9.dp)
+                        .background(
+                            DeepGreen,
+                            CircleShape
+                        )
+                )
 
-        // Quick chips row for other nearby events
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(8.dp)
-        ) {
-            events.filter { it.id != selectedEvent?.id }.take(2).forEach { ev ->
-                AssistChip(
-                    onClick = { selectedEvent = ev },
-                    label = { Text("${ev.title}  ${ev.distanceKm}km") },
-                    modifier = Modifier.padding(end = 8.dp)
+                Text(
+                    text = "Volunteer opportunity",
+                    fontSize = 10.sp,
+                    color = TextMuted
                 )
             }
         }
 
-        // Bottom event card
-        selectedEvent?.let { event ->
+        Spacer(
+            modifier = Modifier.height(10.dp)
+        )
+
+        selectedMapVolunteerEvent?.let {
+                volunteerEvent ->
+
             Card(
-                shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+                onClick = {
+                    onEventSelected(volunteerEvent.id)
+                },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { onEventSelected(event.id) },
-                colors = CardDefaults.cardColors(containerColor = Color.White)
+                    .padding(
+                        start = 12.dp,
+                        end = 12.dp,
+                        bottom = 12.dp
+                    ),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color.White
+                )
             ) {
                 Row(
                     modifier = Modifier.padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment =
+                        Alignment.CenterVertically
                 ) {
                     Box(
                         modifier = Modifier
                             .size(48.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(CardBeige)
+                            .clip(
+                                RoundedCornerShape(10.dp)
+                            )
+                            .background(CardBeige),
+                        contentAlignment =
+                            Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector =
+                                Icons.Filled.LocationOn,
+                            contentDescription = null,
+                            tint = DeepGreen
+                        )
+                    }
+
+                    Spacer(
+                        modifier = Modifier.size(12.dp)
                     )
-                    Spacer(Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(event.title, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                        Text(event.organisation, fontSize = 12.sp, color = TextMuted)
-                        Row {
-                            Text("📍 ${event.distanceKm}km", fontSize = 11.sp, color = TextMuted)
-                            Spacer(Modifier.width(8.dp))
-                            Text("🗓 ${event.date}", fontSize = 11.sp, color = TextMuted)
-                        }
+
+                    Column(
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            text = volunteerEvent.title,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp,
+                            color = TextDark,
+                            maxLines = 1,
+                            overflow =
+                                TextOverflow.Ellipsis
+                        )
+
+                        Text(
+                            text =
+                                volunteerEvent.organisation,
+                            fontSize = 11.sp,
+                            color = TextMuted
+                        )
+
+                        Text(
+                            text =
+                                "${volunteerEvent.distanceKm} km • " +
+                                        volunteerEvent.date,
+                            fontSize = 11.sp,
+                            color = TextMuted
+                        )
                     }
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text("${event.spotsLeft} Left", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = DeepGreen)
-                        Icon(Icons.Filled.LocationOn, contentDescription = "Open", tint = DeepGreen)
-                    }
+
+                    Text(
+                        text =
+                            "${volunteerEvent.spotsLeft} left",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = DeepGreen
+                    )
                 }
             }
         }
     }
 }
-
-@Composable
-private fun MapPin(event: VolunteerEvent, selected: Boolean, modifier: Modifier = Modifier) {
-    Row(
-        modifier = modifier
-            .background(if (selected) DeepGreen else Color.White, RoundedCornerShape(14.dp))
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            Icons.Filled.LocationOn,
-            contentDescription = event.title,
-            tint = if (selected) Color.White else DeepGreen,
-            modifier = Modifier.size(14.dp)
-        )
-        Spacer(Modifier.width(4.dp))
-        Text(
-            event.title,
-            fontSize = 11.sp,
-            color = if (selected) Color.White else TextDark,
-            fontWeight = FontWeight.Medium
-        )
-    }
-}
-
-@Composable
-private fun LegendRow(color: Color, label: String) {
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 2.dp)) {
-        Box(modifier = Modifier.size(10.dp).background(color, CircleShape))
-        Spacer(Modifier.width(6.dp))
-        Text(label, fontSize = 10.sp)
-    }
-}
-
-
-
