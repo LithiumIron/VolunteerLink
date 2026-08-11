@@ -1,6 +1,18 @@
 package com.example.volunteerlink.model
 
-// Volunteer role data model
+// Determines whether joining a role needs an additional form.
+enum class VolunteerRoleApplicationFlow {
+    DIRECT_SUBMISSION,
+    ADDITIONAL_FORM
+}
+
+// One activity shown in the role schedule.
+data class VolunteerRoleScheduleItem(
+    val scheduleTime: String,
+    val scheduleActivity: String
+)
+
+// Volunteer role data model.
 data class VolunteerOpportunityRole(
     val roleId: Int,
     val roleTitle: String,
@@ -9,7 +21,22 @@ data class VolunteerOpportunityRole(
     val rolePrimarySkillPath: String,
     val roleSkillsPractised: List<String>,
     val roleExperienceRequirement: String,
-    val roleExtraApplicationQuestions: List<String> = emptyList()
+    val roleExtraApplicationQuestions: List<String> = emptyList(),
+
+    // Detailed role information.
+    val roleSpecificAssignment: String = "",
+    val roleTrainingDetails: String? = null,
+    val roleResponsibilities: List<String> = emptyList(),
+    val roleScheduleItems:
+    List<VolunteerRoleScheduleItem> = emptyList(),
+
+    // Level 1 = Beginner, 2 = Intermediate, 3 = Advanced.
+    val roleMinimumSkillPathLevel: Int = 1,
+
+    // Both flows use the same Join Event action.
+    val roleApplicationFlow:
+    VolunteerRoleApplicationFlow =
+        VolunteerRoleApplicationFlow.DIRECT_SUBMISSION
 )
 
 enum class VolunteerOpportunityCategory {
@@ -22,7 +49,7 @@ enum class VolunteerOpportunityCategory {
     ARTS
 }
 
-// Volunteer event data model
+// Volunteer event data model.
 data class VolunteerOpportunityEvent(
     val eventId: Int,
     val eventTitle: String,
@@ -38,10 +65,18 @@ data class VolunteerOpportunityEvent(
     val eventApplicationCount: Int,
     val eventDescription: String,
     val eventIsLongTerm: Boolean = false,
-    val eventVolunteerRoles: List<VolunteerOpportunityRole>
+    val eventVolunteerRoles: List<VolunteerOpportunityRole>,
+
+    // Extended event details.
+    val eventIsGovernmentApproved: Boolean = false,
+    val eventFullAddress: String = "",
+    val eventCauseName: String = "",
+    val eventContactEmail: String = "",
+    val eventContactPhone: String = "",
+    val eventShareLink: String = ""
 )
 
-// Volunteer application status
+// Volunteer application status.
 enum class VolunteerApplicationStatus {
     PENDING,
     ACCEPTED,
@@ -50,7 +85,7 @@ enum class VolunteerApplicationStatus {
     CANCELLED
 }
 
-// Volunteer application record
+// Volunteer application record.
 data class VolunteerOpportunityApplication(
     val applicationId: Int,
     val applicationEventId: Int,
@@ -58,10 +93,17 @@ data class VolunteerOpportunityApplication(
     val applicationOrganisationName: String,
     val applicationRoleTitle: String,
     val applicationSubmittedDate: String,
-    val applicationStatus: VolunteerApplicationStatus
+    val applicationStatus: VolunteerApplicationStatus,
+
+    // Additional information for application details.
+    val applicationRoleId: Int? = null,
+    val applicationStatusMessage: String = "",
+    val applicationRejectionReason: String? = null,
+    val applicationVerifiedHours: Int? = null,
+    val applicationCertificateId: String? = null
 )
 
-// Volunteer Event Details for Map purposes
+// Temporary model used by the Map teammate's prototype.
 data class VolunteerEvent(
     val id: String,
     val title: String,
@@ -69,7 +111,10 @@ data class VolunteerEvent(
     val distanceKm: Double,
     val date: String,
     val spotsLeft: Int,
-    val mapX: Float,   // 0f..1f relative position on the map canvas
+    val mapX: Float,
     val mapY: Float,
-    val description: String = "Join us and make a difference in your community. Full details and meeting point will be shared in the event chat room."
+    val description: String =
+        "Join us and make a difference in your community. " +
+                "Full details and meeting point will be shared " +
+                "in the event chat room."
 )
