@@ -5,7 +5,6 @@ import com.example.volunteerlink.model.VolunteerOpportunityApplication
 import com.example.volunteerlink.model.VolunteerOpportunityEvent
 import com.example.volunteerlink.model.VolunteerOpportunityRole
 import com.example.volunteerlink.model.VolunteerOpportunityCategory
-import com.example.volunteerlink.model.VolunteerOpportunityCategory
 
 object VolunteerOpportunitySampleData {
 
@@ -16,8 +15,6 @@ object VolunteerOpportunitySampleData {
             eventTitle = "Charity Fun Run 2026",
             eventOrganisationName = "Green Earth Society",
             eventIsVerifiedOrganisation = true,
-            eventCategory =
-                VolunteerOpportunityCategory.SPORTS,
             eventOpportunityType = "Physical",
             eventCategory = VolunteerOpportunityCategory.SPORTS,
             eventLocation = "Kuala Lumpur",
@@ -73,8 +70,6 @@ object VolunteerOpportunitySampleData {
             eventTitle = "Food Bank Distribution",
             eventOrganisationName = "Community Food Support",
             eventIsVerifiedOrganisation = true,
-            eventCategory =
-                VolunteerOpportunityCategory.COMMUNITY,
             eventOpportunityType = "Physical",
             eventCategory = VolunteerOpportunityCategory.COMMUNITY,
             eventLocation = "Butterworth",
@@ -111,8 +106,6 @@ object VolunteerOpportunitySampleData {
             eventTitle = "Senior Digital Literacy Project",
             eventOrganisationName = "DigitalCare Foundation",
             eventIsVerifiedOrganisation = true,
-            eventCategory =
-                VolunteerOpportunityCategory.EDUCATION,
             eventOpportunityType = "Remote",
             eventCategory = VolunteerOpportunityCategory.EDUCATION,
             eventLocation = "Online",

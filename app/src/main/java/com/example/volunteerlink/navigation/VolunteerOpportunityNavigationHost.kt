@@ -24,7 +24,7 @@ import com.example.volunteerlink.screens.VolunteerHomeScreen
 import com.example.volunteerlink.ui.theme.VolunteerLinkBackground
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextPrimary
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextSecondary
-
+import com.example.volunteerlink.screens.MapScreen
 
 @Composable
 fun VolunteerOpportunityNavigationHost() {
@@ -123,13 +123,14 @@ fun VolunteerOpportunityNavigationHost() {
 
 
         NavHost(
-
             navController =
                 volunteerNavigationController,
 
             startDestination =
                 VolunteerOpportunityNavigationRoutes
                     .VOLUNTEER_HOME_ROUTE,
+
+            route = "volunteer_root_navigation_graph",
 
             modifier =
                 Modifier.padding(
@@ -143,7 +144,6 @@ fun VolunteerOpportunityNavigationHost() {
                     VolunteerOpportunityNavigationRoutes
                         .VOLUNTEER_HOME_ROUTE
             ) {
-
                 VolunteerHomeScreen()
             }
 
@@ -177,10 +177,7 @@ fun VolunteerOpportunityNavigationHost() {
                     VolunteerOpportunityNavigationRoutes
                         .VOLUNTEER_MAP_ROUTE
             ) {
-
-                VolunteerTemporaryModuleScreen(
-                    moduleTitle = "Map"
-                )
+                MapScreen()
             }
 
 
