@@ -142,16 +142,20 @@ fun MapScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(DeepGreen)
-                .padding(
-                    horizontal = 16.dp,
-                    vertical = 16.dp
-                )
+                .height(90.dp)
+
+
         ) {
             Text(
                 text = "NEARBY EVENTS",
                 color = Color.White,
                 fontWeight = FontWeight.Bold,
-                fontSize = 18.sp
+                fontSize = 18.sp,
+                modifier = Modifier.align(Alignment.BottomStart)
+                    .padding(
+                        start = 20.dp,
+                        bottom = 14.dp
+                    )
             )
         }
 
