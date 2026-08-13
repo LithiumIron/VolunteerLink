@@ -2,6 +2,7 @@ package com.example.volunteerlink.navigation
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,19 +17,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import com.example.volunteerlink.screens.MapScreen
+import com.example.volunteerlink.screens.VolunteerApplicationScreen
 import com.example.volunteerlink.screens.VolunteerHomeScreen
+import com.example.volunteerlink.screens.VolunteerOpportunityDetailsScreen
+import com.example.volunteerlink.screens.VolunteerRoleDetailsScreen
+import com.example.volunteerlink.screens.VolunteerSearchScreen
 import com.example.volunteerlink.ui.theme.VolunteerLinkBackground
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextPrimary
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextSecondary
-import com.example.volunteerlink.screens.MapScreen
 
 @Composable
 fun VolunteerOpportunityNavigationHost() {
-
     val volunteerNavigationController =
         rememberNavController()
 
@@ -41,52 +47,371 @@ fun VolunteerOpportunityNavigationHost() {
             ?.destination
             ?.route
 
-
     val volunteerBottomNavigationRoutes =
         setOf(
             VolunteerOpportunityNavigationRoutes
                 .VOLUNTEER_HOME_ROUTE,
 
             VolunteerOpportunityNavigationRoutes
-                .VOLUNTEER_CHAT_ROUTE,
+                .VOLUNTEER_MAP_ROUTE,
 
             VolunteerOpportunityNavigationRoutes
                 .VOLUNTEER_SKILL_PATH_ROUTE,
 
             VolunteerOpportunityNavigationRoutes
-                .VOLUNTEER_MAP_ROUTE,
+                .VOLUNTEER_CHAT_ROUTE,
 
             VolunteerOpportunityNavigationRoutes
                 .VOLUNTEER_PROFILE_ROUTE
         )
 
-
     val shouldShowVolunteerBottomNavigationBar =
         currentVolunteerNavigationRoute in
                 volunteerBottomNavigationRoutes
 
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                VolunteerLinkBackground
+            )
+    ) {
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            containerColor =
+                VolunteerLinkBackground,
+            contentWindowInsets =
+                WindowInsets(
+                    left = 0,
+                    top = 0,
+                    right = 0,
+                    bottom = 0
+                )
+        ) { volunteerNavigationInnerPadding ->
 
-    Scaffold(
+            NavHost(
+                navController =
+                    volunteerNavigationController,
 
-        modifier =
-            Modifier.fillMaxSize(),
+                startDestination =
+                    VolunteerOpportunityNavigationRoutes
+                        .VOLUNTEER_HOME_ROUTE,
 
-        contentWindowInsets =
-            WindowInsets(
-                left = 0,
-                top = 0,
-                right = 0,
-                bottom = 0
-            ),
+                route =
+                    "volunteer_root_navigation_graph",
 
-        bottomBar = {
-
-            if (
-                shouldShowVolunteerBottomNavigationBar
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(
+                        volunteerNavigationInnerPadding
+                    )
             ) {
+                // Home
+                composable(
+                    route =
+                        VolunteerOpportunityNavigationRoutes
+                            .VOLUNTEER_HOME_ROUTE
+                ) {
+                    VolunteerHomeScreen(
+                        onVolunteerSearchSelected = {
+                            volunteerNavigationController
+                                .navigate(
+                                    VolunteerOpportunityNavigationRoutes
+                                        .VOLUNTEER_SEARCH_ROUTE
+                                )
+                        },
 
+                        onVolunteerOpportunitySelected = {
+                                volunteerEventId ->
+
+                            volunteerNavigationController
+                                .navigate(
+                                    VolunteerOpportunityNavigationRoutes
+                                        .createVolunteerOpportunityDetailsRoute(
+                                            volunteerEventId
+                                        )
+                                )
+                        }
+                    )
+                }
+
+                // Search
+                composable(
+                    route =
+                        VolunteerOpportunityNavigationRoutes
+                            .VOLUNTEER_SEARCH_ROUTE
+                ) {
+                    VolunteerSearchScreen(
+                        onBackSelected = {
+                            volunteerNavigationController
+                                .popBackStack()
+                        },
+
+                        onVolunteerOpportunitySelected = {
+                                volunteerEventId ->
+
+                            volunteerNavigationController
+                                .navigate(
+                                    VolunteerOpportunityNavigationRoutes
+                                        .createVolunteerOpportunityDetailsRoute(
+                                            volunteerEventId
+                                        )
+                                )
+                        }
+                    )
+                }
+
+                // Opportunity Details
+                composable(
+                    route =
+                        VolunteerOpportunityNavigationRoutes
+                            .VOLUNTEER_OPPORTUNITY_DETAILS_ROUTE,
+
+                    arguments =
+                        listOf(
+                            navArgument(
+                                VolunteerOpportunityNavigationRoutes
+                                    .VOLUNTEER_EVENT_ID_ARGUMENT
+                            ) {
+                                type = NavType.IntType
+                            }
+                        )
+                ) { navigationBackStackEntry ->
+
+                    val volunteerEventId =
+                        navigationBackStackEntry
+                            .arguments
+                            ?.getInt(
+                                VolunteerOpportunityNavigationRoutes
+                                    .VOLUNTEER_EVENT_ID_ARGUMENT
+                            )
+                            ?: return@composable
+
+                    VolunteerOpportunityDetailsScreen(
+                        volunteerEventId =
+                            volunteerEventId,
+
+                        onBackSelected = {
+                            volunteerNavigationController
+                                .popBackStack()
+                        },
+
+                        onVolunteerRoleSelected = {
+                                selectedEventId,
+                                selectedRoleId ->
+
+                            volunteerNavigationController
+                                .navigate(
+                                    VolunteerOpportunityNavigationRoutes
+                                        .createVolunteerRoleDetailsRoute(
+                                            volunteerEventId =
+                                                selectedEventId,
+                                            volunteerRoleId =
+                                                selectedRoleId
+                                        )
+                                )
+                        }
+                    )
+                }
+
+                // Role Details
+                composable(
+                    route =
+                        VolunteerOpportunityNavigationRoutes
+                            .VOLUNTEER_ROLE_DETAILS_ROUTE,
+
+                    arguments =
+                        listOf(
+                            navArgument(
+                                VolunteerOpportunityNavigationRoutes
+                                    .VOLUNTEER_EVENT_ID_ARGUMENT
+                            ) {
+                                type = NavType.IntType
+                            },
+
+                            navArgument(
+                                VolunteerOpportunityNavigationRoutes
+                                    .VOLUNTEER_ROLE_ID_ARGUMENT
+                            ) {
+                                type = NavType.IntType
+                            }
+                        )
+                ) { navigationBackStackEntry ->
+
+                    val volunteerEventId =
+                        navigationBackStackEntry
+                            .arguments
+                            ?.getInt(
+                                VolunteerOpportunityNavigationRoutes
+                                    .VOLUNTEER_EVENT_ID_ARGUMENT
+                            )
+                            ?: return@composable
+
+                    val volunteerRoleId =
+                        navigationBackStackEntry
+                            .arguments
+                            ?.getInt(
+                                VolunteerOpportunityNavigationRoutes
+                                    .VOLUNTEER_ROLE_ID_ARGUMENT
+                            )
+                            ?: return@composable
+
+                    VolunteerRoleDetailsScreen(
+                        volunteerEventId =
+                            volunteerEventId,
+
+                        volunteerRoleId =
+                            volunteerRoleId,
+
+                        onBackSelected = {
+                            volunteerNavigationController
+                                .popBackStack()
+                        },
+
+                        onJoinRoleSelected = {
+                                selectedEventId,
+                                selectedRoleId ->
+
+                            volunteerNavigationController
+                                .navigate(
+                                    VolunteerOpportunityNavigationRoutes
+                                        .createVolunteerRoleApplicationRoute(
+                                            volunteerEventId =
+                                                selectedEventId,
+                                            volunteerRoleId =
+                                                selectedRoleId
+                                        )
+                                )
+                        }
+                    )
+                }
+
+                // Role Application
+                composable(
+                    route =
+                        VolunteerOpportunityNavigationRoutes
+                            .VOLUNTEER_ROLE_APPLICATION_ROUTE,
+
+                    arguments =
+                        listOf(
+                            navArgument(
+                                VolunteerOpportunityNavigationRoutes
+                                    .VOLUNTEER_EVENT_ID_ARGUMENT
+                            ) {
+                                type = NavType.IntType
+                            },
+
+                            navArgument(
+                                VolunteerOpportunityNavigationRoutes
+                                    .VOLUNTEER_ROLE_ID_ARGUMENT
+                            ) {
+                                type = NavType.IntType
+                            }
+                        )
+                ) { navigationBackStackEntry ->
+
+                    val volunteerEventId =
+                        navigationBackStackEntry
+                            .arguments
+                            ?.getInt(
+                                VolunteerOpportunityNavigationRoutes
+                                    .VOLUNTEER_EVENT_ID_ARGUMENT
+                            )
+                            ?: return@composable
+
+                    val volunteerRoleId =
+                        navigationBackStackEntry
+                            .arguments
+                            ?.getInt(
+                                VolunteerOpportunityNavigationRoutes
+                                    .VOLUNTEER_ROLE_ID_ARGUMENT
+                            )
+                            ?: return@composable
+
+                    VolunteerApplicationScreen(
+                        volunteerEventId =
+                            volunteerEventId,
+
+                        volunteerRoleId =
+                            volunteerRoleId,
+
+                        onBackSelected = {
+                            volunteerNavigationController
+                                .popBackStack()
+                        },
+
+                        onReturnHomeSelected = {
+                            volunteerNavigationController
+                                .navigate(
+                                    VolunteerOpportunityNavigationRoutes
+                                        .VOLUNTEER_HOME_ROUTE
+                                ) {
+                                    popUpTo(
+                                        VolunteerOpportunityNavigationRoutes
+                                            .VOLUNTEER_HOME_ROUTE
+                                    ) {
+                                        inclusive = false
+                                    }
+
+                                    launchSingleTop = true
+                                }
+                        }
+                    )
+                }
+
+                // Map
+                composable(
+                    route =
+                        VolunteerOpportunityNavigationRoutes
+                            .VOLUNTEER_MAP_ROUTE
+                ) {
+                    MapScreen()
+                }
+
+                // Skill Path
+                composable(
+                    route =
+                        VolunteerOpportunityNavigationRoutes
+                            .VOLUNTEER_SKILL_PATH_ROUTE
+                ) {
+                    VolunteerTemporaryModuleScreen(
+                        moduleTitle = "Skill Path"
+                    )
+                }
+
+                // Chats
+                composable(
+                    route =
+                        VolunteerOpportunityNavigationRoutes
+                            .VOLUNTEER_CHAT_ROUTE
+                ) {
+                    VolunteerTemporaryModuleScreen(
+                        moduleTitle = "Chats"
+                    )
+                }
+
+                // Profile
+                composable(
+                    route =
+                        VolunteerOpportunityNavigationRoutes
+                            .VOLUNTEER_PROFILE_ROUTE
+                ) {
+                    VolunteerTemporaryModuleScreen(
+                        moduleTitle = "Profile"
+                    )
+                }
+            }
+        }
+
+        if (
+            shouldShowVolunteerBottomNavigationBar
+        ) {
+            Box(
+                modifier = Modifier.align(
+                    Alignment.BottomCenter
+                )
+            ) {
                 VolunteerBottomNavigationBar(
-
                     currentVolunteerNavigationRoute =
                         currentVolunteerNavigationRoute,
 
@@ -97,12 +422,10 @@ fun VolunteerOpportunityNavigationHost() {
                             selectedNavigationRoute !=
                             currentVolunteerNavigationRoute
                         ) {
-
                             volunteerNavigationController
                                 .navigate(
                                     selectedNavigationRoute
                                 ) {
-
                                     popUpTo(
                                         VolunteerOpportunityNavigationRoutes
                                             .VOLUNTEER_HOME_ROUTE
@@ -118,98 +441,21 @@ fun VolunteerOpportunityNavigationHost() {
                 )
             }
         }
-
-    ) { volunteerNavigationInnerPadding ->
-
-
-        NavHost(
-            navController =
-                volunteerNavigationController,
-
-            startDestination =
-                VolunteerOpportunityNavigationRoutes
-                    .VOLUNTEER_HOME_ROUTE,
-
-            route = "volunteer_root_navigation_graph",
-
-            modifier =
-                Modifier.padding(
-                    volunteerNavigationInnerPadding
-                )
-        ) {
-
-
-            composable(
-                route =
-                    VolunteerOpportunityNavigationRoutes
-                        .VOLUNTEER_HOME_ROUTE
-            ) {
-                VolunteerHomeScreen()
-            }
-
-
-            composable(
-                route =
-                    VolunteerOpportunityNavigationRoutes
-                        .VOLUNTEER_CHAT_ROUTE
-            ) {
-
-                VolunteerTemporaryModuleScreen(
-                    moduleTitle = "Chat"
-                )
-            }
-
-
-            composable(
-                route =
-                    VolunteerOpportunityNavigationRoutes
-                        .VOLUNTEER_SKILL_PATH_ROUTE
-            ) {
-
-                VolunteerTemporaryModuleScreen(
-                    moduleTitle = "Skill Path"
-                )
-            }
-
-
-            composable(
-                route =
-                    VolunteerOpportunityNavigationRoutes
-                        .VOLUNTEER_MAP_ROUTE
-            ) {
-                MapScreen()
-            }
-
-
-            composable(
-                route =
-                    VolunteerOpportunityNavigationRoutes
-                        .VOLUNTEER_PROFILE_ROUTE
-            ) {
-
-                VolunteerTemporaryModuleScreen(
-                    moduleTitle = "Profile"
-                )
-            }
-        }
     }
 }
-
 
 @Composable
 private fun VolunteerTemporaryModuleScreen(
     moduleTitle: String
 ) {
-
     Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .background(
-                    VolunteerLinkBackground
-                )
-                .statusBarsPadding()
-                .padding(24.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                VolunteerLinkBackground
+            )
+            .statusBarsPadding()
+            .padding(24.dp),
 
         horizontalAlignment =
             Alignment.CenterHorizontally,
@@ -217,7 +463,6 @@ private fun VolunteerTemporaryModuleScreen(
         verticalArrangement =
             Arrangement.Center
     ) {
-
         Text(
             text = moduleTitle,
             fontSize = 22.sp,

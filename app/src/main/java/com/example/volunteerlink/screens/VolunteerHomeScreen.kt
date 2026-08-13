@@ -182,7 +182,7 @@ fun VolunteerHomeScreen(
 
         contentPadding =
             PaddingValues(
-                bottom = 20.dp
+                bottom = 110.dp
             )
     ) {
 

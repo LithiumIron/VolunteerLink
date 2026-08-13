@@ -19,7 +19,7 @@ object VolunteerOpportunityNavigationRoutes {
         "volunteer_profile"
 
 
-    // Volunteer Opportunity module destinations
+    // Volunteer Opportunity destinations
     const val VOLUNTEER_SEARCH_ROUTE =
         "volunteer_search"
 
@@ -27,25 +27,31 @@ object VolunteerOpportunityNavigationRoutes {
         "volunteer_my_applications"
 
 
-    // Event Details
+    // Shared navigation arguments
     const val VOLUNTEER_EVENT_ID_ARGUMENT =
         "volunteerEventId"
 
+    const val VOLUNTEER_ROLE_ID_ARGUMENT =
+        "volunteerRoleId"
+
+    const val VOLUNTEER_APPLICATION_ID_ARGUMENT =
+        "volunteerApplicationId"
+
+
+    // Opportunity Details
     const val VOLUNTEER_OPPORTUNITY_DETAILS_ROUTE =
-        "volunteer_opportunity_details/{$VOLUNTEER_EVENT_ID_ARGUMENT}"
+        "volunteer_opportunity_details/" +
+                "{$VOLUNTEER_EVENT_ID_ARGUMENT}"
 
     fun createVolunteerOpportunityDetailsRoute(
         volunteerEventId: Int
     ): String {
-
-        return "volunteer_opportunity_details/$volunteerEventId"
+        return "volunteer_opportunity_details/" +
+                volunteerEventId
     }
 
 
     // Role Details
-    const val VOLUNTEER_ROLE_ID_ARGUMENT =
-        "volunteerRoleId"
-
     const val VOLUNTEER_ROLE_DETAILS_ROUTE =
         "volunteer_role_details/" +
                 "{$VOLUNTEER_EVENT_ID_ARGUMENT}/" +
@@ -55,17 +61,29 @@ object VolunteerOpportunityNavigationRoutes {
         volunteerEventId: Int,
         volunteerRoleId: Int
     ): String {
-
         return "volunteer_role_details/" +
                 "$volunteerEventId/" +
-                "$volunteerRoleId"
+                volunteerRoleId
+    }
+
+
+    // Role Application
+    const val VOLUNTEER_ROLE_APPLICATION_ROUTE =
+        "volunteer_role_application/" +
+                "{$VOLUNTEER_EVENT_ID_ARGUMENT}/" +
+                "{$VOLUNTEER_ROLE_ID_ARGUMENT}"
+
+    fun createVolunteerRoleApplicationRoute(
+        volunteerEventId: Int,
+        volunteerRoleId: Int
+    ): String {
+        return "volunteer_role_application/" +
+                "$volunteerEventId/" +
+                volunteerRoleId
     }
 
 
     // Application Details
-    const val VOLUNTEER_APPLICATION_ID_ARGUMENT =
-        "volunteerApplicationId"
-
     const val VOLUNTEER_APPLICATION_DETAILS_ROUTE =
         "volunteer_application_details/" +
                 "{$VOLUNTEER_APPLICATION_ID_ARGUMENT}"
@@ -73,7 +91,6 @@ object VolunteerOpportunityNavigationRoutes {
     fun createVolunteerApplicationDetailsRoute(
         volunteerApplicationId: Int
     ): String {
-
         return "volunteer_application_details/" +
                 volunteerApplicationId
     }
