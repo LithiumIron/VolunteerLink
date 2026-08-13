@@ -32,14 +32,10 @@ class VolunteerSkillPathViewModel : ViewModel() {
     }
 
     fun retry() {
-        loadSkillPaths(
-            forceRefresh = true
-        )
+        loadSkillPaths()
     }
 
-    private fun loadSkillPaths(
-        forceRefresh: Boolean = false
-    ) {
+    private fun loadSkillPaths() {
         viewModelScope.launch {
             mutableUiState.update {
                     currentUiState ->
@@ -52,10 +48,7 @@ class VolunteerSkillPathViewModel : ViewModel() {
             try {
                 val skillPaths =
                     VolunteerSkillPathRepository
-                        .getSkillPaths(
-                            forceRefresh =
-                                forceRefresh
-                        )
+                        .getSkillPaths()
 
                 mutableUiState.value =
                     VolunteerSkillPathUiState(

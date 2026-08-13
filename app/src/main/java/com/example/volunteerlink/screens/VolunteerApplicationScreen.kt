@@ -45,7 +45,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.volunteerlink.data.VolunteerOpportunitySampleData
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.volunteerlink.data.VolunteerOpportunitySessionStore
 import com.example.volunteerlink.model.VolunteerApplicationStatus
 import com.example.volunteerlink.model.VolunteerOpportunityApplication
 import com.example.volunteerlink.model.VolunteerOpportunityEvent
@@ -70,15 +71,21 @@ fun VolunteerApplicationScreen(
     volunteerEventId: Int,
     volunteerRoleId: Int,
     onBackSelected: () -> Unit,
-    onReturnHomeSelected: () -> Unit
+    onReturnHomeSelected: () -> Unit,
+    volunteerOpportunityViewModel:
+        VolunteerOpportunityViewModel
 ) {
+    val opportunityUiState by
+        volunteerOpportunityViewModel.uiState
+            .collectAsStateWithLifecycle()
+
     val volunteerOpportunityEvent =
-        VolunteerOpportunitySampleData.findEventById(
+        VolunteerOpportunitySessionStore.findEventById(
             volunteerEventId
         )
 
     val volunteerOpportunityRole =
-        VolunteerOpportunitySampleData.findRoleById(
+        VolunteerOpportunitySessionStore.findRoleById(
             eventId = volunteerEventId,
             roleId = volunteerRoleId
         )
@@ -102,7 +109,7 @@ fun VolunteerApplicationScreen(
     }
 
     val existingApplication =
-        VolunteerOpportunitySampleData
+        VolunteerOpportunitySessionStore
             .volunteerApplications
             .firstOrNull { volunteerApplication ->
                 volunteerApplication.applicationEventId ==
@@ -146,21 +153,23 @@ fun VolunteerApplicationScreen(
                     volunteerOpportunityRole,
                 onBackSelected =
                     onBackSelected,
+                isSubmitting =
+                    opportunityUiState
+                        .isApplicationActionRunning,
+                serverErrorMessage =
+                    opportunityUiState
+                        .applicationActionError,
                 onApplicationSubmitted = {
-                    val submittedApplication =
-                        VolunteerOpportunitySampleData
-                            .submitApplication(
-                                eventId =
-                                    volunteerEventId,
-                                roleId =
-                                    volunteerRoleId
-                            )
-
-                    if (
-                        submittedApplication != null
-                    ) {
-                        applicationWasSubmitted = true
-                    }
+                        submittedAnswers ->
+                    volunteerOpportunityViewModel
+                        .submitApplication(
+                            eventId = volunteerEventId,
+                            roleId = volunteerRoleId,
+                            answers = submittedAnswers,
+                            onSuccess = {
+                                applicationWasSubmitted = true
+                            }
+                        )
                 }
             )
         }
@@ -174,7 +183,9 @@ private fun VolunteerApplicationFormScreen(
     volunteerOpportunityRole:
     VolunteerOpportunityRole,
     onBackSelected: () -> Unit,
-    onApplicationSubmitted: () -> Unit
+    isSubmitting: Boolean,
+    serverErrorMessage: String?,
+    onApplicationSubmitted: (List<String>) -> Unit
 ) {
     val extraQuestions =
         volunteerOpportunityRole
@@ -526,6 +537,20 @@ private fun VolunteerApplicationFormScreen(
                     )
                 }
 
+            serverErrorMessage
+                ?.let { errorMessage ->
+                    Spacer(
+                        modifier = Modifier.height(10.dp)
+                    )
+
+                    Text(
+                        text = errorMessage,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = VolunteerLinkError
+                    )
+                }
+
             Spacer(
                 modifier = Modifier.height(24.dp)
             )
@@ -562,7 +587,9 @@ private fun VolunteerApplicationFormScreen(
                     if (
                         validationErrorMessage == null
                     ) {
-                        onApplicationSubmitted()
+                        onApplicationSubmitted(
+                            questionAnswers.toList()
+                        )
                     }
                 },
                 modifier = Modifier
@@ -585,11 +612,14 @@ private fun VolunteerApplicationFormScreen(
                 contentPadding =
                     PaddingValues(
                         horizontal = 16.dp
-                    )
+                    ),
+                enabled = !isSubmitting
             ) {
                 Text(
                     text =
-                        if (applicationIsInstantJoin) {
+                        if (isSubmitting) {
+                            "Submitting..."
+                        } else if (applicationIsInstantJoin) {
                             "Join Role"
                         } else {
                             "Submit Application"

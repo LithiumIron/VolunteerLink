@@ -51,6 +51,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     // Supabase
     implementation(platform("io.github.jan-tennert.supabase:bom:3.2.6"))
+    implementation("io.github.jan-tennert.supabase:auth-kt")
     implementation("io.github.jan-tennert.supabase:postgrest-kt")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
     // Require HTTP engine for supabase

@@ -48,7 +48,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.volunteerlink.data.VolunteerOpportunitySampleData
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.volunteerlink.data.VolunteerOpportunitySessionStore
 import com.example.volunteerlink.model.VolunteerApplicationStatus
 import com.example.volunteerlink.model.VolunteerOpportunityApplication
 import com.example.volunteerlink.ui.theme.VolunteerLinkBackground
@@ -63,6 +64,12 @@ import com.example.volunteerlink.ui.theme.VolunteerLinkSurface
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextPrimary
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextSecondary
 import com.example.volunteerlink.ui.theme.VolunteerLinkWarning
+
+private data class VolunteerApplicationTimelineStep(
+    val title: String,
+    val supportingText: String,
+    val state: String
+)
 
 @Composable
 fun VolunteerMyApplicationsScreen(
@@ -81,11 +88,12 @@ fun VolunteerMyApplicationsScreen(
             "All",
             "Pending",
             "Accepted",
-            "Closed"
+            "Rejected",
+            "Completed"
         )
 
     val filteredApplications =
-        VolunteerOpportunitySampleData
+        VolunteerOpportunitySessionStore
             .volunteerApplications
             .filter { volunteerApplication ->
                 when (selectedStatusFilter) {
@@ -97,13 +105,13 @@ fun VolunteerMyApplicationsScreen(
                         volunteerApplication.applicationStatus ==
                                 VolunteerApplicationStatus.ACCEPTED
 
-                    "Closed" ->
-                        volunteerApplication.applicationStatus in
-                                setOf(
-                                    VolunteerApplicationStatus.REJECTED,
-                                    VolunteerApplicationStatus.COMPLETED,
-                                    VolunteerApplicationStatus.CANCELLED
-                                )
+                    "Rejected" ->
+                        volunteerApplication.applicationStatus ==
+                            VolunteerApplicationStatus.REJECTED
+
+                    "Completed" ->
+                        volunteerApplication.applicationStatus ==
+                            VolunteerApplicationStatus.COMPLETED
 
                     else -> true
                 }
@@ -267,15 +275,24 @@ fun VolunteerApplicationDetailsScreen(
     onVolunteerRoleSelected: (
         eventId: Int,
         roleId: Int
-    ) -> Unit
+    ) -> Unit,
+    onCertificateSelected: (
+        applicationId: Int
+    ) -> Unit,
+    volunteerOpportunityViewModel:
+        VolunteerOpportunityViewModel
 ) {
+    val opportunityUiState by
+        volunteerOpportunityViewModel.uiState
+            .collectAsStateWithLifecycle()
+
     var shouldShowCancelDialog by
         rememberSaveable {
             mutableStateOf(false)
         }
 
     val volunteerApplication =
-        VolunteerOpportunitySampleData
+        VolunteerOpportunitySessionStore
             .findApplicationById(
                 volunteerApplicationId
             )
@@ -288,14 +305,14 @@ fun VolunteerApplicationDetailsScreen(
     }
 
     val volunteerOpportunityEvent =
-        VolunteerOpportunitySampleData.findEventById(
+        VolunteerOpportunitySessionStore.findEventById(
             volunteerApplication.applicationEventId
         )
 
     val volunteerOpportunityRole =
         volunteerApplication.applicationRoleId
             ?.let { applicationRoleId ->
-                VolunteerOpportunitySampleData.findRoleById(
+                VolunteerOpportunitySessionStore.findRoleById(
                     eventId =
                         volunteerApplication.applicationEventId,
                     roleId = applicationRoleId
@@ -332,15 +349,26 @@ fun VolunteerApplicationDetailsScreen(
             }
 
             item(
+                key = "application_timeline"
+            ) {
+                VolunteerApplicationTimelineCard(
+                    volunteerApplication =
+                        volunteerApplication
+                )
+            }
+
+            item(
                 key = "application_information"
             ) {
                 VolunteerApplicationInformationCard(
                     volunteerApplication =
                         volunteerApplication,
                     eventDate =
-                        volunteerOpportunityEvent?.eventDate,
+                        volunteerOpportunityEvent?.eventDate
+                            ?: volunteerApplication.applicationEventDate,
                     eventTime =
-                        volunteerOpportunityEvent?.eventTime,
+                        volunteerOpportunityEvent?.eventTime
+                            ?: volunteerApplication.applicationEventTime,
                     eventLocation =
                         volunteerOpportunityEvent
                             ?.let { event ->
@@ -349,6 +377,8 @@ fun VolunteerApplicationDetailsScreen(
                                         event.eventLocation
                                     }
                             }
+                            ?: volunteerApplication
+                                .applicationEventLocation
                 )
             }
 
@@ -359,8 +389,34 @@ fun VolunteerApplicationDetailsScreen(
                     verticalArrangement =
                         Arrangement.spacedBy(9.dp)
                 ) {
-                    if (volunteerOpportunityEvent != null) {
+                    if (
+                        volunteerApplication.applicationStatus ==
+                        VolunteerApplicationStatus.COMPLETED
+                    ) {
                         Button(
+                            onClick = {
+                                onCertificateSelected(
+                                    volunteerApplication.applicationId
+                                )
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(50.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor =
+                                    VolunteerLinkPrimaryGreen
+                            )
+                        ) {
+                            Text(
+                                text = "View & Download Certificate",
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    if (volunteerOpportunityEvent != null) {
+                        OutlinedButton(
                             onClick = {
                                 onVolunteerOpportunitySelected(
                                     volunteerOpportunityEvent.eventId
@@ -371,15 +427,15 @@ fun VolunteerApplicationDetailsScreen(
                                 .height(48.dp),
                             shape =
                                 RoundedCornerShape(10.dp),
-                            colors =
-                                ButtonDefaults.buttonColors(
-                                    containerColor =
-                                        VolunteerLinkPrimaryGreen
-                                )
+                            border = BorderStroke(
+                                width = 1.dp,
+                                color = VolunteerLinkPrimaryGreen
+                            )
                         ) {
                             Text(
                                 text = "View Opportunity",
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                color = VolunteerLinkPrimaryGreen
                             )
                         }
                     }
@@ -448,23 +504,50 @@ fun VolunteerApplicationDetailsScreen(
                 )
             },
             text = {
-                Text(
-                    text =
-                        "This application will be marked as cancelled."
-                )
+                Column {
+                    Text(
+                        text =
+                            "This application will be marked as cancelled."
+                    )
+
+                    opportunityUiState
+                        .applicationActionError
+                        ?.let { errorMessage ->
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                text = errorMessage,
+                                color = VolunteerLinkError,
+                                fontSize = 12.sp
+                            )
+                        }
+                }
             },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        VolunteerOpportunitySampleData
+                        volunteerOpportunityViewModel
                             .cancelApplication(
-                                volunteerApplicationId
+                                applicationId =
+                                    volunteerApplicationId,
+                                onSuccess = {
+                                    shouldShowCancelDialog = false
+                                }
                             )
-                        shouldShowCancelDialog = false
-                    }
+                    },
+                    enabled =
+                        !opportunityUiState
+                            .isApplicationActionRunning
                 ) {
                     Text(
-                        text = "Cancel application",
+                        text =
+                            if (
+                                opportunityUiState
+                                    .isApplicationActionRunning
+                            ) {
+                                "Cancelling..."
+                            } else {
+                                "Cancel application"
+                            },
                         color = VolunteerLinkError
                     )
                 }
@@ -714,6 +797,277 @@ private fun VolunteerApplicationStatusCard(
 }
 
 @Composable
+private fun VolunteerApplicationTimelineCard(
+    volunteerApplication:
+        VolunteerOpportunityApplication
+) {
+    val steps =
+        volunteerApplicationTimelineSteps(
+            volunteerApplication
+        )
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = VolunteerLinkSurface
+        ),
+        border = BorderStroke(
+            width = 1.dp,
+            color = VolunteerLinkBorderColour
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Text(
+                text = "Application Journey",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = VolunteerLinkTextPrimary
+            )
+            Text(
+                text =
+                    "Follow what has happened and what comes next.",
+                modifier = Modifier.padding(top = 2.dp),
+                fontSize = 10.sp,
+                color = VolunteerLinkTextSecondary
+            )
+
+            Spacer(modifier = Modifier.height(13.dp))
+
+            steps.forEachIndexed { index, step ->
+                VolunteerApplicationTimelineRow(
+                    step = step,
+                    showConnector = index < steps.lastIndex
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun VolunteerApplicationTimelineRow(
+    step: VolunteerApplicationTimelineStep,
+    showConnector: Boolean
+) {
+    val stepColour = when (step.state) {
+        "COMPLETE" -> VolunteerLinkSuccess
+        "CURRENT" -> VolunteerLinkInformation
+        "ERROR" -> VolunteerLinkError
+        else -> VolunteerLinkBorderColour
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.Top
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Surface(
+                modifier = Modifier.size(26.dp),
+                shape = CircleShape,
+                color = stepColour.copy(
+                    alpha =
+                        if (step.state == "PENDING") 0.20f
+                        else 1f
+                )
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    if (step.state == "COMPLETE") {
+                        Icon(
+                            imageVector = Icons.Filled.CheckCircle,
+                            contentDescription = "Completed step",
+                            modifier = Modifier.size(17.dp),
+                            tint = Color.White
+                        )
+                    } else {
+                        Text(
+                            text =
+                                if (step.state == "ERROR") "!"
+                                else "•",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color =
+                                if (step.state == "PENDING") {
+                                    VolunteerLinkTextSecondary
+                                } else {
+                                    Color.White
+                                }
+                        )
+                    }
+                }
+            }
+
+            if (showConnector) {
+                Box(
+                    modifier = Modifier
+                        .size(
+                            width = 2.dp,
+                            height = 34.dp
+                        )
+                        .background(
+                            if (step.state == "COMPLETE") {
+                                VolunteerLinkSuccess.copy(alpha = 0.35f)
+                            } else {
+                                VolunteerLinkBorderColour
+                            }
+                        )
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.size(10.dp))
+
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(bottom = 12.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = step.title,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color =
+                        if (step.state == "PENDING") {
+                            VolunteerLinkTextSecondary
+                        } else {
+                            VolunteerLinkTextPrimary
+                        }
+                )
+
+                if (step.state == "CURRENT") {
+                    Text(
+                        text = "  CURRENT",
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = VolunteerLinkInformation
+                    )
+                }
+            }
+            Text(
+                text = step.supportingText,
+                modifier = Modifier.padding(top = 2.dp),
+                fontSize = 10.sp,
+                lineHeight = 14.sp,
+                color = VolunteerLinkTextSecondary
+            )
+        }
+    }
+}
+
+private fun volunteerApplicationTimelineSteps(
+    application: VolunteerOpportunityApplication
+): List<VolunteerApplicationTimelineStep> {
+    val submitted =
+        VolunteerApplicationTimelineStep(
+            title = "Application submitted",
+            supportingText =
+                "Sent on ${application.applicationSubmittedDate}.",
+            state = "COMPLETE"
+        )
+
+    return when (application.applicationStatus) {
+        VolunteerApplicationStatus.PENDING ->
+            listOf(
+                submitted,
+                VolunteerApplicationTimelineStep(
+                    title = "Organisation review",
+                    supportingText =
+                        "The organisation is reviewing your application.",
+                    state = "CURRENT"
+                ),
+                VolunteerApplicationTimelineStep(
+                    title = "Decision",
+                    supportingText =
+                        "You will see the decision here once it is made.",
+                    state = "PENDING"
+                )
+            )
+
+        VolunteerApplicationStatus.ACCEPTED ->
+            listOf(
+                submitted,
+                VolunteerApplicationTimelineStep(
+                    title = "Application accepted",
+                    supportingText =
+                        "Your place for this role has been confirmed.",
+                    state = "COMPLETE"
+                ),
+                VolunteerApplicationTimelineStep(
+                    title = "Complete the volunteer role",
+                    supportingText =
+                        "Attend or submit the work. Accepted is not yet Completed.",
+                    state = "CURRENT"
+                ),
+                VolunteerApplicationTimelineStep(
+                    title = "Organisation verification",
+                    supportingText =
+                        "Verified completion will update Skill Path and certificate.",
+                    state = "PENDING"
+                )
+            )
+
+        VolunteerApplicationStatus.REJECTED ->
+            listOf(
+                submitted,
+                VolunteerApplicationTimelineStep(
+                    title = "Organisation review completed",
+                    supportingText =
+                        "The organisation assessed the application.",
+                    state = "COMPLETE"
+                ),
+                VolunteerApplicationTimelineStep(
+                    title = "Not selected for this role",
+                    supportingText =
+                        application.applicationRejectionReason
+                            ?.takeIf(String::isNotBlank)
+                            ?: "Open the decision details for more information.",
+                    state = "ERROR"
+                )
+            )
+
+        VolunteerApplicationStatus.COMPLETED ->
+            listOf(
+                submitted,
+                VolunteerApplicationTimelineStep(
+                    title = "Application accepted",
+                    supportingText =
+                        "The organisation confirmed your place.",
+                    state = "COMPLETE"
+                ),
+                VolunteerApplicationTimelineStep(
+                    title = "Volunteer role completed",
+                    supportingText =
+                        "Completed ${application.applicationCompletedDate ?: "and recorded"}.",
+                    state = "COMPLETE"
+                ),
+                VolunteerApplicationTimelineStep(
+                    title = "Verified achievement issued",
+                    supportingText =
+                        "Skill Path evidence and certificate are now available.",
+                    state = "CURRENT"
+                )
+            )
+
+        VolunteerApplicationStatus.CANCELLED ->
+            listOf(
+                submitted,
+                VolunteerApplicationTimelineStep(
+                    title = "Application cancelled",
+                    supportingText =
+                        "This application is closed and will not be reviewed.",
+                    state = "ERROR"
+                )
+            )
+    }
+}
+
+@Composable
 private fun VolunteerApplicationInformationCard(
     volunteerApplication:
         VolunteerOpportunityApplication,
@@ -812,15 +1166,54 @@ private fun VolunteerApplicationInformationCard(
 
             if (
                 volunteerApplication
-                    .applicationVerifiedHours != null
+                    .applicationVerifiedMinutes != null
             ) {
                 VolunteerApplicationInformationRow(
-                    label = "Verified hours",
+                    label = "Verified service",
                     value =
-                        "${volunteerApplication.applicationVerifiedHours} hours"
+                        formatVerifiedServiceTime(
+                            volunteerApplication
+                                .applicationVerifiedMinutes
+                                ?: 0
+                        )
                 )
             }
+
+            volunteerApplication.applicationCompletedDate
+                ?.let { completedDate ->
+                    VolunteerApplicationInformationRow(
+                        label = "Completed",
+                        value = completedDate
+                    )
+                }
+
+            volunteerApplication.applicationCertificateId
+                ?.let { certificateId ->
+                    VolunteerApplicationInformationRow(
+                        label = "Certificate",
+                        value = certificateId
+                    )
+                }
+
+            volunteerApplication.applicationOrganisationFeedback
+                ?.takeIf(String::isNotBlank)
+                ?.let { feedback ->
+                    VolunteerApplicationInformationRow(
+                        label = "Feedback",
+                        value = feedback
+                    )
+                }
         }
+    }
+}
+
+private fun formatVerifiedServiceTime(minutes: Int): String {
+    val hours = minutes / 60
+    val remainingMinutes = minutes % 60
+    return when {
+        hours == 0 -> "$remainingMinutes minutes"
+        remainingMinutes == 0 -> "$hours hours"
+        else -> "$hours hours $remainingMinutes minutes"
     }
 }
 

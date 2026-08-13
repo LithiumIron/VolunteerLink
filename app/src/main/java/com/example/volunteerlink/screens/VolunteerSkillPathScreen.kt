@@ -48,12 +48,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.volunteerlink.data.VolunteerOpportunitySessionStore
+import com.example.volunteerlink.model.VolunteerApplicationStatus
 import com.example.volunteerlink.model.VolunteerSkillPath
-import com.example.volunteerlink.model.VolunteerSkillPathLevel
 import com.example.volunteerlink.ui.theme.VolunteerLinkBackground
 import com.example.volunteerlink.ui.theme.VolunteerLinkBorderColour
 import com.example.volunteerlink.ui.theme.VolunteerLinkInformation
@@ -64,6 +66,14 @@ import com.example.volunteerlink.ui.theme.VolunteerLinkSuccess
 import com.example.volunteerlink.ui.theme.VolunteerLinkSurface
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextPrimary
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextSecondary
+import com.example.volunteerlink.ui.theme.VolunteerLinkWarning
+
+private data class VolunteerSkillPathBadge(
+    val title: String,
+    val description: String,
+    val isEarned: Boolean,
+    val progressText: String
+)
 
 @Composable
 fun VolunteerSkillPathScreen(
@@ -110,7 +120,10 @@ fun VolunteerSkillPathScreen(
             .fillMaxSize()
             .background(VolunteerLinkBackground)
     ) {
-        VolunteerSkillPathHeader()
+        VolunteerSkillPathHeader(
+            onRefreshSelected =
+                skillPathViewModel::retry
+        )
 
         when {
             skillPathUiState.isLoading ->
@@ -139,6 +152,21 @@ fun VolunteerSkillPathScreen(
                             skillPaths =
                                 skillPathUiState.skillPaths
                         )
+                    }
+
+                    item(
+                        key = "skill_path_badges"
+                    ) {
+                        VolunteerSkillPathBadgesSection(
+                            skillPaths =
+                                skillPathUiState.skillPaths
+                        )
+                    }
+
+                    item(
+                        key = "skill_path_guide"
+                    ) {
+                        VolunteerSkillPathGuideCard()
                     }
 
                     item(
@@ -251,6 +279,10 @@ fun VolunteerSkillPathScreen(
 fun VolunteerSkillPathDetailsScreen(
     skillPathId: String,
     onBackSelected: () -> Unit,
+    onVolunteerRoleSelected: (
+        eventId: Int,
+        roleId: Int
+    ) -> Unit,
     skillPathViewModel:
         VolunteerSkillPathViewModel = viewModel()
 ) {
@@ -264,6 +296,11 @@ fun VolunteerSkillPathDetailsScreen(
                 skillPath.skillPathId ==
                         skillPathId
             }
+
+    var selectedDetailTab by
+        rememberSaveable(skillPathId) {
+            mutableStateOf("Progress")
+        }
 
     Column(
         modifier = Modifier
@@ -321,30 +358,53 @@ fun VolunteerSkillPathDetailsScreen(
                     }
 
                     item(
-                        key = "skill_path_detail_levels"
+                        key = "skill_path_detail_tabs"
                     ) {
-                        VolunteerSkillPathLevelsSection(
-                            volunteerSkillPath =
-                                volunteerSkillPath
+                        VolunteerSkillPathDetailTabs(
+                            selectedTab = selectedDetailTab,
+                            onTabSelected = {
+                                    selectedTab ->
+                                selectedDetailTab = selectedTab
+                            }
                         )
                     }
 
-                    item(
-                        key = "skill_path_detail_skills"
-                    ) {
-                        VolunteerSkillPathSkillsSection(
-                            volunteerSkillPath =
-                                volunteerSkillPath
-                        )
-                    }
+                    when (selectedDetailTab) {
+                        "Skills" -> {
+                            item(
+                                key = "skill_path_detail_skills"
+                            ) {
+                                VolunteerSkillPathSkillsSection(
+                                    volunteerSkillPath =
+                                        volunteerSkillPath
+                                )
+                            }
+                        }
 
-                    item(
-                        key = "skill_path_detail_roles"
-                    ) {
-                        VolunteerSkillPathRolesSection(
-                            volunteerSkillPath =
-                                volunteerSkillPath
-                        )
+                        "Roles" -> {
+                            item(
+                                key = "skill_path_detail_roles"
+                            ) {
+                                VolunteerSkillPathRolesSection(
+                                    volunteerSkillPath =
+                                        volunteerSkillPath,
+                                    onVolunteerRoleSelected =
+                                        onVolunteerRoleSelected
+                                )
+                            }
+                        }
+
+                        else -> {
+                            item(
+                                key = "skill_path_detail_evidence"
+                            ) {
+                                VolunteerSkillPathEvidenceSection(
+                                    volunteerSkillPath =
+                                        volunteerSkillPath
+                                )
+                            }
+
+                        }
                     }
                 }
         }
@@ -352,8 +412,69 @@ fun VolunteerSkillPathDetailsScreen(
 }
 
 @Composable
-private fun VolunteerSkillPathHeader() {
-    Column(
+private fun VolunteerSkillPathDetailTabs(
+    selectedTab: String,
+    onTabSelected: (String) -> Unit
+) {
+    val tabs = listOf(
+        "Progress",
+        "Skills",
+        "Roles"
+    )
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(VolunteerLinkSurface)
+            .padding(
+                horizontal =
+                    VolunteerLinkScreenHorizontalPadding,
+                vertical = 10.dp
+            ),
+        horizontalArrangement =
+            Arrangement.spacedBy(8.dp)
+    ) {
+        tabs.forEach { tab ->
+            Surface(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable {
+                        onTabSelected(tab)
+                    },
+                shape = RoundedCornerShape(9.dp),
+                color =
+                    if (selectedTab == tab) {
+                        VolunteerLinkPrimaryGreen
+                    } else {
+                        VolunteerLinkSoftGreenSurface
+                    }
+            ) {
+                Text(
+                    text = tab,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 9.dp),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color =
+                        if (selectedTab == tab) {
+                            Color.White
+                        } else {
+                            VolunteerLinkPrimaryGreen
+                        },
+                    textAlign = TextAlign.Center,
+                    maxLines = 1
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun VolunteerSkillPathHeader(
+    onRefreshSelected: () -> Unit
+) {
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(VolunteerLinkPrimaryGreen)
@@ -365,24 +486,42 @@ private fun VolunteerSkillPathHeader() {
                     VolunteerLinkScreenHorizontalPadding,
                 top = 13.dp,
                 bottom = 16.dp
-            )
+            ),
+        verticalAlignment = Alignment.CenterVertically
     ) {
+        Column(
+            modifier = Modifier.weight(1f)
+        ) {
+            Text(
+                text = "SKILL PATH",
+                fontSize = 19.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+
+            Spacer(
+                modifier = Modifier.height(4.dp)
+            )
+
+            Text(
+                text =
+                    "Verified growth from completed volunteer roles.",
+                fontSize = 12.sp,
+                color = Color.White.copy(alpha = 0.84f)
+            )
+        }
+
         Text(
-            text = "SKILL PATH",
-            fontSize = 19.sp,
+            text = "SYNC",
+            modifier = Modifier
+                .clickable(onClick = onRefreshSelected)
+                .padding(
+                    horizontal = 10.dp,
+                    vertical = 8.dp
+                ),
+            fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
             color = Color.White
-        )
-
-        Spacer(
-            modifier = Modifier.height(4.dp)
-        )
-
-        Text(
-            text =
-                "Build verified skills through volunteer roles.",
-            fontSize = 12.sp,
-            color = Color.White.copy(alpha = 0.84f)
         )
     }
 }
@@ -427,6 +566,19 @@ private fun VolunteerSkillPathDetailsTopBar(
 private fun VolunteerSkillPathSummaryCard(
     skillPaths: List<VolunteerSkillPath>
 ) {
+    val verifiedRoles =
+        skillPaths.sumOf { skillPath ->
+            skillPath.verifiedAssignments
+        }
+    val verifiedMinutes =
+        skillPaths.sumOf { skillPath ->
+            skillPath.verifiedMinutes ?: 0
+        }
+    val activePaths =
+        skillPaths.count { skillPath ->
+            skillPath.hasVerifiedEvidence
+        }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -439,8 +591,7 @@ private fun VolunteerSkillPathSummaryCard(
             ),
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(
-            containerColor =
-                VolunteerLinkSoftGreenSurface
+            containerColor = VolunteerLinkSurface
         ),
         border = BorderStroke(
             width = 1.dp,
@@ -449,57 +600,484 @@ private fun VolunteerSkillPathSummaryCard(
             )
         )
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment =
-                Alignment.CenterVertically
+                .padding(16.dp)
         ) {
-            Surface(
-                modifier = Modifier.size(52.dp),
-                shape = CircleShape,
-                color = Color.White
+            Row(
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
-                    contentAlignment = Alignment.Center
+                Surface(
+                    modifier = Modifier.size(42.dp),
+                    shape = RoundedCornerShape(11.dp),
+                    color = VolunteerLinkSoftGreenSurface
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.School,
-                        contentDescription = null,
-                        modifier = Modifier.size(28.dp),
-                        tint = VolunteerLinkPrimaryGreen
+                    Box(
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.School,
+                            contentDescription = null,
+                            modifier = Modifier.size(23.dp),
+                            tint = VolunteerLinkPrimaryGreen
+                        )
+                    }
+                }
+
+                Spacer(
+                    modifier = Modifier.size(11.dp)
+                )
+
+                Column {
+                    Text(
+                        text = "Your Verified Record",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = VolunteerLinkTextPrimary
+                    )
+
+                    Text(
+                        text =
+                            "Progress is added only after organisation verification.",
+                        fontSize = 10.sp,
+                        color = VolunteerLinkTextSecondary
                     )
                 }
             }
 
             Spacer(
-                modifier = Modifier.size(13.dp)
+                modifier = Modifier.height(14.dp)
             )
 
-            Column(
-                modifier = Modifier.weight(1f)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement =
+                    Arrangement.spacedBy(8.dp)
             ) {
+                VolunteerSkillPathStat(
+                    value = verifiedRoles.toString(),
+                    label = "Completed\nroles",
+                    modifier = Modifier.weight(1f)
+                )
+
+                VolunteerSkillPathStat(
+                    value =
+                        if (verifiedMinutes >= 60) {
+                            "${verifiedMinutes / 60}h"
+                        } else {
+                            "${verifiedMinutes}m"
+                        },
+                    label = "Verified\ntime",
+                    modifier = Modifier.weight(1f)
+                )
+
+                VolunteerSkillPathStat(
+                    value = "$activePaths/${skillPaths.size}",
+                    label = "Active\npaths",
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            if (verifiedRoles == 0) {
+                Spacer(
+                    modifier = Modifier.height(12.dp)
+                )
+
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(9.dp),
+                    color = Color(0xFFFFF7E8)
+                ) {
+                    Text(
+                        text =
+                            "You have no verified role evidence yet. " +
+                                "Accepted means your place is confirmed; " +
+                                "it does not mean the role is completed.",
+                        modifier = Modifier.padding(11.dp),
+                        fontSize = 11.sp,
+                        lineHeight = 16.sp,
+                        color = VolunteerLinkWarning
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun VolunteerSkillPathStat(
+    value: String,
+    label: String,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(10.dp),
+        color = VolunteerLinkSoftGreenSurface
+    ) {
+        Column(
+            modifier = Modifier.padding(
+                horizontal = 6.dp,
+                vertical = 10.dp
+            ),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = value,
+                fontSize = 17.sp,
+                fontWeight = FontWeight.Bold,
+                color = VolunteerLinkPrimaryGreen
+            )
+
+            Text(
+                text = label,
+                fontSize = 9.sp,
+                lineHeight = 11.sp,
+                color = VolunteerLinkTextSecondary
+            )
+        }
+    }
+}
+
+@Composable
+private fun VolunteerSkillPathBadgesSection(
+    skillPaths: List<VolunteerSkillPath>
+) {
+    val verifiedRoles =
+        skillPaths.sumOf { it.verifiedAssignments }
+    val verifiedMinutes =
+        skillPaths.sumOf { it.verifiedMinutes ?: 0 }
+    val activePaths =
+        skillPaths.count { it.hasVerifiedEvidence }
+    val intermediatePaths =
+        skillPaths.count { it.currentLevel >= 2 }
+
+    val badges = listOf(
+        VolunteerSkillPathBadge(
+            title = "First Verified Role",
+            description =
+                "Complete one organisation-verified volunteer role.",
+            isEarned = verifiedRoles >= 1,
+            progressText = "${verifiedRoles.coerceAtMost(1)}/1 role"
+        ),
+        VolunteerSkillPathBadge(
+            title = "Five-Hour Contributor",
+            description =
+                "Build at least five hours of verified service.",
+            isEarned = verifiedMinutes >= 300,
+            progressText =
+                "${verifiedMinutes.coerceAtMost(300)}/300 min"
+        ),
+        VolunteerSkillPathBadge(
+            title = "Multi-Path Explorer",
+            description =
+                "Earn verified evidence in two different Skill Paths.",
+            isEarned = activePaths >= 2,
+            progressText = "${activePaths.coerceAtMost(2)}/2 paths"
+        ),
+        VolunteerSkillPathBadge(
+            title = "Intermediate Ready",
+            description =
+                "Reach Intermediate in any one Skill Path.",
+            isEarned = intermediatePaths >= 1,
+            progressText =
+                "${intermediatePaths.coerceAtMost(1)}/1 path"
+        )
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 16.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(
+                    horizontal =
+                        VolunteerLinkScreenHorizontalPadding
+                ),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text =
-                        "${skillPaths.size} Skill Paths available",
+                    text = "Milestone Badges",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = VolunteerLinkTextPrimary
                 )
-
-                Spacer(
-                    modifier = Modifier.height(4.dp)
-                )
-
                 Text(
                     text =
-                        "${skillPaths.count { it.pathMode == "PHYSICAL" }} physical  •  " +
-                                "${skillPaths.count { it.pathMode == "REMOTE" }} remote",
-                    fontSize = 11.sp,
+                        "Automatically earned from verified evidence.",
+                    modifier = Modifier.padding(top = 2.dp),
+                    fontSize = 10.sp,
                     color = VolunteerLinkTextSecondary
                 )
             }
+            Text(
+                text = "${badges.count { it.isEarned }}/${badges.size} EARNED",
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                color = VolunteerLinkSuccess
+            )
+        }
+
+        Spacer(modifier = Modifier.height(9.dp))
+
+        LazyRow(
+            contentPadding = PaddingValues(
+                horizontal = VolunteerLinkScreenHorizontalPadding
+            ),
+            horizontalArrangement = Arrangement.spacedBy(9.dp)
+        ) {
+            items(
+                items = badges,
+                key = { it.title }
+            ) { badge ->
+                Card(
+                    modifier = Modifier.size(
+                        width = 174.dp,
+                        height = 122.dp
+                    ),
+                    shape = RoundedCornerShape(13.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor =
+                            if (badge.isEarned) {
+                                VolunteerLinkSoftGreenSurface
+                            } else {
+                                VolunteerLinkSurface
+                            }
+                    ),
+                    border = BorderStroke(
+                        width = 1.dp,
+                        color =
+                            if (badge.isEarned) {
+                                VolunteerLinkPrimaryGreen.copy(
+                                    alpha = 0.38f
+                                )
+                            } else {
+                                VolunteerLinkBorderColour
+                            }
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp)
+                    ) {
+                        Row(
+                            verticalAlignment =
+                                Alignment.CenterVertically
+                        ) {
+                            Surface(
+                                modifier = Modifier.size(28.dp),
+                                shape = CircleShape,
+                                color =
+                                    if (badge.isEarned) {
+                                        VolunteerLinkPrimaryGreen
+                                    } else {
+                                        VolunteerLinkBorderColour
+                                    }
+                            ) {
+                                Box(
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector =
+                                            if (badge.isEarned) {
+                                                Icons.Filled.CheckCircle
+                                            } else {
+                                                Icons.Filled.Lock
+                                            },
+                                        contentDescription =
+                                            if (badge.isEarned) {
+                                                "Badge earned"
+                                            } else {
+                                                "Badge locked"
+                                            },
+                                        modifier = Modifier.size(17.dp),
+                                        tint = Color.White
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.size(8.dp))
+
+                            Text(
+                                text =
+                                    if (badge.isEarned) "EARNED"
+                                    else badge.progressText,
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Bold,
+                                color =
+                                    if (badge.isEarned) {
+                                        VolunteerLinkSuccess
+                                    } else {
+                                        VolunteerLinkTextSecondary
+                                    }
+                            )
+                        }
+
+                        Text(
+                            text = badge.title,
+                            modifier = Modifier.padding(top = 8.dp),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = VolunteerLinkTextPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = badge.description,
+                            modifier = Modifier.padding(top = 3.dp),
+                            fontSize = 9.sp,
+                            lineHeight = 12.sp,
+                            color = VolunteerLinkTextSecondary,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun VolunteerSkillPathGuideCard() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(
+                start = VolunteerLinkScreenHorizontalPadding,
+                end = VolunteerLinkScreenHorizontalPadding,
+                top = 14.dp
+            )
+    ) {
+        Text(
+            text = "How Skill Path Works",
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+            color = VolunteerLinkTextPrimary
+        )
+
+        Spacer(
+            modifier = Modifier.height(8.dp)
+        )
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = VolunteerLinkSurface
+            ),
+            border = BorderStroke(
+                width = 1.dp,
+                color = VolunteerLinkBorderColour
+            )
+        ) {
+            Column(
+                modifier = Modifier.padding(15.dp)
+            ) {
+                VolunteerSkillPathGuideStep(
+                    stepNumber = "1",
+                    title = "Join a matching role",
+                    description =
+                        "Each role names one Primary Skill Path and a required level."
+                )
+                VolunteerSkillPathGuideStep(
+                    stepNumber = "2",
+                    title = "Complete the volunteer work",
+                    description =
+                        "Pending or Accepted applications do not increase progress."
+                )
+                VolunteerSkillPathGuideStep(
+                    stepNumber = "3",
+                    title = "Organisation verifies completion",
+                    description =
+                        "The completed role and verified time become evidence in that path."
+                )
+                VolunteerSkillPathGuideStep(
+                    stepNumber = "4",
+                    title = "Unlock higher-level roles",
+                    description =
+                        "Meet every requirement to move from Beginner to Intermediate and Advanced.",
+                    showConnector = false
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun VolunteerSkillPathGuideStep(
+    stepNumber: String,
+    title: String,
+    description: String,
+    showConnector: Boolean = true
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.Top
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Surface(
+                modifier = Modifier.size(26.dp),
+                shape = CircleShape,
+                color = VolunteerLinkPrimaryGreen
+            ) {
+                Box(
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = stepNumber,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+            }
+
+            if (showConnector) {
+                Box(
+                    modifier = Modifier
+                        .size(
+                            width = 2.dp,
+                            height = 32.dp
+                        )
+                        .background(
+                            VolunteerLinkPrimaryGreen.copy(
+                                alpha = 0.22f
+                            )
+                        )
+                )
+            }
+        }
+
+        Spacer(
+            modifier = Modifier.size(10.dp)
+        )
+
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(bottom = 11.dp)
+        ) {
+            Text(
+                text = title,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = VolunteerLinkTextPrimary
+            )
+
+            Text(
+                text = description,
+                fontSize = 10.sp,
+                lineHeight = 15.sp,
+                color = VolunteerLinkTextSecondary
+            )
         }
     }
 }
@@ -509,6 +1087,17 @@ private fun VolunteerSkillPathCard(
     volunteerSkillPath: VolunteerSkillPath,
     onSelected: () -> Unit
 ) {
+    val openEventRoleCount =
+        VolunteerOpportunitySessionStore
+            .volunteerOpportunityEvents
+            .sumOf { event ->
+                event.eventVolunteerRoles.count { role ->
+                    role.rolePrimarySkillPath ==
+                        volunteerSkillPath.name &&
+                        role.roleVacancies > 0
+                }
+            }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -577,7 +1166,10 @@ private fun VolunteerSkillPathCard(
 
                         VolunteerSkillPathLabel(
                             labelText =
-                                "Level ${volunteerSkillPath.currentLevel}",
+                                volunteerLevelDisplayName(
+                                    volunteerSkillPath.currentLevel
+                                ) +
+                                    " • Level ${volunteerSkillPath.currentLevel}",
                             labelColour =
                                 VolunteerLinkSuccess
                         )
@@ -596,29 +1188,72 @@ private fun VolunteerSkillPathCard(
                 modifier = Modifier.height(13.dp)
             )
 
-            LinearProgressIndicator(
-                progress = {
-                    volunteerSkillPath.progressFraction
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(7.dp),
-                color = VolunteerLinkPrimaryGreen,
-                trackColor = VolunteerLinkBorderColour
-            )
+            val nextLevel = volunteerSkillPath.nextLevel
 
-            Spacer(
-                modifier = Modifier.height(7.dp)
-            )
+            if (nextLevel == null) {
+                Text(
+                    text = "Maximum level achieved",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = VolunteerLinkSuccess
+                )
+            } else {
+                Text(
+                    text =
+                        "Next unlock: " +
+                            volunteerLevelDisplayName(
+                                nextLevel.levelNumber
+                            ) +
+                            " • Level ${nextLevel.levelNumber}",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = VolunteerLinkTextPrimary
+                )
 
-            Text(
-                text =
-                    volunteerSkillPathProgressText(
+                Spacer(
+                    modifier = Modifier.height(8.dp)
+                )
+
+                VolunteerSkillPathRequirementProgress(
+                    label = "Completed roles",
+                    currentValue =
                         volunteerSkillPath
-                    ),
-                fontSize = 10.sp,
-                color = VolunteerLinkTextSecondary
-            )
+                            .verifiedAssignments,
+                    requiredValue =
+                        nextLevel.requiredAssignments
+                )
+
+                nextLevel.requiredMinutes
+                    ?.let { requiredMinutes ->
+                        Spacer(
+                            modifier = Modifier.height(7.dp)
+                        )
+
+                        VolunteerSkillPathRequirementProgress(
+                            label = "Verified minutes",
+                            currentValue =
+                                volunteerSkillPath
+                                    .verifiedMinutes
+                                    ?: 0,
+                            requiredValue = requiredMinutes
+                        )
+                    }
+
+                Spacer(
+                    modifier = Modifier.height(7.dp)
+                )
+
+                Text(
+                    text =
+                        if (nextLevel.requiredMinutes == null) {
+                            "Completed roles are verified by the organisation."
+                        } else {
+                            "Both completed roles and verified time are required."
+                        },
+                    fontSize = 9.sp,
+                    color = VolunteerLinkTextSecondary
+                )
+            }
 
             Spacer(
                 modifier = Modifier.height(10.dp)
@@ -627,13 +1262,61 @@ private fun VolunteerSkillPathCard(
             Text(
                 text =
                     "${volunteerSkillPath.skills.size} skills  •  " +
-                            "${volunteerSkillPath.relatedRoles.size} related roles",
+                            "$openEventRoleCount open event roles",
                 fontSize = 11.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = VolunteerLinkPrimaryGreen
             )
         }
     }
+}
+
+@Composable
+private fun VolunteerSkillPathRequirementProgress(
+    label: String,
+    currentValue: Int,
+    requiredValue: Int
+) {
+    val progress =
+        if (requiredValue <= 0) {
+            1f
+        } else {
+            currentValue.toFloat()
+                .div(requiredValue.toFloat())
+                .coerceIn(0f, 1f)
+        }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.weight(1f),
+            fontSize = 10.sp,
+            color = VolunteerLinkTextSecondary
+        )
+
+        Text(
+            text = "$currentValue/$requiredValue",
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            color = VolunteerLinkPrimaryGreen
+        )
+    }
+
+    Spacer(
+        modifier = Modifier.height(4.dp)
+    )
+
+    LinearProgressIndicator(
+        progress = { progress },
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(6.dp),
+        color = VolunteerLinkPrimaryGreen,
+        trackColor = VolunteerLinkBorderColour
+    )
 }
 
 @Composable
@@ -685,6 +1368,15 @@ private fun VolunteerSkillPathDetailHeader(
                     },
                 labelColour = VolunteerLinkInformation
             )
+
+            VolunteerSkillPathLabel(
+                labelText =
+                    volunteerLevelDisplayName(
+                        volunteerSkillPath.currentLevel
+                    ) +
+                        " • Level ${volunteerSkillPath.currentLevel}",
+                labelColour = VolunteerLinkSuccess
+            )
         }
 
         if (
@@ -710,152 +1402,243 @@ private fun VolunteerSkillPathDetailHeader(
 private fun VolunteerSkillPathProgressSection(
     volunteerSkillPath: VolunteerSkillPath
 ) {
+    val nextLevel = volunteerSkillPath.nextLevel
+
     VolunteerSkillPathSectionContainer(
         sectionTitle = "Your Progress"
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement =
-                Arrangement.SpaceBetween,
-            verticalAlignment =
-                Alignment.CenterVertically
-        ) {
-            Column {
-                Text(
-                    text =
-                        "Current Level ${volunteerSkillPath.currentLevel}",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = VolunteerLinkPrimaryGreen
-                )
+        Text(
+            text =
+                volunteerLevelDisplayName(
+                    volunteerSkillPath.currentLevel
+                ) +
+                    " • Level ${volunteerSkillPath.currentLevel}",
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+            color = VolunteerLinkPrimaryGreen
+        )
 
-                Spacer(
-                    modifier = Modifier.height(3.dp)
-                )
+        Spacer(
+            modifier = Modifier.height(4.dp)
+        )
 
-                Text(
-                    text =
-                        volunteerSkillPathProgressText(
-                            volunteerSkillPath
-                        ),
-                    fontSize = 11.sp,
-                    color = VolunteerLinkTextSecondary
-                )
-            }
+        Text(
+            text =
+                if (volunteerSkillPath.hasVerifiedEvidence) {
+                    "Based on organisation-verified completed roles."
+                } else {
+                    "Starting level — no completed role evidence yet."
+                },
+            fontSize = 11.sp,
+            color = VolunteerLinkTextSecondary
+        )
+
+        if (nextLevel != null) {
+            Spacer(
+                modifier = Modifier.height(14.dp)
+            )
 
             Text(
                 text =
-                    "${(volunteerSkillPath.progressFraction * 100).toInt()}%",
-                fontSize = 17.sp,
+                    "Requirements for " +
+                        volunteerLevelDisplayName(
+                            nextLevel.levelNumber
+                        ) +
+                        " • Level ${nextLevel.levelNumber}",
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
-                color = VolunteerLinkPrimaryGreen
+                color = VolunteerLinkTextPrimary
             )
-        }
 
-        Spacer(
-            modifier = Modifier.height(12.dp)
-        )
+            Spacer(
+                modifier = Modifier.height(9.dp)
+            )
 
-        LinearProgressIndicator(
-            progress = {
-                volunteerSkillPath.progressFraction
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(8.dp),
-            color = VolunteerLinkPrimaryGreen,
-            trackColor = VolunteerLinkBorderColour
-        )
-    }
-}
+            VolunteerSkillPathRequirementProgress(
+                label = "Completed roles",
+                currentValue =
+                    volunteerSkillPath.verifiedAssignments,
+                requiredValue =
+                    nextLevel.requiredAssignments
+            )
 
-@Composable
-private fun VolunteerSkillPathLevelsSection(
-    volunteerSkillPath: VolunteerSkillPath
-) {
-    VolunteerSkillPathSectionContainer(
-        sectionTitle = "Level Requirements"
-    ) {
-        volunteerSkillPath.levels
-            .forEachIndexed {
-                    levelIndex,
-                    skillPathLevel ->
-                VolunteerSkillPathLevelRow(
-                    skillPathLevel = skillPathLevel,
-                    currentLevel =
-                        volunteerSkillPath.currentLevel
-                )
-
-                if (
-                    levelIndex <
-                    volunteerSkillPath.levels.lastIndex
-                ) {
+            nextLevel.requiredMinutes
+                ?.let { requiredMinutes ->
                     Spacer(
-                        modifier = Modifier.height(10.dp)
+                        modifier = Modifier.height(9.dp)
+                    )
+
+                    VolunteerSkillPathRequirementProgress(
+                        label = "Verified minutes",
+                        currentValue =
+                            volunteerSkillPath
+                                .verifiedMinutes
+                                ?: 0,
+                        requiredValue = requiredMinutes
                     )
                 }
-            }
+
+            Spacer(
+                modifier = Modifier.height(9.dp)
+            )
+
+            Text(
+                text =
+                    if (nextLevel.requiredMinutes == null) {
+                        "Reach the completed-role requirement to level up."
+                    } else {
+                        "You must reach BOTH requirements. One requirement alone does not level up."
+                    },
+                fontSize = 10.sp,
+                lineHeight = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = VolunteerLinkInformation
+            )
+        }
     }
 }
 
 @Composable
-private fun VolunteerSkillPathLevelRow(
-    skillPathLevel: VolunteerSkillPathLevel,
-    currentLevel: Int
+private fun VolunteerSkillPathEvidenceSection(
+    volunteerSkillPath: VolunteerSkillPath
 ) {
-    val levelIsReached =
-        currentLevel >= skillPathLevel.levelNumber
+    val completedEvidence =
+        VolunteerOpportunitySessionStore
+            .volunteerApplications
+            .filter { application ->
+                application.applicationStatus ==
+                    VolunteerApplicationStatus.COMPLETED &&
+                    application.applicationPrimarySkillPath ==
+                        volunteerSkillPath.name
+            }
 
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
+    VolunteerSkillPathSectionContainer(
+        sectionTitle = "Completed Evidence"
     ) {
-        Icon(
-            imageVector =
-                if (levelIsReached) {
-                    Icons.Filled.CheckCircle
-                } else {
-                    Icons.Filled.Lock
-                },
-            contentDescription = null,
-            modifier = Modifier.size(21.dp),
-            tint =
-                if (levelIsReached) {
-                    VolunteerLinkSuccess
-                } else {
-                    VolunteerLinkTextSecondary
-                }
-        )
-
-        Spacer(
-            modifier = Modifier.size(10.dp)
-        )
-
-        Column(
-            modifier = Modifier.weight(1f)
-        ) {
+        if (completedEvidence.isEmpty()) {
             Text(
-                text = skillPathLevel.levelName,
+                text = "No verified evidence yet",
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
                 color = VolunteerLinkTextPrimary
             )
 
+            Spacer(
+                modifier = Modifier.height(5.dp)
+            )
+
             Text(
-                text = buildString {
-                    append(
-                        "${skillPathLevel.requiredAssignments} verified assignments"
-                    )
-                    skillPathLevel.requiredMinutes
-                        ?.let { requiredMinutes ->
-                            append("  •  ")
-                            append(requiredMinutes / 60)
-                            append(" verified hours")
-                        }
-                },
-                fontSize = 10.sp,
+                text =
+                    "Your current applications may be Pending or Accepted. " +
+                        "Evidence appears here only after the organisation marks " +
+                        "the role Completed.",
+                fontSize = 11.sp,
+                lineHeight = 17.sp,
                 color = VolunteerLinkTextSecondary
             )
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement =
+                    Arrangement.spacedBy(8.dp)
+            ) {
+                VolunteerSkillPathStat(
+                    value =
+                        volunteerSkillPath
+                            .verifiedAssignments
+                            .toString(),
+                    label = "Verified\nroles",
+                    modifier = Modifier.weight(1f)
+                )
+
+                VolunteerSkillPathStat(
+                    value =
+                        (volunteerSkillPath
+                            .verifiedMinutes
+                            ?: 0)
+                            .toString(),
+                    label = "Verified\nminutes",
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            Spacer(
+                modifier = Modifier.height(13.dp)
+            )
+
+            completedEvidence.forEachIndexed {
+                    evidenceIndex,
+                    application ->
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 5.dp),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Surface(
+                        modifier = Modifier.size(34.dp),
+                        shape = CircleShape,
+                        color = VolunteerLinkSoftGreenSurface
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Filled.CheckCircle,
+                                contentDescription = null,
+                                modifier = Modifier.size(19.dp),
+                                tint = VolunteerLinkSuccess
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.size(10.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = application.applicationEventTitle,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = VolunteerLinkTextPrimary
+                        )
+                        Text(
+                            text = application.applicationRoleTitle,
+                            fontSize = 10.sp,
+                            color = VolunteerLinkPrimaryGreen
+                        )
+                        Text(
+                            text = buildString {
+                                append(
+                                    application.applicationCompletedDate
+                                        ?: "Completed"
+                                )
+                                application.applicationVerifiedMinutes
+                                    ?.let { minutes ->
+                                        append(" • $minutes verified minutes")
+                                    }
+                            },
+                            fontSize = 9.sp,
+                            color = VolunteerLinkTextSecondary
+                        )
+                    }
+
+                    application.applicationCertificateId
+                        ?.let {
+                            Text(
+                                text = "CERTIFIED",
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = VolunteerLinkSuccess
+                            )
+                        }
+                }
+
+                if (evidenceIndex < completedEvidence.lastIndex) {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 5.dp),
+                        color = VolunteerLinkBorderColour
+                    )
+                }
+            }
         }
     }
 }
@@ -911,55 +1694,166 @@ private fun VolunteerSkillPathSkillsSection(
 
 @Composable
 private fun VolunteerSkillPathRolesSection(
-    volunteerSkillPath: VolunteerSkillPath
+    volunteerSkillPath: VolunteerSkillPath,
+    onVolunteerRoleSelected: (
+        eventId: Int,
+        roleId: Int
+    ) -> Unit
 ) {
+    val matchingEventRoles =
+        VolunteerOpportunitySessionStore
+            .volunteerOpportunityEvents
+            .flatMap { event ->
+                event.eventVolunteerRoles
+                    .filter { role ->
+                        role.rolePrimarySkillPath ==
+                            volunteerSkillPath.name &&
+                            role.roleVacancies > 0 &&
+                            !VolunteerOpportunitySessionStore
+                                .hasApplicationForRole(
+                                    eventId = event.eventId,
+                                    roleId = role.roleId
+                                )
+                    }
+                    .map { role -> event to role }
+            }
+            .sortedWith(
+                compareBy(
+                    { pair ->
+                        pair.second.roleMinimumSkillPathLevel >
+                            volunteerSkillPath.currentLevel
+                    },
+                    { pair -> pair.first.eventDate }
+                )
+            )
+            .take(6)
+
     VolunteerSkillPathSectionContainer(
-        sectionTitle = "Related Volunteer Roles"
+        sectionTitle = "Build This Skill Path"
     ) {
-        if (volunteerSkillPath.relatedRoles.isEmpty()) {
+        Text(
+            text =
+                "These are real, currently published opportunities. " +
+                    "Complete one of these roles to add verified evidence " +
+                    "to ${volunteerSkillPath.name}.",
+            fontSize = 11.sp,
+            lineHeight = 16.sp,
+            color = VolunteerLinkTextSecondary
+        )
+
+        Spacer(modifier = Modifier.height(11.dp))
+
+        if (matchingEventRoles.isEmpty()) {
             Text(
                 text =
-                    "No role templates are linked to this path yet.",
+                    "No open roles for this path right now. Try another path or check again after organisations publish new opportunities.",
                 fontSize = 12.sp,
+                lineHeight = 17.sp,
                 color = VolunteerLinkTextSecondary
             )
         } else {
-            volunteerSkillPath.relatedRoles
-                .forEachIndexed { roleIndex, role ->
-                    Column(
-                        modifier = Modifier.fillMaxWidth()
+            matchingEventRoles
+                .forEachIndexed { roleIndex, pair ->
+                    val event = pair.first
+                    val role = pair.second
+                    val isEligible =
+                        volunteerSkillPath.currentLevel >=
+                            role.roleMinimumSkillPathLevel
+
+                    Card(
+                        onClick = {
+                            onVolunteerRoleSelected(
+                                event.eventId,
+                                role.roleId
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor =
+                                if (isEligible) {
+                                    VolunteerLinkSoftGreenSurface
+                                } else {
+                                    VolunteerLinkSurface
+                                }
+                        ),
+                        border = BorderStroke(
+                            1.dp,
+                            if (isEligible) {
+                                VolunteerLinkPrimaryGreen.copy(
+                                    alpha = 0.35f
+                                )
+                            } else {
+                                VolunteerLinkBorderColour
+                            }
+                        )
                     ) {
-                        Text(
-                            text = role.roleName,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = VolunteerLinkTextPrimary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment =
+                                    Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = event.eventTitle,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = VolunteerLinkTextPrimary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = role.roleTitle,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = VolunteerLinkPrimaryGreen,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
 
-                        Spacer(
-                            modifier = Modifier.height(2.dp)
-                        )
+                                Text(
+                                    text =
+                                        if (isEligible) "MATCH"
+                                        else "LEVEL ${role.roleMinimumSkillPathLevel}",
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color =
+                                        if (isEligible) {
+                                            VolunteerLinkSuccess
+                                        } else {
+                                            VolunteerLinkWarning
+                                        }
+                                )
+                            }
 
-                        Text(
-                            text = role.roleArea,
-                            fontSize = 10.sp,
-                            color = VolunteerLinkTextSecondary
-                        )
+                            Spacer(modifier = Modifier.height(7.dp))
+
+                            Text(
+                                text =
+                                    "${event.eventDate} • " +
+                                        "${event.eventLocation} • " +
+                                        "${role.roleVacancies} spots",
+                                fontSize = 9.sp,
+                                color = VolunteerLinkTextSecondary
+                            )
+                            Text(
+                                text =
+                                    role.roleSkillsPractised
+                                        .take(3)
+                                        .joinToString(" • "),
+                                modifier = Modifier.padding(top = 3.dp),
+                                fontSize = 9.sp,
+                                color = VolunteerLinkInformation,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
 
-                    if (
-                        roleIndex <
-                        volunteerSkillPath.relatedRoles
-                            .lastIndex
-                    ) {
-                        HorizontalDivider(
-                            modifier = Modifier.padding(
-                                vertical = 9.dp
-                            ),
-                            color = VolunteerLinkBorderColour
-                        )
+                    if (roleIndex < matchingEventRoles.lastIndex) {
+                        Spacer(modifier = Modifier.height(9.dp))
                     }
                 }
         }
@@ -1096,27 +1990,13 @@ private fun VolunteerSkillPathErrorContent(
     }
 }
 
-private fun volunteerSkillPathProgressText(
-    volunteerSkillPath: VolunteerSkillPath
+private fun volunteerLevelDisplayName(
+    level: Int
 ): String {
-    val nextLevel = volunteerSkillPath.nextLevel
-        ?: return "Maximum level achieved"
-
-    return buildString {
-        append(
-            "${volunteerSkillPath.verifiedAssignments}/${nextLevel.requiredAssignments} assignments"
-        )
-
-        nextLevel.requiredMinutes
-            ?.let { requiredMinutes ->
-                append("  •  ")
-                append(
-                    "${volunteerSkillPath.verifiedMinutes ?: 0}/$requiredMinutes minutes"
-                )
-            }
-
-        append(
-            " to ${nextLevel.levelName}"
-        )
+    return when (level) {
+        1 -> "Beginner"
+        2 -> "Intermediate"
+        3 -> "Advanced"
+        else -> "Level $level"
     }
 }

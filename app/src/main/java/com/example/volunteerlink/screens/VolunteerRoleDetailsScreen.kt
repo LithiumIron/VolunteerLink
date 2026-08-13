@@ -31,17 +31,21 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.volunteerlink.data.VolunteerOpportunitySampleData
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.volunteerlink.data.VolunteerOpportunitySessionStore
 import com.example.volunteerlink.model.VolunteerOpportunityEvent
 import com.example.volunteerlink.model.VolunteerOpportunityRole
 import com.example.volunteerlink.model.VolunteerRoleApplicationFlow
 import com.example.volunteerlink.model.VolunteerRoleApplicationMethod
+import com.example.volunteerlink.model.VolunteerSkillPath
 import com.example.volunteerlink.ui.theme.VolunteerLinkBackground
 import com.example.volunteerlink.ui.theme.VolunteerLinkBorderColour
 import com.example.volunteerlink.ui.theme.VolunteerLinkError
@@ -64,15 +68,16 @@ fun VolunteerRoleDetailsScreen(
         eventId: Int,
         roleId: Int
     ) -> Unit,
-    currentVolunteerSkillPathLevel: Int = 2
+    skillPathViewModel:
+        VolunteerSkillPathViewModel = viewModel()
 ) {
     val volunteerOpportunityEvent =
-        VolunteerOpportunitySampleData.findEventById(
+        VolunteerOpportunitySessionStore.findEventById(
             volunteerEventId
         )
 
     val volunteerOpportunityRole =
-        VolunteerOpportunitySampleData.findRoleById(
+        VolunteerOpportunitySessionStore.findRoleById(
             eventId = volunteerEventId,
             roleId = volunteerRoleId
         )
@@ -87,13 +92,39 @@ fun VolunteerRoleDetailsScreen(
         return
     }
 
+    val skillPathUiState by
+        skillPathViewModel.uiState
+            .collectAsStateWithLifecycle()
+
+    val matchingVolunteerSkillPath =
+        skillPathUiState.skillPaths
+            .firstOrNull { skillPath ->
+                skillPath.name ==
+                        volunteerOpportunityRole
+                            .rolePrimarySkillPath
+            }
+
+    val currentVolunteerSkillPathLevel =
+        matchingVolunteerSkillPath
+            ?.currentLevel
+            ?: 1
+
+    val eligibilityIsLoading =
+        skillPathUiState.isLoading
+
+    val eligibilityIsAvailable =
+        !eligibilityIsLoading &&
+                skillPathUiState.errorMessage == null &&
+                matchingVolunteerSkillPath != null
+
     val volunteerIsEligible =
-        currentVolunteerSkillPathLevel >=
+        eligibilityIsAvailable &&
+            currentVolunteerSkillPathLevel >=
                 volunteerOpportunityRole
                     .roleMinimumSkillPathLevel
 
     val volunteerHasApplied =
-        VolunteerOpportunitySampleData
+        VolunteerOpportunitySessionStore
             .hasApplicationForRole(
                 eventId = volunteerEventId,
                 roleId = volunteerRoleId
@@ -190,10 +221,16 @@ fun VolunteerRoleDetailsScreen(
                 VolunteerRoleEligibilitySection(
                     volunteerOpportunityRole =
                         volunteerOpportunityRole,
+                    volunteerSkillPath =
+                        matchingVolunteerSkillPath,
                     currentVolunteerSkillPathLevel =
                         currentVolunteerSkillPathLevel,
                     volunteerIsEligible =
-                        volunteerIsEligible
+                        volunteerIsEligible,
+                    eligibilityIsLoading =
+                        eligibilityIsLoading,
+                    eligibilityIsAvailable =
+                        eligibilityIsAvailable
                 )
             }
         }
@@ -203,6 +240,10 @@ fun VolunteerRoleDetailsScreen(
                 volunteerOpportunityRole,
             volunteerIsEligible =
                 volunteerIsEligible,
+            eligibilityIsLoading =
+                eligibilityIsLoading,
+            eligibilityIsAvailable =
+                eligibilityIsAvailable,
             volunteerHasApplied =
                 volunteerHasApplied,
             onJoinRoleSelected = {
@@ -349,7 +390,8 @@ private fun VolunteerRoleHeaderSection(
         ) {
             VolunteerRoleLabel(
                 labelText =
-                    volunteerOpportunityRole.roleLevel,
+                    "Role difficulty: " +
+                        volunteerOpportunityRole.roleLevel,
                 labelTextColour = roleLevelColour,
                 labelBackgroundColour =
                     roleLevelColour.copy(alpha = 0.12f)
@@ -628,21 +670,47 @@ private fun VolunteerRoleScheduleSection(
 private fun VolunteerRoleEligibilitySection(
     volunteerOpportunityRole:
     VolunteerOpportunityRole,
+    volunteerSkillPath: VolunteerSkillPath?,
     currentVolunteerSkillPathLevel: Int,
-    volunteerIsEligible: Boolean
+    volunteerIsEligible: Boolean,
+    eligibilityIsLoading: Boolean,
+    eligibilityIsAvailable: Boolean
 ) {
+    val requiredSkillPathLevel =
+        volunteerSkillPath
+            ?.levels
+            ?.firstOrNull { skillPathLevel ->
+                skillPathLevel.levelNumber ==
+                        volunteerOpportunityRole
+                            .roleMinimumSkillPathLevel
+            }
+
     val eligibilityColour =
-        if (volunteerIsEligible) {
-            VolunteerLinkSuccess
-        } else {
-            VolunteerLinkWarning
+        when {
+            eligibilityIsLoading ->
+                VolunteerLinkInformation
+
+            !eligibilityIsAvailable ->
+                VolunteerLinkError
+
+            volunteerIsEligible ->
+                VolunteerLinkSuccess
+
+            else -> VolunteerLinkWarning
         }
 
     val eligibilityBackgroundColour =
-        if (volunteerIsEligible) {
-            Color(0xFFE8F5E9)
-        } else {
-            Color(0xFFFFF3E0)
+        when {
+            eligibilityIsLoading ->
+                Color(0xFFE3F2FD)
+
+            !eligibilityIsAvailable ->
+                Color(0xFFFFEBEE)
+
+            volunteerIsEligible ->
+                Color(0xFFE8F5E9)
+
+            else -> Color(0xFFFFF3E0)
         }
 
     Card(
@@ -670,10 +738,18 @@ private fun VolunteerRoleEligibilitySection(
         ) {
             Text(
                 text =
-                    if (volunteerIsEligible) {
-                        "You are eligible for this role"
-                    } else {
-                        "Skill Path level required"
+                    when {
+                        eligibilityIsLoading ->
+                            "Checking your Skill Path level"
+
+                        !eligibilityIsAvailable ->
+                            "Skill Path level unavailable"
+
+                        volunteerIsEligible ->
+                            "You meet this role's level requirement"
+
+                        else ->
+                            "Build more verified experience first"
                     },
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
@@ -684,15 +760,120 @@ private fun VolunteerRoleEligibilitySection(
                 modifier = Modifier.height(4.dp)
             )
 
-            Text(
-                text =
-                    "Your level: $currentVolunteerSkillPathLevel  •  " +
-                            "Required level: " +
+            if (eligibilityIsAvailable) {
+                Text(
+                    text =
+                        volunteerOpportunityRole
+                            .rolePrimarySkillPath,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = VolunteerLinkTextPrimary
+                )
+
+                Spacer(
+                    modifier = Modifier.height(5.dp)
+                )
+
+                Text(
+                    text =
+                        "Your level: " +
+                            volunteerRoleLevelName(
+                                currentVolunteerSkillPathLevel
+                            ) +
+                            " (Level $currentVolunteerSkillPathLevel)",
+                    fontSize = 11.sp,
+                    color = VolunteerLinkTextSecondary
+                )
+
+                Text(
+                    text =
+                        "Required: " +
+                            volunteerRoleLevelName(
+                                volunteerOpportunityRole
+                                    .roleMinimumSkillPathLevel
+                            ) +
+                            " (Level " +
                             volunteerOpportunityRole
-                                .roleMinimumSkillPathLevel,
-                fontSize = 11.sp,
-                color = VolunteerLinkTextSecondary
-            )
+                                .roleMinimumSkillPathLevel +
+                            ")",
+                    fontSize = 11.sp,
+                    color = VolunteerLinkTextSecondary
+                )
+
+                Spacer(
+                    modifier = Modifier.height(8.dp)
+                )
+
+                if (
+                    !volunteerIsEligible &&
+                    volunteerSkillPath != null &&
+                    requiredSkillPathLevel != null
+                ) {
+                    Text(
+                        text = "Progress toward this requirement",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = VolunteerLinkTextPrimary
+                    )
+
+                    Text(
+                        text =
+                            "Completed roles: " +
+                                volunteerSkillPath
+                                    .verifiedAssignments +
+                                "/" +
+                                requiredSkillPathLevel
+                                    .requiredAssignments,
+                        fontSize = 10.sp,
+                        color = VolunteerLinkTextSecondary
+                    )
+
+                    requiredSkillPathLevel
+                        .requiredMinutes
+                        ?.let { requiredMinutes ->
+                            Text(
+                                text =
+                                    "Verified minutes: " +
+                                        (volunteerSkillPath
+                                            .verifiedMinutes
+                                            ?: 0) +
+                                        "/" +
+                                        requiredMinutes,
+                                fontSize = 10.sp,
+                                color =
+                                    VolunteerLinkTextSecondary
+                            )
+                        }
+
+                    Spacer(
+                        modifier = Modifier.height(7.dp)
+                    )
+                }
+
+                Text(
+                    text =
+                        if (volunteerIsEligible) {
+                            "Your level was calculated from organisation-verified completed roles."
+                        } else {
+                            "Open Skill Path to see the completed-role and verified-time requirements for the next level."
+                        },
+                    fontSize = 10.sp,
+                    lineHeight = 15.sp,
+                    color = eligibilityColour
+                )
+            } else {
+                Text(
+                    text =
+                        if (eligibilityIsLoading) {
+                            "Loading your verified progress from Supabase..."
+                        } else {
+                            "This role's Primary Skill Path could not be matched. Refresh Skill Path and try again."
+                        },
+                    fontSize = 11.sp,
+                    lineHeight = 16.sp,
+                    color = VolunteerLinkTextSecondary
+                )
+            }
         }
     }
 }
@@ -702,6 +883,8 @@ private fun VolunteerRoleJoinSection(
     volunteerOpportunityRole:
     VolunteerOpportunityRole,
     volunteerIsEligible: Boolean,
+    eligibilityIsLoading: Boolean,
+    eligibilityIsAvailable: Boolean,
     volunteerHasApplied: Boolean,
     onJoinRoleSelected: () -> Unit
 ) {
@@ -721,6 +904,8 @@ private fun VolunteerRoleJoinSection(
                 onClick = onJoinRoleSelected,
                 enabled =
                     volunteerIsEligible &&
+                            eligibilityIsAvailable &&
+                            !eligibilityIsLoading &&
                             !volunteerHasApplied,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -740,6 +925,10 @@ private fun VolunteerRoleJoinSection(
                     text =
                         if (volunteerHasApplied) {
                             "Already Registered"
+                        } else if (eligibilityIsLoading) {
+                            "Checking Skill Path Level..."
+                        } else if (!eligibilityIsAvailable) {
+                            "Skill Path Unavailable"
                         } else if (!volunteerIsEligible) {
                             "Skill Path Level Required"
                         } else {
@@ -820,6 +1009,17 @@ private fun VolunteerRoleJoinSection(
                     }
             )
         }
+    }
+}
+
+private fun volunteerRoleLevelName(
+    level: Int
+): String {
+    return when (level) {
+        1 -> "Beginner"
+        2 -> "Intermediate"
+        3 -> "Advanced"
+        else -> "Level $level"
     }
 }
 

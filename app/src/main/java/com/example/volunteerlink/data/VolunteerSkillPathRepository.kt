@@ -3,31 +3,15 @@ package com.example.volunteerlink.data
 import com.example.volunteerlink.model.VolunteerSkill
 import com.example.volunteerlink.model.VolunteerSkillPath
 import com.example.volunteerlink.model.VolunteerSkillPathLevel
-import com.example.volunteerlink.model.VolunteerSkillPathRole
 import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 object VolunteerSkillPathRepository {
 
-    private const val DEMO_VOLUNTEER_USER_ID =
-        "USER001"
-
-    private var cachedSkillPaths:
-        List<VolunteerSkillPath>? = null
-
-    suspend fun getSkillPaths(
-        forceRefresh: Boolean = false,
-        volunteerUserId: String =
-            DEMO_VOLUNTEER_USER_ID
-    ): List<VolunteerSkillPath> {
-        if (!forceRefresh) {
-            cachedSkillPaths?.let {
-                    volunteerSkillPaths ->
-                return volunteerSkillPaths
-            }
-        }
-
+    suspend fun getSkillPaths():
+        List<VolunteerSkillPath> {
         val skillPathRows =
             supabase
                 .from("skill_paths")
@@ -46,21 +30,18 @@ object VolunteerSkillPathRepository {
                 .select()
                 .decodeList<VolunteerSkillRow>()
 
-        val roleRows =
-            supabase
-                .from("role_templates")
-                .select()
-                .decodeList<VolunteerSkillPathRoleRow>()
+        // Progress is derived from verified, completed participation records.
+        // Accepted or in-progress applications must never increase Skill Path
+        // assignments or minutes.
+        supabase.postgrest.rpc(
+            function = "refresh_my_skill_path_progress"
+        )
 
         val progressRows =
             supabase
                 .from("volunteer_skill_path_progress")
                 .select()
                 .decodeList<VolunteerSkillPathProgressRow>()
-                .filter { skillPathProgressRow ->
-                    skillPathProgressRow.userId ==
-                            volunteerUserId
-                }
 
         val progressByPathId =
             progressRows.associateBy {
@@ -68,8 +49,7 @@ object VolunteerSkillPathRepository {
                 skillPathProgressRow.skillPathId
             }
 
-        val loadedSkillPaths =
-            skillPathRows
+        return skillPathRows
                 .sortedBy { skillPathRow ->
                     skillPathRow.skillPathId
                 }
@@ -132,26 +112,6 @@ object VolunteerSkillPathRepository {
                                         skillRow.description
                                 )
                             },
-                        relatedRoles = roleRows
-                            .filter { roleRow ->
-                                roleRow.skillPathId ==
-                                        skillPathRow
-                                            .skillPathId
-                            }
-                            .sortedBy { roleRow ->
-                                roleRow.roleTemplateId
-                            }
-                            .map { roleRow ->
-                                VolunteerSkillPathRole(
-                                    roleTemplateId =
-                                        roleRow.roleTemplateId,
-                                    roleName = roleRow.roleName,
-                                    roleArea = roleRow.roleArea,
-                                    roleMode = roleRow.roleMode,
-                                    description =
-                                        roleRow.description
-                                )
-                            },
                         currentLevel =
                             progress?.currentLevel ?: 1,
                         verifiedAssignments =
@@ -162,10 +122,6 @@ object VolunteerSkillPathRepository {
                             progress?.verifiedMinutes
                     )
                 }
-
-        cachedSkillPaths = loadedSkillPaths
-
-        return loadedSkillPaths
     }
 }
 
@@ -205,25 +161,6 @@ private data class VolunteerSkillRow(
     val skillPathId: String,
     val name: String,
     val description: String? = null
-)
-
-@Serializable
-private data class VolunteerSkillPathRoleRow(
-    @SerialName("role_template_id")
-    val roleTemplateId: String,
-    @SerialName("role_name")
-    val roleName: String,
-    @SerialName("role_area")
-    val roleArea: String,
-    @SerialName("role_mode")
-    val roleMode: String,
-    @SerialName("skill_path_id")
-    val skillPathId: String,
-    val description: String? = null,
-    @SerialName("skills_practised")
-    val skillsPractised: List<String> = emptyList(),
-    @SerialName("recommended_skills")
-    val recommendedSkills: List<String> = emptyList()
 )
 
 @Serializable

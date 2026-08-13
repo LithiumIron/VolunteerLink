@@ -8,11 +8,14 @@ data class VolunteerSkillPath(
     val progressionType: String,
     val levels: List<VolunteerSkillPathLevel>,
     val skills: List<VolunteerSkill>,
-    val relatedRoles: List<VolunteerSkillPathRole>,
     val currentLevel: Int,
     val verifiedAssignments: Int,
     val verifiedMinutes: Int?
 ) {
+    val hasVerifiedEvidence: Boolean
+        get() = verifiedAssignments > 0 ||
+                (verifiedMinutes ?: 0) > 0
+
     val nextLevel: VolunteerSkillPathLevel?
         get() = levels
             .sortedBy { skillPathLevel ->
@@ -59,6 +62,23 @@ data class VolunteerSkillPath(
                 ).coerceIn(0f, 1f)
             }
         }
+
+    fun levelIsReached(
+        skillPathLevel: VolunteerSkillPathLevel
+    ): Boolean {
+        val assignmentsReached =
+            verifiedAssignments >=
+                    skillPathLevel.requiredAssignments
+
+        val minutesReached =
+            skillPathLevel.requiredMinutes
+                ?.let { requiredMinutes ->
+                    (verifiedMinutes ?: 0) >= requiredMinutes
+                }
+                ?: true
+
+        return assignmentsReached && minutesReached
+    }
 }
 
 data class VolunteerSkillPathLevel(
@@ -72,13 +92,5 @@ data class VolunteerSkillPathLevel(
 data class VolunteerSkill(
     val skillId: String,
     val name: String,
-    val description: String?
-)
-
-data class VolunteerSkillPathRole(
-    val roleTemplateId: String,
-    val roleName: String,
-    val roleArea: String,
-    val roleMode: String,
     val description: String?
 )

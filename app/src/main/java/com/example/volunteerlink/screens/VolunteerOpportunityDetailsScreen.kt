@@ -46,7 +46,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.volunteerlink.R
-import com.example.volunteerlink.data.VolunteerOpportunitySampleData
+import com.example.volunteerlink.data.VolunteerOpportunitySessionStore
+import com.example.volunteerlink.model.VolunteerApplicationStatus
 import com.example.volunteerlink.model.VolunteerOpportunityCategory
 import com.example.volunteerlink.model.VolunteerOpportunityEvent
 import com.example.volunteerlink.model.VolunteerOpportunityRole
@@ -77,7 +78,7 @@ fun VolunteerOpportunityDetailsScreen(
     val context = LocalContext.current
 
     val volunteerOpportunityEvent =
-        VolunteerOpportunitySampleData.findEventById(
+        VolunteerOpportunitySessionStore.findEventById(
             volunteerEventId
         )
 
@@ -566,6 +567,8 @@ private fun VolunteerOpportunityRolesSection(
             .forEach { volunteerOpportunityRole ->
 
                 VolunteerOpportunityRoleCard(
+                    volunteerEventId =
+                        volunteerOpportunityEvent.eventId,
                     volunteerOpportunityRole =
                         volunteerOpportunityRole,
                     onRoleSelected = {
@@ -585,10 +588,20 @@ private fun VolunteerOpportunityRolesSection(
 
 @Composable
 private fun VolunteerOpportunityRoleCard(
+    volunteerEventId: Int,
     volunteerOpportunityRole:
     VolunteerOpportunityRole,
     onRoleSelected: () -> Unit
 ) {
+    val existingApplication =
+        VolunteerOpportunitySessionStore
+            .volunteerApplications
+            .firstOrNull { application ->
+                application.applicationEventId ==
+                    volunteerEventId &&
+                    application.applicationRoleId ==
+                    volunteerOpportunityRole.roleId
+            }
     val roleLevelColour =
         when (volunteerOpportunityRole.roleLevel) {
             "Beginner" -> VolunteerLinkSuccess
@@ -639,7 +652,8 @@ private fun VolunteerOpportunityRoleCard(
 
                 OpportunityBadge(
                     badgeText =
-                        volunteerOpportunityRole.roleLevel,
+                        volunteerOpportunityRole.roleLevel +
+                            " role",
                     badgeTextColour = roleLevelColour,
                     badgeBackgroundColour =
                         roleLevelBackgroundColour
@@ -673,11 +687,30 @@ private fun VolunteerOpportunityRoleCard(
 
             Text(
                 text =
-                    volunteerOpportunityRole
-                        .rolePrimarySkillPath,
+                    "Primary path: " +
+                        volunteerOpportunityRole
+                            .rolePrimarySkillPath,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = VolunteerLinkPrimaryGreen
+            )
+
+            Spacer(
+                modifier = Modifier.height(3.dp)
+            )
+
+            Text(
+                text =
+                    "Skill Path requirement: " +
+                        opportunitySkillPathLevelName(
+                            volunteerOpportunityRole
+                                .roleMinimumSkillPathLevel
+                        ) +
+                        " • Level " +
+                        volunteerOpportunityRole
+                            .roleMinimumSkillPathLevel,
+                fontSize = 10.sp,
+                color = VolunteerLinkTextSecondary
             )
 
             Spacer(
@@ -699,30 +732,50 @@ private fun VolunteerOpportunityRoleCard(
 
                 Text(
                     text =
-                        when (
-                            volunteerOpportunityRole
-                                .roleApplicationMethod
-                        ) {
-                            VolunteerRoleApplicationMethod
-                                .INSTANT_JOIN ->
-                                "Instant join"
-
-                            VolunteerRoleApplicationMethod
-                                .REVIEW_APPLICANTS ->
-                                if (
-                                    volunteerOpportunityRole
-                                        .roleApplicationFlow ==
-                                    VolunteerRoleApplicationFlow
-                                        .ADDITIONAL_FORM
-                                ) {
-                                    "Application form"
-                                } else {
-                                    "Review required"
+                        existingApplication
+                            ?.let { application ->
+                                when (application.applicationStatus) {
+                                    VolunteerApplicationStatus.PENDING ->
+                                        "Applied • Pending"
+                                    VolunteerApplicationStatus.ACCEPTED ->
+                                        "Accepted"
+                                    VolunteerApplicationStatus.REJECTED ->
+                                        "Not selected"
+                                    VolunteerApplicationStatus.COMPLETED ->
+                                        "Completed"
+                                    VolunteerApplicationStatus.CANCELLED ->
+                                        "Cancelled"
                                 }
-                        },
+                            }
+                            ?: when (
+                                volunteerOpportunityRole
+                                    .roleApplicationMethod
+                            ) {
+                                VolunteerRoleApplicationMethod
+                                    .INSTANT_JOIN ->
+                                    "Instant join"
+
+                                VolunteerRoleApplicationMethod
+                                    .REVIEW_APPLICANTS ->
+                                    if (
+                                        volunteerOpportunityRole
+                                            .roleApplicationFlow ==
+                                        VolunteerRoleApplicationFlow
+                                            .ADDITIONAL_FORM
+                                    ) {
+                                        "Application form"
+                                    } else {
+                                        "Review required"
+                                    }
+                            },
                     fontSize = 11.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = VolunteerLinkInformation
+                    color =
+                        if (existingApplication != null) {
+                            VolunteerLinkPrimaryGreen
+                        } else {
+                            VolunteerLinkInformation
+                        }
                 )
 
                 Text(
@@ -733,6 +786,17 @@ private fun VolunteerOpportunityRoleCard(
                 )
             }
         }
+    }
+}
+
+private fun opportunitySkillPathLevelName(
+    level: Int
+): String {
+    return when (level) {
+        1 -> "Beginner"
+        2 -> "Intermediate"
+        3 -> "Advanced"
+        else -> "Level $level"
     }
 }
 

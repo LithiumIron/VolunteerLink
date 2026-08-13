@@ -99,6 +99,19 @@ object VolunteerOpportunityNavigationRoutes {
     }
 
 
+    // Certificate issued for a completed application
+    const val VOLUNTEER_CERTIFICATE_ROUTE =
+        "volunteer_certificate/" +
+                "{$VOLUNTEER_APPLICATION_ID_ARGUMENT}"
+
+    fun createVolunteerCertificateRoute(
+        volunteerApplicationId: Int
+    ): String {
+        return "volunteer_certificate/" +
+                volunteerApplicationId
+    }
+
+
     // Skill Path Details
     const val VOLUNTEER_SKILL_PATH_DETAILS_ROUTE =
         "volunteer_skill_path_details/" +

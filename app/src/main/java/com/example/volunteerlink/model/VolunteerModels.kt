@@ -47,7 +47,10 @@ data class VolunteerOpportunityRole(
 
     val roleApplicationMethod:
     VolunteerRoleApplicationMethod =
-        VolunteerRoleApplicationMethod.REVIEW_APPLICANTS
+        VolunteerRoleApplicationMethod.REVIEW_APPLICANTS,
+
+    // Stable Supabase primary key, for secure RPC calls.
+    val roleDatabaseId: String = ""
 )
 
 enum class VolunteerOpportunityCategory {
@@ -84,7 +87,11 @@ data class VolunteerOpportunityEvent(
     val eventCauseName: String = "",
     val eventContactEmail: String = "",
     val eventContactPhone: String = "",
-    val eventShareLink: String = ""
+    val eventShareLink: String = "",
+
+    // Stable Supabase primary key. eventId remains the navigation-safe Int.
+    val eventDatabaseId: String = "",
+    val eventStatus: String = "PUBLISHED"
 )
 
 // Volunteer application status.
@@ -111,7 +118,19 @@ data class VolunteerOpportunityApplication(
     val applicationStatusMessage: String = "",
     val applicationRejectionReason: String? = null,
     val applicationVerifiedHours: Int? = null,
-    val applicationCertificateId: String? = null
+    val applicationVerifiedMinutes: Int? = null,
+    val applicationCertificateId: String? = null,
+    val applicationCompletedDate: String? = null,
+    val applicationOrganisationFeedback: String? = null,
+    val applicationVolunteerName: String = "VolunteerLink Volunteer",
+    val applicationEventDate: String? = null,
+    val applicationEventTime: String? = null,
+    val applicationEventLocation: String? = null,
+    val applicationPrimarySkillPath: String? = null,
+    val applicationPractisedSkills: List<String> = emptyList(),
+
+    // Stable Supabase primary key, used when cancelling an application.
+    val applicationDatabaseId: String = ""
 )
 
 // Temporary model used by the Map teammate's prototype.

@@ -7,6 +7,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.volunteerlink.organisation.navigation.OrganisationNavigationHost
 import com.example.volunteerlink.screens.UserTypeSelectionScreen
+import com.example.volunteerlink.screens.VolunteerSignInScreen
 
 /**
  * Root navigation graph for the whole application.
@@ -25,10 +26,28 @@ fun AppNavGraph(
         composable(AppRoutes.USER_TYPE_SELECTION) {
             UserTypeSelectionScreen(
                 onVolunteerClick = {
-                    navController.navigate(AppRoutes.VOLUNTEER)
+                    navController.navigate(
+                        AppRoutes.VOLUNTEER_LOGIN
+                    )
                 },
                 onOrganisationClick = {
                     navController.navigate(AppRoutes.ORGANISATION)
+                }
+            )
+        }
+
+        composable(AppRoutes.VOLUNTEER_LOGIN) {
+            VolunteerSignInScreen(
+                onBackSelected = {
+                    navController.popBackStack()
+                },
+                onSignedIn = {
+                    navController.navigate(AppRoutes.VOLUNTEER) {
+                        popUpTo(AppRoutes.VOLUNTEER_LOGIN) {
+                            inclusive = true
+                        }
+                        launchSingleTop = true
+                    }
                 }
             )
         }

@@ -9,6 +9,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -17,28 +20,54 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.volunteerlink.data.VolunteerOpportunitySessionStore
 import com.example.volunteerlink.screens.MapScreen
 import com.example.volunteerlink.screens.VolunteerApplicationDetailsScreen
 import com.example.volunteerlink.screens.VolunteerApplicationScreen
+import com.example.volunteerlink.screens.VolunteerCertificateScreen
 import com.example.volunteerlink.screens.VolunteerHomeScreen
 import com.example.volunteerlink.screens.VolunteerMyApplicationsScreen
 import com.example.volunteerlink.screens.VolunteerOpportunityDetailsScreen
+import com.example.volunteerlink.screens.VolunteerOpportunityViewModel
 import com.example.volunteerlink.screens.VolunteerRoleDetailsScreen
 import com.example.volunteerlink.screens.VolunteerSearchScreen
 import com.example.volunteerlink.screens.VolunteerSkillPathDetailsScreen
 import com.example.volunteerlink.screens.VolunteerSkillPathScreen
 import com.example.volunteerlink.ui.theme.VolunteerLinkBackground
+import com.example.volunteerlink.ui.theme.VolunteerLinkPrimaryGreen
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextPrimary
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextSecondary
 
 @Composable
 fun VolunteerOpportunityNavigationHost() {
+    val volunteerOpportunityViewModel:
+        VolunteerOpportunityViewModel = viewModel()
+
+    val opportunityUiState by
+        volunteerOpportunityViewModel.uiState
+            .collectAsStateWithLifecycle()
+
+    if (opportunityUiState.isLoading) {
+        VolunteerOpportunityLoadingScreen()
+        return
+    }
+
+    opportunityUiState.errorMessage?.let { errorMessage ->
+        VolunteerOpportunityLoadErrorScreen(
+            errorMessage = errorMessage,
+            onRetry = volunteerOpportunityViewModel::retry
+        )
+        return
+    }
+
     val volunteerNavigationController =
         rememberNavController()
 
@@ -404,7 +433,9 @@ fun VolunteerOpportunityNavigationHost() {
 
                                     launchSingleTop = true
                                 }
-                        }
+                        },
+                        volunteerOpportunityViewModel =
+                            volunteerOpportunityViewModel
                     )
                 }
 
@@ -464,6 +495,53 @@ fun VolunteerOpportunityNavigationHost() {
                                                 volunteerRoleId
                                         )
                                 )
+                        },
+                        onCertificateSelected = {
+                                volunteerApplicationId ->
+
+                            volunteerNavigationController
+                                .navigate(
+                                    VolunteerOpportunityNavigationRoutes
+                                        .createVolunteerCertificateRoute(
+                                            volunteerApplicationId
+                                        )
+                                )
+                        },
+                        volunteerOpportunityViewModel =
+                            volunteerOpportunityViewModel
+                    )
+                }
+
+                // Certificate for a completed volunteer role
+                composable(
+                    route =
+                        VolunteerOpportunityNavigationRoutes
+                            .VOLUNTEER_CERTIFICATE_ROUTE,
+                    arguments =
+                        listOf(
+                            navArgument(
+                                VolunteerOpportunityNavigationRoutes
+                                    .VOLUNTEER_APPLICATION_ID_ARGUMENT
+                            ) {
+                                type = NavType.IntType
+                            }
+                        )
+                ) { navigationBackStackEntry ->
+                    val volunteerApplicationId =
+                        navigationBackStackEntry
+                            .arguments
+                            ?.getInt(
+                                VolunteerOpportunityNavigationRoutes
+                                    .VOLUNTEER_APPLICATION_ID_ARGUMENT
+                            )
+                            ?: return@composable
+
+                    VolunteerCertificateScreen(
+                        volunteerApplicationId =
+                            volunteerApplicationId,
+                        onBackSelected = {
+                            volunteerNavigationController
+                                .popBackStack()
                         }
                     )
                 }
@@ -474,7 +552,22 @@ fun VolunteerOpportunityNavigationHost() {
                         VolunteerOpportunityNavigationRoutes
                             .VOLUNTEER_MAP_ROUTE
                 ) {
-                    MapScreen()
+                    MapScreen(
+                        volunteerOpportunityEvents =
+                            VolunteerOpportunitySessionStore
+                                .volunteerOpportunityEvents
+                                .toList(),
+                        onEventSelected = {
+                                volunteerEventId ->
+
+                            volunteerNavigationController.navigate(
+                                VolunteerOpportunityNavigationRoutes
+                                    .createVolunteerOpportunityDetailsRoute(
+                                        volunteerEventId
+                                    )
+                            )
+                        }
+                    )
                 }
 
                 // Skill Path
@@ -528,6 +621,20 @@ fun VolunteerOpportunityNavigationHost() {
                         onBackSelected = {
                             volunteerNavigationController
                                 .popBackStack()
+                        },
+                        onVolunteerRoleSelected = {
+                                volunteerEventId,
+                                volunteerRoleId ->
+
+                            volunteerNavigationController.navigate(
+                                VolunteerOpportunityNavigationRoutes
+                                    .createVolunteerRoleDetailsRoute(
+                                        volunteerEventId =
+                                            volunteerEventId,
+                                        volunteerRoleId =
+                                            volunteerRoleId
+                                    )
+                            )
                         }
                     )
                 }
@@ -593,6 +700,68 @@ fun VolunteerOpportunityNavigationHost() {
                     }
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun VolunteerOpportunityLoadingScreen() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(VolunteerLinkBackground),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        CircularProgressIndicator(
+            color = VolunteerLinkPrimaryGreen
+        )
+
+        Text(
+            text = "Loading opportunities from Supabase...",
+            modifier = Modifier.padding(top = 14.dp),
+            fontSize = 13.sp,
+            color = VolunteerLinkTextSecondary
+        )
+    }
+}
+
+@Composable
+private fun VolunteerOpportunityLoadErrorScreen(
+    errorMessage: String,
+    onRetry: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(VolunteerLinkBackground)
+            .statusBarsPadding()
+            .padding(28.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = "Unable to load volunteer data",
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+            color = VolunteerLinkTextPrimary
+        )
+
+        Text(
+            text = errorMessage,
+            modifier = Modifier.padding(top = 8.dp),
+            fontSize = 13.sp,
+            color = VolunteerLinkTextSecondary
+        )
+
+        Button(
+            onClick = onRetry,
+            modifier = Modifier.padding(top = 20.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = VolunteerLinkPrimaryGreen
+            )
+        ) {
+            Text("Retry")
         }
     }
 }
