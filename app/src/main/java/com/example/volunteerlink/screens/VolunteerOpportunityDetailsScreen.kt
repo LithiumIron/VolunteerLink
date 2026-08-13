@@ -51,6 +51,7 @@ import com.example.volunteerlink.model.VolunteerOpportunityCategory
 import com.example.volunteerlink.model.VolunteerOpportunityEvent
 import com.example.volunteerlink.model.VolunteerOpportunityRole
 import com.example.volunteerlink.model.VolunteerRoleApplicationFlow
+import com.example.volunteerlink.model.VolunteerRoleApplicationMethod
 import com.example.volunteerlink.ui.theme.VolunteerLinkBackground
 import com.example.volunteerlink.ui.theme.VolunteerLinkBorderColour
 import com.example.volunteerlink.ui.theme.VolunteerLinkError
@@ -700,15 +701,24 @@ private fun VolunteerOpportunityRoleCard(
                     text =
                         when (
                             volunteerOpportunityRole
-                                .roleApplicationFlow
+                                .roleApplicationMethod
                         ) {
-                            VolunteerRoleApplicationFlow
-                                .DIRECT_SUBMISSION ->
-                                "Quick apply"
+                            VolunteerRoleApplicationMethod
+                                .INSTANT_JOIN ->
+                                "Instant join"
 
-                            VolunteerRoleApplicationFlow
-                                .ADDITIONAL_FORM ->
-                                "Application form"
+                            VolunteerRoleApplicationMethod
+                                .REVIEW_APPLICANTS ->
+                                if (
+                                    volunteerOpportunityRole
+                                        .roleApplicationFlow ==
+                                    VolunteerRoleApplicationFlow
+                                        .ADDITIONAL_FORM
+                                ) {
+                                    "Application form"
+                                } else {
+                                    "Review required"
+                                }
                         },
                     fontSize = 11.sp,
                     fontWeight = FontWeight.SemiBold,

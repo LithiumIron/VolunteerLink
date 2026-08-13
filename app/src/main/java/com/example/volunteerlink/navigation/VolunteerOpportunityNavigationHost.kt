@@ -24,11 +24,15 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.volunteerlink.screens.MapScreen
+import com.example.volunteerlink.screens.VolunteerApplicationDetailsScreen
 import com.example.volunteerlink.screens.VolunteerApplicationScreen
 import com.example.volunteerlink.screens.VolunteerHomeScreen
+import com.example.volunteerlink.screens.VolunteerMyApplicationsScreen
 import com.example.volunteerlink.screens.VolunteerOpportunityDetailsScreen
 import com.example.volunteerlink.screens.VolunteerRoleDetailsScreen
 import com.example.volunteerlink.screens.VolunteerSearchScreen
+import com.example.volunteerlink.screens.VolunteerSkillPathDetailsScreen
+import com.example.volunteerlink.screens.VolunteerSkillPathScreen
 import com.example.volunteerlink.ui.theme.VolunteerLinkBackground
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextPrimary
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextSecondary
@@ -131,6 +135,26 @@ fun VolunteerOpportunityNavigationHost() {
                                             volunteerEventId
                                         )
                                 )
+                        },
+
+                        onVolunteerApplicationSelected = {
+                                volunteerApplicationId ->
+
+                            volunteerNavigationController
+                                .navigate(
+                                    VolunteerOpportunityNavigationRoutes
+                                        .createVolunteerApplicationDetailsRoute(
+                                            volunteerApplicationId
+                                        )
+                                )
+                        },
+
+                        onViewAllApplicationsSelected = {
+                            volunteerNavigationController
+                                .navigate(
+                                    VolunteerOpportunityNavigationRoutes
+                                        .VOLUNTEER_MY_APPLICATIONS_ROUTE
+                                )
                         }
                     )
                 }
@@ -155,6 +179,31 @@ fun VolunteerOpportunityNavigationHost() {
                                     VolunteerOpportunityNavigationRoutes
                                         .createVolunteerOpportunityDetailsRoute(
                                             volunteerEventId
+                                        )
+                                )
+                        }
+                    )
+                }
+
+                // My Applications
+                composable(
+                    route =
+                        VolunteerOpportunityNavigationRoutes
+                            .VOLUNTEER_MY_APPLICATIONS_ROUTE
+                ) {
+                    VolunteerMyApplicationsScreen(
+                        onBackSelected = {
+                            volunteerNavigationController
+                                .popBackStack()
+                        },
+                        onVolunteerApplicationSelected = {
+                                volunteerApplicationId ->
+
+                            volunteerNavigationController
+                                .navigate(
+                                    VolunteerOpportunityNavigationRoutes
+                                        .createVolunteerApplicationDetailsRoute(
+                                            volunteerApplicationId
                                         )
                                 )
                         }
@@ -359,6 +408,66 @@ fun VolunteerOpportunityNavigationHost() {
                     )
                 }
 
+                // Application Details
+                composable(
+                    route =
+                        VolunteerOpportunityNavigationRoutes
+                            .VOLUNTEER_APPLICATION_DETAILS_ROUTE,
+                    arguments =
+                        listOf(
+                            navArgument(
+                                VolunteerOpportunityNavigationRoutes
+                                    .VOLUNTEER_APPLICATION_ID_ARGUMENT
+                            ) {
+                                type = NavType.IntType
+                            }
+                        )
+                ) { navigationBackStackEntry ->
+                    val volunteerApplicationId =
+                        navigationBackStackEntry
+                            .arguments
+                            ?.getInt(
+                                VolunteerOpportunityNavigationRoutes
+                                    .VOLUNTEER_APPLICATION_ID_ARGUMENT
+                            )
+                            ?: return@composable
+
+                    VolunteerApplicationDetailsScreen(
+                        volunteerApplicationId =
+                            volunteerApplicationId,
+                        onBackSelected = {
+                            volunteerNavigationController
+                                .popBackStack()
+                        },
+                        onVolunteerOpportunitySelected = {
+                                volunteerEventId ->
+
+                            volunteerNavigationController
+                                .navigate(
+                                    VolunteerOpportunityNavigationRoutes
+                                        .createVolunteerOpportunityDetailsRoute(
+                                            volunteerEventId
+                                        )
+                                )
+                        },
+                        onVolunteerRoleSelected = {
+                                volunteerEventId,
+                                volunteerRoleId ->
+
+                            volunteerNavigationController
+                                .navigate(
+                                    VolunteerOpportunityNavigationRoutes
+                                        .createVolunteerRoleDetailsRoute(
+                                            volunteerEventId =
+                                                volunteerEventId,
+                                            volunteerRoleId =
+                                                volunteerRoleId
+                                        )
+                                )
+                        }
+                    )
+                }
+
                 // Map
                 composable(
                     route =
@@ -374,8 +483,52 @@ fun VolunteerOpportunityNavigationHost() {
                         VolunteerOpportunityNavigationRoutes
                             .VOLUNTEER_SKILL_PATH_ROUTE
                 ) {
-                    VolunteerTemporaryModuleScreen(
-                        moduleTitle = "Skill Path"
+                    VolunteerSkillPathScreen(
+                        onSkillPathSelected = {
+                                volunteerSkillPathId ->
+
+                            volunteerNavigationController
+                                .navigate(
+                                    VolunteerOpportunityNavigationRoutes
+                                        .createVolunteerSkillPathDetailsRoute(
+                                            volunteerSkillPathId
+                                        )
+                                )
+                        }
+                    )
+                }
+
+                // Skill Path Details
+                composable(
+                    route =
+                        VolunteerOpportunityNavigationRoutes
+                            .VOLUNTEER_SKILL_PATH_DETAILS_ROUTE,
+                    arguments =
+                        listOf(
+                            navArgument(
+                                VolunteerOpportunityNavigationRoutes
+                                    .VOLUNTEER_SKILL_PATH_ID_ARGUMENT
+                            ) {
+                                type = NavType.StringType
+                            }
+                        )
+                ) { navigationBackStackEntry ->
+                    val volunteerSkillPathId =
+                        navigationBackStackEntry
+                            .arguments
+                            ?.getString(
+                                VolunteerOpportunityNavigationRoutes
+                                    .VOLUNTEER_SKILL_PATH_ID_ARGUMENT
+                            )
+                            ?: return@composable
+
+                    VolunteerSkillPathDetailsScreen(
+                        skillPathId =
+                            volunteerSkillPathId,
+                        onBackSelected = {
+                            volunteerNavigationController
+                                .popBackStack()
+                        }
                     )
                 }
 

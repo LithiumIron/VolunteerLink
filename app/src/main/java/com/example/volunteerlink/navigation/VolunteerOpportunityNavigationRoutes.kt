@@ -37,6 +37,9 @@ object VolunteerOpportunityNavigationRoutes {
     const val VOLUNTEER_APPLICATION_ID_ARGUMENT =
         "volunteerApplicationId"
 
+    const val VOLUNTEER_SKILL_PATH_ID_ARGUMENT =
+        "volunteerSkillPathId"
+
 
     // Opportunity Details
     const val VOLUNTEER_OPPORTUNITY_DETAILS_ROUTE =
@@ -93,5 +96,18 @@ object VolunteerOpportunityNavigationRoutes {
     ): String {
         return "volunteer_application_details/" +
                 volunteerApplicationId
+    }
+
+
+    // Skill Path Details
+    const val VOLUNTEER_SKILL_PATH_DETAILS_ROUTE =
+        "volunteer_skill_path_details/" +
+                "{$VOLUNTEER_SKILL_PATH_ID_ARGUMENT}"
+
+    fun createVolunteerSkillPathDetailsRoute(
+        volunteerSkillPathId: String
+    ): String {
+        return "volunteer_skill_path_details/" +
+                volunteerSkillPathId
     }
 }

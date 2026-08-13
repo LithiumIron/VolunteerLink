@@ -6,6 +6,7 @@ import com.example.volunteerlink.model.VolunteerOpportunityCategory
 import com.example.volunteerlink.model.VolunteerOpportunityEvent
 import com.example.volunteerlink.model.VolunteerOpportunityRole
 import com.example.volunteerlink.model.VolunteerRoleApplicationFlow
+import com.example.volunteerlink.model.VolunteerRoleApplicationMethod
 import com.example.volunteerlink.model.VolunteerRoleScheduleItem
 import androidx.compose.runtime.mutableStateListOf
 
@@ -41,8 +42,9 @@ object VolunteerOpportunitySampleData {
 
                         VolunteerOpportunityRole(
                             roleId = 101,
+                            roleTemplateId = "ROLE004",
                             roleTitle =
-                                "Communication Assistant",
+                                "Greeter & Check-in Assistant",
                             roleLevel = "Beginner",
                             roleVacancies = 5,
                             rolePrimarySkillPath =
@@ -95,13 +97,17 @@ object VolunteerOpportunitySampleData {
                             roleMinimumSkillPathLevel = 1,
                             roleApplicationFlow =
                                 VolunteerRoleApplicationFlow
-                                    .DIRECT_SUBMISSION
+                                    .DIRECT_SUBMISSION,
+                            roleApplicationMethod =
+                                VolunteerRoleApplicationMethod
+                                    .INSTANT_JOIN
                         ),
 
                         VolunteerOpportunityRole(
                             roleId = 102,
+                            roleTemplateId = "ROLE007",
                             roleTitle =
-                                "Logistics Assistant",
+                                "Equipment & Supply Assistant",
                             roleLevel = "Intermediate",
                             roleVacancies = 6,
                             rolePrimarySkillPath =
@@ -157,7 +163,10 @@ object VolunteerOpportunitySampleData {
                             roleMinimumSkillPathLevel = 2,
                             roleApplicationFlow =
                                 VolunteerRoleApplicationFlow
-                                    .ADDITIONAL_FORM
+                                    .ADDITIONAL_FORM,
+                            roleApplicationMethod =
+                                VolunteerRoleApplicationMethod
+                                    .REVIEW_APPLICANTS
                         )
                     ),
 
@@ -199,8 +208,9 @@ object VolunteerOpportunitySampleData {
                     listOf(
                         VolunteerOpportunityRole(
                             roleId = 201,
+                            roleTemplateId = "ROLE007",
                             roleTitle =
-                                "Distribution Assistant",
+                                "Equipment & Supply Assistant",
                             roleLevel = "Beginner",
                             roleVacancies = 12,
                             rolePrimarySkillPath =
@@ -251,7 +261,10 @@ object VolunteerOpportunitySampleData {
                             roleMinimumSkillPathLevel = 1,
                             roleApplicationFlow =
                                 VolunteerRoleApplicationFlow
-                                    .DIRECT_SUBMISSION
+                                    .DIRECT_SUBMISSION,
+                            roleApplicationMethod =
+                                VolunteerRoleApplicationMethod
+                                    .INSTANT_JOIN
                         )
                     ),
 
@@ -294,8 +307,9 @@ object VolunteerOpportunitySampleData {
                     listOf(
                         VolunteerOpportunityRole(
                             roleId = 301,
+                            roleTemplateId = "ROLE022",
                             roleTitle =
-                                "Online Content Assistant",
+                                "Content Writer",
                             roleLevel = "Beginner",
                             roleVacancies = 8,
                             rolePrimarySkillPath =
@@ -351,7 +365,10 @@ object VolunteerOpportunitySampleData {
                             roleMinimumSkillPathLevel = 1,
                             roleApplicationFlow =
                                 VolunteerRoleApplicationFlow
-                                    .ADDITIONAL_FORM
+                                    .ADDITIONAL_FORM,
+                            roleApplicationMethod =
+                                VolunteerRoleApplicationMethod
+                                    .REVIEW_APPLICANTS
                         )
                     ),
 
@@ -379,7 +396,7 @@ object VolunteerOpportunitySampleData {
             applicationOrganisationName =
                 "Green Earth Society",
             applicationRoleTitle =
-                "Logistics Assistant",
+                "Equipment & Supply Assistant",
             applicationSubmittedDate =
                 "2 days ago",
             applicationStatus =
@@ -397,7 +414,7 @@ object VolunteerOpportunitySampleData {
                 applicationOrganisationName =
                     "Community Food Support",
                 applicationRoleTitle =
-                    "Distribution Assistant",
+                    "Equipment & Supply Assistant",
                 applicationSubmittedDate =
                     "1 week ago",
                 applicationStatus =
@@ -484,13 +501,31 @@ object VolunteerOpportunitySampleData {
                 applicationSubmittedDate =
                     "Just now",
                 applicationStatus =
-                    VolunteerApplicationStatus.PENDING,
+                    if (
+                        volunteerOpportunityRole
+                            .roleApplicationMethod ==
+                        VolunteerRoleApplicationMethod
+                            .INSTANT_JOIN
+                    ) {
+                        VolunteerApplicationStatus.ACCEPTED
+                    } else {
+                        VolunteerApplicationStatus.PENDING
+                    },
                 applicationRoleId =
                     volunteerOpportunityRole
                         .roleId,
                 applicationStatusMessage =
-                    "Your application has been submitted " +
-                            "and is waiting for organisation review."
+                    if (
+                        volunteerOpportunityRole
+                            .roleApplicationMethod ==
+                        VolunteerRoleApplicationMethod
+                            .INSTANT_JOIN
+                    ) {
+                        "You joined this role successfully."
+                    } else {
+                        "Your application has been submitted " +
+                                "and is waiting for organisation review."
+                    }
             )
 
         volunteerApplications.add(
@@ -532,5 +567,40 @@ object VolunteerOpportunitySampleData {
                     .applicationId ==
                         applicationId
             }
+    }
+
+    fun cancelApplication(
+        applicationId: Int
+    ): Boolean {
+        val applicationIndex =
+            volunteerApplications.indexOfFirst {
+                    volunteerOpportunityApplication ->
+                volunteerOpportunityApplication.applicationId ==
+                        applicationId
+            }
+
+        if (applicationIndex == -1) {
+            return false
+        }
+
+        val existingApplication =
+            volunteerApplications[applicationIndex]
+
+        if (
+            existingApplication.applicationStatus !=
+            VolunteerApplicationStatus.PENDING
+        ) {
+            return false
+        }
+
+        volunteerApplications[applicationIndex] =
+            existingApplication.copy(
+                applicationStatus =
+                    VolunteerApplicationStatus.CANCELLED,
+                applicationStatusMessage =
+                    "You cancelled this application."
+            )
+
+        return true
     }
 }

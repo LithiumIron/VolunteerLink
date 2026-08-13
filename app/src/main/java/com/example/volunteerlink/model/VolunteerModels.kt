@@ -6,6 +6,12 @@ enum class VolunteerRoleApplicationFlow {
     ADDITIONAL_FORM
 }
 
+// Mirrors post_roles.application_method in Supabase.
+enum class VolunteerRoleApplicationMethod {
+    INSTANT_JOIN,
+    REVIEW_APPLICANTS
+}
+
 // One activity shown in the role schedule.
 data class VolunteerRoleScheduleItem(
     val scheduleTime: String,
@@ -15,6 +21,7 @@ data class VolunteerRoleScheduleItem(
 // Volunteer role data model.
 data class VolunteerOpportunityRole(
     val roleId: Int,
+    val roleTemplateId: String,
     val roleTitle: String,
     val roleLevel: String,
     val roleVacancies: Int,
@@ -36,7 +43,11 @@ data class VolunteerOpportunityRole(
     // Both flows use the same Join Event action.
     val roleApplicationFlow:
     VolunteerRoleApplicationFlow =
-        VolunteerRoleApplicationFlow.DIRECT_SUBMISSION
+        VolunteerRoleApplicationFlow.DIRECT_SUBMISSION,
+
+    val roleApplicationMethod:
+    VolunteerRoleApplicationMethod =
+        VolunteerRoleApplicationMethod.REVIEW_APPLICANTS
 )
 
 enum class VolunteerOpportunityCategory {

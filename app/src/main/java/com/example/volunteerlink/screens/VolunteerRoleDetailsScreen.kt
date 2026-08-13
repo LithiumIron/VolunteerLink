@@ -41,6 +41,7 @@ import com.example.volunteerlink.data.VolunteerOpportunitySampleData
 import com.example.volunteerlink.model.VolunteerOpportunityEvent
 import com.example.volunteerlink.model.VolunteerOpportunityRole
 import com.example.volunteerlink.model.VolunteerRoleApplicationFlow
+import com.example.volunteerlink.model.VolunteerRoleApplicationMethod
 import com.example.volunteerlink.ui.theme.VolunteerLinkBackground
 import com.example.volunteerlink.ui.theme.VolunteerLinkBorderColour
 import com.example.volunteerlink.ui.theme.VolunteerLinkError
@@ -90,6 +91,13 @@ fun VolunteerRoleDetailsScreen(
         currentVolunteerSkillPathLevel >=
                 volunteerOpportunityRole
                     .roleMinimumSkillPathLevel
+
+    val volunteerHasApplied =
+        VolunteerOpportunitySampleData
+            .hasApplicationForRole(
+                eventId = volunteerEventId,
+                roleId = volunteerRoleId
+            )
 
     Column(
         modifier = Modifier
@@ -195,6 +203,8 @@ fun VolunteerRoleDetailsScreen(
                 volunteerOpportunityRole,
             volunteerIsEligible =
                 volunteerIsEligible,
+            volunteerHasApplied =
+                volunteerHasApplied,
             onJoinRoleSelected = {
                 onJoinRoleSelected(
                     volunteerOpportunityEvent.eventId,
@@ -692,6 +702,7 @@ private fun VolunteerRoleJoinSection(
     volunteerOpportunityRole:
     VolunteerOpportunityRole,
     volunteerIsEligible: Boolean,
+    volunteerHasApplied: Boolean,
     onJoinRoleSelected: () -> Unit
 ) {
     Surface(
@@ -708,7 +719,9 @@ private fun VolunteerRoleJoinSection(
         ) {
             Button(
                 onClick = onJoinRoleSelected,
-                enabled = volunteerIsEligible,
+                enabled =
+                    volunteerIsEligible &&
+                            !volunteerHasApplied,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp),
@@ -725,20 +738,31 @@ private fun VolunteerRoleJoinSection(
             ) {
                 Text(
                     text =
-                        if (!volunteerIsEligible) {
+                        if (volunteerHasApplied) {
+                            "Already Registered"
+                        } else if (!volunteerIsEligible) {
                             "Skill Path Level Required"
                         } else {
                             when (
                                 volunteerOpportunityRole
-                                    .roleApplicationFlow
+                                    .roleApplicationMethod
                             ) {
-                                VolunteerRoleApplicationFlow
-                                    .DIRECT_SUBMISSION ->
+                                VolunteerRoleApplicationMethod
+                                    .INSTANT_JOIN ->
                                     "Join Event"
 
-                                VolunteerRoleApplicationFlow
-                                    .ADDITIONAL_FORM ->
-                                    "Continue to Application"
+                                VolunteerRoleApplicationMethod
+                                    .REVIEW_APPLICANTS ->
+                                    if (
+                                        volunteerOpportunityRole
+                                            .roleApplicationFlow ==
+                                        VolunteerRoleApplicationFlow
+                                            .ADDITIONAL_FORM
+                                    ) {
+                                        "Continue to Application"
+                                    } else {
+                                        "Apply for Role"
+                                    }
                             }
                         },
                     fontSize = 14.sp,
@@ -752,21 +776,48 @@ private fun VolunteerRoleJoinSection(
 
             Text(
                 text =
-                    when (
+                    if (volunteerHasApplied) {
+                        "Already registered — track status in My Applications."
+                    } else when (
                         volunteerOpportunityRole
-                            .roleApplicationFlow
+                            .roleApplicationMethod
                     ) {
-                        VolunteerRoleApplicationFlow
-                            .DIRECT_SUBMISSION ->
-                            "This role supports quick application."
+                        VolunteerRoleApplicationMethod
+                            .INSTANT_JOIN ->
+                            "No organisation review is required."
 
-                        VolunteerRoleApplicationFlow
-                            .ADDITIONAL_FORM ->
-                            "Additional questions are required."
+                        VolunteerRoleApplicationMethod
+                            .REVIEW_APPLICANTS ->
+                            if (
+                                volunteerOpportunityRole
+                                    .roleApplicationFlow ==
+                                VolunteerRoleApplicationFlow
+                                    .ADDITIONAL_FORM
+                            ) {
+                                "Additional questions are required."
+                            } else {
+                                "The organisation will review your application."
+                            }
                     },
                 modifier = Modifier.fillMaxWidth(),
-                fontSize = 10.sp,
-                color = VolunteerLinkTextSecondary
+                fontSize =
+                    if (volunteerHasApplied) {
+                        12.sp
+                    } else {
+                        10.sp
+                    },
+                fontWeight =
+                    if (volunteerHasApplied) {
+                        FontWeight.SemiBold
+                    } else {
+                        FontWeight.Normal
+                    },
+                color =
+                    if (volunteerHasApplied) {
+                        VolunteerLinkPrimaryGreen
+                    } else {
+                        VolunteerLinkTextSecondary
+                    }
             )
         }
     }

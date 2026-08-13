@@ -51,6 +51,7 @@ import com.example.volunteerlink.model.VolunteerOpportunityApplication
 import com.example.volunteerlink.model.VolunteerOpportunityEvent
 import com.example.volunteerlink.model.VolunteerOpportunityRole
 import com.example.volunteerlink.model.VolunteerRoleApplicationFlow
+import com.example.volunteerlink.model.VolunteerRoleApplicationMethod
 import com.example.volunteerlink.ui.theme.VolunteerLinkBackground
 import com.example.volunteerlink.ui.theme.VolunteerLinkBorderColour
 import com.example.volunteerlink.ui.theme.VolunteerLinkError
@@ -209,6 +210,12 @@ private fun VolunteerApplicationFormScreen(
                 VolunteerRoleApplicationFlow
                     .ADDITIONAL_FORM
 
+    val applicationIsInstantJoin =
+        volunteerOpportunityRole
+            .roleApplicationMethod ==
+                VolunteerRoleApplicationMethod
+                    .INSTANT_JOIN
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -219,6 +226,8 @@ private fun VolunteerApplicationFormScreen(
         VolunteerApplicationTopBar(
             applicationNeedsAdditionalForm =
                 applicationNeedsAdditionalForm,
+            applicationIsInstantJoin =
+                applicationIsInstantJoin,
             onBackSelected =
                 onBackSelected
         )
@@ -276,9 +285,12 @@ private fun VolunteerApplicationFormScreen(
                                 "additional information before " +
                                 "reviewing your application."
                     } else {
-                        "This role supports quick application. " +
-                                "Review the role information " +
-                                "before submitting."
+                        if (applicationIsInstantJoin) {
+                            "This role supports instant joining. " +
+                                    "Confirm your availability to secure the role."
+                        } else {
+                            "Review the role information before submitting."
+                        }
                     },
                 fontSize = 12.sp,
                 lineHeight = 18.sp,
@@ -413,11 +425,16 @@ private fun VolunteerApplicationFormScreen(
 
                         Text(
                             text =
-                                "Your application will be sent to " +
-                                        volunteerOpportunityEvent
-                                            .eventOrganisationName +
-                                        ". You can check its status " +
-                                        "from My Applications.",
+                                if (applicationIsInstantJoin) {
+                                    "Your place will be confirmed immediately. " +
+                                            "The role will appear in My Applications."
+                                } else {
+                                    "Your application will be sent to " +
+                                            volunteerOpportunityEvent
+                                                .eventOrganisationName +
+                                            ". You can check its status " +
+                                            "from My Applications."
+                                },
                             fontSize = 12.sp,
                             lineHeight = 18.sp,
                             color =
@@ -571,7 +588,12 @@ private fun VolunteerApplicationFormScreen(
                     )
             ) {
                 Text(
-                    text = "Submit Application",
+                    text =
+                        if (applicationIsInstantJoin) {
+                            "Join Role"
+                        } else {
+                            "Submit Application"
+                        },
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -583,6 +605,7 @@ private fun VolunteerApplicationFormScreen(
 @Composable
 private fun VolunteerApplicationTopBar(
     applicationNeedsAdditionalForm: Boolean,
+    applicationIsInstantJoin: Boolean,
     onBackSelected: () -> Unit
 ) {
     Row(
@@ -617,6 +640,8 @@ private fun VolunteerApplicationTopBar(
                     applicationNeedsAdditionalForm
                 ) {
                     "Role Application"
+                } else if (applicationIsInstantJoin) {
+                    "Instant Join"
                 } else {
                     "Quick Application"
                 },
@@ -781,6 +806,12 @@ private fun VolunteerApplicationSuccessScreen(
     VolunteerOpportunityRole,
     onReturnHomeSelected: () -> Unit
 ) {
+    val applicationIsInstantJoin =
+        volunteerOpportunityRole
+            .roleApplicationMethod ==
+                VolunteerRoleApplicationMethod
+                    .INSTANT_JOIN
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -810,7 +841,11 @@ private fun VolunteerApplicationSuccessScreen(
                     imageVector =
                         Icons.Filled.CheckCircle,
                     contentDescription =
-                        "Application submitted",
+                        if (applicationIsInstantJoin) {
+                            "Role joined"
+                        } else {
+                            "Application submitted"
+                        },
                     modifier =
                         Modifier.size(52.dp),
                     tint = VolunteerLinkSuccess
@@ -823,7 +858,12 @@ private fun VolunteerApplicationSuccessScreen(
         )
 
         Text(
-            text = "Application Submitted",
+            text =
+                if (applicationIsInstantJoin) {
+                    "Role Joined"
+                } else {
+                    "Application Submitted"
+                },
             fontSize = 23.sp,
             fontWeight = FontWeight.Bold,
             color = VolunteerLinkTextPrimary
@@ -835,13 +875,23 @@ private fun VolunteerApplicationSuccessScreen(
 
         Text(
             text =
-                "Your application for " +
+                if (applicationIsInstantJoin) {
+                    "Your place for " +
+                            volunteerOpportunityRole
+                                .roleTitle +
+                            " with " +
+                            volunteerOpportunityEvent
+                                .eventOrganisationName +
+                            " is confirmed."
+                } else {
+                    "Your application for " +
                         volunteerOpportunityRole
                             .roleTitle +
                         " has been sent to " +
                         volunteerOpportunityEvent
                             .eventOrganisationName +
-                        ".",
+                        "."
+                },
             fontSize = 13.sp,
             lineHeight = 20.sp,
             color = VolunteerLinkTextSecondary
@@ -950,6 +1000,11 @@ private fun VolunteerExistingApplicationScreen(
                     .roleApplicationFlow ==
                         VolunteerRoleApplicationFlow
                             .ADDITIONAL_FORM,
+            applicationIsInstantJoin =
+                volunteerOpportunityRole
+                    .roleApplicationMethod ==
+                        VolunteerRoleApplicationMethod
+                            .INSTANT_JOIN,
             onBackSelected =
                 onBackSelected
         )
