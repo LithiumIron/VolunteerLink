@@ -463,14 +463,25 @@ class CreatePostViewModel : ViewModel() {
         val defaultFilter = when (_uiState.value.draft.postType) {
             VolunteerPostType.PHYSICAL -> VolunteerRoleMode.PHYSICAL
             VolunteerPostType.REMOTE -> VolunteerRoleMode.REMOTE
-            VolunteerPostType.HYBRID -> null
+            VolunteerPostType.HYBRID -> VolunteerRoleMode.PHYSICAL
             null -> null
         }
 
         _uiState.update { current ->
+            val refreshedRoleErrors = if (current.roleCatalogue.isNotEmpty()) {
+                CreatePostValidator.validateStepTwo(
+                    draft = current.draft,
+                    roleCatalogue = current.roleCatalogue
+                )
+            } else {
+                current.roleSelectionErrors
+            }
+
             current.copy(
                 currentStep = 2,
                 roleModeFilter = defaultFilter,
+                roleSearchQuery = "",
+                roleSelectionErrors = refreshedRoleErrors,
                 showRoleSelectionErrors = false,
                 isStepTwoReady = false
             )
@@ -559,23 +570,32 @@ class CreatePostViewModel : ViewModel() {
     fun updateRoleModeFilter(mode: VolunteerRoleMode?) {
         val postType = _uiState.value.draft.postType
 
-        // Physical/Remote posts always stay on their matching catalogue.
-        if (
-            postType == VolunteerPostType.PHYSICAL &&
-            mode != VolunteerRoleMode.PHYSICAL
-        ) {
-            return
-        }
+        val acceptedMode = when (postType) {
+            VolunteerPostType.PHYSICAL -> {
+                if (mode != VolunteerRoleMode.PHYSICAL) return
+                VolunteerRoleMode.PHYSICAL
+            }
 
-        if (
-            postType == VolunteerPostType.REMOTE &&
-            mode != VolunteerRoleMode.REMOTE
-        ) {
-            return
+            VolunteerPostType.REMOTE -> {
+                if (mode != VolunteerRoleMode.REMOTE) return
+                VolunteerRoleMode.REMOTE
+            }
+
+            VolunteerPostType.HYBRID -> mode ?: return
+            null -> return
         }
 
         _uiState.update { current ->
-            current.copy(roleModeFilter = mode)
+            current.copy(
+                roleModeFilter = acceptedMode,
+                // Match the prototype: switching Physical/Remote starts with
+                // a clean search instead of carrying an unrelated query over.
+                roleSearchQuery = if (current.roleModeFilter != acceptedMode) {
+                    ""
+                } else {
+                    current.roleSearchQuery
+                }
+            )
         }
     }
 
@@ -694,18 +714,49 @@ class CreatePostViewModel : ViewModel() {
         roleTemplateId: String,
         text: String
     ) {
-        val digitsOnly = text.filter { it.isDigit() }.take(4)
-        val capacity = if (digitsOnly.isBlank()) {
-            0
-        } else {
-            digitsOnly.toIntOrNull() ?: return
+        val requestedCapacity = text
+            .filter { it.isDigit() }
+            .take(4)
+            .toIntOrNull()
+            ?: return
+
+        val current = _uiState.value
+        val template = current.roleCatalogue.firstOrNull { role ->
+            role.roleTemplateId == roleTemplateId
+        } ?: return
+
+        val requiredTotal = requiredCapacityForMode(
+            draft = current.draft,
+            mode = template.roleMode
+        ) ?: return
+
+        val templatesById = current.roleCatalogue.associateBy { role ->
+            role.roleTemplateId
         }
+
+        val assignedByOtherRoles = current.draft.selectedRoles
+            .filter { selected ->
+                selected.roleTemplateId != roleTemplateId &&
+                        templatesById[selected.roleTemplateId]?.roleMode ==
+                        template.roleMode
+            }
+            .sumOf { it.capacity }
+
+        // The typed value follows the same rule as the + button: one role
+        // cannot use more positions than are still available for its mode.
+        val maximumForThisRole =
+            (requiredTotal - assignedByOtherRoles).coerceAtLeast(1)
+
+        val acceptedCapacity = requestedCapacity.coerceIn(
+            minimumValue = 1,
+            maximumValue = maximumForThisRole
+        )
 
         updateStepTwoDraft { draft ->
             draft.copy(
                 selectedRoles = draft.selectedRoles.map { selected ->
                     if (selected.roleTemplateId == roleTemplateId) {
-                        selected.copy(capacity = capacity)
+                        selected.copy(capacity = acceptedCapacity)
                     } else {
                         selected
                     }
