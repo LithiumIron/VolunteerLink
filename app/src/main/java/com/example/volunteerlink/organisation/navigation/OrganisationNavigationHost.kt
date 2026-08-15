@@ -74,7 +74,15 @@ fun OrganisationNavigationHost() {
             }
 
             composable(OrganisationNavigationRoutes.CREATE) {
-                OrganisationCreateScreen()
+                OrganisationCreateScreen(
+                    onExitCreate = {
+                        if (!navController.popBackStack()) {
+                            navController.navigate(OrganisationNavigationRoutes.HOME) {
+                                launchSingleTop = true
+                            }
+                        }
+                    }
+                )
             }
 
             composable(OrganisationNavigationRoutes.CHATS) {
