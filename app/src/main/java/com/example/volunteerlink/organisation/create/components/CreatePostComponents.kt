@@ -45,8 +45,8 @@ import com.example.volunteerlink.organisation.create.model.VolunteerPostCategory
 import com.example.volunteerlink.organisation.create.model.VolunteerPostType
 
 val CreateGreen = Color(0xFF2A4A1E)
-private val CreateLightGreen = Color(0xFFE5EFE1)
-private val CreateCardBackground = Color(0xFFFBFCF9)
+val CreateLightGreen = Color(0xFFE5EFE1)
+val CreateCardBackground = Color(0xFFFBFCF9)
 
 @Composable
 fun CreateSectionCard(
