@@ -22,13 +22,15 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.volunteerlink.data.location.DeviceLocationHelper
 import com.example.volunteerlink.organisation.create.model.VolunteerPostType
 import com.example.volunteerlink.organisation.create.steps.PostDetailsStep
+import com.example.volunteerlink.organisation.create.steps.SelectRolesStep
 import com.example.volunteerlink.organisation.viewmodel.CreatePostViewModel
 
 /**
  * Organisation Create route.
  *
- * The route owns lifecycle-only concerns (ViewModel collection, permission and
- * exiting). Step 1 itself remains a reusable UI function.
+ * The route owns lifecycle-only concerns (ViewModel collection, permission,
+ * exiting and which Create Post step is shown). Individual steps stay reusable
+ * and do not own a NavController.
  */
 @Composable
 fun OrganisationCreateScreen(
@@ -90,13 +92,43 @@ fun OrganisationCreateScreen(
         }
     }
 
-    BackHandler(onBack = requestExit)
+    val requestBack: () -> Unit = {
+        if (uiState.currentStep == 2) {
+            viewModel.backToStepOne()
+        } else {
+            requestExit()
+        }
+    }
 
-    PostDetailsStep(
-        uiState = uiState,
-        viewModel = viewModel,
-        onBack = requestExit
-    )
+    BackHandler(onBack = requestBack)
+
+    when (uiState.currentStep) {
+        1 -> {
+            PostDetailsStep(
+                uiState = uiState,
+                viewModel = viewModel,
+                onBack = requestExit,
+                onStepOneComplete = viewModel::openStepTwo
+            )
+        }
+
+        2 -> {
+            SelectRolesStep(
+                uiState = uiState,
+                viewModel = viewModel,
+                onBack = viewModel::backToStepOne
+            )
+        }
+
+        else -> {
+            PostDetailsStep(
+                uiState = uiState,
+                viewModel = viewModel,
+                onBack = requestExit,
+                onStepOneComplete = viewModel::openStepTwo
+            )
+        }
+    }
 
     if (showDiscardDialog) {
         AlertDialog(

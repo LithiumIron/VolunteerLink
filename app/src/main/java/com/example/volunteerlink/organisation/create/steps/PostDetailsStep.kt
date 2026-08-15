@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -39,7 +38,6 @@ import com.example.volunteerlink.organisation.create.components.CategoryPicker
 import com.example.volunteerlink.organisation.create.components.CreateGreen
 import com.example.volunteerlink.organisation.create.components.CreateSectionCard
 import com.example.volunteerlink.organisation.create.components.FormError
-import com.example.volunteerlink.organisation.create.components.HelpNeededEditor
 import com.example.volunteerlink.organisation.create.components.PostTypeCard
 import com.example.volunteerlink.organisation.create.components.ThumbnailPickerSection
 import com.example.volunteerlink.organisation.create.model.CreatePostUiState
@@ -60,8 +58,7 @@ fun PostDetailsStep(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .statusBarsPadding()
-            .imePadding(),
+            .statusBarsPadding(),
         contentPadding = PaddingValues(
             start = 20.dp,
             top = 12.dp,
@@ -238,15 +235,6 @@ fun PostDetailsStep(
                         )
                         FormError(errors.description)
                     }
-
-                    HelpNeededEditor(
-                        input = uiState.helpNeededInput,
-                        items = draft.helpNeeded,
-                        onInputChanged = viewModel::updateHelpNeededInput,
-                        onAdd = viewModel::addHelpNeeded,
-                        onRemove = viewModel::removeHelpNeeded,
-                        errorMessage = errors.helpNeeded
-                    )
 
                     ThumbnailPickerSection(
                         thumbnailUri = draft.thumbnailUri,

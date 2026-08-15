@@ -39,6 +39,57 @@ enum class VolunteerPostCategory(
     ARTS("Arts", "ARTS")
 }
 
+
+
+/** Values match role_templates.role_mode in Supabase. */
+enum class VolunteerRoleMode(
+    val displayName: String,
+    val databaseValue: String
+) {
+    PHYSICAL("Physical", "PHYSICAL"),
+    REMOTE("Remote", "REMOTE")
+}
+
+/** Values match role_templates.default_level in Supabase. */
+enum class VolunteerRoleLevel(
+    val displayName: String,
+    val databaseValue: String
+) {
+    BEGINNER("Beginner", "BEGINNER"),
+    INTERMEDIATE("Intermediate", "INTERMEDIATE"),
+    ADVANCED("Advanced", "ADVANCED")
+}
+
+/** One skill shown inside a role template card. */
+data class CreateRoleSkill(
+    val skillId: String,
+    val name: String
+)
+
+/**
+ * A fixed role template loaded from Supabase for Step 2.
+ *
+ * This is catalogue data only. The organiser does not edit these values.
+ */
+data class CreateRoleTemplate(
+    val roleTemplateId: String,
+    val roleName: String,
+    val roleArea: String,
+    val roleMode: VolunteerRoleMode,
+    val skillPathId: String,
+    val skillPathName: String,
+    val description: String,
+    val skillsPractised: List<CreateRoleSkill>,
+    val recommendedSkills: List<CreateRoleSkill>,
+    val defaultLevel: VolunteerRoleLevel
+)
+
+/** The organiser's Step 2 selection for one fixed role template. */
+data class SelectedRoleDraft(
+    val roleTemplateId: String,
+    val capacity: Int = 1
+)
+
 /** Values match remote_details.submission_mode in Supabase. */
 enum class RemoteSubmissionMode(
     val displayName: String,
@@ -68,7 +119,6 @@ data class CreatePostDraft(
     val title: String = "",
     val description: String = "",
     val thumbnailUri: String? = null,
-    val helpNeeded: List<String> = emptyList(),
 
     // Physical details
     val isMultiDayPhysicalEvent: Boolean = false,
@@ -90,7 +140,10 @@ data class CreatePostDraft(
 
     // Hybrid uses separate physical and remote capacity totals.
     val hybridPhysicalVolunteerCapacity: Int? = null,
-    val hybridRemoteVolunteerCapacity: Int? = null
+    val hybridRemoteVolunteerCapacity: Int? = null,
+
+    // Step 2: fixed role templates selected for this post.
+    val selectedRoles: List<SelectedRoleDraft> = emptyList()
 ) {
     val requiredPhysicalVolunteerTotal: Int?
         get() = when (postType) {
@@ -218,7 +271,6 @@ data class CreatePostDraft(
                 title.isNotBlank() ||
                 description.isNotBlank() ||
                 thumbnailUri != null ||
-                helpNeeded.isNotEmpty() ||
                 physicalStartDateMillis != null ||
                 physicalEndDateMillis != null ||
                 physicalStartTimeMinutes != null ||
@@ -233,6 +285,7 @@ data class CreatePostDraft(
                 remoteSubmissionMode != null ||
                 sharedDeliverable.isNotBlank() ||
                 hybridPhysicalVolunteerCapacity != null ||
-                hybridRemoteVolunteerCapacity != null
+                hybridRemoteVolunteerCapacity != null ||
+                selectedRoles.isNotEmpty()
     }
 }

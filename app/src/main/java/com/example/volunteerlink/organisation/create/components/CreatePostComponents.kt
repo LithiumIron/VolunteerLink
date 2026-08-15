@@ -13,10 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -25,7 +22,6 @@ import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -243,95 +239,6 @@ fun CategoryPicker(
                             onCategorySelected(category)
                         }
                     )
-                }
-            }
-        }
-
-        FormError(errorMessage)
-    }
-}
-
-@Composable
-fun HelpNeededEditor(
-    input: String,
-    items: List<String>,
-    onInputChanged: (String) -> Unit,
-    onAdd: () -> Unit,
-    onRemove: (String) -> Unit,
-    errorMessage: String?
-) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        Text(
-            text = "Help Needed",
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Medium
-        )
-
-        Text(
-            text = "Add short points describing what support the post needs.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            OutlinedTextField(
-                value = input,
-                onValueChange = onInputChanged,
-                modifier = Modifier.weight(1f),
-                placeholder = { Text("Example: Registration support") },
-                singleLine = true,
-                isError = errorMessage != null && items.isEmpty(),
-                shape = RoundedCornerShape(14.dp),
-                keyboardOptions = KeyboardOptions(
-                    imeAction = ImeAction.Done
-                ),
-                keyboardActions = KeyboardActions(
-                    onDone = { onAdd() }
-                )
-            )
-
-            Button(
-                onClick = onAdd,
-                enabled = input.isNotBlank(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = CreateGreen
-                )
-            ) {
-                Text("Add")
-            }
-        }
-
-        items.forEach { item ->
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                color = Color(0xFFF1F5EF)
-            ) {
-                Row(
-                    modifier = Modifier.padding(
-                        start = 12.dp,
-                        end = 6.dp,
-                        top = 5.dp,
-                        bottom = 5.dp
-                    ),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = item,
-                        modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-
-                    TextButton(onClick = { onRemove(item) }) {
-                        Text("Remove")
-                    }
                 }
             }
         }

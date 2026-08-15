@@ -8,7 +8,6 @@ data class CreatePostErrors(
     val category: String? = null,
     val title: String? = null,
     val description: String? = null,
-    val helpNeeded: String? = null,
     val physicalStartDate: String? = null,
     val physicalEndDate: String? = null,
     val physicalTime: String? = null,
@@ -28,7 +27,6 @@ data class CreatePostErrors(
             category,
             title,
             description,
-            helpNeeded,
             physicalStartDate,
             physicalEndDate,
             physicalTime,
@@ -45,13 +43,23 @@ data class CreatePostErrors(
     }
 }
 
+/** Step 2 capacity-allocation messages. */
+data class RoleSelectionErrors(
+    val general: String? = null,
+    val physical: String? = null,
+    val remote: String? = null
+) {
+    fun hasErrors(): Boolean {
+        return general != null || physical != null || remote != null
+    }
+}
+
 /**
  * Everything the Create Post UI currently needs to display.
  * MutableStateFlow stays private inside CreatePostViewModel.
  */
 data class CreatePostUiState(
     val draft: CreatePostDraft = CreatePostDraft(),
-    val helpNeededInput: String = "",
     val locationSuggestions: List<LocationSuggestion> = emptyList(),
     val isLocationSearching: Boolean = false,
     val locationSearchError: String? = null,
@@ -59,6 +67,19 @@ data class CreatePostUiState(
     val errors: CreatePostErrors = CreatePostErrors(),
     val showValidationErrors: Boolean = false,
     val isStepOneReady: Boolean = false,
+
+    // Current Create Post page.
+    val currentStep: Int = 1,
+
+    // Step 2 role catalogue / role selection state.
+    val roleCatalogue: List<CreateRoleTemplate> = emptyList(),
+    val isRoleCatalogueLoading: Boolean = false,
+    val roleCatalogueError: String? = null,
+    val roleSearchQuery: String = "",
+    val roleModeFilter: VolunteerRoleMode? = null,
+    val roleSelectionErrors: RoleSelectionErrors = RoleSelectionErrors(),
+    val showRoleSelectionErrors: Boolean = false,
+    val isStepTwoReady: Boolean = false,
 
     // Post type switching state.
     val pendingPostType: VolunteerPostType? = null,
@@ -68,8 +89,15 @@ data class CreatePostUiState(
     val visibleErrors: CreatePostErrors
         get() = if (showValidationErrors) errors else CreatePostErrors()
 
+    val visibleRoleSelectionErrors: RoleSelectionErrors
+        get() = if (showRoleSelectionErrors) {
+            roleSelectionErrors
+        } else {
+            RoleSelectionErrors()
+        }
+
     fun hasUnsavedInput(): Boolean {
-        return draft.hasMeaningfulContent() || helpNeededInput.isNotBlank()
+        return draft.hasMeaningfulContent()
     }
 }
 

@@ -2,8 +2,11 @@ package com.example.volunteerlink.organisation.create
 
 import com.example.volunteerlink.organisation.create.model.CreatePostDraft
 import com.example.volunteerlink.organisation.create.model.CreatePostErrors
+import com.example.volunteerlink.organisation.create.model.CreateRoleTemplate
 import com.example.volunteerlink.organisation.create.model.RemoteSubmissionMode
+import com.example.volunteerlink.organisation.create.model.RoleSelectionErrors
 import com.example.volunteerlink.organisation.create.model.VolunteerPostType
+import com.example.volunteerlink.organisation.create.model.VolunteerRoleMode
 import java.util.Calendar
 
 /**
@@ -169,10 +172,6 @@ object CreatePostValidator {
                 "Enter a description."
             } else null,
 
-            helpNeeded = if (draft.helpNeeded.isEmpty()) {
-                "Add at least one Help Needed item."
-            } else null,
-
             physicalStartDate = physicalStartDateError,
             physicalEndDate = physicalEndDateError,
             physicalTime = physicalTimeError,
@@ -229,4 +228,120 @@ object CreatePostValidator {
             } else null
         )
     }
+
+    /**
+     * Step 2 is complete only when the selected role capacities exactly match
+     * the volunteer requirement entered in Step 1.
+     *
+     * Hybrid posts are checked separately so Physical and Remote capacities
+     * cannot accidentally be mixed together.
+     */
+    fun validateStepTwo(
+        draft: CreatePostDraft,
+        roleCatalogue: List<CreateRoleTemplate>
+    ): RoleSelectionErrors {
+        if (roleCatalogue.isEmpty()) {
+            return RoleSelectionErrors(
+                general = "Role catalogue is not available yet."
+            )
+        }
+
+        val templatesById = roleCatalogue.associateBy { it.roleTemplateId }
+
+        if (draft.selectedRoles.any { it.capacity <= 0 }) {
+            return RoleSelectionErrors(
+                general = "Each selected role needs at least 1 volunteer."
+            )
+        }
+
+        if (draft.selectedRoles.any { it.roleTemplateId !in templatesById }) {
+            return RoleSelectionErrors(
+                general = "One selected role is no longer available. Remove it and select another role."
+            )
+        }
+
+        val physicalSelections = draft.selectedRoles.filter { selected ->
+            templatesById[selected.roleTemplateId]?.roleMode ==
+                    VolunteerRoleMode.PHYSICAL
+        }
+
+        val remoteSelections = draft.selectedRoles.filter { selected ->
+            templatesById[selected.roleTemplateId]?.roleMode ==
+                    VolunteerRoleMode.REMOTE
+        }
+
+        fun capacityError(
+            label: String,
+            required: Int?,
+            assigned: Int,
+            selectedCount: Int
+        ): String? {
+            if (required == null || required <= 0) {
+                return "Return to Step 1 and set the $label volunteer requirement."
+            }
+
+            if (selectedCount == 0) {
+                return "Select at least one $label role."
+            }
+
+            return if (assigned != required) {
+                "Assign exactly $required $label volunteers. Currently assigned $assigned."
+            } else {
+                null
+            }
+        }
+
+        val physicalAssigned = physicalSelections.sumOf { it.capacity }
+        val remoteAssigned = remoteSelections.sumOf { it.capacity }
+
+        return when (draft.postType) {
+            VolunteerPostType.PHYSICAL -> RoleSelectionErrors(
+                general = if (remoteSelections.isNotEmpty()) {
+                    "Remote roles cannot be added to a Physical post."
+                } else {
+                    null
+                },
+                physical = capacityError(
+                    label = "Physical",
+                    required = draft.requiredPhysicalVolunteerTotal,
+                    assigned = physicalAssigned,
+                    selectedCount = physicalSelections.size
+                )
+            )
+
+            VolunteerPostType.REMOTE -> RoleSelectionErrors(
+                general = if (physicalSelections.isNotEmpty()) {
+                    "Physical roles cannot be added to a Remote post."
+                } else {
+                    null
+                },
+                remote = capacityError(
+                    label = "Remote",
+                    required = draft.requiredRemoteVolunteerTotal,
+                    assigned = remoteAssigned,
+                    selectedCount = remoteSelections.size
+                )
+            )
+
+            VolunteerPostType.HYBRID -> RoleSelectionErrors(
+                physical = capacityError(
+                    label = "Physical",
+                    required = draft.requiredPhysicalVolunteerTotal,
+                    assigned = physicalAssigned,
+                    selectedCount = physicalSelections.size
+                ),
+                remote = capacityError(
+                    label = "Remote",
+                    required = draft.requiredRemoteVolunteerTotal,
+                    assigned = remoteAssigned,
+                    selectedCount = remoteSelections.size
+                )
+            )
+
+            null -> RoleSelectionErrors(
+                general = "Return to Step 1 and select a post type."
+            )
+        }
+    }
+
 }
