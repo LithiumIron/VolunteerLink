@@ -3,9 +3,11 @@ package com.example.volunteerlink.organisation.create.steps
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -80,7 +82,7 @@ fun PostDetailsStep(
                     Image(
                         painter = painterResource(R.drawable.back),
                         contentDescription = "Back",
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(30.dp)
                     )
                 }
 
@@ -127,6 +129,7 @@ fun PostDetailsStep(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .height(IntrinsicSize.Max)
                         .selectableGroup(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
@@ -135,9 +138,13 @@ fun PostDetailsStep(
                         iconRes = R.drawable.post_physical_event,
                         selected = draft.postType == VolunteerPostType.PHYSICAL,
                         onClick = {
-                            actions.updatePostType(VolunteerPostType.PHYSICAL)
+                            actions.updatePostType(
+                                VolunteerPostType.PHYSICAL
+                            )
                         },
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
                     )
 
                     PostTypeCard(
@@ -145,9 +152,13 @@ fun PostDetailsStep(
                         iconRes = R.drawable.post_remote_project,
                         selected = draft.postType == VolunteerPostType.REMOTE,
                         onClick = {
-                            actions.updatePostType(VolunteerPostType.REMOTE)
+                            actions.updatePostType(
+                                VolunteerPostType.REMOTE
+                            )
                         },
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
                     )
 
                     PostTypeCard(
@@ -155,9 +166,13 @@ fun PostDetailsStep(
                         iconRes = R.drawable.post_hybrid_event,
                         selected = draft.postType == VolunteerPostType.HYBRID,
                         onClick = {
-                            actions.updatePostType(VolunteerPostType.HYBRID)
+                            actions.updatePostType(
+                                VolunteerPostType.HYBRID
+                            )
                         },
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
                     )
                 }
 
