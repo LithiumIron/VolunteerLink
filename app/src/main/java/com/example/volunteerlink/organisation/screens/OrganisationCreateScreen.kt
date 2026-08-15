@@ -94,7 +94,7 @@ fun OrganisationCreateScreen(
 
     PostDetailsStep(
         uiState = uiState,
-        actions = viewModel,
+        viewModel = viewModel,
         onBack = requestExit
     )
 

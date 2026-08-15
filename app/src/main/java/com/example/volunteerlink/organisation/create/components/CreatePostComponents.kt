@@ -7,7 +7,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -36,6 +38,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.volunteerlink.R
 import com.example.volunteerlink.organisation.create.model.VolunteerPostCategory
@@ -100,40 +103,70 @@ fun PostTypeCard(
     val background = if (selected) CreateLightGreen else Color.White
 
     Surface(
-        modifier = modifier
-            .clickable(onClick = onClick),
+        modifier = modifier.clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
         color = background,
         border = BorderStroke(1.2.dp, borderColor)
     ) {
         Column(
-            modifier = Modifier.padding(
-                horizontal = 10.dp,
-                vertical = 14.dp
-            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 14.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(7.dp)
+            verticalArrangement = Arrangement.Top
         ) {
-            Image(
-                painter = painterResource(iconRes),
-                contentDescription = null,
-                modifier = Modifier.size(28.dp)
-            )
+            // Icon area
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(30.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Image(
+                    painter = painterResource(iconRes),
+                    contentDescription = null,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
 
-            Text(
-                text = type.displayName,
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = if (selected) CreateGreen else Color(0xFF263824),
-                maxLines = 2
-            )
+            Spacer(modifier = Modifier.height(8.dp))
 
-            Text(
-                text = type.shortDescription,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2
-            )
+            // Keep title area consistent for all 3 cards
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                contentAlignment = Alignment.TopCenter
+            ) {
+                Text(
+                    text = type.displayName,
+                    modifier = Modifier.fillMaxWidth(),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (selected) CreateGreen else Color(0xFF263824),
+                    maxLines = 2,
+                    textAlign = TextAlign.Center
+                )
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // Keep description centered too
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp),
+                contentAlignment = Alignment.TopCenter
+            ) {
+                Text(
+                    text = type.shortDescription,
+                    modifier = Modifier.fillMaxWidth(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    textAlign = TextAlign.Center
+                )
+            }
         }
     }
 }

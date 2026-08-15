@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.IconButton
@@ -25,6 +26,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,7 +35,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.volunteerlink.R
-import com.example.volunteerlink.organisation.create.CreatePostStepOneActions
 import com.example.volunteerlink.organisation.create.components.CategoryPicker
 import com.example.volunteerlink.organisation.create.components.CreateGreen
 import com.example.volunteerlink.organisation.create.components.CreateSectionCard
@@ -42,22 +43,19 @@ import com.example.volunteerlink.organisation.create.components.HelpNeededEditor
 import com.example.volunteerlink.organisation.create.components.PostTypeCard
 import com.example.volunteerlink.organisation.create.components.ThumbnailPickerSection
 import com.example.volunteerlink.organisation.create.model.CreatePostUiState
+import com.example.volunteerlink.organisation.viewmodel.CreatePostViewModel
 import com.example.volunteerlink.organisation.create.model.VolunteerPostType
 
 /** Full Step 1 UI. Form data is read from and written back to the ViewModel. */
 @Composable
 fun PostDetailsStep(
     uiState: CreatePostUiState,
-    actions: CreatePostStepOneActions,
+    viewModel: CreatePostViewModel,
     onBack: () -> Unit,
     onStepOneComplete: () -> Unit = {}
 ) {
     val draft = uiState.draft
-    val errors = if (uiState.showValidationErrors) {
-        uiState.errors
-    } else {
-        com.example.volunteerlink.organisation.create.model.CreatePostStepOneErrors()
-    }
+    val errors = uiState.visibleErrors
 
     LazyColumn(
         modifier = Modifier
@@ -138,7 +136,7 @@ fun PostDetailsStep(
                         iconRes = R.drawable.post_physical_event,
                         selected = draft.postType == VolunteerPostType.PHYSICAL,
                         onClick = {
-                            actions.updatePostType(
+                            viewModel.requestPostTypeChange(
                                 VolunteerPostType.PHYSICAL
                             )
                         },
@@ -152,7 +150,7 @@ fun PostDetailsStep(
                         iconRes = R.drawable.post_remote_project,
                         selected = draft.postType == VolunteerPostType.REMOTE,
                         onClick = {
-                            actions.updatePostType(
+                            viewModel.requestPostTypeChange(
                                 VolunteerPostType.REMOTE
                             )
                         },
@@ -166,7 +164,7 @@ fun PostDetailsStep(
                         iconRes = R.drawable.post_hybrid_event,
                         selected = draft.postType == VolunteerPostType.HYBRID,
                         onClick = {
-                            actions.updatePostType(
+                            viewModel.requestPostTypeChange(
                                 VolunteerPostType.HYBRID
                             )
                         },
@@ -177,6 +175,8 @@ fun PostDetailsStep(
                 }
 
                 FormError(errors.postType)
+
+
             }
         }
 
@@ -188,7 +188,7 @@ fun PostDetailsStep(
                 ) {
                     CategoryPicker(
                         selectedCategory = draft.category,
-                        onCategorySelected = actions::updateCategory,
+                        onCategorySelected = viewModel::updateCategory,
                         errorMessage = errors.category
                     )
 
@@ -197,7 +197,7 @@ fun PostDetailsStep(
                     ) {
                         OutlinedTextField(
                             value = draft.title,
-                            onValueChange = actions::updateTitle,
+                            onValueChange = viewModel::updateTitle,
                             modifier = Modifier.fillMaxWidth(),
                             label = { Text("Title") },
                             placeholder = {
@@ -225,7 +225,7 @@ fun PostDetailsStep(
                     ) {
                         OutlinedTextField(
                             value = draft.description,
-                            onValueChange = actions::updateDescription,
+                            onValueChange = viewModel::updateDescription,
                             modifier = Modifier.fillMaxWidth(),
                             label = { Text("Description") },
                             placeholder = {
@@ -242,15 +242,15 @@ fun PostDetailsStep(
                     HelpNeededEditor(
                         input = uiState.helpNeededInput,
                         items = draft.helpNeeded,
-                        onInputChanged = actions::updateHelpNeededInput,
-                        onAdd = actions::addHelpNeeded,
-                        onRemove = actions::removeHelpNeeded,
+                        onInputChanged = viewModel::updateHelpNeededInput,
+                        onAdd = viewModel::addHelpNeeded,
+                        onRemove = viewModel::removeHelpNeeded,
                         errorMessage = errors.helpNeeded
                     )
 
                     ThumbnailPickerSection(
                         thumbnailUri = draft.thumbnailUri,
-                        onThumbnailChanged = actions::updateThumbnailUri
+                        onThumbnailChanged = viewModel::updateThumbnailUri
                     )
                 }
             }
@@ -261,25 +261,10 @@ fun PostDetailsStep(
             ) {
                 item {
                     PhysicalEventDetailsSection(
-                        draft = draft,
-                        errors = errors,
-                        physicalTimeError = uiState.physicalTimeError,
-                        locationSuggestions = uiState.locationSuggestions,
-                        isLocationSearching = uiState.isLocationSearching,
-                        locationSearchError = uiState.locationSearchError,
+                        uiState = uiState,
+                        viewModel = viewModel,
                         showVolunteerCapacity =
-                            draft.postType == VolunteerPostType.PHYSICAL,
-                        onMultiDayChanged = actions::updateIsMultiDay,
-                        onStartDateSelected = actions::updatePhysicalStartDate,
-                        onEndDateSelected = actions::updatePhysicalEndDate,
-                        onStartTimeSelected = actions::updatePhysicalStartTime,
-                        onEndTimeSelected = actions::updatePhysicalEndTime,
-                        onTimeDialogOpened = actions::clearPhysicalTimeError,
-                        onLocationSearchChanged = actions::onLocationQueryChanged,
-                        onLocationSelected = actions::onLocationSelected,
-                        onClearLocation = actions::clearLocation,
-                        onMeetingPointChanged = actions::updateMeetingPoint,
-                        onVolunteerCapacityChanged = actions::updatePhysicalVolunteerCapacity
+                            draft.postType == VolunteerPostType.PHYSICAL
                     )
                 }
             }
@@ -290,15 +275,10 @@ fun PostDetailsStep(
             ) {
                 item {
                     RemoteProjectDetailsSection(
-                        draft = draft,
-                        errors = errors,
+                        uiState = uiState,
+                        viewModel = viewModel,
                         showVolunteerCapacity =
-                            draft.postType == VolunteerPostType.REMOTE,
-                        onStartDateSelected = actions::updateRemoteStartDate,
-                        onDueDateSelected = actions::updateRemoteDueDate,
-                        onVolunteerCapacityChanged = actions::updateRemoteVolunteerCapacity,
-                        onSubmissionModeChanged = actions::updateRemoteSubmissionMode,
-                        onSharedDeliverableChanged = actions::updateSharedDeliverable
+                            draft.postType == VolunteerPostType.REMOTE
                     )
                 }
             }
@@ -306,12 +286,8 @@ fun PostDetailsStep(
             if (draft.postType == VolunteerPostType.HYBRID) {
                 item {
                     HybridVolunteerRequirementSection(
-                        draft = draft,
-                        errors = errors,
-                        onPhysicalCapacityChanged =
-                            actions::updateHybridPhysicalVolunteerCapacity,
-                        onRemoteCapacityChanged =
-                            actions::updateHybridRemoteVolunteerCapacity
+                        uiState = uiState,
+                        viewModel = viewModel
                     )
                 }
             }
@@ -322,7 +298,7 @@ fun PostDetailsStep(
                 ) {
                     Button(
                         onClick = {
-                            if (actions.continueFromStepOne()) {
+                            if (viewModel.continueFromStepOne()) {
                                 onStepOneComplete()
                             }
                         },
@@ -361,5 +337,43 @@ fun PostDetailsStep(
         item {
             Spacer(modifier = Modifier.height(8.dp))
         }
+    }
+
+    // Ask only when switching away from a mode that already contains
+    // mode-specific information. Shared fields are never affected.
+    uiState.pendingPostType?.let { pendingType ->
+        val currentType = draft.postType
+
+        AlertDialog(
+            onDismissRequest = viewModel::cancelPostTypeChange,
+            title = {
+                Text("Switch post type?")
+            },
+            text = {
+                Text(
+                    if (currentType != null) {
+                        "Switch from ${currentType.displayName} to ${pendingType.displayName}? " +
+                                "Your ${currentType.displayName} details will be kept temporarily while you remain on Step 1. " +
+                                "If you continue with ${pendingType.displayName}, unused ${currentType.displayName} details will be cleared."
+                    } else {
+                        "Switch to ${pendingType.displayName}?"
+                    }
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = viewModel::confirmPostTypeChange
+                ) {
+                    Text("Switch Mode")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = viewModel::cancelPostTypeChange
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }

@@ -5,11 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.example.volunteerlink.BuildConfig
 import com.example.volunteerlink.data.location.GeoapifyLocationService
 import com.example.volunteerlink.data.location.LocationSuggestion
-import com.example.volunteerlink.organisation.create.CreatePostStepOneActions
-import com.example.volunteerlink.organisation.create.model.CreatePostDateRules
+import com.example.volunteerlink.organisation.create.CreatePostValidator
 import com.example.volunteerlink.organisation.create.model.CreatePostDraft
-import com.example.volunteerlink.organisation.create.model.CreatePostStepOneErrors
-import com.example.volunteerlink.organisation.create.model.CreatePostTimeRules
 import com.example.volunteerlink.organisation.create.model.CreatePostUiState
 import com.example.volunteerlink.organisation.create.model.RemoteSubmissionMode
 import com.example.volunteerlink.organisation.create.model.VolunteerPostCategory
@@ -29,7 +26,7 @@ import kotlinx.coroutines.launch
  * same StateFlow pattern used in the practicals while keeping a larger form in
  * one structured CreatePostDraft object.
  */
-class CreatePostViewModel : ViewModel(), CreatePostStepOneActions {
+class CreatePostViewModel : ViewModel() {
 
     private val locationService = GeoapifyLocationService()
 
@@ -44,23 +41,90 @@ class CreatePostViewModel : ViewModel(), CreatePostStepOneActions {
     // Shared post information
     // ---------------------------------------------------------------------
 
-    override fun updatePostType(type: VolunteerPostType) {
-        updateDraft { it.copy(postType = type) }
+    /**
+     * Handles a tap on a post type card.
+     *
+     * Shared Step 1 information is never cleared here. If the current mode
+     * already contains mode-specific input, the UI asks for confirmation first.
+     */
+    fun requestPostTypeChange(type: VolunteerPostType) {
+        val currentState = _uiState.value
+        val currentType = currentState.draft.postType
+
+        if (currentType == type) return
+
+        // After Continue succeeds, the selected mode is committed.
+        if (currentState.isPostTypeCommitted) {
+            // The mode is committed after Continue. Ignore further mode taps
+            // until the organiser discards the draft.
+            _uiState.update { current ->
+                current.copy(pendingPostType = null)
+            }
+            return
+        }
+
+        // First selection does not need a confirmation dialog.
+        if (currentType == null) {
+            applyPostTypeChange(type)
+            return
+        }
+
+        // Ask before hiding mode-specific information the organiser already entered.
+        if (currentState.draft.hasModeSpecificInput(currentType)) {
+            _uiState.update { current ->
+                current.copy(
+                    pendingPostType = type
+                )
+            }
+            return
+        }
+
+        applyPostTypeChange(type)
     }
 
-    override fun updateCategory(category: VolunteerPostCategory) {
+    /** Called by the confirmation dialog. */
+    fun confirmPostTypeChange() {
+        val pendingType = _uiState.value.pendingPostType ?: return
+        applyPostTypeChange(pendingType)
+    }
+
+    /** Keeps the current mode and closes the confirmation dialog. */
+    fun cancelPostTypeChange() {
+        _uiState.update { current ->
+            current.copy(pendingPostType = null)
+        }
+    }
+
+    private fun applyPostTypeChange(type: VolunteerPostType) {
+        _uiState.update { current ->
+            val newDraft = current.draft.copy(postType = type)
+
+            current.copy(
+                draft = newDraft,
+                pendingPostType = null,
+                errors = if (current.showValidationErrors) {
+                    CreatePostValidator.validateStepOne(newDraft)
+                } else {
+                    current.errors
+                },
+                isStepOneReady = false
+            )
+        }
+    }
+
+    fun updateCategory(category: VolunteerPostCategory) {
         updateDraft { it.copy(category = category) }
     }
 
-    override fun updateTitle(title: String) {
+    fun updateTitle(title: String) {
         updateDraft { it.copy(title = title.take(120)) }
     }
 
-    override fun updateDescription(description: String) {
+    fun updateDescription(description: String) {
         updateDraft { it.copy(description = description.take(2000)) }
     }
 
-    override fun updateThumbnailUri(uri: String?) {
+    fun updateThumbnailUri(uri: String?) {
         updateDraft { it.copy(thumbnailUri = uri) }
     }
 
@@ -68,7 +132,7 @@ class CreatePostViewModel : ViewModel(), CreatePostStepOneActions {
     // Help Needed
     // ---------------------------------------------------------------------
 
-    override fun updateHelpNeededInput(text: String) {
+    fun updateHelpNeededInput(text: String) {
         _uiState.update { current ->
             current.copy(
                 helpNeededInput = text.take(100),
@@ -77,7 +141,7 @@ class CreatePostViewModel : ViewModel(), CreatePostStepOneActions {
         }
     }
 
-    override fun addHelpNeeded() {
+    fun addHelpNeeded() {
         val input = _uiState.value.helpNeededInput.trim()
         if (input.isBlank()) return
 
@@ -96,7 +160,7 @@ class CreatePostViewModel : ViewModel(), CreatePostStepOneActions {
         }
     }
 
-    override fun removeHelpNeeded(item: String) {
+    fun removeHelpNeeded(item: String) {
         updateDraft { draft ->
             draft.copy(helpNeeded = draft.helpNeeded - item)
         }
@@ -106,7 +170,7 @@ class CreatePostViewModel : ViewModel(), CreatePostStepOneActions {
     // Physical event
     // ---------------------------------------------------------------------
 
-    override fun updateIsMultiDay(isMultiDay: Boolean) {
+    fun updateIsMultiDay(isMultiDay: Boolean) {
         updateDraft { draft ->
             val startDate = draft.physicalStartDateMillis
 
@@ -119,7 +183,7 @@ class CreatePostViewModel : ViewModel(), CreatePostStepOneActions {
                             draft.physicalEndDateMillis > startDate -> {
                         draft.physicalEndDateMillis
                     }
-                    else -> CreatePostDateRules.nextDayMillis(startDate)
+                    else -> CreatePostValidator.nextDayMillis(startDate)
                 }
             }
 
@@ -130,16 +194,16 @@ class CreatePostViewModel : ViewModel(), CreatePostStepOneActions {
         }
     }
 
-    override fun updatePhysicalStartDate(dateMillis: Long) {
+    fun updatePhysicalStartDate(dateMillis: Long) {
         updateDraft { draft ->
-            val normalizedDate = CreatePostDateRules.startOfDayMillis(dateMillis)
+            val normalizedDate = CreatePostValidator.startOfDayMillis(dateMillis)
 
             val endDate = if (!draft.isMultiDayPhysicalEvent) {
                 normalizedDate
             } else {
                 draft.physicalEndDateMillis?.takeIf {
                     it > normalizedDate
-                } ?: CreatePostDateRules.nextDayMillis(normalizedDate)
+                } ?: CreatePostValidator.nextDayMillis(normalizedDate)
             }
 
             draft.copy(
@@ -149,16 +213,16 @@ class CreatePostViewModel : ViewModel(), CreatePostStepOneActions {
         }
     }
 
-    override fun updatePhysicalEndDate(dateMillis: Long) {
+    fun updatePhysicalEndDate(dateMillis: Long) {
         updateDraft { draft ->
             draft.copy(
                 physicalEndDateMillis =
-                    CreatePostDateRules.startOfDayMillis(dateMillis)
+                    CreatePostValidator.startOfDayMillis(dateMillis)
             )
         }
     }
 
-    override fun updatePhysicalStartTime(hour: Int, minute: Int) {
+    fun updatePhysicalStartTime(hour: Int, minute: Int) {
         val startMinutes = hour * 60 + minute
 
         updateDraft { draft ->
@@ -175,9 +239,9 @@ class CreatePostViewModel : ViewModel(), CreatePostStepOneActions {
     /**
      * Returns an error for the time dialog. Invalid end times are not saved.
      */
-    override fun updatePhysicalEndTime(hour: Int, minute: Int): String? {
+    fun updatePhysicalEndTime(hour: Int, minute: Int): String? {
         val endMinutes = hour * 60 + minute
-        val error = CreatePostTimeRules.endTimeError(
+        val error = CreatePostValidator.endTimeError(
             startTimeMinutes = _uiState.value.draft.physicalStartTimeMinutes,
             endTimeMinutes = endMinutes
         )
@@ -205,15 +269,15 @@ class CreatePostViewModel : ViewModel(), CreatePostStepOneActions {
         return null
     }
 
-    override fun clearPhysicalTimeError() {
+    fun clearPhysicalTimeError() {
         _uiState.update { it.copy(physicalTimeError = null) }
     }
 
-    override fun updateMeetingPoint(text: String) {
+    fun updateMeetingPoint(text: String) {
         updateDraft { it.copy(meetingPoint = text.take(250)) }
     }
 
-    override fun updatePhysicalVolunteerCapacity(text: String) {
+    fun updatePhysicalVolunteerCapacity(text: String) {
         updateDraft { draft ->
             draft.copy(
                 physicalVolunteerCapacity = parsePositiveNumber(text)
@@ -230,7 +294,7 @@ class CreatePostViewModel : ViewModel(), CreatePostStepOneActions {
         locationBiasLongitude = longitude
     }
 
-    override fun onLocationQueryChanged(query: String) {
+    fun onLocationQueryChanged(query: String) {
         locationSearchJob?.cancel()
 
         updateDraft { draft ->
@@ -313,7 +377,7 @@ class CreatePostViewModel : ViewModel(), CreatePostStepOneActions {
         }
     }
 
-    override fun onLocationSelected(location: LocationSuggestion) {
+    fun onLocationSelected(location: LocationSuggestion) {
         locationSearchJob?.cancel()
 
         updateDraft { draft ->
@@ -334,7 +398,7 @@ class CreatePostViewModel : ViewModel(), CreatePostStepOneActions {
         }
     }
 
-    override fun clearLocation() {
+    fun clearLocation() {
         locationSearchJob?.cancel()
 
         updateDraft { draft ->
@@ -357,9 +421,9 @@ class CreatePostViewModel : ViewModel(), CreatePostStepOneActions {
     // Remote project
     // ---------------------------------------------------------------------
 
-    override fun updateRemoteStartDate(dateMillis: Long) {
+    fun updateRemoteStartDate(dateMillis: Long) {
         updateDraft { draft ->
-            val normalizedDate = CreatePostDateRules.startOfDayMillis(dateMillis)
+            val normalizedDate = CreatePostValidator.startOfDayMillis(dateMillis)
 
             draft.copy(
                 remoteStartDateMillis = normalizedDate,
@@ -369,15 +433,15 @@ class CreatePostViewModel : ViewModel(), CreatePostStepOneActions {
         }
     }
 
-    override fun updateRemoteDueDate(dateMillis: Long) {
+    fun updateRemoteDueDate(dateMillis: Long) {
         updateDraft { draft ->
             draft.copy(
-                remoteDueDateMillis = CreatePostDateRules.startOfDayMillis(dateMillis)
+                remoteDueDateMillis = CreatePostValidator.startOfDayMillis(dateMillis)
             )
         }
     }
 
-    override fun updateRemoteVolunteerCapacity(text: String) {
+    fun updateRemoteVolunteerCapacity(text: String) {
         updateDraft { draft ->
             draft.copy(
                 remoteVolunteerCapacity = parsePositiveNumber(text)
@@ -385,13 +449,13 @@ class CreatePostViewModel : ViewModel(), CreatePostStepOneActions {
         }
     }
 
-    override fun updateRemoteSubmissionMode(mode: RemoteSubmissionMode) {
+    fun updateRemoteSubmissionMode(mode: RemoteSubmissionMode) {
         updateDraft { draft ->
             draft.copy(remoteSubmissionMode = mode)
         }
     }
 
-    override fun updateSharedDeliverable(text: String) {
+    fun updateSharedDeliverable(text: String) {
         updateDraft { draft ->
             draft.copy(sharedDeliverable = text.take(500))
         }
@@ -401,7 +465,7 @@ class CreatePostViewModel : ViewModel(), CreatePostStepOneActions {
     // Hybrid capacities
     // ---------------------------------------------------------------------
 
-    override fun updateHybridPhysicalVolunteerCapacity(text: String) {
+    fun updateHybridPhysicalVolunteerCapacity(text: String) {
         updateDraft { draft ->
             draft.copy(
                 hybridPhysicalVolunteerCapacity = parsePositiveNumber(text)
@@ -409,7 +473,7 @@ class CreatePostViewModel : ViewModel(), CreatePostStepOneActions {
         }
     }
 
-    override fun updateHybridRemoteVolunteerCapacity(text: String) {
+    fun updateHybridRemoteVolunteerCapacity(text: String) {
         updateDraft { draft ->
             draft.copy(
                 hybridRemoteVolunteerCapacity = parsePositiveNumber(text)
@@ -421,15 +485,24 @@ class CreatePostViewModel : ViewModel(), CreatePostStepOneActions {
     // Step validation / editor lifecycle
     // ---------------------------------------------------------------------
 
-    override fun continueFromStepOne(): Boolean {
-        val errors = validateStepOne(_uiState.value.draft)
+    fun continueFromStepOne(): Boolean {
+        val currentDraft = _uiState.value.draft
+        val errors = CreatePostValidator.validateStepOne(currentDraft)
         val ready = !errors.hasErrors()
 
         _uiState.update { current ->
             current.copy(
+                // Only clear unused temporary mode data after validation succeeds.
+                draft = if (ready) {
+                    current.draft.keepOnlySelectedModeData()
+                } else {
+                    current.draft
+                },
                 errors = errors,
                 showValidationErrors = true,
-                isStepOneReady = ready
+                isStepOneReady = ready,
+                pendingPostType = null,
+                isPostTypeCommitted = ready
             )
         }
 
@@ -451,134 +524,13 @@ class CreatePostViewModel : ViewModel(), CreatePostStepOneActions {
             current.copy(
                 draft = newDraft,
                 errors = if (current.showValidationErrors) {
-                    validateStepOne(newDraft)
+                    CreatePostValidator.validateStepOne(newDraft)
                 } else {
                     current.errors
                 },
                 isStepOneReady = false
             )
         }
-    }
-
-    private fun validateStepOne(draft: CreatePostDraft): CreatePostStepOneErrors {
-        val needsPhysical = draft.postType == VolunteerPostType.PHYSICAL ||
-                draft.postType == VolunteerPostType.HYBRID
-
-        val needsRemote = draft.postType == VolunteerPostType.REMOTE ||
-                draft.postType == VolunteerPostType.HYBRID
-
-        val physicalStartDateError = if (needsPhysical) {
-            when {
-                draft.physicalStartDateMillis == null -> "Select a start date."
-                !CreatePostDateRules.isValidStartDate(draft.physicalStartDateMillis) ->
-                    "Start date must be at least 7 days from today."
-                else -> null
-            }
-        } else null
-
-        val physicalEndDateError = if (
-            needsPhysical && draft.isMultiDayPhysicalEvent
-        ) {
-            when {
-                draft.physicalEndDateMillis == null -> "Select an end date."
-                !CreatePostDateRules.isValidPhysicalEndDate(
-                    draft.physicalStartDateMillis,
-                    draft.physicalEndDateMillis,
-                    isMultiDay = true
-                ) -> "End date must be after the start date."
-                else -> null
-            }
-        } else null
-
-        val physicalTimeError = if (needsPhysical) {
-            when {
-                draft.physicalStartTimeMinutes == null -> "Select a start time."
-                draft.physicalEndTimeMinutes == null -> "Select an end time."
-                draft.physicalEndTimeMinutes <= draft.physicalStartTimeMinutes ->
-                    "End time must be later than the start time."
-                else -> null
-            }
-        } else null
-
-        val remoteStartDateError = if (needsRemote) {
-            when {
-                draft.remoteStartDateMillis == null -> "Select a start date."
-                !CreatePostDateRules.isValidStartDate(draft.remoteStartDateMillis) ->
-                    "Start date must be at least 7 days from today."
-                else -> null
-            }
-        } else null
-
-        val remoteDueDateError = if (needsRemote) {
-            when {
-                draft.remoteDueDateMillis == null -> "Select a due date."
-                !CreatePostDateRules.isValidRemoteDueDate(
-                    draft.remoteStartDateMillis,
-                    draft.remoteDueDateMillis
-                ) -> "Due date must be after the start date."
-                else -> null
-            }
-        } else null
-
-        return CreatePostStepOneErrors(
-            postType = if (draft.postType == null) {
-                "Select a post type."
-            } else null,
-            category = if (draft.category == null) {
-                "Select a category."
-            } else null,
-            title = if (draft.title.isBlank()) {
-                "Enter a post title."
-            } else null,
-            description = if (draft.description.isBlank()) {
-                "Enter a description."
-            } else null,
-            helpNeeded = if (draft.helpNeeded.isEmpty()) {
-                "Add at least one Help Needed item."
-            } else null,
-            physicalStartDate = physicalStartDateError,
-            physicalEndDate = physicalEndDateError,
-            physicalTime = physicalTimeError,
-            physicalLocation = if (needsPhysical && draft.physicalLocation == null) {
-                "Select a location from the suggestions."
-            } else null,
-            physicalCapacity = if (
-                draft.postType == VolunteerPostType.PHYSICAL &&
-                (draft.physicalVolunteerCapacity ?: 0) <= 0
-            ) {
-                "Enter the number of volunteers needed."
-            } else null,
-            remoteStartDate = remoteStartDateError,
-            remoteDueDate = remoteDueDateError,
-            remoteCapacity = if (
-                draft.postType == VolunteerPostType.REMOTE &&
-                (draft.remoteVolunteerCapacity ?: 0) <= 0
-            ) {
-                "Enter the number of volunteers needed."
-            } else null,
-            remoteSubmissionMode = if (needsRemote && draft.remoteSubmissionMode == null) {
-                "Choose a submission setup."
-            } else null,
-            sharedDeliverable = if (
-                needsRemote &&
-                draft.remoteSubmissionMode == RemoteSubmissionMode.SHARED_TEAM &&
-                draft.sharedDeliverable.isBlank()
-            ) {
-                "Describe the shared team deliverable."
-            } else null,
-            hybridPhysicalCapacity = if (
-                draft.postType == VolunteerPostType.HYBRID &&
-                (draft.hybridPhysicalVolunteerCapacity ?: 0) <= 0
-            ) {
-                "Enter the Physical volunteer requirement."
-            } else null,
-            hybridRemoteCapacity = if (
-                draft.postType == VolunteerPostType.HYBRID &&
-                (draft.hybridRemoteVolunteerCapacity ?: 0) <= 0
-            ) {
-                "Enter the Remote volunteer requirement."
-            } else null
-        )
     }
 
     private fun parsePositiveNumber(text: String): Int? {
