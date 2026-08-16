@@ -86,6 +86,20 @@ data class CreatePostUiState(
     val roleSettingsError: String? = null,
     val isStepThreeReady: Boolean = false,
 
+    // Step 4 schedule state. The editor uses a temporary buffer so pressing
+    // Add never creates an incomplete saved schedule item.
+    val activeScheduleSection: ScheduleType? = null,
+    val selectedPhysicalScheduleDateMillis: Long? = null,
+    val editingScheduleItemId: String? = null,
+    val scheduleEditorDraft: ScheduleItemDraft? = null,
+    val isScheduleEditorOpen: Boolean = false,
+    val trainingLocationSuggestions: List<LocationSuggestion> = emptyList(),
+    val isTrainingLocationSearching: Boolean = false,
+    val trainingLocationSearchError: String? = null,
+    val scheduleError: String? = null,
+    val showScheduleErrors: Boolean = false,
+    val isStepFourReady: Boolean = false,
+
     // Post type switching state.
     val pendingPostType: VolunteerPostType? = null,
     val isPostTypeCommitted: Boolean = false

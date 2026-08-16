@@ -162,6 +162,8 @@ data class CreatePostDraft(
     val physicalLocation: LocationSuggestion? = null,
     val meetingPoint: String = "",
     val physicalVolunteerCapacity: Int? = null,
+    // Time-zone support is postponed for now; future SQL can store NULL.
+    val physicalTimeZoneId: String? = null,
 
     // Remote details
     val remoteStartDateMillis: Long? = null,
@@ -179,7 +181,10 @@ data class CreatePostDraft(
 
     // Step 3 only. Later, publish maps this template ID to the generated
     // post_role_id before inserting remote_details.
-    val sharedSubmissionResponsibleRoleTemplateId: String? = null
+    val sharedSubmissionResponsibleRoleTemplateId: String? = null,
+
+    // Step 4: optional schedule kept locally until the final Publish step.
+    val scheduleItems: List<ScheduleItemDraft> = emptyList()
 ) {
     val requiredPhysicalVolunteerTotal: Int?
         get() = when (postType) {
@@ -273,7 +278,10 @@ data class CreatePostDraft(
                 remoteSubmissionMode = null,
                 sharedDeliverable = "",
                 hybridPhysicalVolunteerCapacity = null,
-                hybridRemoteVolunteerCapacity = null
+                hybridRemoteVolunteerCapacity = null,
+                scheduleItems = scheduleItems.filter { item ->
+                    item.scheduleType != ScheduleType.REMOTE
+                }
             )
 
             VolunteerPostType.REMOTE -> copy(
@@ -287,7 +295,10 @@ data class CreatePostDraft(
                 meetingPoint = "",
                 physicalVolunteerCapacity = null,
                 hybridPhysicalVolunteerCapacity = null,
-                hybridRemoteVolunteerCapacity = null
+                hybridRemoteVolunteerCapacity = null,
+                scheduleItems = scheduleItems.filter { item ->
+                    item.scheduleType != ScheduleType.PHYSICAL
+                }
             )
 
             VolunteerPostType.HYBRID -> copy(
@@ -323,6 +334,7 @@ data class CreatePostDraft(
                 hybridPhysicalVolunteerCapacity != null ||
                 hybridRemoteVolunteerCapacity != null ||
                 selectedRoles.isNotEmpty() ||
-                sharedSubmissionResponsibleRoleTemplateId != null
+                sharedSubmissionResponsibleRoleTemplateId != null ||
+                scheduleItems.isNotEmpty()
     }
 }

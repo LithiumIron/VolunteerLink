@@ -10,6 +10,10 @@ import com.example.volunteerlink.organisation.create.model.CreatePostDraft
 import com.example.volunteerlink.organisation.create.model.CreateRoleTemplate
 import com.example.volunteerlink.organisation.create.model.CreatePostUiState
 import com.example.volunteerlink.organisation.create.model.RemoteSubmissionMode
+import com.example.volunteerlink.organisation.create.model.ScheduleItemDraft
+import com.example.volunteerlink.organisation.create.model.ScheduleType
+import com.example.volunteerlink.organisation.create.model.TrainingMode
+import com.example.volunteerlink.organisation.create.model.TrainingLocationMode
 import com.example.volunteerlink.organisation.create.model.RoleApplicationMethod
 import com.example.volunteerlink.organisation.create.model.SelectedRoleDraft
 import com.example.volunteerlink.organisation.create.model.VolunteerPostCategory
@@ -25,6 +29,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.util.Calendar
+import java.util.UUID
 
 /**
  * Shared state holder for the Create Post wizard.
@@ -43,6 +49,7 @@ class CreatePostViewModel : ViewModel() {
     val uiState = _uiState.asStateFlow()
 
     private var locationSearchJob: Job? = null
+    private var trainingLocationSearchJob: Job? = null
     private var locationBiasLatitude: Double? = null
     private var locationBiasLongitude: Double? = null
 
@@ -1434,11 +1441,35 @@ class CreatePostViewModel : ViewModel() {
         val ready = error == null
 
         _uiState.update { state ->
+            val sections = availableScheduleSections(state.draft.postType)
             state.copy(
                 roleSettingsError = error,
                 isStepThreeReady = ready,
                 currentStep = if (ready) 4 else state.currentStep,
-                editingRoleTemplateId = if (ready) null else state.editingRoleTemplateId
+                editingRoleTemplateId = if (ready) null else state.editingRoleTemplateId,
+                activeScheduleSection = if (ready) {
+                    state.activeScheduleSection
+                        ?.takeIf { it in sections }
+                        ?: sections.firstOrNull()
+                } else {
+                    state.activeScheduleSection
+                },
+                selectedPhysicalScheduleDateMillis = if (ready) {
+                    validSelectedPhysicalDate(
+                        draft = state.draft,
+                        currentDate = state.selectedPhysicalScheduleDateMillis
+                    )
+                } else {
+                    state.selectedPhysicalScheduleDateMillis
+                },
+                editingScheduleItemId = state.editingScheduleItemId,
+                scheduleEditorDraft = state.scheduleEditorDraft,
+                isScheduleEditorOpen = if (ready) false else state.isScheduleEditorOpen,
+                trainingLocationSuggestions = if (ready) emptyList() else state.trainingLocationSuggestions,
+                isTrainingLocationSearching = if (ready) false else state.isTrainingLocationSearching,
+                trainingLocationSearchError = if (ready) null else state.trainingLocationSearchError,
+                scheduleError = if (ready) null else state.scheduleError,
+                showScheduleErrors = if (ready) false else state.showScheduleErrors
             )
         }
 
@@ -1453,6 +1484,1256 @@ class CreatePostViewModel : ViewModel() {
                 roleSettingsError = null
             )
         }
+    }
+
+    // ---------------------------------------------------------------------
+    // Step 4: schedule
+    // ---------------------------------------------------------------------
+
+    fun selectScheduleSection(section: ScheduleType) {
+        if (section !in availableScheduleSections(_uiState.value.draft.postType)) {
+            return
+        }
+
+        _uiState.update { state ->
+            state.copy(
+                activeScheduleSection = section,
+                scheduleError = null,
+                showScheduleErrors = false
+            )
+        }
+    }
+
+    fun selectPhysicalScheduleDate(dateMillis: Long) {
+        val date = CreatePostValidator.startOfDayMillis(dateMillis)
+        if (date !in CreatePostValidator.physicalScheduleDates(_uiState.value.draft)) {
+            return
+        }
+
+        _uiState.update { state ->
+            state.copy(
+                selectedPhysicalScheduleDateMillis = date,
+                scheduleError = null,
+                showScheduleErrors = false
+            )
+        }
+    }
+
+    fun openScheduleItemEditor(itemId: String) {
+        val current = _uiState.value
+        val pausedDraft = current.scheduleEditorDraft
+        if (pausedDraft != null && !current.isScheduleEditorOpen) {
+            setScheduleError(
+                "You have unfinished schedule input. Resume or discard it before editing another item."
+            )
+            return
+        }
+
+        val item = current.draft.scheduleItems.firstOrNull { existing ->
+            existing.draftId == itemId
+        } ?: return
+
+        trainingLocationSearchJob?.cancel()
+
+        _uiState.update { state ->
+            state.copy(
+                activeScheduleSection = item.scheduleType,
+                editingScheduleItemId = itemId,
+                scheduleEditorDraft = item,
+                isScheduleEditorOpen = true,
+                trainingLocationSuggestions = emptyList(),
+                isTrainingLocationSearching = false,
+                trainingLocationSearchError = null,
+                scheduleError = null,
+                showScheduleErrors = false
+            )
+        }
+    }
+
+    /**
+     * Leaves the editor but keeps every typed value in the Step 4 UI state.
+     * The overview shows a Resume / Discard card instead of creating an
+     * incomplete saved schedule item.
+     */
+    fun closeScheduleItemEditor() {
+        trainingLocationSearchJob?.cancel()
+
+        _uiState.update { state ->
+            state.copy(
+                isScheduleEditorOpen = false,
+                trainingLocationSuggestions = emptyList(),
+                isTrainingLocationSearching = false,
+                trainingLocationSearchError = null,
+                scheduleError = null,
+                showScheduleErrors = false
+            )
+        }
+    }
+
+    fun resumeScheduleEditorDraft() {
+        val item = _uiState.value.scheduleEditorDraft ?: return
+        _uiState.update { state ->
+            state.copy(
+                activeScheduleSection = item.scheduleType,
+                selectedPhysicalScheduleDateMillis = if (
+                    item.scheduleType == ScheduleType.PHYSICAL
+                ) {
+                    item.scheduleDateMillis
+                } else {
+                    state.selectedPhysicalScheduleDateMillis
+                },
+                isScheduleEditorOpen = true,
+                scheduleError = null,
+                showScheduleErrors = false
+            )
+        }
+    }
+
+    fun discardScheduleEditorDraft() {
+        trainingLocationSearchJob?.cancel()
+        _uiState.update { state ->
+            state.copy(
+                editingScheduleItemId = null,
+                scheduleEditorDraft = null,
+                isScheduleEditorOpen = false,
+                trainingLocationSuggestions = emptyList(),
+                isTrainingLocationSearching = false,
+                trainingLocationSearchError = null,
+                scheduleError = null,
+                showScheduleErrors = false
+            )
+        }
+    }
+
+    /** System/UI Back: item editor -> Step 4 overview, overview -> Step 3. */
+    fun backFromStepFour() {
+        if (_uiState.value.isScheduleEditorOpen) {
+            closeScheduleItemEditor()
+            return
+        }
+
+        _uiState.update { state ->
+            state.copy(
+                currentStep = 3,
+                isScheduleEditorOpen = false,
+                scheduleError = null,
+                showScheduleErrors = false,
+                isStepFourReady = false
+            )
+        }
+    }
+
+    /**
+     * Starts a new Physical activity editor.
+     *
+     * Do not try to find a free slot here. The organiser chooses the time and
+     * overlap validation runs only when Save is pressed.
+     */
+    fun addPhysicalScheduleItem(dateMillis: Long): String? {
+        val current = _uiState.value
+        val pausedDraft = current.scheduleEditorDraft
+        if (pausedDraft != null) {
+            resumeScheduleEditorDraft()
+            return pausedDraft.draftId
+        }
+
+        val date = CreatePostValidator.startOfDayMillis(dateMillis)
+
+        if (date !in CreatePostValidator.physicalScheduleDates(current.draft)) {
+            setScheduleError("Choose one of the Physical event dates.")
+            return null
+        }
+
+        val roleIds = CreatePostValidator.applicableScheduleRoleIds(
+            draft = current.draft,
+            scheduleType = ScheduleType.PHYSICAL,
+            roleCatalogue = current.roleCatalogue
+        )
+
+        if (roleIds.isEmpty()) {
+            setScheduleError("Return to Step 2 and select at least one Physical role.")
+            return null
+        }
+
+        val eventStart = current.draft.physicalStartTimeMinutes
+        val eventEnd = current.draft.physicalEndTimeMinutes
+        if (eventStart == null || eventEnd == null || eventEnd <= eventStart) {
+            setScheduleError("Return to Step 1 and set a valid Physical event time.")
+            return null
+        }
+
+        val newId = UUID.randomUUID().toString()
+        val newItem = ScheduleItemDraft(
+            draftId = newId,
+            scheduleType = ScheduleType.PHYSICAL,
+            scheduleDateMillis = date,
+            appliesToAllRoles = roleIds.size > 1,
+            targetRoleTemplateIds = roleIds.singleOrNull()?.let(::listOf).orEmpty()
+        )
+
+        openNewScheduleEditor(
+            item = newItem,
+            selectedPhysicalDate = date
+        )
+        return newId
+    }
+
+    /** Starts a new Training / Briefing editor without saving an incomplete item. */
+    fun addTrainingScheduleItem(): String? {
+        val current = _uiState.value
+        val pausedDraft = current.scheduleEditorDraft
+        if (pausedDraft != null) {
+            resumeScheduleEditorDraft()
+            return pausedDraft.draftId
+        }
+
+        val roleIds = CreatePostValidator.applicableScheduleRoleIds(
+            draft = current.draft,
+            scheduleType = ScheduleType.TRAINING,
+            roleCatalogue = current.roleCatalogue
+        )
+
+        if (roleIds.isEmpty()) {
+            setScheduleError("Return to Step 2 and select at least one role.")
+            return null
+        }
+
+        val today = CreatePostValidator.startOfDayMillis()
+        val starts = listOfNotNull(
+            current.draft.physicalStartDateMillis,
+            current.draft.remoteStartDateMillis
+        ).map(CreatePostValidator::startOfDayMillis)
+
+        val suggestedDate = starts.minOrNull()
+            ?.let(::previousDayMillis)
+            ?.coerceAtLeast(today)
+            ?: today
+
+        val newId = UUID.randomUUID().toString()
+        val newItem = ScheduleItemDraft(
+            draftId = newId,
+            scheduleType = ScheduleType.TRAINING,
+            scheduleDateMillis = suggestedDate,
+            appliesToAllRoles = roleIds.size > 1,
+            targetRoleTemplateIds = roleIds.singleOrNull()?.let(::listOf).orEmpty(),
+            trainingMode = TrainingMode.ONLINE,
+            trainingTimeZoneId = null,
+            allowApplicationsAfterStart = true
+        )
+
+        openNewScheduleEditor(newItem)
+        return newId
+    }
+
+    /** Starts a new date-based Remote milestone editor. */
+    fun addRemoteScheduleItem(): String? {
+        val current = _uiState.value
+        val pausedDraft = current.scheduleEditorDraft
+        if (pausedDraft != null) {
+            resumeScheduleEditorDraft()
+            return pausedDraft.draftId
+        }
+
+        val start = current.draft.remoteStartDateMillis
+            ?.let(CreatePostValidator::startOfDayMillis)
+            ?: run {
+                setScheduleError("Return to Step 1 and set the Remote start date.")
+                return null
+            }
+        val due = current.draft.remoteDueDateMillis
+            ?.let(CreatePostValidator::startOfDayMillis)
+            ?: run {
+                setScheduleError("Return to Step 1 and set the Remote due date.")
+                return null
+            }
+
+        val roleIds = CreatePostValidator.applicableScheduleRoleIds(
+            draft = current.draft,
+            scheduleType = ScheduleType.REMOTE,
+            roleCatalogue = current.roleCatalogue
+        )
+
+        if (roleIds.isEmpty()) {
+            setScheduleError("Return to Step 2 and select at least one Remote role.")
+            return null
+        }
+
+        val latestDate = current.draft.scheduleItems
+            .filter { item -> item.scheduleType == ScheduleType.REMOTE }
+            .mapNotNull { item -> item.scheduleDateMillis }
+            .map(CreatePostValidator::startOfDayMillis)
+            .maxOrNull()
+
+        val suggestedDate = if (latestDate == null) {
+            start
+        } else {
+            CreatePostValidator.nextDayMillis(latestDate)
+                .coerceAtMost(due)
+                .coerceAtLeast(start)
+        }
+
+        val newId = UUID.randomUUID().toString()
+        val newItem = ScheduleItemDraft(
+            draftId = newId,
+            scheduleType = ScheduleType.REMOTE,
+            scheduleDateMillis = suggestedDate,
+            appliesToAllRoles = roleIds.size > 1,
+            targetRoleTemplateIds = roleIds.singleOrNull()?.let(::listOf).orEmpty()
+        )
+
+        openNewScheduleEditor(newItem)
+        return newId
+    }
+
+    fun removeScheduleItem(itemId: String) {
+        updateStepFourDraft { draft ->
+            draft.copy(
+                scheduleItems = draft.scheduleItems.filterNot { item ->
+                    item.draftId == itemId
+                }
+            )
+        }
+
+        if (_uiState.value.editingScheduleItemId == itemId) {
+            discardScheduleEditorDraft()
+        }
+    }
+
+    fun updateScheduleEditorTitle(text: String) {
+        updateScheduleEditor { item ->
+            item.copy(title = text.take(120))
+        }
+    }
+
+    fun updateScheduleEditorNotes(text: String) {
+        updateScheduleEditor { item ->
+            item.copy(notes = text.take(500))
+        }
+    }
+
+    fun updateScheduleEditorLocation(text: String) {
+        updateScheduleEditor { item ->
+            if (item.scheduleType == ScheduleType.PHYSICAL) {
+                item.copy(location = text.take(180))
+            } else {
+                item
+            }
+        }
+    }
+
+    fun updateScheduleEditorDate(dateMillis: Long) {
+        val date = CreatePostValidator.startOfDayMillis(dateMillis)
+        val current = _uiState.value
+        val item = current.scheduleEditorDraft ?: return
+
+        val accepted = when (item.scheduleType) {
+            ScheduleType.PHYSICAL -> false
+
+            ScheduleType.REMOTE -> {
+                val start = current.draft.remoteStartDateMillis
+                    ?.let(CreatePostValidator::startOfDayMillis)
+                val due = current.draft.remoteDueDateMillis
+                    ?.let(CreatePostValidator::startOfDayMillis)
+                start != null && due != null && date in start..due
+            }
+
+            ScheduleType.TRAINING -> {
+                date >= CreatePostValidator.startOfDayMillis()
+            }
+        }
+
+        if (accepted) {
+            updateScheduleEditor { existing ->
+                existing.copy(scheduleDateMillis = date)
+            }
+        }
+    }
+
+    fun updateScheduleEditorStartTime(
+        hour: Int,
+        minute: Int
+    ): String? {
+        val time = hour * 60 + minute
+        if (time !in 0..1439) {
+            return "Choose a valid start time."
+        }
+
+        val item = _uiState.value.scheduleEditorDraft
+            ?: return "This schedule editor is no longer open."
+
+        if (item.scheduleType == ScheduleType.REMOTE) {
+            return "Remote milestones do not use a clock time."
+        }
+
+        if (item.scheduleType == ScheduleType.PHYSICAL) {
+            val eventStart = _uiState.value.draft.physicalStartTimeMinutes
+                ?: return "Set the event start time in Step 1 first."
+            val eventEnd = _uiState.value.draft.physicalEndTimeMinutes
+                ?: return "Set the event end time in Step 1 first."
+
+            if (time < eventStart || time >= eventEnd) {
+                return "Start time must be inside the Physical event time."
+            }
+        }
+
+        updateScheduleEditor { current ->
+            current.copy(
+                startTimeMinutes = time,
+                endTimeMinutes = current.endTimeMinutes
+                    ?.takeIf { end -> end > time }
+            )
+        }
+        return null
+    }
+
+    fun updateScheduleEditorEndTime(
+        hour: Int,
+        minute: Int
+    ): String? {
+        val time = hour * 60 + minute
+        if (time !in 0..1439) {
+            return "Choose a valid end time."
+        }
+
+        val item = _uiState.value.scheduleEditorDraft
+            ?: return "This schedule editor is no longer open."
+
+        if (item.scheduleType == ScheduleType.REMOTE) {
+            return "Remote milestones do not use a clock time."
+        }
+
+        val start = item.startTimeMinutes
+            ?: return "Select the start time first."
+        if (time <= start) {
+            return "End time must be later than the start time."
+        }
+
+        if (item.scheduleType == ScheduleType.PHYSICAL) {
+            val eventEnd = _uiState.value.draft.physicalEndTimeMinutes
+                ?: return "Set the event end time in Step 1 first."
+            if (time > eventEnd) {
+                return "End time must be inside the Physical event time."
+            }
+        }
+
+        updateScheduleEditor { current ->
+            current.copy(endTimeMinutes = time)
+        }
+        return null
+    }
+
+    fun updateTrainingMode(trainingMode: TrainingMode) {
+        val hasEventLocation = _uiState.value.draft.physicalLocation != null
+
+        updateScheduleEditor { item ->
+            if (item.scheduleType != ScheduleType.TRAINING) {
+                item
+            } else {
+                when (trainingMode) {
+                    TrainingMode.ONLINE -> item.copy(
+                        trainingMode = TrainingMode.ONLINE,
+                        trainingLocationMode = null,
+                        trainingLocationQuery = "",
+                        trainingLocation = null,
+                        location = "",
+                        trainingTimeZoneId = null
+                    )
+
+                    TrainingMode.ONSITE -> {
+                        val locationMode = if (hasEventLocation) {
+                            TrainingLocationMode.EVENT_LOCATION
+                        } else {
+                            TrainingLocationMode.TBA
+                        }
+
+                        item.copy(
+                            trainingMode = TrainingMode.ONSITE,
+                            trainingLocationMode = locationMode,
+                            trainingLocationQuery = "",
+                            trainingLocation = null,
+                            location = if (locationMode == TrainingLocationMode.EVENT_LOCATION) {
+                                eventLocationText(_uiState.value.draft)
+                            } else {
+                                ""
+                            },
+                            onlinePlatform = "",
+                            meetingLink = "",
+                            trainingTimeZoneId = null
+                        )
+                    }
+                }
+            }
+        }
+
+        clearTrainingLocationSearchUi()
+    }
+
+    fun updateTrainingOnlinePlatform(text: String) {
+        updateScheduleEditor { item ->
+            if (
+                item.scheduleType == ScheduleType.TRAINING &&
+                item.trainingMode == TrainingMode.ONLINE
+            ) {
+                item.copy(onlinePlatform = text.take(100))
+            } else {
+                item
+            }
+        }
+    }
+
+    fun updateTrainingMeetingLink(text: String) {
+        updateScheduleEditor { item ->
+            if (
+                item.scheduleType == ScheduleType.TRAINING &&
+                item.trainingMode == TrainingMode.ONLINE
+            ) {
+                item.copy(meetingLink = text.take(500))
+            } else {
+                item
+            }
+        }
+    }
+
+    fun updateTrainingLocationMode(mode: TrainingLocationMode) {
+        val current = _uiState.value
+        val item = current.scheduleEditorDraft ?: return
+        if (
+            item.scheduleType != ScheduleType.TRAINING ||
+            item.trainingMode != TrainingMode.ONSITE
+        ) {
+            return
+        }
+
+        if (mode == TrainingLocationMode.EVENT_LOCATION) {
+            val eventLocation = eventLocationText(current.draft)
+            if (eventLocation.isBlank()) {
+                setScheduleError("The Physical event location is not available for this post.")
+                return
+            }
+        }
+
+        trainingLocationSearchJob?.cancel()
+        updateScheduleEditor { existing ->
+            existing.copy(
+                trainingLocationMode = mode,
+                trainingLocationQuery = "",
+                trainingLocation = null,
+                location = when (mode) {
+                    TrainingLocationMode.EVENT_LOCATION -> eventLocationText(current.draft)
+                    TrainingLocationMode.CUSTOM,
+                    TrainingLocationMode.TBA -> ""
+                },
+                trainingTimeZoneId = null
+            )
+        }
+        clearTrainingLocationSearchUi()
+    }
+
+    fun onTrainingLocationQueryChanged(query: String) {
+        val current = _uiState.value
+        val item = current.scheduleEditorDraft ?: return
+        if (
+            item.scheduleType != ScheduleType.TRAINING ||
+            item.trainingMode != TrainingMode.ONSITE ||
+            item.trainingLocationMode != TrainingLocationMode.CUSTOM
+        ) {
+            return
+        }
+
+        trainingLocationSearchJob?.cancel()
+
+        updateScheduleEditor { existing ->
+            existing.copy(
+                trainingLocationQuery = query,
+                trainingLocation = null,
+                location = ""
+            )
+        }
+
+        _uiState.update { state ->
+            state.copy(
+                trainingLocationSuggestions = emptyList(),
+                isTrainingLocationSearching = false,
+                trainingLocationSearchError = null
+            )
+        }
+
+        val cleanQuery = query.trim()
+        if (cleanQuery.length < 2) return
+
+        trainingLocationSearchJob = viewModelScope.launch {
+            delay(350)
+
+            if (BuildConfig.GEOAPIFY_API_KEY.isBlank()) {
+                _uiState.update { state ->
+                    state.copy(
+                        isTrainingLocationSearching = false,
+                        trainingLocationSearchError = "Geoapify API key is missing."
+                    )
+                }
+                return@launch
+            }
+
+            _uiState.update { state ->
+                state.copy(
+                    isTrainingLocationSearching = true,
+                    trainingLocationSearchError = null
+                )
+            }
+
+            try {
+                val results = locationService.searchLocations(
+                    query = cleanQuery,
+                    biasLatitude = locationBiasLatitude,
+                    biasLongitude = locationBiasLongitude
+                )
+
+                val latest = _uiState.value.scheduleEditorDraft
+                if (
+                    latest?.trainingLocationMode == TrainingLocationMode.CUSTOM &&
+                    latest.trainingLocationQuery.trim() == cleanQuery &&
+                    latest.trainingLocation == null
+                ) {
+                    _uiState.update { state ->
+                        state.copy(
+                            trainingLocationSuggestions = results,
+                            isTrainingLocationSearching = false,
+                            trainingLocationSearchError = if (results.isEmpty()) {
+                                "No matching location found."
+                            } else {
+                                null
+                            }
+                        )
+                    }
+                }
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (_: Exception) {
+                val latest = _uiState.value.scheduleEditorDraft
+                if (latest?.trainingLocationQuery?.trim() == cleanQuery) {
+                    _uiState.update { state ->
+                        state.copy(
+                            trainingLocationSuggestions = emptyList(),
+                            isTrainingLocationSearching = false,
+                            trainingLocationSearchError = "Unable to search locations."
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun onTrainingLocationSelected(location: LocationSuggestion) {
+        trainingLocationSearchJob?.cancel()
+
+        updateScheduleEditor { item ->
+            if (
+                item.scheduleType == ScheduleType.TRAINING &&
+                item.trainingMode == TrainingMode.ONSITE &&
+                item.trainingLocationMode == TrainingLocationMode.CUSTOM
+            ) {
+                item.copy(
+                    trainingLocationQuery = location.address.ifBlank {
+                        location.displayName
+                    },
+                    trainingLocation = location,
+                    location = location.address.ifBlank {
+                        location.displayName
+                    }.take(180),
+                    trainingTimeZoneId = null
+                )
+            } else {
+                item
+            }
+        }
+
+        clearTrainingLocationSearchUi()
+    }
+
+    fun clearTrainingLocation() {
+        trainingLocationSearchJob?.cancel()
+        updateScheduleEditor { item ->
+            if (item.trainingLocationMode == TrainingLocationMode.CUSTOM) {
+                item.copy(
+                    trainingLocationQuery = "",
+                    trainingLocation = null,
+                    location = "",
+                    trainingTimeZoneId = null
+                )
+            } else {
+                item
+            }
+        }
+        clearTrainingLocationSearchUi()
+    }
+
+    fun updateTrainingAllowApplicationsAfterStart(allow: Boolean) {
+        updateScheduleEditor { item ->
+            if (item.scheduleType == ScheduleType.TRAINING) {
+                item.copy(allowApplicationsAfterStart = allow)
+            } else {
+                item
+            }
+        }
+    }
+
+    fun updateScheduleEditorAppliesToAll(appliesToAll: Boolean) {
+        val current = _uiState.value
+        val item = current.scheduleEditorDraft ?: return
+        val availableRoleIds = CreatePostValidator.applicableScheduleRoleIds(
+            draft = current.draft,
+            scheduleType = item.scheduleType,
+            roleCatalogue = current.roleCatalogue
+        )
+
+        if (availableRoleIds.isEmpty()) return
+
+        updateScheduleEditor { existing ->
+            when {
+                availableRoleIds.size == 1 -> existing.copy(
+                    appliesToAllRoles = false,
+                    targetRoleTemplateIds = availableRoleIds
+                )
+
+                appliesToAll -> existing.copy(
+                    appliesToAllRoles = true,
+                    targetRoleTemplateIds = emptyList()
+                )
+
+                else -> existing.copy(
+                    appliesToAllRoles = false,
+                    targetRoleTemplateIds = existing.targetRoleTemplateIds
+                        .filter { roleId -> roleId in availableRoleIds }
+                        .ifEmpty { listOf(availableRoleIds.first()) }
+                )
+            }
+        }
+    }
+
+    fun toggleScheduleEditorRole(roleTemplateId: String) {
+        val current = _uiState.value
+        val item = current.scheduleEditorDraft ?: return
+        val availableRoleIds = CreatePostValidator.applicableScheduleRoleIds(
+            draft = current.draft,
+            scheduleType = item.scheduleType,
+            roleCatalogue = current.roleCatalogue
+        )
+
+        if (roleTemplateId !in availableRoleIds) return
+
+        updateScheduleEditor { existing ->
+            val currentTargets = if (existing.appliesToAllRoles) {
+                emptyList()
+            } else {
+                existing.targetRoleTemplateIds
+                    .filter { roleId -> roleId in availableRoleIds }
+            }
+
+            val changedTargets = if (roleTemplateId in currentTargets) {
+                currentTargets - roleTemplateId
+            } else {
+                currentTargets + roleTemplateId
+            }
+
+            existing.copy(
+                appliesToAllRoles = false,
+                targetRoleTemplateIds = changedTargets.distinct()
+            )
+        }
+    }
+
+    /** Validates the temporary editor buffer without saving it to CreatePostDraft. */
+    fun validateScheduleEditor(): Boolean {
+        val current = _uiState.value
+        val item = current.scheduleEditorDraft ?: return false
+        val cleanedItem = cleanScheduleItem(item, current.draft)
+        val candidateDraft = draftWithEditorItem(current.draft, cleanedItem)
+
+        val error = CreatePostValidator.validateScheduleItem(
+            draft = candidateDraft,
+            item = cleanedItem,
+            roleCatalogue = current.roleCatalogue
+        )
+
+        _uiState.update { state ->
+            state.copy(
+                scheduleEditorDraft = cleanedItem,
+                scheduleError = error,
+                showScheduleErrors = error != null,
+                isStepFourReady = false
+            )
+        }
+
+        return error == null
+    }
+
+    /** Commits a valid editor buffer to the shared CreatePostDraft. */
+    fun saveScheduleEditor(): Boolean {
+        val current = _uiState.value
+        val item = current.scheduleEditorDraft ?: return false
+        val cleanedItem = cleanScheduleItem(item, current.draft)
+        val candidateDraft = draftWithEditorItem(current.draft, cleanedItem)
+
+        val error = CreatePostValidator.validateScheduleItem(
+            draft = candidateDraft,
+            item = cleanedItem,
+            roleCatalogue = current.roleCatalogue
+        )
+
+        if (error != null) {
+            _uiState.update { state ->
+                state.copy(
+                    scheduleEditorDraft = cleanedItem,
+                    scheduleError = error,
+                    showScheduleErrors = true,
+                    isStepFourReady = false
+                )
+            }
+            return false
+        }
+
+        trainingLocationSearchJob?.cancel()
+        _uiState.update { state ->
+            state.copy(
+                draft = candidateDraft,
+                activeScheduleSection = cleanedItem.scheduleType,
+                selectedPhysicalScheduleDateMillis = if (
+                    cleanedItem.scheduleType == ScheduleType.PHYSICAL
+                ) {
+                    cleanedItem.scheduleDateMillis
+                } else {
+                    state.selectedPhysicalScheduleDateMillis
+                },
+                editingScheduleItemId = null,
+                scheduleEditorDraft = null,
+                isScheduleEditorOpen = false,
+                trainingLocationSuggestions = emptyList(),
+                isTrainingLocationSearching = false,
+                trainingLocationSearchError = null,
+                scheduleError = null,
+                showScheduleErrors = false,
+                isStepFourReady = false
+            )
+        }
+        return true
+    }
+
+    fun getScheduleEditorWarning(): String? {
+        val current = _uiState.value
+        val item = current.scheduleEditorDraft ?: return null
+        if (!CreatePostValidator.trainingStartsWithinShortNotice(item)) {
+            return null
+        }
+
+        return CreatePostValidator.scheduleItemWarning(
+            draft = draftWithEditorItem(current.draft, item),
+            item = item
+        )
+    }
+
+    /** Used by the overview to mark only saved items invalidated by earlier steps. */
+    fun getScheduleItemValidationMessage(itemId: String): String? {
+        val current = _uiState.value
+        val item = current.draft.scheduleItems.firstOrNull { existing ->
+            existing.draftId == itemId
+        } ?: return null
+
+        return CreatePostValidator.validateScheduleItem(
+            draft = current.draft,
+            item = item,
+            roleCatalogue = current.roleCatalogue
+        )
+    }
+
+    fun getScheduleItemWarning(itemId: String): String? {
+        val current = _uiState.value
+        val item = current.draft.scheduleItems.firstOrNull { existing ->
+            existing.draftId == itemId
+        } ?: return null
+
+        return CreatePostValidator.scheduleItemWarning(
+            draft = current.draft,
+            item = item
+        )
+    }
+
+    /**
+     * Copies one complete Physical day to another event date.
+     * The copied activities receive new local draft IDs. Training and Remote
+     * items on the target date are never touched.
+     */
+    fun copyPhysicalScheduleDay(
+        sourceDateMillis: Long,
+        targetDateMillis: Long,
+        replaceExisting: Boolean
+    ): Boolean {
+        val current = _uiState.value
+        val sourceDate = CreatePostValidator.startOfDayMillis(sourceDateMillis)
+        val targetDate = CreatePostValidator.startOfDayMillis(targetDateMillis)
+        val allowedDates = CreatePostValidator.physicalScheduleDates(current.draft)
+
+        if (
+            sourceDate == targetDate ||
+            sourceDate !in allowedDates ||
+            targetDate !in allowedDates
+        ) {
+            setScheduleError("Choose two different Physical event dates.")
+            return false
+        }
+
+        val sourceItems = current.draft.scheduleItems.filter { item ->
+            item.scheduleType == ScheduleType.PHYSICAL &&
+                item.scheduleDateMillis?.let(
+                    CreatePostValidator::startOfDayMillis
+                ) == sourceDate
+        }
+
+        if (sourceItems.isEmpty()) {
+            setScheduleError("There is no Physical timetable to copy from this day.")
+            return false
+        }
+
+        val sourceError = sourceItems.firstNotNullOfOrNull { item ->
+            CreatePostValidator.validateScheduleItem(
+                draft = current.draft,
+                item = item,
+                roleCatalogue = current.roleCatalogue
+            )
+        }
+
+        if (sourceError != null) {
+            setScheduleError(
+                "Fix the source day's timetable before copying it. $sourceError"
+            )
+            return false
+        }
+
+        val targetHasItems = physicalScheduleDayHasItems(targetDate)
+        if (targetHasItems && !replaceExisting) {
+            return false
+        }
+
+        val keptItems = if (replaceExisting) {
+            current.draft.scheduleItems.filterNot { item ->
+                item.scheduleType == ScheduleType.PHYSICAL &&
+                    item.scheduleDateMillis?.let(
+                        CreatePostValidator::startOfDayMillis
+                    ) == targetDate
+            }
+        } else {
+            current.draft.scheduleItems
+        }
+
+        val copies = sourceItems.map { source ->
+            source.copy(
+                draftId = UUID.randomUUID().toString(),
+                scheduleDateMillis = targetDate
+            )
+        }
+
+        val candidateDraft = current.draft.copy(
+            scheduleItems = keptItems + copies
+        )
+
+        val copiedError = copies.firstNotNullOfOrNull { item ->
+            CreatePostValidator.validateScheduleItem(
+                draft = candidateDraft,
+                item = item,
+                roleCatalogue = current.roleCatalogue
+            )
+        }
+
+        if (copiedError != null) {
+            setScheduleError(
+                "The copied timetable conflicts with the target day. $copiedError"
+            )
+            return false
+        }
+
+        _uiState.update { state ->
+            state.copy(
+                draft = candidateDraft,
+                selectedPhysicalScheduleDateMillis = targetDate,
+                scheduleError = null,
+                showScheduleErrors = false,
+                isStepFourReady = false
+            )
+        }
+        return true
+    }
+
+    fun physicalScheduleDayHasItems(dateMillis: Long): Boolean {
+        val date = CreatePostValidator.startOfDayMillis(dateMillis)
+        return _uiState.value.draft.scheduleItems.any { item ->
+            item.scheduleType == ScheduleType.PHYSICAL &&
+                item.scheduleDateMillis?.let(
+                    CreatePostValidator::startOfDayMillis
+                ) == date
+        }
+    }
+
+    fun canCopyPhysicalScheduleDay(dateMillis: Long): Boolean {
+        val current = _uiState.value
+        val date = CreatePostValidator.startOfDayMillis(dateMillis)
+        val items = current.draft.scheduleItems.filter { item ->
+            item.scheduleType == ScheduleType.PHYSICAL &&
+                item.scheduleDateMillis?.let(
+                    CreatePostValidator::startOfDayMillis
+                ) == date
+        }
+
+        return items.isNotEmpty() && items.all { item ->
+            CreatePostValidator.validateScheduleItem(
+                draft = current.draft,
+                item = item,
+                roleCatalogue = current.roleCatalogue
+            ) == null
+        }
+    }
+
+    fun validateScheduleForContinue(): Boolean {
+        val current = _uiState.value
+        if (current.scheduleEditorDraft != null) {
+            setScheduleError("You have unfinished schedule input. Resume it and save, or discard it before continuing to Review.")
+            return false
+        }
+
+        val error = CreatePostValidator.validateStepFour(
+            draft = current.draft,
+            roleCatalogue = current.roleCatalogue
+        )
+
+        _uiState.update { state ->
+            state.copy(
+                scheduleError = error,
+                showScheduleErrors = error != null,
+                isStepFourReady = error == null
+            )
+        }
+        return error == null
+    }
+
+    fun getScheduleProceedWarning(): String? {
+        return CreatePostValidator.scheduleProceedWarning(
+            draft = _uiState.value.draft
+        )
+    }
+
+    fun continueFromScheduleConfirmed(): Boolean {
+        if (!validateScheduleForContinue()) return false
+
+        _uiState.update { state ->
+            state.copy(
+                currentStep = 5,
+                editingScheduleItemId = null,
+                scheduleEditorDraft = null,
+                isScheduleEditorOpen = false,
+                scheduleError = null,
+                showScheduleErrors = false,
+                isStepFourReady = true
+            )
+        }
+        return true
+    }
+
+    /** Future Step 5 Back can use this without losing the Step 4 draft. */
+    fun backToStepFour() {
+        _uiState.update { state ->
+            val sections = availableScheduleSections(state.draft.postType)
+            state.copy(
+                currentStep = 4,
+                activeScheduleSection = state.activeScheduleSection
+                    ?.takeIf { it in sections }
+                    ?: sections.firstOrNull(),
+                selectedPhysicalScheduleDateMillis = validSelectedPhysicalDate(
+                    draft = state.draft,
+                    currentDate = state.selectedPhysicalScheduleDateMillis
+                ),
+                isScheduleEditorOpen = false,
+                scheduleError = null,
+                showScheduleErrors = false
+            )
+        }
+    }
+
+    private fun openNewScheduleEditor(
+        item: ScheduleItemDraft,
+        selectedPhysicalDate: Long? = null
+    ) {
+        trainingLocationSearchJob?.cancel()
+        _uiState.update { state ->
+            state.copy(
+                activeScheduleSection = item.scheduleType,
+                selectedPhysicalScheduleDateMillis = selectedPhysicalDate
+                    ?: state.selectedPhysicalScheduleDateMillis,
+                editingScheduleItemId = null,
+                scheduleEditorDraft = item,
+                isScheduleEditorOpen = true,
+                trainingLocationSuggestions = emptyList(),
+                isTrainingLocationSearching = false,
+                trainingLocationSearchError = null,
+                scheduleError = null,
+                showScheduleErrors = false,
+                isStepFourReady = false
+            )
+        }
+    }
+
+    private fun updateScheduleEditor(
+        transform: (ScheduleItemDraft) -> ScheduleItemDraft
+    ) {
+        _uiState.update { state ->
+            val item = state.scheduleEditorDraft ?: return@update state
+            state.copy(
+                scheduleEditorDraft = transform(item),
+                scheduleError = null,
+                showScheduleErrors = false,
+                isStepFourReady = false
+            )
+        }
+    }
+
+    private fun cleanScheduleItem(
+        item: ScheduleItemDraft,
+        draft: CreatePostDraft
+    ): ScheduleItemDraft {
+        val cleaned = item.copy(
+            title = item.title.trim(),
+            location = item.location.trim(),
+            targetRoleTemplateIds = item.targetRoleTemplateIds.distinct(),
+            notes = item.notes.trim(),
+            trainingLocationQuery = item.trainingLocationQuery.trim(),
+            onlinePlatform = item.onlinePlatform.trim(),
+            meetingLink = item.meetingLink.trim(),
+            trainingTimeZoneId = null
+        )
+
+        if (
+            cleaned.scheduleType != ScheduleType.TRAINING ||
+            cleaned.trainingMode != TrainingMode.ONSITE
+        ) {
+            return cleaned
+        }
+
+        return when (cleaned.trainingLocationMode) {
+            TrainingLocationMode.EVENT_LOCATION -> cleaned.copy(
+                location = eventLocationText(draft),
+                trainingLocationQuery = "",
+                trainingLocation = null
+            )
+
+            TrainingLocationMode.CUSTOM -> cleaned.copy(
+                location = cleaned.trainingLocation
+                    ?.let { location ->
+                        location.address.ifBlank { location.displayName }
+                    }
+                    .orEmpty()
+                    .take(180)
+            )
+
+            TrainingLocationMode.TBA -> cleaned.copy(
+                location = "",
+                trainingLocationQuery = "",
+                trainingLocation = null
+            )
+
+            null -> cleaned
+        }
+    }
+
+    private fun draftWithEditorItem(
+        draft: CreatePostDraft,
+        item: ScheduleItemDraft
+    ): CreatePostDraft {
+        val editingId = _uiState.value.editingScheduleItemId
+        val items = if (editingId == null) {
+            draft.scheduleItems + item
+        } else {
+            draft.scheduleItems.map { existing ->
+                if (existing.draftId == editingId) item else existing
+            }
+        }
+        return draft.copy(scheduleItems = items)
+    }
+
+    private fun eventLocationText(draft: CreatePostDraft): String {
+        val location = draft.physicalLocation ?: return ""
+        return location.address.ifBlank { location.displayName }.take(180)
+    }
+
+    private fun clearTrainingLocationSearchUi() {
+        _uiState.update { state ->
+            state.copy(
+                trainingLocationSuggestions = emptyList(),
+                isTrainingLocationSearching = false,
+                trainingLocationSearchError = null
+            )
+        }
+    }
+
+    private fun updateStepFourDraft(
+        change: (CreatePostDraft) -> CreatePostDraft
+    ) {
+        _uiState.update { current ->
+            current.copy(
+                draft = change(current.draft),
+                scheduleError = null,
+                showScheduleErrors = false,
+                isStepFourReady = false
+            )
+        }
+    }
+
+    private fun setScheduleError(message: String) {
+        _uiState.update { state ->
+            state.copy(
+                scheduleError = message,
+                showScheduleErrors = true,
+                isStepFourReady = false
+            )
+        }
+    }
+
+    private fun availableScheduleSections(
+        postType: VolunteerPostType?
+    ): List<ScheduleType> {
+        return when (postType) {
+            VolunteerPostType.PHYSICAL -> listOf(
+                ScheduleType.PHYSICAL,
+                ScheduleType.TRAINING
+            )
+
+            VolunteerPostType.REMOTE -> listOf(
+                ScheduleType.REMOTE,
+                ScheduleType.TRAINING
+            )
+
+            VolunteerPostType.HYBRID -> listOf(
+                ScheduleType.PHYSICAL,
+                ScheduleType.REMOTE,
+                ScheduleType.TRAINING
+            )
+
+            null -> emptyList()
+        }
+    }
+
+    private fun validSelectedPhysicalDate(
+        draft: CreatePostDraft,
+        currentDate: Long?
+    ): Long? {
+        val dates = CreatePostValidator.physicalScheduleDates(draft)
+        return currentDate
+            ?.let(CreatePostValidator::startOfDayMillis)
+            ?.takeIf { it in dates }
+            ?: dates.firstOrNull()
+    }
+
+    private fun previousDayMillis(dateMillis: Long): Long {
+        return Calendar.getInstance().apply {
+            timeInMillis = CreatePostValidator.startOfDayMillis(dateMillis)
+            add(Calendar.DAY_OF_YEAR, -1)
+        }.timeInMillis
     }
 
     private fun updateRoleConfiguration(
@@ -1505,7 +2786,11 @@ class CreatePostViewModel : ViewModel() {
             current.copy(
                 draft = newDraft,
                 roleSelectionErrors = errors,
-                isStepTwoReady = false
+                isStepTwoReady = false,
+                isStepThreeReady = false,
+                isStepFourReady = false,
+                scheduleError = null,
+                showScheduleErrors = false
             )
         }
     }
@@ -1585,6 +2870,7 @@ class CreatePostViewModel : ViewModel() {
 
     fun discardDraft() {
         locationSearchJob?.cancel()
+        trainingLocationSearchJob?.cancel()
         _uiState.value = CreatePostUiState()
     }
 
@@ -1602,7 +2888,11 @@ class CreatePostViewModel : ViewModel() {
                 },
                 isStepOneReady = false,
                 isStepTwoReady = false,
-                showRoleSelectionErrors = false
+                isStepThreeReady = false,
+                isStepFourReady = false,
+                showRoleSelectionErrors = false,
+                scheduleError = null,
+                showScheduleErrors = false
             )
         }
     }

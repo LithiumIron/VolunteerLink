@@ -33,6 +33,8 @@ fun LocationAutocompleteField(
     isSearching: Boolean,
     searchError: String?,
     validationError: String?,
+    label: String = "Location",
+    placeholder: String = "Search a venue or address",
     onQueryChanged: (String) -> Unit,
     onLocationSelected: (LocationSuggestion) -> Unit,
     onClearLocation: () -> Unit
@@ -44,8 +46,8 @@ fun LocationAutocompleteField(
             value = query,
             onValueChange = onQueryChanged,
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("Location") },
-            placeholder = { Text("Search a venue or address") },
+            label = { Text(label) },
+            placeholder = { Text(placeholder) },
             singleLine = true,
             isError = validationError != null,
             shape = RoundedCornerShape(14.dp)
