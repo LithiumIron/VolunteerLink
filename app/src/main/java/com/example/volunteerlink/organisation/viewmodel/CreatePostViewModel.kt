@@ -10,9 +10,11 @@ import com.example.volunteerlink.organisation.create.model.CreatePostDraft
 import com.example.volunteerlink.organisation.create.model.CreateRoleTemplate
 import com.example.volunteerlink.organisation.create.model.CreatePostUiState
 import com.example.volunteerlink.organisation.create.model.RemoteSubmissionMode
+import com.example.volunteerlink.organisation.create.model.RoleApplicationMethod
 import com.example.volunteerlink.organisation.create.model.SelectedRoleDraft
 import com.example.volunteerlink.organisation.create.model.VolunteerPostCategory
 import com.example.volunteerlink.organisation.create.model.VolunteerPostType
+import com.example.volunteerlink.organisation.create.model.VolunteerRoleLevel
 import com.example.volunteerlink.organisation.create.model.VolunteerRoleMode
 import com.example.volunteerlink.organisation.repository.CreatePostRepository
 import com.example.volunteerlink.organisation.repository.SupabaseCreatePostRepository
@@ -656,7 +658,16 @@ class CreatePostViewModel : ViewModel() {
             draft.copy(
                 selectedRoles = draft.selectedRoles.filterNot {
                     it.roleTemplateId == roleTemplateId
-                }
+                },
+                sharedSubmissionResponsibleRoleTemplateId =
+                    if (
+                        draft.sharedSubmissionResponsibleRoleTemplateId ==
+                        roleTemplateId
+                    ) {
+                        null
+                    } else {
+                        draft.sharedSubmissionResponsibleRoleTemplateId
+                    }
             )
         }
     }
@@ -781,7 +792,704 @@ class CreatePostViewModel : ViewModel() {
             )
         }
 
+        if (ready) {
+            openStepThree()
+        }
+
         return ready
+    }
+
+    // ---------------------------------------------------------------------
+    // Step 3: role settings
+    // ---------------------------------------------------------------------
+
+    /**
+     * Opens Step 3 and prepares each selected role from the Supabase catalogue.
+     * Recommended skills become the starting selection only the first time the
+     * role reaches Step 3; existing organiser edits are preserved.
+     */
+    fun openStepThree() {
+        val current = _uiState.value
+        val stepTwoErrors = CreatePostValidator.validateStepTwo(
+            draft = current.draft,
+            roleCatalogue = current.roleCatalogue
+        )
+
+        if (stepTwoErrors.hasErrors()) {
+            _uiState.update { state ->
+                state.copy(
+                    roleSelectionErrors = stepTwoErrors,
+                    showRoleSelectionErrors = true,
+                    isStepTwoReady = false
+                )
+            }
+            return
+        }
+
+        val templatesById = current.roleCatalogue.associateBy { template ->
+            template.roleTemplateId
+        }
+
+        val preparedRoles = current.draft.selectedRoles.map { selectedRole ->
+            val template = templatesById[selectedRole.roleTemplateId]
+                ?: return@map selectedRole
+
+            val allowedSkillIds = template.skillsPractised
+                .map { skill -> skill.skillId }
+            val allowedSkillSet = allowedSkillIds.toSet()
+
+            val existingSkills = selectedRole.practisedSkillIds
+                .filter { skillId -> skillId in allowedSkillSet }
+                .distinct()
+
+            val recommendedIds = template.recommendedSkills
+                .map { skill -> skill.skillId }
+                .filter { skillId -> skillId in allowedSkillSet }
+                .distinct()
+
+            val startingSkills = if (existingSkills.isNotEmpty()) {
+                existingSkills.take(4)
+            } else {
+                (recommendedIds + allowedSkillIds)
+                    .distinct()
+                    .take(2)
+            }
+
+            val recommendedMethod =
+                CreatePostValidator.recommendedApplicationMethodForLevel(
+                    template.defaultLevel
+                )
+            val selectedMethod =
+                selectedRole.applicationMethod ?: recommendedMethod
+
+            val cleanedRequirements = if (
+                template.defaultLevel == VolunteerRoleLevel.BEGINNER
+            ) {
+                emptyMap()
+            } else {
+                selectedRole.requiredSkillExperience
+                    .filter { (skillId, minimum) ->
+                        skillId in startingSkills && minimum in 1..5
+                    }
+            }
+
+            val prepared = selectedRole.copy(
+                practisedSkillIds = startingSkills,
+                requiredSkillExperience = cleanedRequirements,
+                responsibilities = if (selectedRole.responsibilities.isEmpty()) {
+                    listOf("")
+                } else {
+                    selectedRole.responsibilities
+                },
+                applicationMethod = selectedMethod,
+                screeningQuestions = if (
+                    selectedMethod == RoleApplicationMethod.INSTANT_JOIN
+                ) {
+                    emptyList()
+                } else {
+                    selectedRole.screeningQuestions.take(3)
+                }
+            )
+
+            prepared.copy(
+                isConfigured = selectedRole.isConfigured &&
+                        CreatePostValidator.validateRoleConfiguration(
+                            draft = current.draft,
+                            selectedRole = prepared,
+                            template = template
+                        ).isEmpty()
+            )
+        }
+
+        var preparedDraft = current.draft.copy(
+            selectedRoles = preparedRoles
+        )
+
+        if (preparedDraft.remoteSubmissionMode == RemoteSubmissionMode.SHARED_TEAM) {
+            val remoteRoleIds = preparedRoles.mapNotNull { selectedRole ->
+                val template = templatesById[selectedRole.roleTemplateId]
+                if (template?.roleMode == VolunteerRoleMode.REMOTE) {
+                    selectedRole.roleTemplateId
+                } else {
+                    null
+                }
+            }
+
+            val currentResponsible =
+                preparedDraft.sharedSubmissionResponsibleRoleTemplateId
+
+            val resolvedResponsible = when {
+                currentResponsible != null && currentResponsible in remoteRoleIds ->
+                    currentResponsible
+
+                remoteRoleIds.size == 1 -> remoteRoleIds.first()
+                else -> null
+            }
+
+            preparedDraft = preparedDraft.copy(
+                sharedSubmissionResponsibleRoleTemplateId = resolvedResponsible
+            )
+        }
+
+        val ready = CreatePostValidator.validateStepThree(
+            draft = preparedDraft,
+            roleCatalogue = current.roleCatalogue
+        ) == null
+
+        _uiState.update { state ->
+            state.copy(
+                draft = preparedDraft,
+                currentStep = 3,
+                editingRoleTemplateId = null,
+                roleSettingsError = null,
+                isStepThreeReady = ready,
+                showRoleSelectionErrors = false
+            )
+        }
+    }
+
+    /** Opens one selected role in the Step 3 editor. */
+    fun openRoleEditor(roleTemplateId: String) {
+        val current = _uiState.value
+        if (current.draft.selectedRoles.none {
+                it.roleTemplateId == roleTemplateId
+            }) {
+            return
+        }
+
+        _uiState.update { state ->
+            state.copy(
+                editingRoleTemplateId = roleTemplateId,
+                roleSettingsError = null
+            )
+        }
+    }
+
+    /** Returns from one role editor to the Step 3 overview. */
+    fun closeRoleEditor() {
+        _uiState.update { state ->
+            state.copy(
+                editingRoleTemplateId = null,
+                roleSettingsError = null
+            )
+        }
+    }
+
+    /** System/UI Back: role editor -> overview, overview -> Step 2. */
+    fun backFromStepThree() {
+        if (_uiState.value.editingRoleTemplateId != null) {
+            closeRoleEditor()
+        } else {
+            _uiState.update { state ->
+                state.copy(
+                    currentStep = 2,
+                    roleSettingsError = null,
+                    isStepThreeReady = false
+                )
+            }
+        }
+    }
+
+    fun togglePractisedSkill(
+        roleTemplateId: String,
+        skillId: String
+    ) {
+        val current = _uiState.value
+        val template = current.roleCatalogue.firstOrNull {
+            it.roleTemplateId == roleTemplateId
+        } ?: return
+
+        if (template.skillsPractised.none { it.skillId == skillId }) return
+
+        val selectedRole = current.draft.selectedRoles.firstOrNull {
+            it.roleTemplateId == roleTemplateId
+        } ?: return
+
+        val currentlySelected = skillId in selectedRole.practisedSkillIds
+
+        if (!currentlySelected && selectedRole.practisedSkillIds.size >= 4) {
+            setRoleSettingsError(
+                "Maximum 4 practised skills. Remove another skill first."
+            )
+            return
+        }
+
+        if (
+            currentlySelected &&
+            skillId in selectedRole.requiredSkillExperience
+        ) {
+            setRoleSettingsError(
+                "This skill is Required. Remove the requirement before unticking it."
+            )
+            return
+        }
+
+        if (currentlySelected && selectedRole.practisedSkillIds.size <= 2) {
+            setRoleSettingsError(
+                "Keep at least 2 practised skills for this role."
+            )
+            return
+        }
+
+        updateRoleConfiguration(roleTemplateId) { role ->
+            val updatedIds = if (currentlySelected) {
+                role.practisedSkillIds - skillId
+            } else {
+                val selectedSet = (role.practisedSkillIds + skillId).toSet()
+                template.skillsPractised
+                    .map { skill -> skill.skillId }
+                    .filter { availableId -> availableId in selectedSet }
+            }
+
+            role.copy(
+                practisedSkillIds = updatedIds,
+                requiredSkillExperience = role.requiredSkillExperience
+                    .filterKeys { requiredId -> requiredId in updatedIds }
+            )
+        }
+    }
+
+    fun toggleRequiredSkill(
+        roleTemplateId: String,
+        skillId: String
+    ) {
+        val current = _uiState.value
+        val template = current.roleCatalogue.firstOrNull {
+            it.roleTemplateId == roleTemplateId
+        } ?: return
+
+        if (template.defaultLevel == VolunteerRoleLevel.BEGINNER) return
+        if (template.skillsPractised.none { it.skillId == skillId }) return
+
+        val selectedRole = current.draft.selectedRoles.firstOrNull {
+            it.roleTemplateId == roleTemplateId
+        } ?: return
+
+        val isRequired = skillId in selectedRole.requiredSkillExperience
+
+        if (
+            !isRequired &&
+            skillId !in selectedRole.practisedSkillIds &&
+            selectedRole.practisedSkillIds.size >= 4
+        ) {
+            setRoleSettingsError(
+                "Maximum 4 practised skills. Remove another skill before making this one Required."
+            )
+            return
+        }
+
+        updateRoleConfiguration(roleTemplateId) { role ->
+            if (isRequired) {
+                role.copy(
+                    requiredSkillExperience =
+                        role.requiredSkillExperience - skillId
+                )
+            } else {
+                val selectedSet =
+                    (role.practisedSkillIds + skillId).toSet()
+                val orderedSkills = template.skillsPractised
+                    .map { skill -> skill.skillId }
+                    .filter { availableId -> availableId in selectedSet }
+                    .take(4)
+
+                role.copy(
+                    practisedSkillIds = orderedSkills,
+                    requiredSkillExperience =
+                        role.requiredSkillExperience + (skillId to 1)
+                )
+            }
+        }
+    }
+
+    fun increaseRequiredSkillExperience(
+        roleTemplateId: String,
+        skillId: String
+    ) {
+        changeRequiredSkillExperience(
+            roleTemplateId = roleTemplateId,
+            skillId = skillId,
+            change = 1
+        )
+    }
+
+    fun decreaseRequiredSkillExperience(
+        roleTemplateId: String,
+        skillId: String
+    ) {
+        changeRequiredSkillExperience(
+            roleTemplateId = roleTemplateId,
+            skillId = skillId,
+            change = -1
+        )
+    }
+
+    private fun changeRequiredSkillExperience(
+        roleTemplateId: String,
+        skillId: String,
+        change: Int
+    ) {
+        updateRoleConfiguration(roleTemplateId) { role ->
+            val current = role.requiredSkillExperience[skillId]
+                ?: return@updateRoleConfiguration role
+
+            role.copy(
+                requiredSkillExperience =
+                    role.requiredSkillExperience +
+                            (skillId to (current + change).coerceIn(1, 5))
+            )
+        }
+    }
+
+    fun addResponsibility(roleTemplateId: String) {
+        updateRoleConfiguration(roleTemplateId) { role ->
+            if (role.responsibilities.lastOrNull()?.isBlank() == true) {
+                role
+            } else {
+                role.copy(
+                    responsibilities = role.responsibilities + ""
+                )
+            }
+        }
+    }
+
+    fun updateResponsibility(
+        roleTemplateId: String,
+        index: Int,
+        text: String
+    ) {
+        updateRoleConfiguration(roleTemplateId) { role ->
+            if (index !in role.responsibilities.indices) {
+                return@updateRoleConfiguration role
+            }
+
+            role.copy(
+                responsibilities = role.responsibilities.mapIndexed { itemIndex, item ->
+                    if (itemIndex == index) text.take(160) else item
+                }
+            )
+        }
+    }
+
+    fun removeResponsibility(
+        roleTemplateId: String,
+        index: Int
+    ) {
+        updateRoleConfiguration(roleTemplateId) { role ->
+            if (index !in role.responsibilities.indices) {
+                return@updateRoleConfiguration role
+            }
+
+            val updated = role.responsibilities.filterIndexed { itemIndex, _ ->
+                itemIndex != index
+            }
+
+            role.copy(
+                responsibilities = if (updated.isEmpty()) listOf("") else updated
+            )
+        }
+    }
+
+    /**
+     * Changes the application method for one role.
+     *
+     * The role level only controls the initial recommendation. Organisations
+     * can choose either method for Beginner, Intermediate or Advanced roles.
+     */
+    fun updateRoleApplicationMethod(
+        roleTemplateId: String,
+        method: RoleApplicationMethod
+    ) {
+        updateRoleConfiguration(roleTemplateId) { role ->
+            role.copy(
+                applicationMethod = method,
+                screeningQuestions = if (
+                    method == RoleApplicationMethod.INSTANT_JOIN
+                ) {
+                    emptyList()
+                } else {
+                    role.screeningQuestions.take(3)
+                }
+            )
+        }
+    }
+
+    fun addScreeningQuestion(roleTemplateId: String) {
+        updateRoleConfiguration(roleTemplateId) { role ->
+            if (
+                role.applicationMethod != RoleApplicationMethod.REVIEW_APPLICANTS ||
+                role.screeningQuestions.size >= 3 ||
+                role.screeningQuestions.lastOrNull()?.isBlank() == true
+            ) {
+                role
+            } else {
+                role.copy(
+                    screeningQuestions = role.screeningQuestions + ""
+                )
+            }
+        }
+    }
+
+    fun updateScreeningQuestion(
+        roleTemplateId: String,
+        index: Int,
+        text: String
+    ) {
+        updateRoleConfiguration(roleTemplateId) { role ->
+            if (index !in role.screeningQuestions.indices) {
+                return@updateRoleConfiguration role
+            }
+
+            role.copy(
+                screeningQuestions = role.screeningQuestions.mapIndexed { itemIndex, item ->
+                    if (itemIndex == index) text.take(180) else item
+                }
+            )
+        }
+    }
+
+    fun removeScreeningQuestion(
+        roleTemplateId: String,
+        index: Int
+    ) {
+        updateRoleConfiguration(roleTemplateId) { role ->
+            role.copy(
+                screeningQuestions = role.screeningQuestions
+                    .filterIndexed { itemIndex, _ -> itemIndex != index }
+            )
+        }
+    }
+
+    fun updateRoleNotes(
+        roleTemplateId: String,
+        text: String
+    ) {
+        updateRoleConfiguration(roleTemplateId) { role ->
+            role.copy(roleNotes = text.take(400))
+        }
+    }
+
+    fun updateIndividualSubmissionRequirement(
+        roleTemplateId: String,
+        text: String
+    ) {
+        updateRoleConfiguration(roleTemplateId) { role ->
+            role.copy(
+                individualSubmissionRequirement = text.take(500)
+            )
+        }
+    }
+
+    fun updateSharedSubmissionResponsibleRole(
+        roleTemplateId: String
+    ) {
+        val current = _uiState.value
+        if (current.draft.remoteSubmissionMode != RemoteSubmissionMode.SHARED_TEAM) {
+            return
+        }
+
+        val isSelectedRemoteRole = current.draft.selectedRoles.any { selectedRole ->
+            selectedRole.roleTemplateId == roleTemplateId &&
+                    current.roleCatalogue.firstOrNull {
+                        it.roleTemplateId == roleTemplateId
+                    }?.roleMode == VolunteerRoleMode.REMOTE
+        }
+
+        if (!isSelectedRemoteRole) return
+
+        val newDraft = current.draft.copy(
+            sharedSubmissionResponsibleRoleTemplateId = roleTemplateId
+        )
+
+        _uiState.update { state ->
+            state.copy(
+                draft = newDraft,
+                roleSettingsError = null,
+                isStepThreeReady = CreatePostValidator.validateStepThree(
+                    draft = newDraft,
+                    roleCatalogue = state.roleCatalogue
+                ) == null
+            )
+        }
+    }
+
+    /** True when the current Step 3 values for this role can be saved. */
+    fun canSaveRoleConfiguration(roleTemplateId: String): Boolean {
+        val current = _uiState.value
+        val template = current.roleCatalogue.firstOrNull {
+            it.roleTemplateId == roleTemplateId
+        } ?: return false
+        val selectedRole = current.draft.selectedRoles.firstOrNull {
+            it.roleTemplateId == roleTemplateId
+        } ?: return false
+
+        return CreatePostValidator.validateRoleConfiguration(
+            draft = current.draft,
+            selectedRole = selectedRole,
+            template = template
+        ).isEmpty()
+    }
+
+    /** Cleans, validates and marks one role Ready. */
+    fun saveRoleConfiguration(roleTemplateId: String): Boolean {
+        val current = _uiState.value
+        val template = current.roleCatalogue.firstOrNull {
+            it.roleTemplateId == roleTemplateId
+        } ?: return false
+
+        val selectedRole = current.draft.selectedRoles.firstOrNull {
+            it.roleTemplateId == roleTemplateId
+        } ?: return false
+
+        val selectedMethod = selectedRole.applicationMethod
+
+        val cleanedRole = selectedRole.copy(
+            responsibilities = selectedRole.responsibilities
+                .map { responsibility -> responsibility.trim() }
+                .filter { responsibility -> responsibility.isNotEmpty() },
+            applicationMethod = selectedMethod,
+            screeningQuestions = if (
+                selectedMethod == RoleApplicationMethod.REVIEW_APPLICANTS
+            ) {
+                selectedRole.screeningQuestions
+                    .map { question -> question.trim() }
+                    .filter { question -> question.isNotEmpty() }
+                    .take(3)
+            } else {
+                emptyList()
+            },
+            roleNotes = selectedRole.roleNotes.trim(),
+            individualSubmissionRequirement =
+                selectedRole.individualSubmissionRequirement.trim(),
+            isConfigured = false
+        )
+
+        val problems = CreatePostValidator.validateRoleConfiguration(
+            draft = current.draft,
+            selectedRole = cleanedRole,
+            template = template
+        )
+
+        if (problems.isNotEmpty()) {
+            _uiState.update { state ->
+                state.copy(
+                    roleSettingsError = problems.first(),
+                    isStepThreeReady = false
+                )
+            }
+            return false
+        }
+
+        val savedRole = cleanedRole.copy(isConfigured = true)
+        val newDraft = current.draft.copy(
+            selectedRoles = current.draft.selectedRoles.map { role ->
+                if (role.roleTemplateId == roleTemplateId) savedRole else role
+            }
+        )
+
+        val ready = CreatePostValidator.validateStepThree(
+            draft = newDraft,
+            roleCatalogue = current.roleCatalogue
+        ) == null
+
+        _uiState.update { state ->
+            state.copy(
+                draft = newDraft,
+                roleSettingsError = null,
+                isStepThreeReady = ready
+            )
+        }
+
+        return true
+    }
+
+    /** Saves the current role and opens the next role that still needs review. */
+    fun saveAndOpenNextRole(roleTemplateId: String): Boolean {
+        if (!saveRoleConfiguration(roleTemplateId)) return false
+
+        val stateAfterSave = _uiState.value
+        val nextRoleId = stateAfterSave.draft.selectedRoles
+            .firstOrNull { selectedRole ->
+                selectedRole.roleTemplateId != roleTemplateId &&
+                        !selectedRole.isConfigured
+            }
+            ?.roleTemplateId
+
+        _uiState.update { state ->
+            state.copy(
+                editingRoleTemplateId = nextRoleId,
+                roleSettingsError = null
+            )
+        }
+
+        return true
+    }
+
+    /** Validates Step 3 before the Schedule step is opened. */
+    fun continueFromStepThree(): Boolean {
+        val current = _uiState.value
+        val error = CreatePostValidator.validateStepThree(
+            draft = current.draft,
+            roleCatalogue = current.roleCatalogue
+        )
+        val ready = error == null
+
+        _uiState.update { state ->
+            state.copy(
+                roleSettingsError = error,
+                isStepThreeReady = ready,
+                currentStep = if (ready) 4 else state.currentStep,
+                editingRoleTemplateId = if (ready) null else state.editingRoleTemplateId
+            )
+        }
+
+        return ready
+    }
+
+    fun backToStepThree() {
+        _uiState.update { state ->
+            state.copy(
+                currentStep = 3,
+                editingRoleTemplateId = null,
+                roleSettingsError = null
+            )
+        }
+    }
+
+    private fun updateRoleConfiguration(
+        roleTemplateId: String,
+        transform: (SelectedRoleDraft) -> SelectedRoleDraft
+    ) {
+        _uiState.update { current ->
+            val updatedRoles = current.draft.selectedRoles.map { selectedRole ->
+                if (selectedRole.roleTemplateId == roleTemplateId) {
+                    val transformed = transform(selectedRole)
+                    if (transformed == selectedRole) {
+                        selectedRole
+                    } else {
+                        transformed.copy(isConfigured = false)
+                    }
+                } else {
+                    selectedRole
+                }
+            }
+
+            val newDraft = current.draft.copy(selectedRoles = updatedRoles)
+
+            current.copy(
+                draft = newDraft,
+                roleSettingsError = null,
+                isStepThreeReady = false
+            )
+        }
+    }
+
+    private fun setRoleSettingsError(message: String) {
+        _uiState.update { state ->
+            state.copy(
+                roleSettingsError = message,
+                isStepThreeReady = false
+            )
+        }
     }
 
     private fun updateStepTwoDraft(

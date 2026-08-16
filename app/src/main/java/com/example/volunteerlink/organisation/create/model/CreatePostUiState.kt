@@ -81,6 +81,11 @@ data class CreatePostUiState(
     val showRoleSelectionErrors: Boolean = false,
     val isStepTwoReady: Boolean = false,
 
+    // Step 3 role-settings state.
+    val editingRoleTemplateId: String? = null,
+    val roleSettingsError: String? = null,
+    val isStepThreeReady: Boolean = false,
+
     // Post type switching state.
     val pendingPostType: VolunteerPostType? = null,
     val isPostTypeCommitted: Boolean = false

@@ -84,10 +84,42 @@ data class CreateRoleTemplate(
     val defaultLevel: VolunteerRoleLevel
 )
 
-/** The organiser's Step 2 selection for one fixed role template. */
+/** Values match post_roles.application_method in Supabase. */
+enum class RoleApplicationMethod(
+    val displayName: String,
+    val databaseValue: String
+) {
+    INSTANT_JOIN(
+        displayName = "Instant Join",
+        databaseValue = "INSTANT_JOIN"
+    ),
+    REVIEW_APPLICANTS(
+        displayName = "Review Applicants",
+        databaseValue = "REVIEW_APPLICANTS"
+    )
+}
+
+/**
+ * The organiser's configuration for one selected fixed role template.
+ *
+ * Step 2 owns roleTemplateId + capacity. Step 3 extends the SAME object with
+ * role-specific settings so there is only one source of truth for each role.
+ */
 data class SelectedRoleDraft(
     val roleTemplateId: String,
-    val capacity: Int = 1
+    val capacity: Int = 1,
+
+    // Step 3: role settings.
+    val practisedSkillIds: List<String> = emptyList(),
+    val requiredSkillExperience: Map<String, Int> = emptyMap(),
+    val responsibilities: List<String> = emptyList(),
+    val applicationMethod: RoleApplicationMethod? = null,
+    val screeningQuestions: List<String> = emptyList(),
+    val roleNotes: String = "",
+    val individualSubmissionRequirement: String = "",
+
+    // Wizard-only state. This is not a Supabase column.
+    val isConfigured: Boolean = false
 )
 
 /** Values match remote_details.submission_mode in Supabase. */
@@ -142,8 +174,12 @@ data class CreatePostDraft(
     val hybridPhysicalVolunteerCapacity: Int? = null,
     val hybridRemoteVolunteerCapacity: Int? = null,
 
-    // Step 2: fixed role templates selected for this post.
-    val selectedRoles: List<SelectedRoleDraft> = emptyList()
+    // Steps 2-3: selected fixed roles and their organisation-specific settings.
+    val selectedRoles: List<SelectedRoleDraft> = emptyList(),
+
+    // Step 3 only. Later, publish maps this template ID to the generated
+    // post_role_id before inserting remote_details.
+    val sharedSubmissionResponsibleRoleTemplateId: String? = null
 ) {
     val requiredPhysicalVolunteerTotal: Int?
         get() = when (postType) {
@@ -286,6 +322,7 @@ data class CreatePostDraft(
                 sharedDeliverable.isNotBlank() ||
                 hybridPhysicalVolunteerCapacity != null ||
                 hybridRemoteVolunteerCapacity != null ||
-                selectedRoles.isNotEmpty()
+                selectedRoles.isNotEmpty() ||
+                sharedSubmissionResponsibleRoleTemplateId != null
     }
 }

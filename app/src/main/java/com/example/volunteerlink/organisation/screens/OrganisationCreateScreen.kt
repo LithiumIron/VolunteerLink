@@ -20,8 +20,10 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.volunteerlink.data.location.DeviceLocationHelper
+import com.example.volunteerlink.organisation.components.OrganisationModulePage
 import com.example.volunteerlink.organisation.create.model.VolunteerPostType
 import com.example.volunteerlink.organisation.create.steps.PostDetailsStep
+import com.example.volunteerlink.organisation.create.steps.RoleSettingsStep
 import com.example.volunteerlink.organisation.create.steps.SelectRolesStep
 import com.example.volunteerlink.organisation.viewmodel.CreatePostViewModel
 
@@ -93,10 +95,12 @@ fun OrganisationCreateScreen(
     }
 
     val requestBack: () -> Unit = {
-        if (uiState.currentStep == 2) {
-            viewModel.backToStepOne()
-        } else {
-            requestExit()
+        when (uiState.currentStep) {
+            1 -> requestExit()
+            2 -> viewModel.backToStepOne()
+            3 -> viewModel.backFromStepThree()
+            4 -> viewModel.backToStepThree()
+            else -> requestExit()
         }
     }
 
@@ -117,6 +121,23 @@ fun OrganisationCreateScreen(
                 uiState = uiState,
                 viewModel = viewModel,
                 onBack = viewModel::backToStepOne
+            )
+        }
+
+        3 -> {
+            RoleSettingsStep(
+                uiState = uiState,
+                viewModel = viewModel,
+                onBack = viewModel::backFromStepThree
+            )
+        }
+
+        4 -> {
+            // Temporary guard until the real Schedule step is connected.
+            // It prevents Step 3 Continue from falling back to Step 1.
+            OrganisationModulePage(
+                title = "Schedule · Step 4 of 5",
+                message = "Step 3 is complete. The Schedule screen will be connected next. Use Back to return to Role Settings."
             )
         }
 

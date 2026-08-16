@@ -4,9 +4,12 @@ import com.example.volunteerlink.organisation.create.model.CreatePostDraft
 import com.example.volunteerlink.organisation.create.model.CreatePostErrors
 import com.example.volunteerlink.organisation.create.model.CreateRoleTemplate
 import com.example.volunteerlink.organisation.create.model.RemoteSubmissionMode
+import com.example.volunteerlink.organisation.create.model.RoleApplicationMethod
+import com.example.volunteerlink.organisation.create.model.SelectedRoleDraft
 import com.example.volunteerlink.organisation.create.model.RoleSelectionErrors
 import com.example.volunteerlink.organisation.create.model.VolunteerPostType
 import com.example.volunteerlink.organisation.create.model.VolunteerRoleMode
+import com.example.volunteerlink.organisation.create.model.VolunteerRoleLevel
 import java.util.Calendar
 
 /**
@@ -342,6 +345,174 @@ object CreatePostValidator {
                 general = "Return to Step 1 and select a post type."
             )
         }
+    }
+
+
+    /**
+     * Returns VolunteerLink's recommended application method for a role level.
+     *
+     * This is only the initial recommendation shown in Step 3. Organisations
+     * can still choose either Instant Join or Review Applicants for any level.
+     */
+    fun recommendedApplicationMethodForLevel(
+        level: VolunteerRoleLevel
+    ): RoleApplicationMethod {
+        return when (level) {
+            VolunteerRoleLevel.BEGINNER ->
+                RoleApplicationMethod.INSTANT_JOIN
+
+            VolunteerRoleLevel.INTERMEDIATE,
+            VolunteerRoleLevel.ADVANCED ->
+                RoleApplicationMethod.REVIEW_APPLICANTS
+        }
+    }
+
+    /**
+     * Returns every Step 3 problem for one role configuration.
+     * Empty means the role is valid and can be marked Ready.
+     */
+    fun validateRoleConfiguration(
+        draft: CreatePostDraft,
+        selectedRole: SelectedRoleDraft,
+        template: CreateRoleTemplate
+    ): List<String> {
+        val problems = mutableListOf<String>()
+        val allowedSkillIds = template.skillsPractised
+            .map { skill -> skill.skillId }
+            .toSet()
+        val selectedSkillIds = selectedRole.practisedSkillIds.distinct()
+
+        if (selectedSkillIds.size !in 2..4) {
+            problems += "Select between 2 and 4 Skills Practised."
+        }
+
+        if (selectedSkillIds.any { skillId -> skillId !in allowedSkillIds }) {
+            problems += "One selected skill is not available for this role."
+        }
+
+        val requiredSkillsValid =
+            selectedRole.requiredSkillExperience.all { (skillId, minimum) ->
+                skillId in selectedSkillIds &&
+                        skillId in allowedSkillIds &&
+                        minimum in 1..5
+            }
+
+        if (
+            template.defaultLevel == VolunteerRoleLevel.BEGINNER &&
+            selectedRole.requiredSkillExperience.isNotEmpty()
+        ) {
+            problems += "Beginner roles cannot require previous skill experience."
+        } else if (!requiredSkillsValid) {
+            problems += "Required skills must also be practised and use 1 to 5 verified experiences."
+        }
+
+        if (
+            selectedRole.responsibilities
+                .map { responsibility -> responsibility.trim() }
+                .none { responsibility -> responsibility.isNotEmpty() }
+        ) {
+            problems += "Add at least one responsibility."
+        }
+
+        val selectedMethod = selectedRole.applicationMethod
+        if (selectedMethod == null) {
+            problems += "Choose an application method."
+        }
+
+        val cleanedQuestions = selectedRole.screeningQuestions
+            .map { question -> question.trim() }
+            .filter { question -> question.isNotEmpty() }
+
+        if (cleanedQuestions.size > 3) {
+            problems += "Use no more than 3 screening questions."
+        }
+
+        if (
+            selectedMethod == RoleApplicationMethod.INSTANT_JOIN &&
+            cleanedQuestions.isNotEmpty()
+        ) {
+            problems += "Instant Join roles cannot use screening questions."
+        }
+
+        if (template.roleMode == VolunteerRoleMode.REMOTE) {
+            when (draft.remoteSubmissionMode) {
+                RemoteSubmissionMode.SHARED_TEAM -> Unit
+
+                RemoteSubmissionMode.INDIVIDUAL -> {
+                    if (selectedRole.individualSubmissionRequirement.isBlank()) {
+                        problems += "Add the Individual Deliverable for this Remote role."
+                    }
+                }
+
+                null -> {
+                    problems += "Return to Step 1 and choose a Remote submission setup."
+                }
+            }
+        }
+
+        return problems
+    }
+
+    /** Returns true when Step 3 can move forward. */
+    fun validateStepThree(
+        draft: CreatePostDraft,
+        roleCatalogue: List<CreateRoleTemplate>
+    ): String? {
+        if (draft.selectedRoles.isEmpty()) {
+            return "Return to Step 2 and select at least one role."
+        }
+
+        val templatesById = roleCatalogue.associateBy { template ->
+            template.roleTemplateId
+        }
+
+        draft.selectedRoles.forEach { selectedRole ->
+            val template = templatesById[selectedRole.roleTemplateId]
+                ?: return "One selected role is no longer available. Return to Step 2 and review your roles."
+
+            if (!selectedRole.isConfigured) {
+                return "Review and save every selected role before continuing."
+            }
+
+            if (
+                validateRoleConfiguration(
+                    draft = draft,
+                    selectedRole = selectedRole,
+                    template = template
+                ).isNotEmpty()
+            ) {
+                return "One saved role has changed. Open it and save the role again."
+            }
+        }
+
+        val needsRemote =
+            draft.postType == VolunteerPostType.REMOTE ||
+                    draft.postType == VolunteerPostType.HYBRID
+
+        if (
+            needsRemote &&
+            draft.remoteSubmissionMode == RemoteSubmissionMode.SHARED_TEAM
+        ) {
+            if (draft.sharedDeliverable.isBlank()) {
+                return "Return to Step 1 and describe the shared team deliverable."
+            }
+
+            val responsibleRoleId =
+                draft.sharedSubmissionResponsibleRoleTemplateId
+                    ?: return "Choose which Remote role will submit the shared team deliverable."
+
+            val isSelectedRemoteRole = draft.selectedRoles.any { selectedRole ->
+                selectedRole.roleTemplateId == responsibleRoleId &&
+                        templatesById[responsibleRoleId]?.roleMode ==
+                        VolunteerRoleMode.REMOTE
+            }
+
+            if (!isSelectedRemoteRole) {
+                return "Choose a selected Remote role to submit the shared team deliverable."
+            }
+        }
+
+        return null
     }
 
 }
