@@ -278,7 +278,7 @@ fun RoleConfigurationEditor(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "Step 3 of 5",
+                        text = "Step 3 of 4",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -505,7 +505,7 @@ fun StepThreeHeader(
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "Step 3 of 5",
+                text = "Step 3 of 4",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

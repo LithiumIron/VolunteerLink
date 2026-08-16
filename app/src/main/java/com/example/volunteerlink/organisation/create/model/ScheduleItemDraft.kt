@@ -33,9 +33,8 @@ enum class TrainingMode(
 /**
  * Wizard-only choice for an on-site training location.
  *
- * The final schedule_items row can still store a resolved location string or
- * NULL. This enum only prevents "same event venue" and "TBA" from becoming
- * ambiguous while the organiser is editing Step 4.
+ * The final schedule_items row stores this choice in training_location_mode.
+ * CUSTOM also persists the selected structured Geoapify location fields.
  */
 enum class TrainingLocationMode {
     EVENT_LOCATION,
@@ -47,8 +46,8 @@ enum class TrainingLocationMode {
  * One Step 4 item kept in the Create Post draft until final Publish.
  *
  * draftId is local wizard state, not schedule_items.schedule_item_id.
- * targetRoleTemplateIds uses ROLE... IDs while creating the post. Publish can
- * later map them to generated PROLE... IDs before inserting schedule_items.
+ * targetRoleTemplateIds uses ROLE... IDs while creating the post and those
+ * same template IDs are stored in schedule_items for the generated post_id.
  */
 data class ScheduleItemDraft(
     val draftId: String,

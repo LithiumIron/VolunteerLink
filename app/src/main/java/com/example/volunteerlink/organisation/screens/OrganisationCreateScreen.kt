@@ -108,19 +108,29 @@ fun OrganisationCreateScreen(
     }
 
     val requestBack: () -> Unit = {
-        when (uiState.currentStep) {
-            1 -> requestExit()
-            2 -> viewModel.backToStepOne()
-            3 -> viewModel.backFromStepThree()
-            4 -> viewModel.backFromStepFour()
-            5 -> viewModel.backToStepFour()
-            else -> requestExit()
+        if (uiState.publishedPostId != null) {
+            onExitCreate()
+        } else {
+            when (uiState.currentStep) {
+                1 -> requestExit()
+                2 -> viewModel.backToStepOne()
+                3 -> viewModel.backFromStepThree()
+                4 -> viewModel.backFromStepFour()
+                else -> requestExit()
+            }
         }
     }
 
     BackHandler(onBack = requestBack)
 
-    when (uiState.currentStep) {
+    if (uiState.publishedPostId != null) {
+        OrganisationModulePage(
+            title = "Volunteer Post Published",
+            message =
+                "Post ${uiState.publishedPostId} was published successfully. " +
+                    "Use Back to return to the Organisation area."
+        )
+    } else when (uiState.currentStep) {
         1 -> {
             PostDetailsStep(
                 uiState = uiState,
@@ -151,15 +161,6 @@ fun OrganisationCreateScreen(
                 uiState = uiState,
                 viewModel = viewModel,
                 onBack = viewModel::backFromStepFour
-            )
-        }
-
-        5 -> {
-            // Step 5 will replace this guard. Keeping a real destination here
-            // lets Step 4 be tested end-to-end without losing the draft.
-            OrganisationModulePage(
-                title = "Review & Publish · Step 5 of 5",
-                message = "Step 4 is complete. Review & Publish will be connected next. Use Back to return to Schedule."
             )
         }
 

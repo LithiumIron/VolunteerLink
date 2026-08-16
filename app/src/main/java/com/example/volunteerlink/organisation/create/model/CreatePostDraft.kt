@@ -141,7 +141,7 @@ enum class RemoteSubmissionMode(
  * One object containing the organiser's Create Post data.
  *
  * The ViewModel owns this object, so the data survives while the organiser
- * moves around the Create Post flow. Later Steps 2-5 can extend this same
+ * moves around the Create Post flow. Later Steps 2-4 can extend this same
  * draft instead of passing many separate values through navigation.
  */
 data class CreatePostDraft(
@@ -179,8 +179,8 @@ data class CreatePostDraft(
     // Steps 2-3: selected fixed roles and their organisation-specific settings.
     val selectedRoles: List<SelectedRoleDraft> = emptyList(),
 
-    // Step 3 only. Later, publish maps this template ID to the generated
-    // post_role_id before inserting remote_details.
+    // Step 3 only. The database now keeps this ROLE... ID directly together
+    // with post_id, matching the composite post_roles key.
     val sharedSubmissionResponsibleRoleTemplateId: String? = null,
 
     // Step 4: optional schedule kept locally until the final Publish step.

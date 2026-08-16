@@ -93,7 +93,7 @@ fun PostDetailsStep(
                     )
 
                     Text(
-                        text = "Step 1 of 5 · Post Details",
+                        text = "Step 1 of 4 · Post Details",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

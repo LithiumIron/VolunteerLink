@@ -1,5 +1,8 @@
 package com.example.volunteerlink.organisation.viewmodel
 
+import android.content.Context
+import android.net.Uri
+import android.webkit.MimeTypeMap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.volunteerlink.BuildConfig
@@ -21,14 +24,17 @@ import com.example.volunteerlink.organisation.create.model.VolunteerPostType
 import com.example.volunteerlink.organisation.create.model.VolunteerRoleLevel
 import com.example.volunteerlink.organisation.create.model.VolunteerRoleMode
 import com.example.volunteerlink.organisation.repository.CreatePostRepository
+import com.example.volunteerlink.organisation.repository.PublishThumbnail
 import com.example.volunteerlink.organisation.repository.SupabaseCreatePostRepository
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Calendar
 import java.util.UUID
 
@@ -2494,7 +2500,7 @@ class CreatePostViewModel : ViewModel() {
     fun validateScheduleForContinue(): Boolean {
         val current = _uiState.value
         if (current.scheduleEditorDraft != null) {
-            setScheduleError("You have unfinished schedule input. Resume it and save, or discard it before continuing to Review.")
+            setScheduleError("You have unfinished schedule input. Resume it and save, or discard it before publishing.")
             return false
         }
 
@@ -2519,39 +2525,139 @@ class CreatePostViewModel : ViewModel() {
         )
     }
 
-    fun continueFromScheduleConfirmed(): Boolean {
-        if (!validateScheduleForContinue()) return false
+    fun publishPost(context: Context) {
+        val current = _uiState.value
+        if (current.isPublishing) return
+        if (!validateScheduleForContinue()) return
 
-        _uiState.update { state ->
-            state.copy(
-                currentStep = 5,
-                editingScheduleItemId = null,
-                scheduleEditorDraft = null,
-                isScheduleEditorOpen = false,
-                scheduleError = null,
-                showScheduleErrors = false,
-                isStepFourReady = true
-            )
+        val validationError = publishValidationError(_uiState.value)
+        if (validationError != null) {
+            _uiState.update { state ->
+                state.copy(
+                    publishError = validationError
+                )
+            }
+            return
         }
-        return true
+
+        viewModelScope.launch {
+            _uiState.update { state ->
+                state.copy(
+                    isPublishing = true,
+                    publishError = null
+                )
+            }
+
+            try {
+                val snapshot = _uiState.value
+                val thumbnail = prepareThumbnailForPublish(
+                    context = context.applicationContext,
+                    thumbnailUri = snapshot.draft.thumbnailUri
+                )
+
+                val result = createPostRepository.publishPost(
+                    draft = snapshot.draft,
+                    roleCatalogue = snapshot.roleCatalogue,
+                    thumbnail = thumbnail
+                )
+
+                // Publishing is complete, so the editable draft is cleared.
+                // publishedPostId switches the route to the success screen.
+                _uiState.update { state ->
+                    state.copy(
+                        draft = CreatePostDraft(),
+                        currentStep = 4,
+                        editingScheduleItemId = null,
+                        scheduleEditorDraft = null,
+                        isScheduleEditorOpen = false,
+                        scheduleError = null,
+                        showScheduleErrors = false,
+                        isStepFourReady = false,
+                        isPublishing = false,
+                        publishError = null,
+                        publishedPostId = result.postId,
+                        pendingPostType = null,
+                        isPostTypeCommitted = false
+                    )
+                }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+
+                e.printStackTrace()
+                _uiState.update { state ->
+                    state.copy(
+                        isPublishing = false,
+                        publishError = e.message
+                            ?: "Could not publish this volunteer post."
+                    )
+                }
+            }
+        }
     }
 
-    /** Future Step 5 Back can use this without losing the Step 4 draft. */
-    fun backToStepFour() {
-        _uiState.update { state ->
-            val sections = availableScheduleSections(state.draft.postType)
-            state.copy(
-                currentStep = 4,
-                activeScheduleSection = state.activeScheduleSection
-                    ?.takeIf { it in sections }
-                    ?: sections.firstOrNull(),
-                selectedPhysicalScheduleDateMillis = validSelectedPhysicalDate(
-                    draft = state.draft,
-                    currentDate = state.selectedPhysicalScheduleDateMillis
-                ),
-                isScheduleEditorOpen = false,
-                scheduleError = null,
-                showScheduleErrors = false
+    private fun publishValidationError(
+        state: CreatePostUiState
+    ): String? {
+        val stepOneErrors = CreatePostValidator.validateStepOne(state.draft)
+        if (stepOneErrors.hasErrors()) {
+            return "Post Details are no longer valid. Return to Step 1 and review them."
+        }
+
+        val stepTwoErrors = CreatePostValidator.validateStepTwo(
+            draft = state.draft,
+            roleCatalogue = state.roleCatalogue
+        )
+        if (stepTwoErrors.hasErrors()) {
+            return "Role capacities are no longer valid. Return to Step 2 and review them."
+        }
+
+        val stepThreeError = CreatePostValidator.validateStepThree(
+            draft = state.draft,
+            roleCatalogue = state.roleCatalogue
+        )
+        if (stepThreeError != null) {
+            return stepThreeError
+        }
+
+        return CreatePostValidator.validateStepFour(
+            draft = state.draft,
+            roleCatalogue = state.roleCatalogue
+        )
+    }
+
+    private suspend fun prepareThumbnailForPublish(
+        context: Context,
+        thumbnailUri: String?
+    ): PublishThumbnail? {
+        if (thumbnailUri.isNullOrBlank()) return null
+
+        return withContext(Dispatchers.IO) {
+            val uri = Uri.parse(thumbnailUri)
+            val mimeType = context.contentResolver.getType(uri)
+                ?: error("Could not determine the selected thumbnail type.")
+
+            if (!mimeType.startsWith("image/")) {
+                error("The selected thumbnail is not an image.")
+            }
+
+            val bytes = context.contentResolver
+                .openInputStream(uri)
+                ?.use { input -> input.readBytes() }
+                ?: error("Could not read the selected thumbnail.")
+
+            val maxBytes = 5 * 1024 * 1024
+            if (bytes.size > maxBytes) {
+                error("Thumbnail must be 5 MB or smaller.")
+            }
+
+            val extension = MimeTypeMap.getSingleton()
+                .getExtensionFromMimeType(mimeType)
+                ?: "jpg"
+
+            PublishThumbnail(
+                bytes = bytes,
+                mimeType = mimeType,
+                fileExtension = extension
             )
         }
     }
@@ -2892,7 +2998,8 @@ class CreatePostViewModel : ViewModel() {
                 isStepFourReady = false,
                 showRoleSelectionErrors = false,
                 scheduleError = null,
-                showScheduleErrors = false
+                showScheduleErrors = false,
+                publishError = null
             )
         }
     }

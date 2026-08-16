@@ -100,6 +100,12 @@ data class CreatePostUiState(
     val showScheduleErrors: Boolean = false,
     val isStepFourReady: Boolean = false,
 
+    // Publish runs from Step 4. publishedPostId is kept for the success screen
+    // after the editable draft has been cleared.
+    val isPublishing: Boolean = false,
+    val publishError: String? = null,
+    val publishedPostId: String? = null,
+
     // Post type switching state.
     val pendingPostType: VolunteerPostType? = null,
     val isPostTypeCommitted: Boolean = false

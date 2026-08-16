@@ -553,7 +553,7 @@ fun RoleSelectionHeader(
             )
 
             Text(
-                text = "Step 2 of 5 · Choose roles and assign their capacity.",
+                text = "Step 2 of 4 · Choose roles and assign their capacity.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
