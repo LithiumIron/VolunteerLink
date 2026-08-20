@@ -1,0 +1,366 @@
+package com.example.volunteerlink.organisation.create.components
+
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import com.example.volunteerlink.R
+import com.example.volunteerlink.organisation.create.model.VolunteerPostCategory
+import com.example.volunteerlink.organisation.create.model.VolunteerPostType
+
+val CreateGreen = Color(0xFF2A4A1E)
+val CreateLightGreen = Color(0xFFE5EFE1)
+val CreateCardBackground = Color(0xFFFBFCF9)
+
+@Composable
+fun CreateSectionCard(
+    title: String,
+    subtitle: String? = null,
+    content: @Composable () -> Unit
+) {
+    OutlinedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.outlinedCardColors(
+            containerColor = CreateCardBackground
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = CreateGreen
+                )
+
+                if (!subtitle.isNullOrBlank()) {
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            content()
+        }
+    }
+}
+
+@Composable
+fun PostTypeCard(
+    type: VolunteerPostType,
+    iconRes: Int,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val borderColor = if (selected) CreateGreen else Color(0xFFD5D8D2)
+    val background = if (selected) CreateLightGreen else Color.White
+
+    Surface(
+        modifier = modifier.clickable(onClick = onClick),
+        shape = RoundedCornerShape(16.dp),
+        color = background,
+        border = BorderStroke(1.2.dp, borderColor)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 14.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Top
+        ) {
+            // Icon area
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(30.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Image(
+                    painter = painterResource(iconRes),
+                    contentDescription = null,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Keep title area consistent for all 3 cards
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                contentAlignment = Alignment.TopCenter
+            ) {
+                Text(
+                    text = type.displayName,
+                    modifier = Modifier.fillMaxWidth(),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (selected) CreateGreen else Color(0xFF263824),
+                    maxLines = 2,
+                    textAlign = TextAlign.Center
+                )
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // Keep description centered too
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp),
+                contentAlignment = Alignment.TopCenter
+            ) {
+                Text(
+                    text = type.shortDescription,
+                    modifier = Modifier.fillMaxWidth(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun CategoryPicker(
+    selectedCategory: VolunteerPostCategory?,
+    onCategorySelected: (VolunteerPostCategory) -> Unit,
+    errorMessage: String?
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Column(
+        verticalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        Text(
+            text = "Category",
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Medium
+        )
+
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = true },
+                shape = RoundedCornerShape(14.dp),
+                color = Color.Transparent,
+                border = BorderStroke(
+                    1.dp,
+                    if (errorMessage != null) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        Color(0xFF777A76)
+                    }
+                )
+            ) {
+                Row(
+                    modifier = Modifier.padding(
+                        horizontal = 16.dp,
+                        vertical = 15.dp
+                    ),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = selectedCategory?.displayName
+                            ?: "Select a category",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = if (selectedCategory == null) {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        }
+                    )
+
+                    Image(
+                        painter = painterResource(R.drawable.org_create_dropdown),
+                        contentDescription = "Open categories",
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false }
+            ) {
+                VolunteerPostCategory.entries.forEach { category ->
+                    DropdownMenuItem(
+                        text = { Text(category.displayName) },
+                        onClick = {
+                            expanded = false
+                            onCategorySelected(category)
+                        }
+                    )
+                }
+            }
+        }
+
+        FormError(errorMessage)
+    }
+}
+
+@Composable
+fun FormSelectionField(
+    label: String,
+    value: String,
+    placeholder: String,
+    iconRes: Int? = null,
+    errorMessage: String? = null,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Medium
+        )
+
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick),
+            shape = RoundedCornerShape(14.dp),
+            color = Color.Transparent,
+            border = BorderStroke(
+                1.dp,
+                if (errorMessage != null) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    Color(0xFF777A76)
+                }
+            )
+        ) {
+            Row(
+                modifier = Modifier.padding(
+                    horizontal = 14.dp,
+                    vertical = 14.dp
+                ),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                if (iconRes != null) {
+                    Image(
+                        painter = painterResource(iconRes),
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                Text(
+                    text = value.ifBlank { placeholder },
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = if (value.isBlank()) {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    }
+                )
+            }
+        }
+
+        FormError(errorMessage)
+    }
+}
+
+@Composable
+fun VolunteerCapacityField(
+    value: Int?,
+    onValueChanged: (String) -> Unit,
+    label: String = "Volunteers Needed",
+    supportingText: String? = null,
+    errorMessage: String? = null,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        OutlinedTextField(
+            value = value?.toString().orEmpty(),
+            onValueChange = onValueChanged,
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text(label) },
+            singleLine = true,
+            isError = errorMessage != null,
+            shape = RoundedCornerShape(14.dp),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Number,
+                imeAction = ImeAction.Done
+            )
+        )
+
+        if (!supportingText.isNullOrBlank() && errorMessage == null) {
+            Text(
+                text = supportingText,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        FormError(errorMessage)
+    }
+}
+
+@Composable
+fun FormError(message: String?) {
+    if (!message.isNullOrBlank()) {
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error
+        )
+    }
+}

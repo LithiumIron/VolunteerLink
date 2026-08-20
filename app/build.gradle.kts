@@ -1,3 +1,28 @@
+import java.util.Properties
+
+val localProperties = Properties().apply {
+    val localPropertiesFile =
+        rootProject.file("local.properties")
+
+    if (localPropertiesFile.exists()) {
+        localPropertiesFile.inputStream().use {
+            load(it)
+        }
+    }
+}
+
+val geoapifyApiKey =
+    localProperties.getProperty(
+        "GEOAPIFY_API_KEY",
+        ""
+    )
+
+val googleMapsApiKey =
+    localProperties.getProperty(
+        "MAPS_API_KEY",
+        ""
+    )
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -18,6 +43,15 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField(
+            "String",
+            "GEOAPIFY_API_KEY",
+            "\"$geoapifyApiKey\""
+        )
+
+        manifestPlaceholders["MAPS_API_KEY"] =
+            googleMapsApiKey
     }
 
     buildTypes {
@@ -33,6 +67,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -49,13 +84,17 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
+    // Geoapify networking
+    implementation("io.ktor:ktor-client-core:3.3.1")
     // Supabase
     implementation(platform("io.github.jan-tennert.supabase:bom:3.2.6"))
     implementation("io.github.jan-tennert.supabase:auth-kt")
     implementation("io.github.jan-tennert.supabase:postgrest-kt")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+    implementation("io.github.jan-tennert.supabase:storage-kt")
     // Require HTTP engine for supabase
     implementation("io.ktor:ktor-client-android:3.3.1")
+    implementation("com.google.maps.android:maps-compose:6.12.0")
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

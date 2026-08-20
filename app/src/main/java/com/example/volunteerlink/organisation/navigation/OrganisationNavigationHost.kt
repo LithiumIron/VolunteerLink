@@ -1,12 +1,21 @@
 package com.example.volunteerlink.organisation.navigation
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.view.WindowCompat
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -27,17 +36,50 @@ import com.example.volunteerlink.organisation.screens.OrganisationProfileScreen
 @Composable
 fun OrganisationNavigationHost() {
     val navController = rememberNavController()
+    val context = LocalContext.current
 
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
 
+    /*
+     * Match the keyboard behaviour used by AssignmentTest.
+     *
+     * AssignmentTest runs its content edge-to-edge while the Activity keeps
+     * android:windowSoftInputMode="adjustResize". In that setup the IME is
+     * delivered as an inset instead of shrinking the Compose root and moving
+     * Scaffold's bottom bar above the keyboard.
+     *
+     * Apply the same window behaviour only while the Organisation branch is
+     * active. The bottom bar therefore stays at the real bottom of the window
+     * and the keyboard naturally covers it. There is no delayed keyboard
+     * observer and no hide/show recomposition, so there is no navigation-bar
+     * flash before it disappears behind the IME.
+     */
+    DisposableEffect(context) {
+        val activity = context.findActivity()
+        val window = activity?.window
+
+        if (window != null) {
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+        }
+
+        onDispose {
+            if (window != null) {
+                // The root app also contains the teammate-owned Volunteer
+                // branch, so restore its previous non-edge-to-edge behaviour
+                // when leaving the Organisation branch.
+                WindowCompat.setDecorFitsSystemWindows(window, true)
+            }
+        }
+    }
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        contentWindowInsets = WindowInsets(
-            left = 0,
-            top = 0,
-            right = 0,
-            bottom = 0
+        // Same safe-area strategy as AssignmentTest: individual screens own
+        // their top inset, the bottom bar owns navigation-bar padding, and the
+        // Scaffold protects horizontal cutouts/system controls in landscape.
+        contentWindowInsets = WindowInsets.safeDrawing.only(
+            WindowInsetsSides.Horizontal
         ),
         bottomBar = {
             AppBottomNavigationBar(
@@ -46,11 +88,12 @@ fun OrganisationNavigationHost() {
                 onItemClick = { item ->
                     if (item.route != currentRoute) {
                         navController.navigate(item.route) {
-                            // Keep only one copy of each main destination and
-                            // restore its state when returning to it.
-                            popUpTo(OrganisationNavigationRoutes.HOME) {
+                            popUpTo(
+                                OrganisationNavigationRoutes.HOME
+                            ) {
                                 saveState = true
                             }
+
                             launchSingleTop = true
                             restoreState = true
                         }
@@ -74,7 +117,15 @@ fun OrganisationNavigationHost() {
             }
 
             composable(OrganisationNavigationRoutes.CREATE) {
-                OrganisationCreateScreen()
+                OrganisationCreateScreen(
+                    onExitCreate = {
+                        if (!navController.popBackStack()) {
+                            navController.navigate(OrganisationNavigationRoutes.HOME) {
+                                launchSingleTop = true
+                            }
+                        }
+                    }
+                )
             }
 
             composable(OrganisationNavigationRoutes.CHATS) {
@@ -86,4 +137,11 @@ fun OrganisationNavigationHost() {
             }
         }
     }
+}
+
+/** Returns the Activity even when Compose is using a ContextWrapper. */
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }
