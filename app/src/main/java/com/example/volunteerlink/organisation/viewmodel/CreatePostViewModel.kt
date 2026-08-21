@@ -560,12 +560,19 @@ class CreatePostViewModel : ViewModel() {
                 }
             } catch (exception: CancellationException) {
                 throw exception
-            } catch (_: Exception) {
+            } catch (exception: Exception) {
                 _uiState.update { current ->
                     current.copy(
                         isRoleCatalogueLoading = false,
-                        roleCatalogueError =
-                            "Unable to load volunteer roles. Check your connection and try again.",
+                        roleCatalogueError = buildString {
+                            append("Unable to load volunteer roles.")
+                            exception.message
+                                ?.takeIf { message -> message.isNotBlank() }
+                                ?.let { message ->
+                                    append("\n")
+                                    append(message)
+                                }
+                        },
                         isStepTwoReady = false
                     )
                 }

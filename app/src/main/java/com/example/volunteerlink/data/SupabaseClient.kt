@@ -9,14 +9,16 @@ val supabase = createSupabaseClient(
     supabaseUrl = "https://ruioybgexfgcrwfeubik.supabase.co",
     supabaseKey = "sb_publishable_ccTYUCLum9NuD2JYLyDHFQ_MhoSwGN8"
 ) {
-    install(Postgrest)
+    install(Postgrest) {
+        defaultSchema = "v1_erd_test"
+    }
     install(Storage)
 }
 
 suspend fun testSupabaseConnection(): Boolean {
     return try {
         supabase
-            .from("app_test_clock")
+            .from("skill_paths")
             .select()
 
         true
