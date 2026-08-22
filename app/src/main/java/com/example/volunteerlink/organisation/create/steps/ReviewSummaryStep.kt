@@ -46,66 +46,86 @@ fun ReviewSummaryStep(
     onSaveDraft: () -> Unit,
     onPublish: () -> Unit
 ) {
-    LazyColumn(
+    Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFFF7FAF5))
-            .statusBarsPadding(),
-        contentPadding = PaddingValues(
-            start = 20.dp,
-            top = 14.dp,
-            end = 20.dp,
-            bottom = 48.dp
-        ),
-        verticalArrangement = Arrangement.spacedBy(24.dp)
+            .statusBarsPadding()
     ) {
-        item {
-            ReviewSummaryHeader(onUp = onUp)
-        }
-
-        if (uiState.scheduleEditorDraft != null) {
+        // Keep the long review content scrollable, but do not put the final
+        // Save/Publish actions inside it. This makes the two database actions
+        // visible at all times instead of hiding them after a long summary.
+        LazyColumn(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+            contentPadding = PaddingValues(
+                start = 20.dp,
+                top = 14.dp,
+                end = 20.dp,
+                bottom = 20.dp
+            ),
+            verticalArrangement = Arrangement.spacedBy(24.dp)
+        ) {
             item {
-                ReviewPausedScheduleBanner()
+                ReviewSummaryHeader(onUp = onUp)
             }
-        }
 
-        item {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                ReviewSectionHeader(
-                    title = "Post Details",
-                    onEdit = { onEditStep(1) }
+            if (uiState.scheduleEditorDraft != null) {
+                item {
+                    ReviewPausedScheduleBanner()
+                }
+            }
+
+            item {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    ReviewSectionHeader(
+                        title = "Post Details",
+                        onEdit = { onEditStep(1) }
+                    )
+
+                    ReviewPostPreviewCard(uiState = uiState)
+
+                    ReviewPostDetailsCard(uiState = uiState)
+                }
+            }
+
+            item {
+                ReviewRolesCapacitySection(
+                    uiState = uiState,
+                    onEdit = { onEditStep(2) }
                 )
+            }
 
-                ReviewPostPreviewCard(uiState = uiState)
+            item {
+                ReviewRoleSettingsSection(
+                    uiState = uiState,
+                    onEdit = { onEditStep(3) }
+                )
+            }
 
-                ReviewPostDetailsCard(uiState = uiState)
+            item {
+                ReviewScheduleSection(
+                    uiState = uiState,
+                    onEdit = { onEditStep(4) }
+                )
             }
         }
 
-        item {
-            ReviewRolesCapacitySection(
-                uiState = uiState,
-                onEdit = { onEditStep(2) }
-            )
-        }
-
-        item {
-            ReviewRoleSettingsSection(
-                uiState = uiState,
-                onEdit = { onEditStep(3) }
-            )
-        }
-
-        item {
-            ReviewScheduleSection(
-                uiState = uiState,
-                onEdit = { onEditStep(4) }
-            )
-        }
-
-        item {
+        // Fixed Review actions. OrganisationNavigationHost already keeps this
+        // screen above the app bottom navigation, so no extra system-bar inset
+        // is needed here.
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color.White)
+                .padding(
+                    horizontal = 20.dp,
+                    vertical = 14.dp
+                )
+        ) {
             ReviewSummaryActions(
                 isSavingDraft = uiState.isSavingDraft,
                 isPublishing = uiState.isPublishing,
@@ -139,36 +159,43 @@ fun ReviewSummaryActions(
             )
         }
 
-        OutlinedButton(
-            onClick = onSaveDraft,
-            enabled = !isBusy,
+        // Final actions sit side-by-side on phone screens so they stay compact
+        // and clearly read as the two choices for finishing the Create Post flow.
+        Row(
             modifier = Modifier.fillMaxWidth(),
-            border = BorderStroke(1.dp, CreateGreen)
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = if (isSavingDraft) "Saving Draft..." else "Save as Draft",
-                color = if (isBusy) {
-                    CreateGreen.copy(alpha = 0.38f)
-                } else {
-                    CreateGreen
-                },
-                fontWeight = FontWeight.SemiBold
-            )
-        }
+            OutlinedButton(
+                onClick = onSaveDraft,
+                enabled = !isBusy,
+                modifier = Modifier.weight(1f),
+                border = BorderStroke(1.dp, CreateGreen)
+            ) {
+                Text(
+                    text = if (isSavingDraft) "Saving Draft..." else "Save as Draft",
+                    color = if (isBusy) {
+                        CreateGreen.copy(alpha = 0.38f)
+                    } else {
+                        CreateGreen
+                    },
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
 
-        Button(
-            onClick = onPublish,
-            enabled = !isBusy,
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = CreateGreen,
-                contentColor = Color.White
-            )
-        ) {
-            Text(
-                text = if (isPublishing) "Publishing..." else "Publish Post",
-                fontWeight = FontWeight.SemiBold
-            )
+            Button(
+                onClick = onPublish,
+                enabled = !isBusy,
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = CreateGreen,
+                    contentColor = Color.White
+                )
+            ) {
+                Text(
+                    text = if (isPublishing) "Publishing..." else "Publish Post",
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
         }
     }
 }
