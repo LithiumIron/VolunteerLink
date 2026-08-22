@@ -77,5 +77,8 @@ data class ScheduleItemDraft(
     // future SQL insert can send NULL until the lecturer confirms it is needed.
     val trainingTimeZoneId: String? = null,
 
-    val allowApplicationsAfterStart: Boolean? = null
+    // TRAINING-only. A role ID appears here only when this training should
+    // create an application cutoff for that targeted role. An empty list means
+    // this training does not close applications for any of its targeted roles.
+    val closingRoleTemplateIds: List<String> = emptyList()
 )

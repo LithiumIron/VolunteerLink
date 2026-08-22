@@ -693,8 +693,13 @@ object CreatePostValidator {
                     return "Training end time must be later than start time."
                 }
 
-                if (item.allowApplicationsAfterStart == null) {
-                    return "Choose whether new applications remain open after training starts."
+                if (!trainingClosingRolesAreValid(
+                        draft = draft,
+                        item = item,
+                        roleCatalogue = roleCatalogue
+                    )
+                ) {
+                    return "Application-closing roles must also be targeted by this training."
                 }
 
                 val latestAllowedDate = trainingLatestAllowedDate(
@@ -844,6 +849,14 @@ object CreatePostValidator {
         roleCatalogue: List<CreateRoleTemplate>,
         nowMillis: Long = System.currentTimeMillis()
     ): String? {
+        duplicateTrainingClosingRoleId(draft)?.let { roleId ->
+            val roleName = roleCatalogue.firstOrNull { role ->
+                role.roleTemplateId == roleId
+            }?.roleName ?: roleId
+
+            return "$roleName can have only one Training responsible for closing applications. Review the Application Closing choices."
+        }
+
         draft.scheduleItems.forEach { item ->
             val error = validateScheduleItem(
                 draft = draft,
@@ -936,6 +949,26 @@ object CreatePostValidator {
         }
     }
 
+    private fun duplicateTrainingClosingRoleId(
+        draft: CreatePostDraft
+    ): String? {
+        val counts = mutableMapOf<String, Int>()
+
+        draft.scheduleItems
+            .filter { item -> item.scheduleType == ScheduleType.TRAINING }
+            .forEach { item ->
+                item.closingRoleTemplateIds
+                    .distinct()
+                    .forEach { roleId ->
+                        val nextCount = (counts[roleId] ?: 0) + 1
+                        if (nextCount > 1) return roleId
+                        counts[roleId] = nextCount
+                    }
+            }
+
+        return null
+    }
+
     private fun hasTrainingOnlyData(item: ScheduleItemDraft): Boolean {
         return item.trainingMode != null ||
             item.trainingLocationMode != null ||
@@ -944,7 +977,7 @@ object CreatePostValidator {
             item.onlinePlatform.isNotBlank() ||
             item.meetingLink.isNotBlank() ||
             item.trainingTimeZoneId != null ||
-            item.allowApplicationsAfterStart != null
+            item.closingRoleTemplateIds.isNotEmpty()
     }
 
     private fun scheduleRoleTargetsAreValid(
@@ -980,6 +1013,26 @@ object CreatePostValidator {
                 .filter { roleId -> roleId in applicable }
                 .toSet()
         }
+    }
+
+    private fun trainingClosingRolesAreValid(
+        draft: CreatePostDraft,
+        item: ScheduleItemDraft,
+        roleCatalogue: List<CreateRoleTemplate>
+    ): Boolean {
+        if (item.scheduleType != ScheduleType.TRAINING) {
+            return item.closingRoleTemplateIds.isEmpty()
+        }
+
+        val targetedRoleIds = effectiveScheduleRoleIds(
+            draft = draft,
+            item = item,
+            roleCatalogue = roleCatalogue
+        )
+
+        return item.closingRoleTemplateIds
+            .distinct()
+            .all { roleId -> roleId in targetedRoleIds }
     }
 
     /**

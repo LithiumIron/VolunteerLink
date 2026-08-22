@@ -475,6 +475,11 @@ class CreatePostViewModel : ViewModel() {
      * in this ViewModel.
      */
     fun openStepTwo() {
+        if (_uiState.value.reviewEditStep == 1) {
+            finishReviewEditAfterStepOne()
+            return
+        }
+
         val defaultFilter = when (_uiState.value.draft.postType) {
             VolunteerPostType.PHYSICAL -> VolunteerRoleMode.PHYSICAL
             VolunteerPostType.REMOTE -> VolunteerRoleMode.REMOTE
@@ -813,7 +818,11 @@ class CreatePostViewModel : ViewModel() {
         }
 
         if (ready) {
-            openStepThree()
+            if (_uiState.value.reviewEditStep == 2) {
+                finishReviewEditAfterStepTwo()
+            } else {
+                openStepThree()
+            }
         }
 
         return ready
@@ -995,18 +1004,26 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
-    /** System/UI Back: role editor -> overview, overview -> Step 2. */
+    /** System Back: role editor -> overview; Review edit -> Review; otherwise Step 2. */
     fun backFromStepThree() {
-        if (_uiState.value.editingRoleTemplateId != null) {
+        val current = _uiState.value
+
+        if (current.editingRoleTemplateId != null) {
             closeRoleEditor()
-        } else {
-            _uiState.update { state ->
-                state.copy(
-                    currentStep = 2,
-                    roleSettingsError = null,
-                    isStepThreeReady = false
-                )
-            }
+            return
+        }
+
+        if (current.reviewEditStep == 3) {
+            returnToReviewFromEdit()
+            return
+        }
+
+        _uiState.update { state ->
+            state.copy(
+                currentStep = 2,
+                roleSettingsError = null,
+                isStepThreeReady = false
+            )
         }
     }
 
@@ -1453,40 +1470,52 @@ class CreatePostViewModel : ViewModel() {
         )
         val ready = error == null
 
+        if (!ready) {
+            _uiState.update { state ->
+                state.copy(
+                    roleSettingsError = error,
+                    isStepThreeReady = false
+                )
+            }
+            return false
+        }
+
+        if (current.reviewEditStep == 3) {
+            _uiState.update { state ->
+                state.copy(
+                    roleSettingsError = null,
+                    isStepThreeReady = true,
+                    editingRoleTemplateId = null
+                )
+            }
+            finishReviewEditAfterStepThree()
+            return true
+        }
+
         _uiState.update { state ->
             val sections = availableScheduleSections(state.draft.postType)
             state.copy(
-                roleSettingsError = error,
-                isStepThreeReady = ready,
-                currentStep = if (ready) 4 else state.currentStep,
-                editingRoleTemplateId = if (ready) null else state.editingRoleTemplateId,
-                activeScheduleSection = if (ready) {
-                    state.activeScheduleSection
-                        ?.takeIf { it in sections }
-                        ?: sections.firstOrNull()
-                } else {
-                    state.activeScheduleSection
-                },
-                selectedPhysicalScheduleDateMillis = if (ready) {
-                    validSelectedPhysicalDate(
-                        draft = state.draft,
-                        currentDate = state.selectedPhysicalScheduleDateMillis
-                    )
-                } else {
-                    state.selectedPhysicalScheduleDateMillis
-                },
-                editingScheduleItemId = state.editingScheduleItemId,
-                scheduleEditorDraft = state.scheduleEditorDraft,
-                isScheduleEditorOpen = if (ready) false else state.isScheduleEditorOpen,
-                trainingLocationSuggestions = if (ready) emptyList() else state.trainingLocationSuggestions,
-                isTrainingLocationSearching = if (ready) false else state.isTrainingLocationSearching,
-                trainingLocationSearchError = if (ready) null else state.trainingLocationSearchError,
-                scheduleError = if (ready) null else state.scheduleError,
-                showScheduleErrors = if (ready) false else state.showScheduleErrors
+                roleSettingsError = null,
+                isStepThreeReady = true,
+                currentStep = 4,
+                editingRoleTemplateId = null,
+                activeScheduleSection = state.activeScheduleSection
+                    ?.takeIf { it in sections }
+                    ?: sections.firstOrNull(),
+                selectedPhysicalScheduleDateMillis = validSelectedPhysicalDate(
+                    draft = state.draft,
+                    currentDate = state.selectedPhysicalScheduleDateMillis
+                ),
+                isScheduleEditorOpen = false,
+                trainingLocationSuggestions = emptyList(),
+                isTrainingLocationSearching = false,
+                trainingLocationSearchError = null,
+                scheduleError = null,
+                showScheduleErrors = false
             )
         }
 
-        return ready
+        return true
     }
 
     fun backToStepThree() {
@@ -1618,10 +1647,17 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
-    /** System/UI Back: item editor -> Step 4 overview, overview -> Step 3. */
+    /** System Back: item editor -> overview; Review edit -> Review; otherwise Step 3. */
     fun backFromStepFour() {
-        if (_uiState.value.isScheduleEditorOpen) {
+        val current = _uiState.value
+
+        if (current.isScheduleEditorOpen) {
             closeScheduleItemEditor()
+            return
+        }
+
+        if (current.reviewEditStep == 4) {
+            returnToReviewFromEdit()
             return
         }
 
@@ -1731,7 +1767,7 @@ class CreatePostViewModel : ViewModel() {
             targetRoleTemplateIds = roleIds.singleOrNull()?.let(::listOf).orEmpty(),
             trainingMode = TrainingMode.ONLINE,
             trainingTimeZoneId = null,
-            allowApplicationsAfterStart = true
+            closingRoleTemplateIds = emptyList()
         )
 
         openNewScheduleEditor(newItem)
@@ -2180,15 +2216,100 @@ class CreatePostViewModel : ViewModel() {
         clearTrainingLocationSearchUi()
     }
 
-    fun updateTrainingAllowApplicationsAfterStart(allow: Boolean) {
-        updateScheduleEditor { item ->
-            if (item.scheduleType == ScheduleType.TRAINING) {
-                item.copy(allowApplicationsAfterStart = allow)
+    /**
+     * Toggles a role only when no other saved Training already owns that
+     * role's application cutoff. Moving a cutoff is a separate confirmed
+     * action so a later Training can never silently replace an earlier choice.
+     */
+    fun toggleTrainingClosingRole(roleTemplateId: String) {
+        val current = _uiState.value
+        val item = current.scheduleEditorDraft ?: return
+        if (item.scheduleType != ScheduleType.TRAINING) return
+
+        val targetedRoleIds = effectiveEditorTargetRoleIds(
+            state = current,
+            item = item
+        )
+        if (roleTemplateId !in targetedRoleIds) return
+
+        val isAlreadyChecked =
+            roleTemplateId in item.closingRoleTemplateIds
+
+        if (!isAlreadyChecked && otherTrainingApplicationCutoff(roleTemplateId) != null) {
+            // The UI will offer Move Cutoff only when this editor is earlier.
+            // Never create two owners through the normal toggle action.
+            return
+        }
+
+        updateScheduleEditor { existing ->
+            val changedClosingRoles = if (isAlreadyChecked) {
+                existing.closingRoleTemplateIds - roleTemplateId
             } else {
-                item
+                existing.closingRoleTemplateIds + roleTemplateId
             }
+
+            existing.copy(
+                closingRoleTemplateIds = changedClosingRoles.distinct()
+            )
         }
     }
+
+    /**
+     * Returns the saved Training that currently owns this role's cutoff,
+     * excluding the Training that is being edited. Normally there is at most
+     * one; minByOrNull keeps old test data deterministic until SQL migration.
+     */
+    fun otherTrainingApplicationCutoff(
+        roleTemplateId: String
+    ): ScheduleItemDraft? {
+        val current = _uiState.value
+        val editorId = current.scheduleEditorDraft?.draftId
+
+        return current.draft.scheduleItems
+            .asSequence()
+            .filter { item ->
+                item.draftId != editorId &&
+                    item.scheduleType == ScheduleType.TRAINING &&
+                    roleTemplateId in item.closingRoleTemplateIds
+            }
+            .minByOrNull { item ->
+                trainingStartOrderValue(item) ?: Long.MAX_VALUE
+            }
+    }
+
+    /**
+     * Called only after the organiser confirms moving an existing cutoff to
+     * this earlier Training. The old saved owner is not changed yet; the move
+     * is committed atomically to the wizard draft only when Save is pressed.
+     */
+    fun moveTrainingApplicationCutoff(roleTemplateId: String) {
+        val current = _uiState.value
+        val item = current.scheduleEditorDraft ?: return
+        if (item.scheduleType != ScheduleType.TRAINING) return
+
+        val targetedRoleIds = effectiveEditorTargetRoleIds(
+            state = current,
+            item = item
+        )
+        if (roleTemplateId !in targetedRoleIds) return
+
+        val oldCutoff = otherTrainingApplicationCutoff(roleTemplateId) ?: return
+        val newStart = trainingStartOrderValue(item) ?: return
+        val oldStart = trainingStartOrderValue(oldCutoff) ?: return
+
+        // Moving is offered only to an earlier Training. A same-time or later
+        // Training cannot replace the existing owner.
+        if (newStart >= oldStart) return
+
+        updateScheduleEditor { existing ->
+            existing.copy(
+                closingRoleTemplateIds =
+                    (existing.closingRoleTemplateIds + roleTemplateId)
+                        .distinct()
+            )
+        }
+    }
+
 
     fun updateScheduleEditorAppliesToAll(appliesToAll: Boolean) {
         val current = _uiState.value
@@ -2203,22 +2324,38 @@ class CreatePostViewModel : ViewModel() {
 
         updateScheduleEditor { existing ->
             when {
-                availableRoleIds.size == 1 -> existing.copy(
-                    appliesToAllRoles = false,
-                    targetRoleTemplateIds = availableRoleIds
-                )
+                availableRoleIds.size == 1 -> {
+                    val targets = availableRoleIds
+                    existing.copy(
+                        appliesToAllRoles = false,
+                        targetRoleTemplateIds = targets,
+                        closingRoleTemplateIds =
+                            existing.closingRoleTemplateIds
+                                .filter { roleId -> roleId in targets }
+                    )
+                }
 
                 appliesToAll -> existing.copy(
                     appliesToAllRoles = true,
-                    targetRoleTemplateIds = emptyList()
+                    targetRoleTemplateIds = emptyList(),
+                    closingRoleTemplateIds =
+                        existing.closingRoleTemplateIds
+                            .filter { roleId -> roleId in availableRoleIds }
                 )
 
-                else -> existing.copy(
-                    appliesToAllRoles = false,
-                    targetRoleTemplateIds = existing.targetRoleTemplateIds
+                else -> {
+                    val targets = existing.targetRoleTemplateIds
                         .filter { roleId -> roleId in availableRoleIds }
                         .ifEmpty { listOf(availableRoleIds.first()) }
-                )
+
+                    existing.copy(
+                        appliesToAllRoles = false,
+                        targetRoleTemplateIds = targets,
+                        closingRoleTemplateIds =
+                            existing.closingRoleTemplateIds
+                                .filter { roleId -> roleId in targets }
+                    )
+                }
             }
         }
     }
@@ -2246,11 +2383,14 @@ class CreatePostViewModel : ViewModel() {
                 currentTargets - roleTemplateId
             } else {
                 currentTargets + roleTemplateId
-            }
+            }.distinct()
 
             existing.copy(
                 appliesToAllRoles = false,
-                targetRoleTemplateIds = changedTargets.distinct()
+                targetRoleTemplateIds = changedTargets,
+                closingRoleTemplateIds =
+                    existing.closingRoleTemplateIds
+                        .filter { roleId -> roleId in changedTargets }
             )
         }
     }
@@ -2260,9 +2400,13 @@ class CreatePostViewModel : ViewModel() {
         val current = _uiState.value
         val item = current.scheduleEditorDraft ?: return false
         val cleanedItem = cleanScheduleItem(item, current.draft)
+        val cutoffMoveError = trainingCutoffMoveError(
+            state = current,
+            item = cleanedItem
+        )
         val candidateDraft = draftWithEditorItem(current.draft, cleanedItem)
 
-        val error = CreatePostValidator.validateScheduleItem(
+        val error = cutoffMoveError ?: CreatePostValidator.validateScheduleItem(
             draft = candidateDraft,
             item = cleanedItem,
             roleCatalogue = current.roleCatalogue
@@ -2285,9 +2429,13 @@ class CreatePostViewModel : ViewModel() {
         val current = _uiState.value
         val item = current.scheduleEditorDraft ?: return false
         val cleanedItem = cleanScheduleItem(item, current.draft)
+        val cutoffMoveError = trainingCutoffMoveError(
+            state = current,
+            item = cleanedItem
+        )
         val candidateDraft = draftWithEditorItem(current.draft, cleanedItem)
 
-        val error = CreatePostValidator.validateScheduleItem(
+        val error = cutoffMoveError ?: CreatePostValidator.validateScheduleItem(
             draft = candidateDraft,
             item = cleanedItem,
             roleCatalogue = current.roleCatalogue
@@ -2507,7 +2655,7 @@ class CreatePostViewModel : ViewModel() {
     fun validateScheduleForContinue(): Boolean {
         val current = _uiState.value
         if (current.scheduleEditorDraft != null) {
-            setScheduleError("You have unfinished schedule input. Resume it and save, or discard it before publishing.")
+            setScheduleError("You have unfinished schedule input. Resume it and save, or discard it before continuing.")
             return false
         }
 
@@ -2532,32 +2680,336 @@ class CreatePostViewModel : ViewModel() {
         )
     }
 
-    fun publishPost(context: Context) {
-        val current = _uiState.value
-        if (current.isPublishing) return
+    // ---------------------------------------------------------------------
+    // Review Summary navigation
+    // ---------------------------------------------------------------------
+
+    /**
+     * Opens Review Summary after Step 4 has been validated.
+     * Save Draft and Publish are both available from Review.
+     */
+    fun openReviewSummary() {
         if (!validateScheduleForContinue()) return
 
-        val validationError = publishValidationError(_uiState.value)
+        _uiState.update { state ->
+            state.copy(
+                currentStep = 5,
+                reviewEditStep = null,
+                editingRoleTemplateId = null,
+                isScheduleEditorOpen = false,
+                scheduleError = null,
+                showScheduleErrors = false,
+                saveDraftError = null,
+                publishError = null
+            )
+        }
+    }
+
+    /** System Back from Review follows the normal wizard order to Step 4. */
+    fun backFromReview() {
+        _uiState.update { state ->
+            val sections = availableScheduleSections(state.draft.postType)
+            state.copy(
+                currentStep = 4,
+                reviewEditStep = null,
+                activeScheduleSection = state.activeScheduleSection
+                    ?.takeIf { it in sections }
+                    ?: sections.firstOrNull(),
+                selectedPhysicalScheduleDateMillis = validSelectedPhysicalDate(
+                    draft = state.draft,
+                    currentDate = state.selectedPhysicalScheduleDateMillis
+                ),
+                editingScheduleItemId = null,
+                isScheduleEditorOpen = false,
+                scheduleError = null,
+                showScheduleErrors = false
+            )
+        }
+    }
+
+    /**
+     * Review has one Edit action for each major wizard section. The edited
+     * page reuses the existing form and keeps the same shared CreatePostDraft.
+     */
+    fun editStepFromReview(step: Int) {
+        if (step !in 1..4 || _uiState.value.currentStep != 5) return
+
+        _uiState.update { state ->
+            val defaultRoleFilter = when (state.draft.postType) {
+                VolunteerPostType.PHYSICAL -> VolunteerRoleMode.PHYSICAL
+                VolunteerPostType.REMOTE -> VolunteerRoleMode.REMOTE
+                VolunteerPostType.HYBRID ->
+                    state.roleModeFilter ?: VolunteerRoleMode.PHYSICAL
+                null -> state.roleModeFilter
+            }
+            val sections = availableScheduleSections(state.draft.postType)
+
+            state.copy(
+                currentStep = step,
+                reviewEditStep = step,
+                roleModeFilter = if (step == 2) {
+                    defaultRoleFilter
+                } else {
+                    state.roleModeFilter
+                },
+                roleSearchQuery = if (step == 2) "" else state.roleSearchQuery,
+                editingRoleTemplateId = null,
+                activeScheduleSection = if (step == 4) {
+                    state.activeScheduleSection
+                        ?.takeIf { it in sections }
+                        ?: sections.firstOrNull()
+                } else {
+                    state.activeScheduleSection
+                },
+                selectedPhysicalScheduleDateMillis = if (step == 4) {
+                    validSelectedPhysicalDate(
+                        draft = state.draft,
+                        currentDate = state.selectedPhysicalScheduleDateMillis
+                    )
+                } else {
+                    state.selectedPhysicalScheduleDateMillis
+                },
+                editingScheduleItemId = if (step == 4) null else state.editingScheduleItemId,
+                isScheduleEditorOpen = false,
+                showValidationErrors = if (step == 1) false else state.showValidationErrors,
+                showRoleSelectionErrors = if (step == 2) false else state.showRoleSelectionErrors,
+                roleSettingsError = if (step == 3) null else state.roleSettingsError,
+                scheduleError = if (step == 4) null else state.scheduleError,
+                showScheduleErrors = if (step == 4) false else state.showScheduleErrors,
+                publishError = null
+            )
+        }
+    }
+
+    /**
+     * Back from an Edit opened by Review returns to Review without clearing
+     * the shared draft. This matches the wizard's existing live-edit model.
+     */
+    fun returnToReviewFromEdit() {
+        _uiState.update { state ->
+            state.copy(
+                currentStep = 5,
+                reviewEditStep = null,
+                editingRoleTemplateId = null,
+                isScheduleEditorOpen = false,
+                publishError = null
+            )
+        }
+    }
+
+    /**
+     * Step 1 can invalidate later sections when dates, mode or capacities are
+     * changed. Save Changes therefore sends the organiser only to the first
+     * dependent section that now needs attention.
+     */
+    private fun finishReviewEditAfterStepOne() {
+        val current = _uiState.value
+        val stepTwoErrors = CreatePostValidator.validateStepTwo(
+            draft = current.draft,
+            roleCatalogue = current.roleCatalogue
+        )
+
+        if (stepTwoErrors.hasErrors()) {
+            val defaultFilter = when (current.draft.postType) {
+                VolunteerPostType.PHYSICAL -> VolunteerRoleMode.PHYSICAL
+                VolunteerPostType.REMOTE -> VolunteerRoleMode.REMOTE
+                VolunteerPostType.HYBRID ->
+                    current.roleModeFilter ?: VolunteerRoleMode.PHYSICAL
+                null -> current.roleModeFilter
+            }
+
+            _uiState.update { state ->
+                state.copy(
+                    currentStep = 2,
+                    reviewEditStep = 2,
+                    roleModeFilter = defaultFilter,
+                    roleSearchQuery = "",
+                    roleSelectionErrors = stepTwoErrors,
+                    showRoleSelectionErrors = true,
+                    isStepTwoReady = false
+                )
+            }
+            return
+        }
+
+        _uiState.update { state ->
+            state.copy(
+                reviewEditStep = 2,
+                roleSelectionErrors = stepTwoErrors,
+                showRoleSelectionErrors = false,
+                isStepTwoReady = true
+            )
+        }
+        finishReviewEditAfterStepTwo()
+    }
+
+    /**
+     * Role selection changes may add a role that has never been configured.
+     * Reuse openStepThree() so Supabase recommendations/defaults are prepared
+     * before deciding whether Review can be shown again.
+     */
+    private fun finishReviewEditAfterStepTwo() {
+        _uiState.update { state ->
+            state.copy(reviewEditStep = 3)
+        }
+
+        openStepThree()
+
+        if (_uiState.value.isStepThreeReady) {
+            finishReviewEditAfterStepThree()
+        }
+    }
+
+    /**
+     * Step 3 changes can affect Step 4 validation. If Schedule needs repair,
+     * keep the organiser in the Review-edit context so Save Changes eventually
+     * returns to Review instead of restarting the wizard.
+     */
+    private fun finishReviewEditAfterStepThree() {
+        val current = _uiState.value
+
+        val scheduleError = if (current.scheduleEditorDraft != null) {
+            "You have unfinished schedule input. Resume it and save, or discard it before returning to Review."
+        } else {
+            CreatePostValidator.validateStepFour(
+                draft = current.draft,
+                roleCatalogue = current.roleCatalogue
+            )
+        }
+
+        if (scheduleError != null) {
+            _uiState.update { state ->
+                val sections = availableScheduleSections(state.draft.postType)
+                state.copy(
+                    currentStep = 4,
+                    reviewEditStep = 4,
+                    activeScheduleSection = state.activeScheduleSection
+                        ?.takeIf { it in sections }
+                        ?: sections.firstOrNull(),
+                    selectedPhysicalScheduleDateMillis = validSelectedPhysicalDate(
+                        draft = state.draft,
+                        currentDate = state.selectedPhysicalScheduleDateMillis
+                    ),
+                    scheduleError = scheduleError,
+                    showScheduleErrors = true,
+                    isStepFourReady = false
+                )
+            }
+            return
+        }
+
+        returnToReviewFromEdit()
+    }
+
+    fun saveDraft(context: Context) {
+        val current = _uiState.value
+        if (current.isSavingDraft || current.isPublishing) return
+        if (!validateScheduleForContinue()) return
+
+        val validationError = postSaveValidationError(_uiState.value)
         if (validationError != null) {
             _uiState.update { state ->
                 state.copy(
+                    saveDraftError = validationError,
+                    publishError = null
+                )
+            }
+            return
+        }
+
+        // Set busy state before launching so a fast double tap cannot start
+        // a second database save.
+        _uiState.update { state ->
+            state.copy(
+                isSavingDraft = true,
+                saveDraftError = null,
+                publishError = null
+            )
+        }
+
+        viewModelScope.launch {
+            try {
+                val snapshot = _uiState.value
+                val thumbnail = prepareThumbnailForSave(
+                    context = context.applicationContext,
+                    thumbnailUri = snapshot.draft.thumbnailUri
+                )
+
+                val result = createPostRepository.saveDraft(
+                    draft = snapshot.draft,
+                    roleCatalogue = snapshot.roleCatalogue,
+                    thumbnail = thumbnail
+                )
+
+                // The complete post now exists in Supabase with status DRAFT.
+                // Clear only the local wizard state; reopening saved drafts is
+                // separate Manage Posts work.
+                _uiState.update { state ->
+                    state.copy(
+                        draft = CreatePostDraft(),
+                        currentStep = 5,
+                        reviewEditStep = null,
+                        editingScheduleItemId = null,
+                        scheduleEditorDraft = null,
+                        isScheduleEditorOpen = false,
+                        scheduleError = null,
+                        showScheduleErrors = false,
+                        isStepFourReady = false,
+                        isSavingDraft = false,
+                        saveDraftError = null,
+                        savedDraftPostId = result.postId,
+                        isPublishing = false,
+                        publishError = null,
+                        publishedPostId = null,
+                        pendingPostType = null,
+                        isPostTypeCommitted = false
+                    )
+                }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+
+                e.printStackTrace()
+                _uiState.update { state ->
+                    state.copy(
+                        isSavingDraft = false,
+                        saveDraftError = e.message
+                            ?: "Could not save this volunteer post as a draft."
+                    )
+                }
+            }
+        }
+    }
+
+    fun publishPost(context: Context) {
+        val current = _uiState.value
+        if (current.isSavingDraft || current.isPublishing) return
+        if (!validateScheduleForContinue()) return
+
+        val validationError = postSaveValidationError(_uiState.value)
+        if (validationError != null) {
+            _uiState.update { state ->
+                state.copy(
+                    saveDraftError = null,
                     publishError = validationError
                 )
             }
             return
         }
 
-        viewModelScope.launch {
-            _uiState.update { state ->
-                state.copy(
-                    isPublishing = true,
-                    publishError = null
-                )
-            }
+        // Publish and Save Draft share the same draft, so lock both actions
+        // before starting the asynchronous database work.
+        _uiState.update { state ->
+            state.copy(
+                isPublishing = true,
+                saveDraftError = null,
+                publishError = null
+            )
+        }
 
+        viewModelScope.launch {
             try {
                 val snapshot = _uiState.value
-                val thumbnail = prepareThumbnailForPublish(
+                val thumbnail = prepareThumbnailForSave(
                     context = context.applicationContext,
                     thumbnailUri = snapshot.draft.thumbnailUri
                 )
@@ -2573,13 +3025,17 @@ class CreatePostViewModel : ViewModel() {
                 _uiState.update { state ->
                     state.copy(
                         draft = CreatePostDraft(),
-                        currentStep = 4,
+                        currentStep = 5,
+                        reviewEditStep = null,
                         editingScheduleItemId = null,
                         scheduleEditorDraft = null,
                         isScheduleEditorOpen = false,
                         scheduleError = null,
                         showScheduleErrors = false,
                         isStepFourReady = false,
+                        isSavingDraft = false,
+                        saveDraftError = null,
+                        savedDraftPostId = null,
                         isPublishing = false,
                         publishError = null,
                         publishedPostId = result.postId,
@@ -2602,7 +3058,7 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
-    private fun publishValidationError(
+    private fun postSaveValidationError(
         state: CreatePostUiState
     ): String? {
         val stepOneErrors = CreatePostValidator.validateStepOne(state.draft)
@@ -2632,7 +3088,7 @@ class CreatePostViewModel : ViewModel() {
         )
     }
 
-    private suspend fun prepareThumbnailForPublish(
+    private suspend fun prepareThumbnailForSave(
         context: Context,
         thumbnailUri: String?
     ): PublishThumbnail? {
@@ -2714,6 +3170,7 @@ class CreatePostViewModel : ViewModel() {
             title = item.title.trim(),
             location = item.location.trim(),
             targetRoleTemplateIds = item.targetRoleTemplateIds.distinct(),
+            closingRoleTemplateIds = item.closingRoleTemplateIds.distinct(),
             notes = item.notes.trim(),
             trainingLocationQuery = item.trainingLocationQuery.trim(),
             onlinePlatform = item.onlinePlatform.trim(),
@@ -2759,13 +3216,39 @@ class CreatePostViewModel : ViewModel() {
         item: ScheduleItemDraft
     ): CreatePostDraft {
         val editingId = _uiState.value.editingScheduleItemId
-        val items = if (editingId == null) {
+        val insertedItems = if (editingId == null) {
             draft.scheduleItems + item
         } else {
             draft.scheduleItems.map { existing ->
                 if (existing.draftId == editingId) item else existing
             }
         }
+
+        // A role can have only one Training responsible for its application
+        // cutoff. If the organiser confirmed a move to the editor item, clear
+        // that role from every other Training in the candidate draft.
+        val claimedRoleIds = if (item.scheduleType == ScheduleType.TRAINING) {
+            item.closingRoleTemplateIds.toSet()
+        } else {
+            emptySet()
+        }
+
+        val items = if (claimedRoleIds.isEmpty()) {
+            insertedItems
+        } else {
+            insertedItems.map { existing ->
+                if (existing.draftId == item.draftId) {
+                    existing
+                } else {
+                    existing.copy(
+                        closingRoleTemplateIds =
+                            existing.closingRoleTemplateIds
+                                .filterNot { roleId -> roleId in claimedRoleIds }
+                    )
+                }
+            }
+        }
+
         return draft.copy(scheduleItems = items)
     }
 
@@ -2886,11 +3369,132 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    private fun trainingCutoffMoveError(
+        state: CreatePostUiState,
+        item: ScheduleItemDraft
+    ): String? {
+        if (item.scheduleType != ScheduleType.TRAINING) return null
+        if (item.closingRoleTemplateIds.isEmpty()) return null
+
+        val newStart = trainingStartOrderValue(item) ?: return null
+        val rolesById = state.roleCatalogue.associateBy { role ->
+            role.roleTemplateId
+        }
+
+        item.closingRoleTemplateIds.distinct().forEach { roleId ->
+            val otherCutoff = state.draft.scheduleItems
+                .asSequence()
+                .filter { saved ->
+                    saved.draftId != item.draftId &&
+                        saved.scheduleType == ScheduleType.TRAINING &&
+                        roleId in saved.closingRoleTemplateIds
+                }
+                .minByOrNull { saved ->
+                    trainingStartOrderValue(saved) ?: Long.MAX_VALUE
+                }
+                ?: return@forEach
+
+            val otherStart = trainingStartOrderValue(otherCutoff)
+                ?: return@forEach
+
+            if (newStart >= otherStart) {
+                val roleName = rolesById[roleId]?.roleName ?: roleId
+                return "$roleName already has an earlier or same-time application-closing training. Uncheck this role or move this training earlier."
+            }
+        }
+
+        return null
+    }
+
+    private fun effectiveEditorTargetRoleIds(
+        state: CreatePostUiState,
+        item: ScheduleItemDraft
+    ): Set<String> {
+        val applicableRoleIds = CreatePostValidator.applicableScheduleRoleIds(
+            draft = state.draft,
+            scheduleType = item.scheduleType,
+            roleCatalogue = state.roleCatalogue
+        )
+
+        return if (item.appliesToAllRoles) {
+            applicableRoleIds.toSet()
+        } else {
+            item.targetRoleTemplateIds
+                .filter { roleId -> roleId in applicableRoleIds }
+                .toSet()
+        }
+    }
+
+    private fun trainingStartOrderValue(item: ScheduleItemDraft): Long? {
+        val date = item.scheduleDateMillis ?: return null
+        val startMinutes = item.startTimeMinutes ?: return null
+        return CreatePostValidator.startOfDayMillis(date) +
+            startMinutes * 60L * 1000L
+    }
+
+    /**
+     * Step 2 can remove a role after Step 4 has already been configured. Keep
+     * saved schedule targets and cutoff-role selections inside the current
+     * selected role set so stale ROLE IDs cannot reach the database.
+     */
+    private fun cleanScheduleRoleReferences(
+        draft: CreatePostDraft,
+        roleCatalogue: List<CreateRoleTemplate>
+    ): CreatePostDraft {
+        return draft.copy(
+            scheduleItems = draft.scheduleItems.map { item ->
+                cleanScheduleItemRoleReferences(
+                    item = item,
+                    draft = draft,
+                    roleCatalogue = roleCatalogue
+                )
+            }
+        )
+    }
+
+    private fun cleanScheduleItemRoleReferences(
+        item: ScheduleItemDraft,
+        draft: CreatePostDraft,
+        roleCatalogue: List<CreateRoleTemplate>
+    ): ScheduleItemDraft {
+        val applicableRoleIds = CreatePostValidator.applicableScheduleRoleIds(
+            draft = draft,
+            scheduleType = item.scheduleType,
+            roleCatalogue = roleCatalogue
+        )
+        val applicableSet = applicableRoleIds.toSet()
+        val cleanedTargets = item.targetRoleTemplateIds
+            .filter { roleId -> roleId in applicableSet }
+            .distinct()
+        val effectiveTargets = if (item.appliesToAllRoles) {
+            applicableSet
+        } else {
+            cleanedTargets.toSet()
+        }
+
+        return item.copy(
+            targetRoleTemplateIds = cleanedTargets,
+            closingRoleTemplateIds = if (
+                item.scheduleType == ScheduleType.TRAINING
+            ) {
+                item.closingRoleTemplateIds
+                    .filter { roleId -> roleId in effectiveTargets }
+                    .distinct()
+            } else {
+                emptyList()
+            }
+        )
+    }
+
     private fun updateStepTwoDraft(
         change: (CreatePostDraft) -> CreatePostDraft
     ) {
         _uiState.update { current ->
-            val newDraft = change(current.draft)
+            val changedDraft = change(current.draft)
+            val newDraft = cleanScheduleRoleReferences(
+                draft = changedDraft,
+                roleCatalogue = current.roleCatalogue
+            )
             val errors = CreatePostValidator.validateStepTwo(
                 draft = newDraft,
                 roleCatalogue = current.roleCatalogue
@@ -2898,6 +3502,13 @@ class CreatePostViewModel : ViewModel() {
 
             current.copy(
                 draft = newDraft,
+                scheduleEditorDraft = current.scheduleEditorDraft?.let { item ->
+                    cleanScheduleItemRoleReferences(
+                        item = item,
+                        draft = newDraft,
+                        roleCatalogue = current.roleCatalogue
+                    )
+                },
                 roleSelectionErrors = errors,
                 isStepTwoReady = false,
                 isStepThreeReady = false,
@@ -3006,6 +3617,7 @@ class CreatePostViewModel : ViewModel() {
                 showRoleSelectionErrors = false,
                 scheduleError = null,
                 showScheduleErrors = false,
+                saveDraftError = null,
                 publishError = null
             )
         }

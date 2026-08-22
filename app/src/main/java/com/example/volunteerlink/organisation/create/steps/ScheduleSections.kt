@@ -28,6 +28,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -703,27 +707,12 @@ private fun TrainingScheduleItemEditor(
             onRoleToggled = viewModel::toggleScheduleEditorRole
         )
 
-        EditorGroup(
-            title = "Late Applications",
-            subtitle = "This controls new applications or Instant Joins for the roles targeted by this training. Existing pending applications remain reviewable."
-        ) {
-            ScheduleChoiceOption(
-                title = "Allow after training starts",
-                description = "Targeted roles may still receive new applications or joins.",
-                selected = item.allowApplicationsAfterStart == true,
-                onClick = {
-                    viewModel.updateTrainingAllowApplicationsAfterStart(true)
-                }
-            )
-            ScheduleChoiceOption(
-                title = "Close when training starts",
-                description = "Stop new applications or joins for targeted roles when this session begins.",
-                selected = item.allowApplicationsAfterStart == false,
-                onClick = {
-                    viewModel.updateTrainingAllowApplicationsAfterStart(false)
-                }
-            )
-        }
+        TrainingApplicationClosingEditor(
+            draft = uiState.draft,
+            roleCatalogue = uiState.roleCatalogue,
+            item = item,
+            viewModel = viewModel
+        )
 
         NotesEditor(
             value = item.notes,
@@ -1017,12 +1006,17 @@ private fun RoleTargetEditor(
 private fun RoleCheckRow(
     role: CreateRoleTemplate,
     checked: Boolean,
+    enabled: Boolean = true,
+    supportingText: String? = null,
     onCheckedChange: () -> Unit
 ) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onCheckedChange),
+            .clickable(
+                enabled = enabled,
+                onClick = onCheckedChange
+            ),
         shape = RoundedCornerShape(12.dp),
         color = ScheduleMuted
     ) {
@@ -1036,6 +1030,7 @@ private fun RoleCheckRow(
         ) {
             Checkbox(
                 checked = checked,
+                enabled = enabled,
                 onCheckedChange = { onCheckedChange() }
             )
             Column(
@@ -1045,7 +1040,12 @@ private fun RoleCheckRow(
                 Text(
                     text = role.roleName,
                     style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (enabled) {
+                        MaterialTheme.colorScheme.onSurface
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    }
                 )
                 Text(
                     text = if (role.roleMode == VolunteerRoleMode.PHYSICAL) {
@@ -1056,9 +1056,164 @@ private fun RoleCheckRow(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                supportingText?.let { message ->
+                    Text(
+                        text = message,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }
+}
+
+@Composable
+private fun TrainingApplicationClosingEditor(
+    draft: CreatePostDraft,
+    roleCatalogue: List<CreateRoleTemplate>,
+    item: ScheduleItemDraft,
+    viewModel: CreatePostViewModel
+) {
+    var pendingMoveRoleId by remember(item.draftId) {
+        mutableStateOf<String?>(null)
+    }
+
+    val applicableIds = CreatePostValidator.applicableScheduleRoleIds(
+        draft = draft,
+        scheduleType = ScheduleType.TRAINING,
+        roleCatalogue = roleCatalogue
+    )
+    val targetedIds = if (item.appliesToAllRoles) {
+        applicableIds
+    } else {
+        item.targetRoleTemplateIds
+            .filter { roleId -> roleId in applicableIds }
+            .distinct()
+    }
+
+    val rolesById = roleCatalogue.associateBy { role ->
+        role.roleTemplateId
+    }
+    val targetedRoles = targetedIds.mapNotNull { roleId ->
+        rolesById[roleId]
+    }
+
+    EditorGroup(
+        title = "Application Closing",
+        subtitle = "Each role can have only one training responsible for closing new applications or Instant Joins. A role may still attend other trainings."
+    ) {
+        if (targetedRoles.isEmpty()) {
+            Text(
+                text = "Choose at least one role in Applies To first.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error
+            )
+        } else {
+            targetedRoles.forEach { role ->
+                val roleId = role.roleTemplateId
+                val checked = roleId in item.closingRoleTemplateIds
+                val otherCutoff = viewModel.otherTrainingApplicationCutoff(roleId)
+                val currentStart = trainingStartOrderValue(item)
+                val otherStart = otherCutoff?.let(::trainingStartOrderValue)
+                val currentIsEarlier = otherCutoff != null &&
+                    currentStart != null &&
+                    otherStart != null &&
+                    currentStart < otherStart
+                val canMoveEarlier = !checked && currentIsEarlier
+
+                val enabled = checked || otherCutoff == null || canMoveEarlier
+
+                val supportingText = when {
+                    checked && otherCutoff != null && currentIsEarlier ->
+                        "Will move the cutoff from ${trainingCutoffText(otherCutoff)} to this earlier training when you save."
+
+                    checked && otherCutoff != null ->
+                        "This selection is no longer earlier than the existing cutoff. Uncheck it or move this training earlier before saving."
+
+                    otherCutoff == null -> null
+
+                    currentStart == null || otherStart == null ->
+                        "${role.roleName} already has an application cutoff. Set this training's date and start time before deciding whether to move it."
+
+                    canMoveEarlier ->
+                        "Currently closes ${trainingCutoffText(otherCutoff)}. Selecting this will move the cutoff to this earlier training."
+
+                    else ->
+                        "Already closes ${trainingCutoffText(otherCutoff)}. This later training cannot create another cutoff."
+                }
+
+                RoleCheckRow(
+                    role = role,
+                    checked = checked,
+                    enabled = enabled,
+                    supportingText = supportingText,
+                    onCheckedChange = {
+                        when {
+                            checked -> viewModel.toggleTrainingClosingRole(roleId)
+                            otherCutoff == null ->
+                                viewModel.toggleTrainingClosingRole(roleId)
+                            canMoveEarlier -> pendingMoveRoleId = roleId
+                        }
+                    }
+                )
+            }
+
+            Text(
+                text = "If a role already has a cutoff, later trainings cannot select it again. An earlier training may take over only after you confirm the move.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+
+    pendingMoveRoleId?.let { roleId ->
+        val role = rolesById[roleId]
+        val oldCutoff = viewModel.otherTrainingApplicationCutoff(roleId)
+
+        if (role != null && oldCutoff != null) {
+            AlertDialog(
+                onDismissRequest = { pendingMoveRoleId = null },
+                title = { Text("Move application cutoff?") },
+                text = {
+                    Text(
+                        "${role.roleName} currently stops accepting new applications ${trainingCutoffText(oldCutoff)}. Moving it here will make this earlier training the only application-closing training for that role."
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            viewModel.moveTrainingApplicationCutoff(roleId)
+                            pendingMoveRoleId = null
+                        }
+                    ) {
+                        Text("Move Cutoff")
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = { pendingMoveRoleId = null }
+                    ) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
+    }
+}
+
+private fun trainingStartOrderValue(item: ScheduleItemDraft): Long? {
+    val date = item.scheduleDateMillis ?: return null
+    val startMinutes = item.startTimeMinutes ?: return null
+    return CreatePostValidator.startOfDayMillis(date) +
+        startMinutes * 60L * 1000L
+}
+
+private fun trainingCutoffText(item: ScheduleItemDraft): String {
+    val date = item.scheduleDateMillis?.let(::formatScheduleDate) ?: "on an unset date"
+    val time = formatScheduleTime(item.startTimeMinutes)
+    val title = item.title.ifBlank { "another training" }
+    return "on $date at $time from \"$title\""
 }
 
 @Composable
@@ -1470,6 +1625,17 @@ private fun ScheduleOverviewItemCard(
                     )
                 }
 
+            trainingApplicationClosingSummary(
+                roleCatalogue = roleCatalogue,
+                item = item
+            )?.let { text ->
+                Text(
+                    text = text,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
             if (error != null) {
                 Text(
                     text = error,
@@ -1555,6 +1721,30 @@ private fun roleSummary(
         .mapNotNull { roleId -> namesById[roleId] }
         .joinToString(" · ")
         .ifBlank { "Selected roles need review" }
+}
+
+private fun trainingApplicationClosingSummary(
+    roleCatalogue: List<CreateRoleTemplate>,
+    item: ScheduleItemDraft
+): String? {
+    if (item.scheduleType != ScheduleType.TRAINING) return null
+
+    if (item.closingRoleTemplateIds.isEmpty()) {
+        return "Applications: no cutoff from this training"
+    }
+
+    val roleNamesById = roleCatalogue.associate { role ->
+        role.roleTemplateId to role.roleName
+    }
+    val names = item.closingRoleTemplateIds
+        .distinct()
+        .mapNotNull { roleId -> roleNamesById[roleId] }
+
+    return if (names.isEmpty()) {
+        "Applications: closing roles need review"
+    } else {
+        "Closes applications on start: ${names.joinToString(" · ")}"
+    }
 }
 
 private fun itemLocationOrFormatText(

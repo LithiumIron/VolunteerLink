@@ -30,36 +30,63 @@ import java.util.UUID
 /**
  * Supabase implementation used by the Create Post wizard.
  *
- * Publishing is still a client-side multi-table operation for this university
- * project. The parent row stays DRAFT only while this one publish call is
- * running, then switches to PUBLISHED after all child rows and the optional
- * thumbnail succeed. There is no user-facing Save Draft feature here.
+ * Saving is a client-side multi-table operation for this university project.
+ * Both actions first create a DRAFT parent and all normalized child rows.
+ * Publish changes the parent to PUBLISHED only after everything succeeds;
+ * Save Draft deliberately leaves status DRAFT and published_at NULL.
  */
 class SupabaseCreatePostRepository : CreatePostRepository {
+
+    override suspend fun saveDraft(
+        draft: CreatePostDraft,
+        roleCatalogue: List<CreateRoleTemplate>,
+        thumbnail: PublishThumbnail?
+    ): SavedPostResult {
+        return savePost(
+            draft = draft,
+            roleCatalogue = roleCatalogue,
+            thumbnail = thumbnail,
+            publishAfterSave = false
+        )
+    }
 
     override suspend fun publishPost(
         draft: CreatePostDraft,
         roleCatalogue: List<CreateRoleTemplate>,
         thumbnail: PublishThumbnail?
-    ): PublishedPostResult {
+    ): SavedPostResult {
+        return savePost(
+            draft = draft,
+            roleCatalogue = roleCatalogue,
+            thumbnail = thumbnail,
+            publishAfterSave = true
+        )
+    }
+
+    private suspend fun savePost(
+        draft: CreatePostDraft,
+        roleCatalogue: List<CreateRoleTemplate>,
+        thumbnail: PublishThumbnail?,
+        publishAfterSave: Boolean
+    ): SavedPostResult {
         val postType = draft.postType
-            ?: error("Choose a post type before publishing.")
+            ?: error("Choose a post type before saving.")
         val category = draft.category
-            ?: error("Choose a category before publishing.")
-        val publishTimestamp = currentUtcTimestamp()
+            ?: error("Choose a category before saving.")
+        val saveTimestamp = currentUtcTimestamp()
         val posts = supabase.from("volunteer_posts")
         val bucket = supabase.storage.from(THUMBNAIL_BUCKET)
 
-        // Keep the parent as DRAFT only while this publish call is inserting
-        // its normalized child rows. The user still has no Save Draft feature.
+        // The parent starts as DRAFT for both actions. Save Draft keeps this
+        // state; Publish switches it only after every child/thumbnail succeeds.
         val parentRow = buildJsonObject {
             put("organisation_id", TEST_ORGANISATION_ID)
             put("title", draft.title.trim())
             put("description", draft.description.trim())
             put("mode", postType.databaseValue)
             put("status", "DRAFT")
-            put("created_at", publishTimestamp)
-            put("updated_at", publishTimestamp)
+            put("created_at", saveTimestamp)
+            put("updated_at", saveTimestamp)
             put("category", category.databaseValue)
         }
 
@@ -157,6 +184,10 @@ class SupabaseCreatePostRepository : CreatePostRepository {
                         put("schedule_item_id", scheduleItemId)
                         put("post_id", postId)
                         put("role_template_id", roleId)
+                        put(
+                            "closes_applications_on_start",
+                            roleId in scheduleData.closingRoleTemplateIds
+                        )
                     }
                 }
 
@@ -196,25 +227,29 @@ class SupabaseCreatePostRepository : CreatePostRepository {
                 }
             }
 
-            // Publication is deliberately the final database action.
-            posts.update(
-                {
-                    set("status", "PUBLISHED")
-                    set("published_at", publishTimestamp)
-                    set("updated_at", publishTimestamp)
-                }
-            ) {
-                filter {
-                    eq("post_id", postId)
+            // Publishing is deliberately the final database action.
+            // Save Draft stops before this update, so status stays DRAFT and
+            // published_at stays SQL NULL.
+            if (publishAfterSave) {
+                posts.update(
+                    {
+                        set("status", "PUBLISHED")
+                        set("published_at", saveTimestamp)
+                        set("updated_at", saveTimestamp)
+                    }
+                ) {
+                    filter {
+                        eq("post_id", postId)
+                    }
                 }
             }
 
-            return PublishedPostResult(
+            return SavedPostResult(
                 postId = postId,
                 thumbnailPath = uploadedThumbnailPath
             )
         } catch (e: Exception) {
-            cleanupFailedPublish(
+            cleanupFailedSave(
                 postId = postId,
                 thumbnailPath = uploadedThumbnailPath
             )
@@ -371,7 +406,7 @@ class SupabaseCreatePostRepository : CreatePostRepository {
         draft: CreatePostDraft
     ): JsonObject {
         val location = draft.physicalLocation
-            ?: error("Choose a Physical event location before publishing.")
+            ?: error("Choose a Physical event location before saving.")
         val capacity = draft.requiredPhysicalVolunteerTotal
             ?: error("Physical volunteer capacity is missing.")
 
@@ -432,7 +467,7 @@ class SupabaseCreatePostRepository : CreatePostRepository {
         draft: CreatePostDraft
     ): JsonObject {
         val mode = draft.remoteSubmissionMode
-            ?: error("Choose a Remote submission mode before publishing.")
+            ?: error("Choose a Remote submission mode before saving.")
         val capacity = draft.requiredRemoteVolunteerTotal
             ?: error("Remote volunteer capacity is missing.")
 
@@ -462,7 +497,7 @@ class SupabaseCreatePostRepository : CreatePostRepository {
                 put(
                     "responsible_role_template_id",
                     draft.sharedSubmissionResponsibleRoleTemplateId
-                        ?: error("Choose the responsible Remote role before publishing.")
+                        ?: error("Choose the responsible Remote role before saving.")
                 )
             }
         }
@@ -529,9 +564,6 @@ class SupabaseCreatePostRepository : CreatePostRepository {
                 item.trainingTimeZoneId.nullIfBlank()?.let { timeZone ->
                     put("training_time_zone", timeZone)
                 }
-                item.allowApplicationsAfterStart?.let { allow ->
-                    put("allow_applications_after_start", allow)
-                }
 
                 when (trainingMode) {
                     TrainingMode.ONLINE -> {
@@ -550,7 +582,7 @@ class SupabaseCreatePostRepository : CreatePostRepository {
 
                         if (locationMode == TrainingLocationMode.CUSTOM) {
                             val location = item.trainingLocation
-                                ?: error("Choose the custom Training location before publishing.")
+                                ?: error("Choose the custom Training location before saving.")
 
                             location.placeId.nullIfBlank()?.let { placeId ->
                                 put("training_location_place_id", placeId)
@@ -578,18 +610,31 @@ class SupabaseCreatePostRepository : CreatePostRepository {
             }
         }
 
+        val closingRoleIds = if (item.scheduleType == ScheduleType.TRAINING) {
+            item.closingRoleTemplateIds
+                .distinct()
+                .toSet()
+        } else {
+            emptySet()
+        }
+
+        if (!targetRoleIds.containsAll(closingRoleIds)) {
+            error("A Training item can only close applications for its targeted roles.")
+        }
+
         return SchedulePublishData(
             row = row,
-            targetRoleTemplateIds = targetRoleIds
+            targetRoleTemplateIds = targetRoleIds,
+            closingRoleTemplateIds = closingRoleIds
         )
     }
 
     /**
-     * Best-effort cleanup for a publish that fails before the final PUBLISHED
-     * update. Explicit child cleanup is kept even where a test FK currently
-     * cascades, so the temporary publish test is easy to understand and debug.
+     * Best-effort cleanup when Save Draft or Publish fails midway.
+     * Explicit child cleanup is kept even where a test FK currently cascades,
+     * so this multi-table client-side save stays understandable and debuggable.
      */
-    private suspend fun cleanupFailedPublish(
+    private suspend fun cleanupFailedSave(
         postId: String,
         thumbnailPath: String?
     ) {
@@ -713,7 +758,8 @@ class SupabaseCreatePostRepository : CreatePostRepository {
 
     private data class SchedulePublishData(
         val row: JsonObject,
-        val targetRoleTemplateIds: List<String>
+        val targetRoleTemplateIds: List<String>,
+        val closingRoleTemplateIds: Set<String>
     )
 
     private companion object {

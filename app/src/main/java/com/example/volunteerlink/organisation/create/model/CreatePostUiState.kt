@@ -68,8 +68,14 @@ data class CreatePostUiState(
     val showValidationErrors: Boolean = false,
     val isStepOneReady: Boolean = false,
 
-    // Current Create Post page.
+    // Current Create Post page. Steps 1-4 are editable form pages and
+    // Step 5 is the read-only Review Summary.
     val currentStep: Int = 1,
+
+    // Non-null only while the organiser is editing one section from Review.
+    // System Back / a successful Save Changes returns to Review instead of
+    // walking through the normal wizard sequence.
+    val reviewEditStep: Int? = null,
 
     // Step 2 role catalogue / role selection state.
     val roleCatalogue: List<CreateRoleTemplate> = emptyList(),
@@ -100,8 +106,11 @@ data class CreatePostUiState(
     val showScheduleErrors: Boolean = false,
     val isStepFourReady: Boolean = false,
 
-    // Publish runs from Step 4. publishedPostId is kept for the success screen
-    // after the editable draft has been cleared.
+    // Save Draft and Publish run from Review. Their IDs are kept only long
+    // enough to show the matching success screen after local input is cleared.
+    val isSavingDraft: Boolean = false,
+    val saveDraftError: String? = null,
+    val savedDraftPostId: String? = null,
     val isPublishing: Boolean = false,
     val publishError: String? = null,
     val publishedPostId: String? = null,

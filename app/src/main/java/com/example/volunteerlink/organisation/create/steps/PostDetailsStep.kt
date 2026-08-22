@@ -76,7 +76,7 @@ fun PostDetailsStep(
                 IconButton(onClick = onBack) {
                     Image(
                         painter = painterResource(R.drawable.back),
-                        contentDescription = "Back",
+                        contentDescription = "Exit Create Post",
                         modifier = Modifier.size(30.dp)
                     )
                 }
@@ -86,14 +86,14 @@ fun PostDetailsStep(
                     verticalArrangement = Arrangement.spacedBy(3.dp)
                 ) {
                     Text(
-                        text = "Create Volunteer Post",
+                        text = if (uiState.reviewEditStep == 1) "Edit Post Details" else "Create Volunteer Post",
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
                         color = CreateGreen
                     )
 
                     Text(
-                        text = "Step 1 of 4 · Post Details",
+                        text = if (uiState.reviewEditStep == 1) "Editing from Review · Post Details" else "Step 1 of 5 · Post Details",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -299,7 +299,7 @@ fun PostDetailsStep(
                         shape = RoundedCornerShape(14.dp)
                     ) {
                         Text(
-                            text = "Continue to Add Roles",
+                            text = if (uiState.reviewEditStep == 1) "Save Changes" else "Continue to Add Roles",
                             fontWeight = FontWeight.SemiBold
                         )
                     }
@@ -311,7 +311,7 @@ fun PostDetailsStep(
                             color = Color(0xFFF1F7EE)
                         ) {
                             Text(
-                                text = "Step 1 is complete and ready for role selection.",
+                                text = if (uiState.reviewEditStep == 1) "Post Details are ready to return to Review." else "Step 1 is complete and ready for role selection.",
                                 modifier = Modifier.padding(12.dp),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = CreateGreen
