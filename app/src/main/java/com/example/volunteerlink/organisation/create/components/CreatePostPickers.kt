@@ -420,7 +420,7 @@ fun ThumbnailPickerSection(
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Text(
-            text = "Thumbnail (Optional)",
+            text = "Thumbnail (Optional · Max 5 MB)",
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.Medium
         )
