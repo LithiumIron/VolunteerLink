@@ -1,5 +1,6 @@
 package com.example.volunteerlink.organisation.create
 
+import com.example.volunteerlink.data.time.AppClock
 import com.example.volunteerlink.organisation.create.model.CreatePostDraft
 import com.example.volunteerlink.organisation.create.model.CreatePostErrors
 import com.example.volunteerlink.organisation.create.model.CreateRoleTemplate
@@ -28,7 +29,7 @@ object CreatePostValidator {
     const val SHORT_NOTICE_TRAINING_HOURS = 72
 
     fun startOfDayMillis(
-        timeMillis: Long = System.currentTimeMillis()
+        timeMillis: Long = AppClock.nowMillis()
     ): Long {
         return Calendar.getInstance().apply {
             timeInMillis = timeMillis
@@ -40,7 +41,7 @@ object CreatePostValidator {
     }
 
     fun minimumStartDateMillis(
-        todayMillis: Long = System.currentTimeMillis()
+        todayMillis: Long = AppClock.nowMillis()
     ): Long {
         return Calendar.getInstance().apply {
             timeInMillis = startOfDayMillis(todayMillis)
@@ -591,7 +592,7 @@ object CreatePostValidator {
         draft: CreatePostDraft,
         item: ScheduleItemDraft,
         roleCatalogue: List<CreateRoleTemplate>,
-        nowMillis: Long = System.currentTimeMillis()
+        nowMillis: Long = AppClock.nowMillis()
     ): String? {
         if (item.title.isBlank()) {
             return when (item.scheduleType) {
@@ -798,7 +799,7 @@ object CreatePostValidator {
 
     fun trainingStartsWithinShortNotice(
         item: ScheduleItemDraft,
-        nowMillis: Long = System.currentTimeMillis()
+        nowMillis: Long = AppClock.nowMillis()
     ): Boolean {
         if (item.scheduleType != ScheduleType.TRAINING) return false
 
@@ -817,7 +818,7 @@ object CreatePostValidator {
     fun scheduleItemWarning(
         draft: CreatePostDraft,
         item: ScheduleItemDraft,
-        nowMillis: Long = System.currentTimeMillis()
+        nowMillis: Long = AppClock.nowMillis()
     ): String? {
         if (item.scheduleType != ScheduleType.TRAINING) return null
 
@@ -847,7 +848,7 @@ object CreatePostValidator {
     fun validateStepFour(
         draft: CreatePostDraft,
         roleCatalogue: List<CreateRoleTemplate>,
-        nowMillis: Long = System.currentTimeMillis()
+        nowMillis: Long = AppClock.nowMillis()
     ): String? {
         duplicateTrainingClosingRoleId(draft)?.let { roleId ->
             val roleName = roleCatalogue.firstOrNull { role ->
@@ -877,7 +878,7 @@ object CreatePostValidator {
      */
     fun scheduleProceedWarning(
         draft: CreatePostDraft,
-        nowMillis: Long = System.currentTimeMillis()
+        nowMillis: Long = AppClock.nowMillis()
     ): String? {
         val warnings = mutableListOf<String>()
         val hasPhysicalPart =

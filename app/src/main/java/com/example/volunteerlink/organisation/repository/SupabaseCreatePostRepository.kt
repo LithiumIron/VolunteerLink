@@ -1,6 +1,7 @@
 package com.example.volunteerlink.organisation.repository
 
 import com.example.volunteerlink.data.supabase
+import com.example.volunteerlink.data.time.AppClock
 import com.example.volunteerlink.organisation.create.CreatePostValidator
 import com.example.volunteerlink.organisation.create.model.CreatePostDraft
 import com.example.volunteerlink.organisation.create.model.CreateRoleSkill
@@ -717,7 +718,7 @@ class SupabaseCreatePostRepository : CreatePostRepository {
             Locale.US
         ).apply {
             timeZone = TimeZone.getTimeZone("UTC")
-        }.format(Date())
+        }.format(Date(AppClock.nowMillis()))
     }
 
     private fun String?.nullIfBlank(): String? {

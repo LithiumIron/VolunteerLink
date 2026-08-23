@@ -13,11 +13,15 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.volunteerlink.data.time.AppClock
 import com.example.volunteerlink.organisation.create.CreatePostValidator
 import com.example.volunteerlink.organisation.create.components.CreateGreen
 import com.example.volunteerlink.organisation.create.components.CreateSectionCard
@@ -26,7 +30,6 @@ import com.example.volunteerlink.organisation.create.components.FormError
 import com.example.volunteerlink.organisation.create.components.LocationAutocompleteField
 import com.example.volunteerlink.organisation.create.components.TimeSelectionField
 import com.example.volunteerlink.organisation.create.components.VolunteerCapacityField
-import com.example.volunteerlink.organisation.create.components.minimumCreatePostStartDateMillis
 import com.example.volunteerlink.organisation.create.model.CreatePostUiState
 import com.example.volunteerlink.organisation.create.model.RemoteSubmissionMode
 import com.example.volunteerlink.organisation.viewmodel.CreatePostViewModel
@@ -40,6 +43,13 @@ fun PhysicalEventDetailsSection(
 ) {
     val draft = uiState.draft
     val errors = uiState.visibleErrors
+
+    // Observe AppClock directly so changing the Supabase test date while the
+    // app is already open recalculates the 7-day minimum immediately.
+    val clockState by AppClock.state.collectAsStateWithLifecycle()
+    val minimumStartDateMillis = remember(clockState.refreshVersion) {
+        CreatePostValidator.minimumStartDateMillis()
+    }
 
     CreateSectionCard(
         title = "Event Schedule",
@@ -78,7 +88,7 @@ fun PhysicalEventDetailsSection(
                 DateSelectionField(
                     label = "Start Date",
                     selectedDateMillis = draft.physicalStartDateMillis,
-                    minimumDateMillis = minimumCreatePostStartDateMillis(),
+                    minimumDateMillis = minimumStartDateMillis,
                     errorMessage = errors.physicalStartDate,
                     onDateSelected = viewModel::updatePhysicalStartDate,
                     modifier = Modifier.weight(1f)
@@ -86,7 +96,7 @@ fun PhysicalEventDetailsSection(
 
                 val minimumEndDate = draft.physicalStartDateMillis?.let {
                     CreatePostValidator.nextDayMillis(it)
-                } ?: minimumCreatePostStartDateMillis()
+                } ?: minimumStartDateMillis
 
                 DateSelectionField(
                     label = "End Date",
@@ -101,7 +111,7 @@ fun PhysicalEventDetailsSection(
             DateSelectionField(
                 label = "Event Date",
                 selectedDateMillis = draft.physicalStartDateMillis,
-                minimumDateMillis = minimumCreatePostStartDateMillis(),
+                minimumDateMillis = minimumStartDateMillis,
                 errorMessage = errors.physicalStartDate,
                 onDateSelected = viewModel::updatePhysicalStartDate
             )
@@ -202,6 +212,12 @@ fun RemoteProjectDetailsSection(
     val draft = uiState.draft
     val errors = uiState.visibleErrors
 
+    // Remote dates use the same observable AppClock as Physical dates.
+    val clockState by AppClock.state.collectAsStateWithLifecycle()
+    val minimumStartDateMillis = remember(clockState.refreshVersion) {
+        CreatePostValidator.minimumStartDateMillis()
+    }
+
     CreateSectionCard(
         title = "Remote Project Timeline",
         subtitle = "Set the working period for the remote part. Start dates must be at least 7 days from today."
@@ -213,7 +229,7 @@ fun RemoteProjectDetailsSection(
             DateSelectionField(
                 label = "Start Date",
                 selectedDateMillis = draft.remoteStartDateMillis,
-                minimumDateMillis = minimumCreatePostStartDateMillis(),
+                minimumDateMillis = minimumStartDateMillis,
                 errorMessage = errors.remoteStartDate,
                 onDateSelected = viewModel::updateRemoteStartDate,
                 modifier = Modifier.weight(1f)
@@ -221,7 +237,7 @@ fun RemoteProjectDetailsSection(
 
             val minimumDueDate = draft.remoteStartDateMillis?.let {
                 CreatePostValidator.nextDayMillis(it)
-            } ?: minimumCreatePostStartDateMillis()
+            } ?: minimumStartDateMillis
 
             DateSelectionField(
                 label = "Due Date",

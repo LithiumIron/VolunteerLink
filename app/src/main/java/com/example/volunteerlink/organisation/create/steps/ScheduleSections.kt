@@ -39,6 +39,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.volunteerlink.data.time.AppClock
 import com.example.volunteerlink.R
 import com.example.volunteerlink.organisation.create.CreatePostValidator
 import com.example.volunteerlink.organisation.create.components.CreateGreen
@@ -605,7 +607,10 @@ private fun TrainingScheduleItemEditor(
     item: ScheduleItemDraft,
     viewModel: CreatePostViewModel
 ) {
-    val today = CreatePostValidator.startOfDayMillis()
+    val clockState by AppClock.state.collectAsStateWithLifecycle()
+    val today = remember(clockState.refreshVersion) {
+        CreatePostValidator.startOfDayMillis()
+    }
     val maximumDate = listOfNotNull(
         uiState.draft.physicalEndDateMillis
             ?: uiState.draft.physicalStartDateMillis,
