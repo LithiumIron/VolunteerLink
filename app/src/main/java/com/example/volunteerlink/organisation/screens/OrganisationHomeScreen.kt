@@ -1,13 +1,207 @@
 package com.example.volunteerlink.organisation.screens
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import com.example.volunteerlink.organisation.components.OrganisationModulePage
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.volunteerlink.data.time.AppClock
+import com.example.volunteerlink.organisation.home.model.OrganisationHomeUiState
+import com.example.volunteerlink.organisation.viewmodel.OrganisationHomeViewModel
+import com.example.volunteerlink.ui.theme.VolunteerLinkBackground
+import com.example.volunteerlink.ui.theme.VolunteerLinkPrimaryGreen
+import com.example.volunteerlink.ui.theme.VolunteerLinkScreenHorizontalPadding
+import com.example.volunteerlink.ui.theme.VolunteerLinkTextPrimary
+import com.example.volunteerlink.ui.theme.VolunteerLinkTextSecondary
 
-/** Organisation landing page. Real dashboard content will be added later. */
+/**
+ * Organisation dashboard.
+ *
+ * The screen only renders OrganisationHomeUiState. Supabase reads and all
+ * date-dependent rules stay in the repository/ViewModel/evaluator layer.
+ */
 @Composable
-fun OrganisationHomeScreen() {
-    OrganisationModulePage(
-        title = "Home",
-        message = "This module will be connected during group integration."
+fun OrganisationHomeScreen(
+    onViewAllPosts: () -> Unit,
+    viewModel: OrganisationHomeViewModel = viewModel()
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    OrganisationHomeContent(
+        uiState = uiState,
+        onViewAllPosts = onViewAllPosts,
+        onRetry = viewModel::refresh
     )
+}
+
+@Composable
+private fun OrganisationHomeContent(
+    uiState: OrganisationHomeUiState,
+    onViewAllPosts: () -> Unit,
+    onRetry: () -> Unit
+) {
+    when {
+        uiState.isLoading -> {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(VolunteerLinkBackground)
+                    .statusBarsPadding(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                CircularProgressIndicator(color = VolunteerLinkPrimaryGreen)
+                Text(
+                    text = "Loading your organisation...",
+                    modifier = Modifier.padding(top = 12.dp),
+                    fontSize = 13.sp,
+                    color = VolunteerLinkTextSecondary
+                )
+            }
+        }
+
+        uiState.errorMessage != null -> {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(VolunteerLinkBackground)
+                    .statusBarsPadding()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = "Couldn't load Home",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = VolunteerLinkTextPrimary
+                )
+                Text(
+                    text = uiState.errorMessage,
+                    modifier = Modifier.padding(top = 8.dp),
+                    fontSize = 13.sp,
+                    color = VolunteerLinkTextSecondary,
+                    textAlign = TextAlign.Center
+                )
+                Button(
+                    onClick = onRetry,
+                    modifier = Modifier.padding(top = 16.dp)
+                ) {
+                    Text("Try Again")
+                }
+            }
+        }
+
+        else -> {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(VolunteerLinkBackground)
+                    .statusBarsPadding(),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                    bottom = 112.dp
+                ),
+                verticalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
+                item(key = "home_header") {
+                    OrganisationHomeHeader(
+                        organisationName = uiState.organisationName,
+                        nowMillis = AppClock.nowMillis()
+                    )
+                }
+
+                if (uiState.attentionItems.isNotEmpty()) {
+                    item(key = "home_attention") {
+                        OrganisationAttentionSection(
+                        items = uiState.attentionItems,
+                        modifier = Modifier.padding(horizontal = VolunteerLinkScreenHorizontalPadding)
+                    )
+                    }
+                }
+
+                item(key = "home_post_summary") {
+                    OrganisationPostSummarySection(
+                        ongoingCount = uiState.ongoingCount,
+                        upcomingCount = uiState.upcomingCount,
+                        draftCount = uiState.draftCount,
+                        onViewAllPosts = onViewAllPosts,
+                        modifier = Modifier.padding(horizontal = VolunteerLinkScreenHorizontalPadding)
+                    )
+                }
+
+                item(key = "happening_now") {
+                    Column(
+                        modifier = Modifier.padding(horizontal = VolunteerLinkScreenHorizontalPadding),
+                        verticalArrangement = Arrangement.spacedBy(9.dp)
+                    ) {
+                        HomeSectionHeading(
+                            title = "Happening Now",
+                            actionLabel = if (uiState.ongoingPosts.size > 2) "View all" else null,
+                            onAction = onViewAllPosts
+                        )
+
+                        if (uiState.ongoingPosts.isEmpty()) {
+                            HomeEmptyMessage(
+                                text = "No volunteering activities are currently ongoing."
+                            )
+                        } else {
+                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                uiState.ongoingPosts.take(2).forEach { post ->
+                                    OngoingPostCard(post = post)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                item(key = "coming_up") {
+                    Column(
+                        modifier = Modifier.padding(horizontal = VolunteerLinkScreenHorizontalPadding),
+                        verticalArrangement = Arrangement.spacedBy(9.dp)
+                    ) {
+                        HomeSectionHeading(
+                            title = "Coming Up",
+                            actionLabel = if (uiState.upcomingPosts.size > 2) {
+                                "View all"
+                            } else {
+                                null
+                            },
+                            onAction = onViewAllPosts
+                        )
+
+                        if (uiState.upcomingPosts.isEmpty()) {
+                            HomeEmptyMessage(
+                                text = "No upcoming published posts yet."
+                            )
+                        } else {
+                            val visibleUpcoming = uiState.upcomingPosts.take(2)
+                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                visibleUpcoming.forEachIndexed { index, post ->
+                                    UpcomingPostRow(
+                                        post = post,
+                                        showDivider = index != visibleUpcoming.lastIndex
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

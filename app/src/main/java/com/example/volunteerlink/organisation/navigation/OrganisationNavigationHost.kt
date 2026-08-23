@@ -109,7 +109,17 @@ fun OrganisationNavigationHost() {
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(OrganisationNavigationRoutes.HOME) {
-                OrganisationHomeScreen()
+                OrganisationHomeScreen(
+                    onViewAllPosts = {
+                        navController.navigate(OrganisationNavigationRoutes.MANAGE) {
+                            popUpTo(OrganisationNavigationRoutes.HOME) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                )
             }
 
             composable(OrganisationNavigationRoutes.MANAGE) {
