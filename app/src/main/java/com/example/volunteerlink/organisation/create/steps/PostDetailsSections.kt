@@ -50,6 +50,11 @@ fun PhysicalEventDetailsSection(
     val minimumStartDateMillis = remember(clockState.refreshVersion) {
         CreatePostValidator.minimumStartDateMillis()
     }
+    val physicalStartDateError = if (draft.physicalStartDateMillis == null) {
+        errors.physicalStartDate
+    } else {
+        CreatePostValidator.minimumLeadTimeError(draft.physicalStartDateMillis)
+    }
 
     CreateSectionCard(
         title = "Event Schedule",
@@ -89,7 +94,7 @@ fun PhysicalEventDetailsSection(
                     label = "Start Date",
                     selectedDateMillis = draft.physicalStartDateMillis,
                     minimumDateMillis = minimumStartDateMillis,
-                    errorMessage = errors.physicalStartDate,
+                    errorMessage = physicalStartDateError,
                     onDateSelected = viewModel::updatePhysicalStartDate,
                     modifier = Modifier.weight(1f)
                 )
@@ -112,7 +117,7 @@ fun PhysicalEventDetailsSection(
                 label = "Event Date",
                 selectedDateMillis = draft.physicalStartDateMillis,
                 minimumDateMillis = minimumStartDateMillis,
-                errorMessage = errors.physicalStartDate,
+                errorMessage = physicalStartDateError,
                 onDateSelected = viewModel::updatePhysicalStartDate
             )
         }
@@ -217,6 +222,11 @@ fun RemoteProjectDetailsSection(
     val minimumStartDateMillis = remember(clockState.refreshVersion) {
         CreatePostValidator.minimumStartDateMillis()
     }
+    val remoteStartDateError = if (draft.remoteStartDateMillis == null) {
+        errors.remoteStartDate
+    } else {
+        CreatePostValidator.minimumLeadTimeError(draft.remoteStartDateMillis)
+    }
 
     CreateSectionCard(
         title = "Remote Project Timeline",
@@ -230,7 +240,7 @@ fun RemoteProjectDetailsSection(
                 label = "Start Date",
                 selectedDateMillis = draft.remoteStartDateMillis,
                 minimumDateMillis = minimumStartDateMillis,
-                errorMessage = errors.remoteStartDate,
+                errorMessage = remoteStartDateError,
                 onDateSelected = viewModel::updateRemoteStartDate,
                 modifier = Modifier.weight(1f)
             )

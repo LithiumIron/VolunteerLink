@@ -207,6 +207,67 @@ fun OrganisationCreateScreen(
         }
     }
 
+    uiState.saveDraftDateWarning?.let { warning ->
+        AlertDialog(
+            onDismissRequest = viewModel::dismissSaveDraftDateWarning,
+            title = {
+                Text("Save draft with an outdated start date?")
+            },
+            text = {
+                Text(
+                    "$warning\n\n" +
+                        "You can still save this draft, but it cannot be published " +
+                        "until the start date is updated."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.confirmSaveDraftWithDateWarning(context)
+                    }
+                ) {
+                    Text("Save Draft Anyway")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = viewModel::dismissSaveDraftDateWarning
+                ) {
+                    Text("Go Back")
+                }
+            }
+        )
+    }
+
+    uiState.publishDateBlockMessage?.let { message ->
+        AlertDialog(
+            onDismissRequest = viewModel::dismissPublishDateBlock,
+            title = {
+                Text("Post can't be published yet")
+            },
+            text = {
+                Text(
+                    "$message\n\n" +
+                        "Update the start date before publishing this post."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = viewModel::fixPublishDateFromReview
+                ) {
+                    Text("Fix Date")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = viewModel::dismissPublishDateBlock
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
     if (showDiscardDialog) {
         AlertDialog(
             onDismissRequest = {

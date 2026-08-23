@@ -110,9 +110,11 @@ data class CreatePostUiState(
     // enough to show the matching success screen after local input is cleared.
     val isSavingDraft: Boolean = false,
     val saveDraftError: String? = null,
+    val saveDraftDateWarning: String? = null,
     val savedDraftPostId: String? = null,
     val isPublishing: Boolean = false,
     val publishError: String? = null,
+    val publishDateBlockMessage: String? = null,
     val publishedPostId: String? = null,
 
     // Post type switching state.

@@ -2902,16 +2902,66 @@ class CreatePostViewModel : ViewModel() {
     }
 
     fun saveDraft(context: Context) {
+        saveDraftInternal(
+            context = context,
+            allowMinimumLeadTimeIssue = false
+        )
+    }
+
+    /**
+     * The organiser explicitly chose to keep an outdated date in a Draft.
+     * Revalidate everything else, then save without bypassing any other rule.
+     */
+    fun confirmSaveDraftWithDateWarning(context: Context) {
+        _uiState.update { state ->
+            state.copy(saveDraftDateWarning = null)
+        }
+        saveDraftInternal(
+            context = context,
+            allowMinimumLeadTimeIssue = true
+        )
+    }
+
+    fun dismissSaveDraftDateWarning() {
+        _uiState.update { state ->
+            state.copy(saveDraftDateWarning = null)
+        }
+    }
+
+    private fun saveDraftInternal(
+        context: Context,
+        allowMinimumLeadTimeIssue: Boolean
+    ) {
         val current = _uiState.value
         if (current.isSavingDraft || current.isPublishing) return
         if (!validateScheduleForContinue()) return
 
-        val validationError = postSaveValidationError(_uiState.value)
+        val dateWarning = CreatePostValidator
+            .minimumLeadTimeIssueMessage(_uiState.value.draft)
+
+        val validationError = postSaveValidationError(
+            state = _uiState.value,
+            ignoreMinimumLeadTime = dateWarning != null
+        )
         if (validationError != null) {
             _uiState.update { state ->
                 state.copy(
                     saveDraftError = validationError,
-                    publishError = null
+                    saveDraftDateWarning = null,
+                    publishError = null,
+                    publishDateBlockMessage = null
+                )
+            }
+            return
+        }
+
+        if (dateWarning != null && !allowMinimumLeadTimeIssue) {
+            _uiState.update { state ->
+                state.copy(
+                    saveDraftError = null,
+                    saveDraftDateWarning = dateWarning,
+                    publishError = null,
+                    publishDateBlockMessage = null
                 )
             }
             return
@@ -2923,7 +2973,9 @@ class CreatePostViewModel : ViewModel() {
             state.copy(
                 isSavingDraft = true,
                 saveDraftError = null,
-                publishError = null
+                saveDraftDateWarning = null,
+                publishError = null,
+                publishDateBlockMessage = null
             )
         }
 
@@ -2957,9 +3009,11 @@ class CreatePostViewModel : ViewModel() {
                         isStepFourReady = false,
                         isSavingDraft = false,
                         saveDraftError = null,
+                        saveDraftDateWarning = null,
                         savedDraftPostId = result.postId,
                         isPublishing = false,
                         publishError = null,
+                        publishDateBlockMessage = null,
                         publishedPostId = null,
                         pendingPostType = null,
                         isPostTypeCommitted = false
@@ -2985,12 +3039,32 @@ class CreatePostViewModel : ViewModel() {
         if (current.isSavingDraft || current.isPublishing) return
         if (!validateScheduleForContinue()) return
 
-        val validationError = postSaveValidationError(_uiState.value)
+        val dateBlockMessage = CreatePostValidator
+            .minimumLeadTimeIssueMessage(_uiState.value.draft)
+
+        val validationError = postSaveValidationError(
+            state = _uiState.value,
+            ignoreMinimumLeadTime = dateBlockMessage != null
+        )
         if (validationError != null) {
             _uiState.update { state ->
                 state.copy(
                     saveDraftError = null,
-                    publishError = validationError
+                    saveDraftDateWarning = null,
+                    publishError = validationError,
+                    publishDateBlockMessage = null
+                )
+            }
+            return
+        }
+
+        if (dateBlockMessage != null) {
+            _uiState.update { state ->
+                state.copy(
+                    saveDraftError = null,
+                    saveDraftDateWarning = null,
+                    publishError = null,
+                    publishDateBlockMessage = dateBlockMessage
                 )
             }
             return
@@ -3002,7 +3076,9 @@ class CreatePostViewModel : ViewModel() {
             state.copy(
                 isPublishing = true,
                 saveDraftError = null,
-                publishError = null
+                saveDraftDateWarning = null,
+                publishError = null,
+                publishDateBlockMessage = null
             )
         }
 
@@ -3035,9 +3111,11 @@ class CreatePostViewModel : ViewModel() {
                         isStepFourReady = false,
                         isSavingDraft = false,
                         saveDraftError = null,
+                        saveDraftDateWarning = null,
                         savedDraftPostId = null,
                         isPublishing = false,
                         publishError = null,
+                        publishDateBlockMessage = null,
                         publishedPostId = result.postId,
                         pendingPostType = null,
                         isPostTypeCommitted = false
@@ -3058,10 +3136,48 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    fun dismissPublishDateBlock() {
+        _uiState.update { state ->
+            state.copy(publishDateBlockMessage = null)
+        }
+    }
+
+    /**
+     * A failed final Publish should not make the organiser hunt through five
+     * steps. Return directly to Post Details and expose the live date error.
+     */
+    fun fixPublishDateFromReview() {
+        val refreshedErrors = CreatePostValidator.validateStepOne(
+            _uiState.value.draft
+        )
+
+        _uiState.update { state ->
+            state.copy(
+                currentStep = 1,
+                reviewEditStep = 1,
+                errors = refreshedErrors,
+                showValidationErrors = true,
+                isStepOneReady = false,
+                saveDraftError = null,
+                saveDraftDateWarning = null,
+                publishError = null,
+                publishDateBlockMessage = null
+            )
+        }
+    }
+
     private fun postSaveValidationError(
-        state: CreatePostUiState
+        state: CreatePostUiState,
+        ignoreMinimumLeadTime: Boolean = false
     ): String? {
-        val stepOneErrors = CreatePostValidator.validateStepOne(state.draft)
+        var stepOneErrors = CreatePostValidator.validateStepOne(state.draft)
+        if (ignoreMinimumLeadTime) {
+            stepOneErrors = CreatePostValidator.withoutMinimumLeadTimeErrors(
+                draft = state.draft,
+                errors = stepOneErrors
+            )
+        }
+
         if (stepOneErrors.hasErrors()) {
             return "Post Details are no longer valid. Return to Step 1 and review them."
         }

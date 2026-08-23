@@ -15,17 +15,38 @@ import androidx.lifecycle.lifecycleScope
 import com.example.volunteerlink.data.time.AppClock
 import com.example.volunteerlink.navigation.AppNavGraph
 import com.example.volunteerlink.ui.theme.VolunteerLinkTheme
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
+    // While the app is visible, keep checking the tiny one-row test clock table.
+    // This is intentionally simple for testing/demo use, so changing the fake
+    // date in Supabase is reflected on the phone without clearing/restarting it.
+    private var appClockRefreshJob: Job? = null
+
     override fun onResume() {
         super.onResume()
+        startAppClockRefresh()
+    }
 
-        // Refresh the shared clock every time the app returns to the foreground.
-        // This makes Supabase test-clock changes easy to preview during testing.
-        lifecycleScope.launch {
-            AppClock.refreshFromDatabase()
+    override fun onPause() {
+        appClockRefreshJob?.cancel()
+        appClockRefreshJob = null
+        super.onPause()
+    }
+
+    private fun startAppClockRefresh() {
+        appClockRefreshJob?.cancel()
+        appClockRefreshJob = lifecycleScope.launch {
+            while (isActive) {
+                // Refresh immediately, then check again every 3 seconds while
+                // VolunteerLink stays in the foreground.
+                AppClock.refreshFromDatabase()
+                delay(APP_CLOCK_REFRESH_INTERVAL_MS)
+            }
         }
     }
 
@@ -59,5 +80,9 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    companion object {
+        private const val APP_CLOCK_REFRESH_INTERVAL_MS = 3_000L
     }
 }
