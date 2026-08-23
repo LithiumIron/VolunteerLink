@@ -1,5 +1,6 @@
 package com.example.volunteerlink.organisation.create
 
+import com.example.volunteerlink.data.time.AppClock
 import com.example.volunteerlink.organisation.create.model.CreatePostDraft
 import com.example.volunteerlink.organisation.create.model.CreatePostErrors
 import com.example.volunteerlink.organisation.create.model.CreateRoleTemplate
@@ -14,7 +15,9 @@ import com.example.volunteerlink.organisation.create.model.RoleSelectionErrors
 import com.example.volunteerlink.organisation.create.model.VolunteerPostType
 import com.example.volunteerlink.organisation.create.model.VolunteerRoleMode
 import com.example.volunteerlink.organisation.create.model.VolunteerRoleLevel
+import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Locale
 
 /**
  * Validation and date/time rules for the Create Post flow.
@@ -28,7 +31,7 @@ object CreatePostValidator {
     const val SHORT_NOTICE_TRAINING_HOURS = 72
 
     fun startOfDayMillis(
-        timeMillis: Long = System.currentTimeMillis()
+        timeMillis: Long = AppClock.nowMillis()
     ): Long {
         return Calendar.getInstance().apply {
             timeInMillis = timeMillis
@@ -40,7 +43,7 @@ object CreatePostValidator {
     }
 
     fun minimumStartDateMillis(
-        todayMillis: Long = System.currentTimeMillis()
+        todayMillis: Long = AppClock.nowMillis()
     ): Long {
         return Calendar.getInstance().apply {
             timeInMillis = startOfDayMillis(todayMillis)
@@ -53,6 +56,87 @@ object CreatePostValidator {
             timeInMillis = startOfDayMillis(dateMillis)
             add(Calendar.DAY_OF_YEAR, 1)
         }.timeInMillis
+    }
+
+    /**
+     * Returns a live publication error only when an already-selected start
+     * date has become too close to the current AppClock date. Null/missing
+     * dates are handled by the normal Step 1 required-field validation.
+     */
+    fun minimumLeadTimeError(dateMillis: Long?): String? {
+        if (dateMillis == null) return null
+
+        val minimum = minimumStartDateMillis()
+        return if (startOfDayMillis(dateMillis) < minimum) {
+            "This date is too soon to publish. Choose ${formatDate(minimum)} or later."
+        } else {
+            null
+        }
+    }
+
+    /**
+     * Message used by Review when Save Draft / Publish discovers that time has
+     * moved forward since Step 1 was first completed.
+     */
+    fun minimumLeadTimeIssueMessage(draft: CreatePostDraft): String? {
+        val minimum = minimumStartDateMillis()
+        val affected = mutableListOf<String>()
+
+        val needsPhysical =
+            draft.postType == VolunteerPostType.PHYSICAL ||
+                draft.postType == VolunteerPostType.HYBRID
+        val needsRemote =
+            draft.postType == VolunteerPostType.REMOTE ||
+                draft.postType == VolunteerPostType.HYBRID
+
+        if (
+            needsPhysical &&
+            draft.physicalStartDateMillis != null &&
+            startOfDayMillis(draft.physicalStartDateMillis) < minimum
+        ) {
+            affected += "Physical start date (${formatDate(draft.physicalStartDateMillis)})"
+        }
+
+        if (
+            needsRemote &&
+            draft.remoteStartDateMillis != null &&
+            startOfDayMillis(draft.remoteStartDateMillis) < minimum
+        ) {
+            affected += "Remote start date (${formatDate(draft.remoteStartDateMillis)})"
+        }
+
+        if (affected.isEmpty()) return null
+
+        val dateText = affected.joinToString(separator = " and ")
+        val verb = if (affected.size == 1) "is" else "are"
+        return "$dateText $verb now less than 7 days from today. " +
+            "Choose ${formatDate(minimum)} or later before publishing."
+    }
+
+    /**
+     * Save Draft may keep an old start date. Remove only the 7-day timing
+     * errors while preserving every other Step 1 validation error.
+     */
+    fun withoutMinimumLeadTimeErrors(
+        draft: CreatePostDraft,
+        errors: CreatePostErrors
+    ): CreatePostErrors {
+        val physicalTooSoon =
+            draft.physicalStartDateMillis != null &&
+                minimumLeadTimeError(draft.physicalStartDateMillis) != null
+        val remoteTooSoon =
+            draft.remoteStartDateMillis != null &&
+                minimumLeadTimeError(draft.remoteStartDateMillis) != null
+
+        return errors.copy(
+            physicalStartDate = if (physicalTooSoon) null else errors.physicalStartDate,
+            remoteStartDate = if (remoteTooSoon) null else errors.remoteStartDate
+        )
+    }
+
+    private fun formatDate(dateMillis: Long): String {
+        return SimpleDateFormat("d MMM yyyy", Locale.getDefault())
+            .format(dateMillis)
     }
 
     fun endTimeError(
@@ -83,11 +167,7 @@ object CreatePostValidator {
                 draft.physicalStartDateMillis == null ->
                     "Select a start date."
 
-                startOfDayMillis(draft.physicalStartDateMillis) <
-                        minimumStartDateMillis() ->
-                    "Start date must be at least 7 days from today."
-
-                else -> null
+                else -> minimumLeadTimeError(draft.physicalStartDateMillis)
             }
         } else {
             null
@@ -135,11 +215,7 @@ object CreatePostValidator {
                 draft.remoteStartDateMillis == null ->
                     "Select a start date."
 
-                startOfDayMillis(draft.remoteStartDateMillis) <
-                        minimumStartDateMillis() ->
-                    "Start date must be at least 7 days from today."
-
-                else -> null
+                else -> minimumLeadTimeError(draft.remoteStartDateMillis)
             }
         } else {
             null
@@ -591,7 +667,7 @@ object CreatePostValidator {
         draft: CreatePostDraft,
         item: ScheduleItemDraft,
         roleCatalogue: List<CreateRoleTemplate>,
-        nowMillis: Long = System.currentTimeMillis()
+        nowMillis: Long = AppClock.nowMillis()
     ): String? {
         if (item.title.isBlank()) {
             return when (item.scheduleType) {
@@ -693,8 +769,13 @@ object CreatePostValidator {
                     return "Training end time must be later than start time."
                 }
 
-                if (item.allowApplicationsAfterStart == null) {
-                    return "Choose whether new applications remain open after training starts."
+                if (!trainingClosingRolesAreValid(
+                        draft = draft,
+                        item = item,
+                        roleCatalogue = roleCatalogue
+                    )
+                ) {
+                    return "Application-closing roles must also be targeted by this training."
                 }
 
                 val latestAllowedDate = trainingLatestAllowedDate(
@@ -793,7 +874,7 @@ object CreatePostValidator {
 
     fun trainingStartsWithinShortNotice(
         item: ScheduleItemDraft,
-        nowMillis: Long = System.currentTimeMillis()
+        nowMillis: Long = AppClock.nowMillis()
     ): Boolean {
         if (item.scheduleType != ScheduleType.TRAINING) return false
 
@@ -812,7 +893,7 @@ object CreatePostValidator {
     fun scheduleItemWarning(
         draft: CreatePostDraft,
         item: ScheduleItemDraft,
-        nowMillis: Long = System.currentTimeMillis()
+        nowMillis: Long = AppClock.nowMillis()
     ): String? {
         if (item.scheduleType != ScheduleType.TRAINING) return null
 
@@ -842,8 +923,16 @@ object CreatePostValidator {
     fun validateStepFour(
         draft: CreatePostDraft,
         roleCatalogue: List<CreateRoleTemplate>,
-        nowMillis: Long = System.currentTimeMillis()
+        nowMillis: Long = AppClock.nowMillis()
     ): String? {
+        duplicateTrainingClosingRoleId(draft)?.let { roleId ->
+            val roleName = roleCatalogue.firstOrNull { role ->
+                role.roleTemplateId == roleId
+            }?.roleName ?: roleId
+
+            return "$roleName can have only one Training responsible for closing applications. Review the Application Closing choices."
+        }
+
         draft.scheduleItems.forEach { item ->
             val error = validateScheduleItem(
                 draft = draft,
@@ -864,7 +953,7 @@ object CreatePostValidator {
      */
     fun scheduleProceedWarning(
         draft: CreatePostDraft,
-        nowMillis: Long = System.currentTimeMillis()
+        nowMillis: Long = AppClock.nowMillis()
     ): String? {
         val warnings = mutableListOf<String>()
         val hasPhysicalPart =
@@ -936,6 +1025,26 @@ object CreatePostValidator {
         }
     }
 
+    private fun duplicateTrainingClosingRoleId(
+        draft: CreatePostDraft
+    ): String? {
+        val counts = mutableMapOf<String, Int>()
+
+        draft.scheduleItems
+            .filter { item -> item.scheduleType == ScheduleType.TRAINING }
+            .forEach { item ->
+                item.closingRoleTemplateIds
+                    .distinct()
+                    .forEach { roleId ->
+                        val nextCount = (counts[roleId] ?: 0) + 1
+                        if (nextCount > 1) return roleId
+                        counts[roleId] = nextCount
+                    }
+            }
+
+        return null
+    }
+
     private fun hasTrainingOnlyData(item: ScheduleItemDraft): Boolean {
         return item.trainingMode != null ||
             item.trainingLocationMode != null ||
@@ -944,7 +1053,7 @@ object CreatePostValidator {
             item.onlinePlatform.isNotBlank() ||
             item.meetingLink.isNotBlank() ||
             item.trainingTimeZoneId != null ||
-            item.allowApplicationsAfterStart != null
+            item.closingRoleTemplateIds.isNotEmpty()
     }
 
     private fun scheduleRoleTargetsAreValid(
@@ -980,6 +1089,26 @@ object CreatePostValidator {
                 .filter { roleId -> roleId in applicable }
                 .toSet()
         }
+    }
+
+    private fun trainingClosingRolesAreValid(
+        draft: CreatePostDraft,
+        item: ScheduleItemDraft,
+        roleCatalogue: List<CreateRoleTemplate>
+    ): Boolean {
+        if (item.scheduleType != ScheduleType.TRAINING) {
+            return item.closingRoleTemplateIds.isEmpty()
+        }
+
+        val targetedRoleIds = effectiveScheduleRoleIds(
+            draft = draft,
+            item = item,
+            roleCatalogue = roleCatalogue
+        )
+
+        return item.closingRoleTemplateIds
+            .distinct()
+            .all { roleId -> roleId in targetedRoleIds }
     }
 
     /**

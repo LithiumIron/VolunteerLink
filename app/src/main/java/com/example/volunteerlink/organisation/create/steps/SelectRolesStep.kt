@@ -187,7 +187,10 @@ fun SelectRolesStep(
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
         item {
-            RoleSelectionHeader(onBack = onBack)
+            RoleSelectionHeader(
+                onBack = onBack,
+                isEditingFromReview = uiState.reviewEditStep == 2
+            )
         }
 
         item {
@@ -510,7 +513,7 @@ fun SelectRolesStep(
                         containerColor = CreateGreen
                     )
                 ) {
-                    Text(text = "Continue to Role Settings")
+                    Text(text = if (uiState.reviewEditStep == 2) "Save Changes" else "Continue to Role Settings")
                 }
             }
         }
@@ -523,7 +526,8 @@ fun SelectRolesStep(
 
 @Composable
 fun RoleSelectionHeader(
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    isEditingFromReview: Boolean
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically
@@ -534,7 +538,7 @@ fun RoleSelectionHeader(
         ) {
             Image(
                 painter = painterResource(R.drawable.back),
-                contentDescription = "Back to post details",
+                contentDescription = "Exit Create Post",
                 modifier = Modifier.size(32.dp),
                 colorFilter = ColorFilter.tint(CreateGreen)
             )
@@ -553,7 +557,7 @@ fun RoleSelectionHeader(
             )
 
             Text(
-                text = "Step 2 of 4 · Choose roles and assign their capacity.",
+                text = if (isEditingFromReview) "Editing from Review · Roles & Capacity" else "Step 2 of 5 · Choose roles and assign their capacity.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

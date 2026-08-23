@@ -120,7 +120,10 @@ fun RoleSettingsOverview(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {
-            StepThreeHeader(onBack = onBack)
+            StepThreeHeader(
+                onBack = onBack,
+                isEditingFromReview = uiState.reviewEditStep == 3
+            )
         }
 
         item {
@@ -189,7 +192,7 @@ fun RoleSettingsOverview(
                 shape = RoundedCornerShape(14.dp)
             ) {
                 Text(
-                    text = "Continue to Schedule",
+                    text = if (uiState.reviewEditStep == 3) "Save Changes" else "Continue to Schedule",
                     fontWeight = FontWeight.SemiBold
                 )
             }
@@ -278,7 +281,7 @@ fun RoleConfigurationEditor(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "Step 3 of 4",
+                        text = "Step 3 of 5",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -478,7 +481,8 @@ fun RoleConfigurationEditor(
 
 @Composable
 fun StepThreeHeader(
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    isEditingFromReview: Boolean
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically
@@ -489,7 +493,7 @@ fun StepThreeHeader(
         ) {
             Image(
                 painter = painterResource(R.drawable.back),
-                contentDescription = "Back to role selection",
+                contentDescription = "Exit Create Post",
                 modifier = Modifier.size(30.dp),
                 colorFilter = ColorFilter.tint(CreateGreen)
             )
@@ -505,7 +509,7 @@ fun StepThreeHeader(
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "Step 3 of 4",
+                text = if (isEditingFromReview) "Editing from Review · Role Settings" else "Step 3 of 5",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

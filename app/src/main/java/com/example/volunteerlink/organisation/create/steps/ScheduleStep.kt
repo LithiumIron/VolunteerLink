@@ -32,7 +32,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -49,7 +48,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/** Step 4 of Create Post: optional Physical, Remote and Training schedules. */
+/** Step 4 of Create Post: optional Physical, Remote and Training schedules before Review. */
 @Composable
 fun ScheduleStep(
     uiState: CreatePostUiState,
@@ -80,7 +79,6 @@ fun ScheduleOverview(
     onBack: () -> Unit
 ) {
     val draft = uiState.draft
-    val context = LocalContext.current
     val sections = scheduleSectionsForPostType(draft.postType)
     val activeSection = uiState.activeScheduleSection
         ?.takeIf { section -> section in sections }
@@ -129,7 +127,10 @@ fun ScheduleOverview(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {
-            ScheduleHeader(onBack = onBack)
+            ScheduleHeader(
+                onBack = onBack,
+                isEditingFromReview = uiState.reviewEditStep == 4
+            )
         }
 
         item {
@@ -232,25 +233,18 @@ fun ScheduleOverview(
             }
         }
 
-        uiState.publishError?.let { publishError ->
-            item {
-                ScheduleErrorCard(publishError)
-            }
-        }
-
         item {
             Button(
                 onClick = {
                     if (viewModel.validateScheduleForContinue()) {
                         val warning = viewModel.getScheduleProceedWarning()
                         if (warning == null) {
-                            viewModel.publishPost(context)
+                            viewModel.openReviewSummary()
                         } else {
                             continueWarning = warning
                         }
                     }
                 },
-                enabled = !uiState.isPublishing,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),
@@ -260,7 +254,11 @@ fun ScheduleOverview(
                 shape = RoundedCornerShape(14.dp)
             ) {
                 Text(
-                    text = if (uiState.isPublishing) "Publishing..." else "Publish Post",
+                    text = if (uiState.reviewEditStep == 4) {
+                        "Save Changes"
+                    } else {
+                        "Continue to Review"
+                    },
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -395,7 +393,7 @@ fun ScheduleOverview(
             },
             title = {
                 Text(
-                    text = "Publish with this schedule?",
+                    text = "Continue with this schedule?",
                     fontWeight = FontWeight.Bold
                 )
             },
@@ -415,13 +413,13 @@ fun ScheduleOverview(
                 Button(
                     onClick = {
                         continueWarning = null
-                        viewModel.publishPost(context)
+                        viewModel.openReviewSummary()
                     },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = CreateGreen
                     )
                 ) {
-                    Text("Publish Anyway")
+                    Text("Continue Anyway")
                 }
             }
         )
@@ -682,7 +680,8 @@ private fun PausedScheduleDraftCard(
 
 @Composable
 fun ScheduleHeader(
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    isEditingFromReview: Boolean
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -692,7 +691,7 @@ fun ScheduleHeader(
         IconButton(onClick = onBack) {
             Image(
                 painter = painterResource(R.drawable.back),
-                contentDescription = "Back",
+                contentDescription = "Exit Create Post",
                 modifier = Modifier.size(30.dp)
             )
         }
@@ -708,7 +707,7 @@ fun ScheduleHeader(
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "Step 4 of 4",
+                text = if (isEditingFromReview) "Editing from Review · Schedule" else "Step 4 of 5",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -764,7 +763,7 @@ fun ScheduleEditorHeader(
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "Step 4 of 4 · Schedule",
+                text = "Step 4 of 5 · Schedule",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

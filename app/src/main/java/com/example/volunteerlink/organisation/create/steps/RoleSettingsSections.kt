@@ -593,82 +593,107 @@ fun RoleSubmissionAndNotesSection(
         }
 
         VolunteerRoleMode.REMOTE -> {
-            when (draft.remoteSubmissionMode) {
-                RemoteSubmissionMode.SHARED_TEAM -> {
-                    RoleSettingsSectionCard(
-                        iconRes = R.drawable.remote_project,
-                        title = "Shared Team Deliverable",
-                        subtitle = "No separate output is required from each volunteer in this role."
-                    ) {
-                        Surface(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            color = CreateLightGreen
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                when (draft.remoteSubmissionMode) {
+                    RemoteSubmissionMode.SHARED_TEAM -> {
+                        RoleSettingsSectionCard(
+                            iconRes = R.drawable.remote_project,
+                            title = "Shared Team Deliverable",
+                            subtitle = "No separate output is required from each volunteer in this role."
                         ) {
-                            Column(
-                                modifier = Modifier.padding(12.dp),
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                color = CreateLightGreen
                             ) {
-                                Text(
-                                    text = "Team's final deliverable",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Text(
-                                    text = draft.sharedDeliverable,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = CreateGreen,
-                                    fontWeight = FontWeight.SemiBold
-                                )
+                                Column(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text(
+                                        text = "Team's final deliverable",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = draft.sharedDeliverable,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = CreateGreen,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
                             }
+
+                            Text(
+                                text = "Use Responsibilities above to explain this role's contribution. The responsible Remote role is selected on the Step 3 overview.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
+                    }
 
-                        Text(
-                            text = "Use Responsibilities above to explain this role's contribution. The responsible Remote role is selected on the Step 3 overview.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    RemoteSubmissionMode.INDIVIDUAL -> {
+                        RoleSettingsSectionCard(
+                            iconRes = R.drawable.instructions,
+                            title = "Individual Deliverable *",
+                            subtitle = "Required · Describe what EACH volunteer assigned to this role must submit."
+                        ) {
+                            OutlinedTextField(
+                                value = selectedRole.individualSubmissionRequirement,
+                                onValueChange = onIndividualSubmissionRequirementChanged,
+                                modifier = Modifier.fillMaxWidth(),
+                                placeholder = {
+                                    Text("Example: Each volunteer submits 2 final poster designs in PNG format.")
+                                },
+                                supportingText = {
+                                    Text(
+                                        "${selectedRole.individualSubmissionRequirement.length} / 500"
+                                    )
+                                },
+                                minLines = 3,
+                                maxLines = 5,
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                        }
+                    }
+
+                    null -> {
+                        RoleSettingsSectionCard(
+                            iconRes = R.drawable.remote_project,
+                            title = "Remote Submission",
+                            subtitle = "Return to Step 1 and choose how Remote work will be submitted."
+                        ) {
+                            Text(
+                                text = "Remote submission setup is incomplete.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = RoleSettingsOrange,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
                     }
                 }
 
-                RemoteSubmissionMode.INDIVIDUAL -> {
-                    RoleSettingsSectionCard(
-                        iconRes = R.drawable.instructions,
-                        title = "Individual Deliverable *",
-                        subtitle = "Required · Describe what EACH volunteer assigned to this role must submit."
-                    ) {
-                        OutlinedTextField(
-                            value = selectedRole.individualSubmissionRequirement,
-                            onValueChange = onIndividualSubmissionRequirementChanged,
-                            modifier = Modifier.fillMaxWidth(),
-                            placeholder = {
-                                Text("Example: Each volunteer submits 2 final poster designs in PNG format.")
-                            },
-                            supportingText = {
-                                Text(
-                                    "${selectedRole.individualSubmissionRequirement.length} / 500"
-                                )
-                            },
-                            minLines = 3,
-                            maxLines = 5,
-                            shape = RoundedCornerShape(12.dp)
-                        )
-                    }
-                }
-
-                null -> {
-                    RoleSettingsSectionCard(
-                        iconRes = R.drawable.remote_project,
-                        title = "Remote Submission",
-                        subtitle = "Return to Step 1 and choose how Remote work will be submitted."
-                    ) {
-                        Text(
-                            text = "Remote submission setup is incomplete.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = RoleSettingsOrange,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
+                RoleSettingsSectionCard(
+                    iconRes = R.drawable.instructions,
+                    title = "Role Notes",
+                    subtitle = "Optional · Add extra instructions or working arrangements not already covered above."
+                ) {
+                    OutlinedTextField(
+                        value = selectedRole.roleNotes,
+                        onValueChange = onRoleNotesChanged,
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = {
+                            Text("Example: Canva access and the shared Drive folder will be provided after joining.")
+                        },
+                        supportingText = {
+                            Text("${selectedRole.roleNotes.length} / 400")
+                        },
+                        minLines = 2,
+                        maxLines = 4,
+                        shape = RoundedCornerShape(12.dp)
+                    )
                 }
             }
         }

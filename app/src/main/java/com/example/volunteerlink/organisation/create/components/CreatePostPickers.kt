@@ -84,7 +84,15 @@ fun DateSelectionField(
         errorMessage = errorMessage,
         modifier = modifier,
         onClick = {
-            val initialDate = selectedDateMillis ?: minimumDateMillis
+            // Keep an outdated date visible in the form so the organiser can
+            // see what needs fixing, but open the picker on the first valid
+            // date instead of focusing a now-disabled day.
+            val initialDate = selectedDateMillis
+                ?.takeIf { selected ->
+                    selected >= minimumDateMillis &&
+                        (maximumDateMillis == null || selected <= maximumDateMillis)
+                }
+                ?: minimumDateMillis
 
             val initialCalendar = Calendar.getInstance().apply {
                 timeInMillis = initialDate
@@ -420,7 +428,7 @@ fun ThumbnailPickerSection(
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Text(
-            text = "Thumbnail (Optional)",
+            text = "Thumbnail (Optional · Max 5 MB)",
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.Medium
         )

@@ -25,6 +25,7 @@ import com.example.volunteerlink.organisation.create.model.TrainingLocationMode
 import com.example.volunteerlink.organisation.create.model.TrainingMode
 import com.example.volunteerlink.organisation.create.model.VolunteerPostType
 import com.example.volunteerlink.organisation.create.steps.PostDetailsStep
+import com.example.volunteerlink.organisation.create.steps.ReviewSummaryStep
 import com.example.volunteerlink.organisation.create.steps.RoleSettingsStep
 import com.example.volunteerlink.organisation.create.steps.ScheduleStep
 import com.example.volunteerlink.organisation.create.steps.SelectRolesStep
@@ -108,14 +109,29 @@ fun OrganisationCreateScreen(
     }
 
     val requestBack: () -> Unit = {
-        if (uiState.publishedPostId != null) {
+        if (uiState.publishedPostId != null || uiState.savedDraftPostId != null) {
             onExitCreate()
         } else {
             when (uiState.currentStep) {
-                1 -> requestExit()
-                2 -> viewModel.backToStepOne()
+                1 -> {
+                    if (uiState.reviewEditStep == 1) {
+                        viewModel.returnToReviewFromEdit()
+                    } else {
+                        requestExit()
+                    }
+                }
+
+                2 -> {
+                    if (uiState.reviewEditStep == 2) {
+                        viewModel.returnToReviewFromEdit()
+                    } else {
+                        viewModel.backToStepOne()
+                    }
+                }
+
                 3 -> viewModel.backFromStepThree()
                 4 -> viewModel.backFromStepFour()
+                5 -> viewModel.backFromReview()
                 else -> requestExit()
             }
         }
@@ -123,7 +139,14 @@ fun OrganisationCreateScreen(
 
     BackHandler(onBack = requestBack)
 
-    if (uiState.publishedPostId != null) {
+    if (uiState.savedDraftPostId != null) {
+        OrganisationModulePage(
+            title = "Draft Saved",
+            message =
+                "Post ${uiState.savedDraftPostId} was saved as a draft and is not published yet. " +
+                    "Use Back to return to the Organisation area."
+        )
+    } else if (uiState.publishedPostId != null) {
         OrganisationModulePage(
             title = "Volunteer Post Published",
             message =
@@ -144,7 +167,7 @@ fun OrganisationCreateScreen(
             SelectRolesStep(
                 uiState = uiState,
                 viewModel = viewModel,
-                onBack = viewModel::backToStepOne
+                onBack = requestExit
             )
         }
 
@@ -152,7 +175,7 @@ fun OrganisationCreateScreen(
             RoleSettingsStep(
                 uiState = uiState,
                 viewModel = viewModel,
-                onBack = viewModel::backFromStepThree
+                onBack = requestExit
             )
         }
 
@@ -160,7 +183,17 @@ fun OrganisationCreateScreen(
             ScheduleStep(
                 uiState = uiState,
                 viewModel = viewModel,
-                onBack = viewModel::backFromStepFour
+                onBack = requestExit
+            )
+        }
+
+        5 -> {
+            ReviewSummaryStep(
+                uiState = uiState,
+                onUp = requestExit,
+                onEditStep = viewModel::editStepFromReview,
+                onSaveDraft = { viewModel.saveDraft(context) },
+                onPublish = { viewModel.publishPost(context) }
             )
         }
 
@@ -172,6 +205,67 @@ fun OrganisationCreateScreen(
                 onStepOneComplete = viewModel::openStepTwo
             )
         }
+    }
+
+    uiState.saveDraftDateWarning?.let { warning ->
+        AlertDialog(
+            onDismissRequest = viewModel::dismissSaveDraftDateWarning,
+            title = {
+                Text("Save draft with an outdated start date?")
+            },
+            text = {
+                Text(
+                    "$warning\n\n" +
+                        "You can still save this draft, but it cannot be published " +
+                        "until the start date is updated."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.confirmSaveDraftWithDateWarning(context)
+                    }
+                ) {
+                    Text("Save Draft Anyway")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = viewModel::dismissSaveDraftDateWarning
+                ) {
+                    Text("Go Back")
+                }
+            }
+        )
+    }
+
+    uiState.publishDateBlockMessage?.let { message ->
+        AlertDialog(
+            onDismissRequest = viewModel::dismissPublishDateBlock,
+            title = {
+                Text("Post can't be published yet")
+            },
+            text = {
+                Text(
+                    "$message\n\n" +
+                        "Update the start date before publishing this post."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = viewModel::fixPublishDateFromReview
+                ) {
+                    Text("Fix Date")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = viewModel::dismissPublishDateBlock
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 
     if (showDiscardDialog) {
