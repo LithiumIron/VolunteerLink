@@ -1,3 +1,4 @@
+
 package com.example.volunteerlink.data
 
 import com.example.volunteerlink.model.VolunteerSkill
@@ -33,15 +34,25 @@ object VolunteerSkillPathRepository {
         // Progress is derived from verified, completed participation records.
         // Accepted or in-progress applications must never increase Skill Path
         // assignments or minutes.
-        supabase.postgrest.rpc(
-            function = "refresh_my_skill_path_progress"
-        )
+        runCatching {
+            supabase.postgrest.rpc(
+                function = "refresh_my_skill_path_progress"
+            )
+        }.onFailure { exception ->
+            exception.printStackTrace()
+        }
 
         val progressRows =
-            supabase
-                .from("volunteer_skill_path_progress")
-                .select()
-                .decodeList<VolunteerSkillPathProgressRow>()
+            runCatching {
+                supabase
+                    .from("volunteer_skill_path_progress")
+                    .select()
+                    .decodeList<VolunteerSkillPathProgressRow>()
+            }.onFailure { exception ->
+                exception.printStackTrace()
+            }.getOrDefault(
+                emptyList()
+            )
 
         val progressByPathId =
             progressRows.associateBy {
@@ -139,8 +150,6 @@ private data class VolunteerSkillPathRow(
 
 @Serializable
 private data class VolunteerSkillPathLevelRow(
-    @SerialName("path_level_id")
-    val pathLevelId: String,
     @SerialName("skill_path_id")
     val skillPathId: String,
     @SerialName("level_number")
@@ -151,7 +160,10 @@ private data class VolunteerSkillPathLevelRow(
     val requiredAssignments: Int,
     @SerialName("required_minutes")
     val requiredMinutes: Int? = null
-)
+) {
+    val pathLevelId: String
+        get() = "$skillPathId-L$levelNumber"
+}
 
 @Serializable
 private data class VolunteerSkillRow(
@@ -180,3 +192,5 @@ private data class VolunteerSkillPathProgressRow(
     @SerialName("updated_at")
     val updatedAt: String
 )
+
+

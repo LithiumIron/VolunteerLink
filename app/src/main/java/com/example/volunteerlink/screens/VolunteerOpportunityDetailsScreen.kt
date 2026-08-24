@@ -7,6 +7,7 @@ import android.widget.Toast
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -70,6 +71,7 @@ import com.example.volunteerlink.ui.theme.VolunteerLinkWarning
 fun VolunteerOpportunityDetailsScreen(
     volunteerEventId: Int,
     onBackSelected: () -> Unit,
+    onLocationSelected: (Int) -> Unit,
     onVolunteerRoleSelected: (
         eventId: Int,
         roleId: Int
@@ -116,7 +118,10 @@ fun VolunteerOpportunityDetailsScreen(
             ) {
                 VolunteerOpportunitySummarySection(
                     volunteerOpportunityEvent =
-                        volunteerOpportunityEvent
+                        volunteerOpportunityEvent,
+                    onLocationSelected = {
+                        onLocationSelected(volunteerOpportunityEvent.eventId)
+                    }
                 )
             }
 
@@ -220,7 +225,8 @@ private fun VolunteerOpportunityDetailsTopBar(
 @Composable
 private fun VolunteerOpportunitySummarySection(
     volunteerOpportunityEvent:
-    VolunteerOpportunityEvent
+    VolunteerOpportunityEvent,
+    onLocationSelected: () -> Unit
 ) {
     val categoryIconResourceId =
         when (volunteerOpportunityEvent.eventCategory) {
@@ -390,6 +396,15 @@ private fun VolunteerOpportunitySummarySection(
                     R.drawable.ic_volunteer_location
                 },
             informationTitle = "Location",
+            onClick =
+                if (
+                    volunteerOpportunityEvent.eventLatitude != null &&
+                    volunteerOpportunityEvent.eventLongitude != null
+                ) {
+                    onLocationSelected
+                } else {
+                    null
+                },
             informationValue =
                 buildString {
                     append(
@@ -955,10 +970,19 @@ private fun VolunteerOpportunityInformationRow(
     @DrawableRes
     iconResourceId: Int,
     informationTitle: String,
-    informationValue: String
+    informationValue: String,
+    onClick: (() -> Unit)? = null
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (onClick != null) {
+                    Modifier.clickable(onClick = onClick)
+                } else {
+                    Modifier
+                }
+            ),
         verticalAlignment = Alignment.Top
     ) {
         Surface(
@@ -1005,6 +1029,16 @@ private fun VolunteerOpportunityInformationRow(
                 fontWeight = FontWeight.Medium,
                 color = VolunteerLinkTextPrimary
             )
+
+            if (onClick != null) {
+                Text(
+                    text = "View on interactive map  ›",
+                    modifier = Modifier.padding(top = 4.dp),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = VolunteerLinkPrimaryGreen
+                )
+            }
         }
     }
 }

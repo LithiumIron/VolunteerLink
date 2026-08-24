@@ -144,6 +144,20 @@ fun VolunteerSearchScreen(
                     ) ||
                     event.eventVolunteerRoles.any { role ->
                         role.roleTitle.contains(query, ignoreCase = true) ||
+                            role.roleSpecificAssignment.contains(
+                                query,
+                                ignoreCase = true
+                            ) ||
+                            role.roleExperienceRequirement.contains(
+                                query,
+                                ignoreCase = true
+                            ) ||
+                            role.roleResponsibilities.any { responsibility ->
+                                responsibility.contains(
+                                    query,
+                                    ignoreCase = true
+                                )
+                            } ||
                             role.rolePrimarySkillPath.contains(
                                 query,
                                 ignoreCase = true

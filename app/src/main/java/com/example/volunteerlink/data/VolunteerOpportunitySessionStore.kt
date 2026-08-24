@@ -11,6 +11,7 @@ import com.example.volunteerlink.model.VolunteerOpportunityRole
  * runtime source of truth.
  */
 object VolunteerOpportunitySessionStore {
+    var mapFocusEventId: Int? = null
     val volunteerOpportunityEvents =
         mutableStateListOf<VolunteerOpportunityEvent>()
 

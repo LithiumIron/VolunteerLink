@@ -17,12 +17,6 @@ val geoapifyApiKey =
         ""
     )
 
-val googleMapsApiKey =
-    localProperties.getProperty(
-        "MAPS_API_KEY",
-        ""
-    )
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -50,8 +44,6 @@ android {
             "\"$geoapifyApiKey\""
         )
 
-        manifestPlaceholders["MAPS_API_KEY"] =
-            googleMapsApiKey
     }
 
     buildTypes {
@@ -94,7 +86,8 @@ dependencies {
     implementation("io.github.jan-tennert.supabase:storage-kt")
     // Require HTTP engine for supabase
     implementation("io.ktor:ktor-client-android:3.3.1")
-    implementation("com.google.maps.android:maps-compose:6.12.0")
+    // Native OpenStreetMap display; no Google billing or API key required.
+    implementation("org.osmdroid:osmdroid-android:6.1.20")
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

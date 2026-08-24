@@ -36,6 +36,8 @@ import com.example.volunteerlink.screens.VolunteerCertificateScreen
 import com.example.volunteerlink.screens.VolunteerHomeScreen
 import com.example.volunteerlink.screens.VolunteerMyApplicationsScreen
 import com.example.volunteerlink.screens.VolunteerOpportunityDetailsScreen
+import com.example.volunteerlink.screens.VolunteerNotificationsScreen
+import com.example.volunteerlink.screens.VolunteerNotificationViewModel
 import com.example.volunteerlink.screens.VolunteerOpportunityViewModel
 import com.example.volunteerlink.screens.VolunteerRoleDetailsScreen
 import com.example.volunteerlink.screens.VolunteerSearchScreen
@@ -53,6 +55,13 @@ fun VolunteerOpportunityNavigationHost() {
 
     val opportunityUiState by
         volunteerOpportunityViewModel.uiState
+            .collectAsStateWithLifecycle()
+
+    val volunteerNotificationViewModel:
+        VolunteerNotificationViewModel = viewModel()
+
+    val notificationUiState by
+        volunteerNotificationViewModel.uiState
             .collectAsStateWithLifecycle()
 
     if (opportunityUiState.isLoading) {
@@ -184,7 +193,60 @@ fun VolunteerOpportunityNavigationHost() {
                                     VolunteerOpportunityNavigationRoutes
                                         .VOLUNTEER_MY_APPLICATIONS_ROUTE
                                 )
-                        }
+                        },
+
+                        onVolunteerNotificationsSelected = {
+                            volunteerNavigationController.navigate(
+                                VolunteerOpportunityNavigationRoutes
+                                    .VOLUNTEER_NOTIFICATIONS_ROUTE
+                            )
+                        },
+
+                        unreadNotificationCount =
+                            notificationUiState.unreadCount
+                    )
+                }
+
+                composable(
+                    route = VolunteerOpportunityNavigationRoutes
+                        .VOLUNTEER_NOTIFICATIONS_ROUTE
+                ) {
+                    VolunteerNotificationsScreen(
+                        onBackSelected = {
+                            volunteerNavigationController.popBackStack()
+                        },
+                        onApplicationsSelected = {
+                            volunteerNavigationController.navigate(
+                                VolunteerOpportunityNavigationRoutes
+                                    .VOLUNTEER_MY_APPLICATIONS_ROUTE
+                            )
+                        },
+
+                        onOpportunitySelected = { postDatabaseId ->
+                            VolunteerOpportunitySessionStore
+                                .volunteerOpportunityEvents
+                                .firstOrNull {
+                                    it.eventDatabaseId == postDatabaseId
+                                }
+                                ?.let { event ->
+                                    volunteerNavigationController.navigate(
+                                        VolunteerOpportunityNavigationRoutes
+                                            .createVolunteerOpportunityDetailsRoute(
+                                                event.eventId
+                                            )
+                                    )
+                                }
+                        },
+
+                        onSkillPathSelected = {
+                            volunteerNavigationController.navigate(
+                                VolunteerOpportunityNavigationRoutes
+                                    .VOLUNTEER_SKILL_PATH_ROUTE
+                            )
+                        },
+
+                        notificationViewModel =
+                            volunteerNotificationViewModel
                     )
                 }
 
@@ -272,6 +334,15 @@ fun VolunteerOpportunityNavigationHost() {
                         onBackSelected = {
                             volunteerNavigationController
                                 .popBackStack()
+                        },
+
+                        onLocationSelected = { selectedEventId ->
+                            VolunteerOpportunitySessionStore.mapFocusEventId =
+                                selectedEventId
+                            volunteerNavigationController.navigate(
+                                VolunteerOpportunityNavigationRoutes
+                                    .VOLUNTEER_MAP_ROUTE
+                            )
                         },
 
                         onVolunteerRoleSelected = {
@@ -557,6 +628,9 @@ fun VolunteerOpportunityNavigationHost() {
                             VolunteerOpportunitySessionStore
                                 .volunteerOpportunityEvents
                                 .toList(),
+                        initialEventId =
+                            VolunteerOpportunitySessionStore
+                                .mapFocusEventId,
                         onEventSelected = {
                                 volunteerEventId ->
 
@@ -679,6 +753,29 @@ fun VolunteerOpportunityNavigationHost() {
                             selectedNavigationRoute ->
 
                         if (
+                            selectedNavigationRoute ==
+                            VolunteerOpportunityNavigationRoutes
+                                .VOLUNTEER_HOME_ROUTE
+                        ) {
+                            val returnedToHome =
+                                volunteerNavigationController
+                                    .popBackStack(
+                                        route =
+                                            VolunteerOpportunityNavigationRoutes
+                                                .VOLUNTEER_HOME_ROUTE,
+                                        inclusive = false
+                                    )
+
+                            if (!returnedToHome) {
+                                volunteerNavigationController
+                                    .navigate(
+                                        VolunteerOpportunityNavigationRoutes
+                                            .VOLUNTEER_HOME_ROUTE
+                                    ) {
+                                        launchSingleTop = true
+                                    }
+                            }
+                        } else if (
                             selectedNavigationRoute !=
                             currentVolunteerNavigationRoute
                         ) {

@@ -88,6 +88,8 @@ data class VolunteerOpportunityEvent(
     val eventContactEmail: String = "",
     val eventContactPhone: String = "",
     val eventShareLink: String = "",
+    val eventLatitude: Double? = null,
+    val eventLongitude: Double? = null,
 
     // Stable Supabase primary key. eventId remains the navigation-safe Int.
     val eventDatabaseId: String = "",

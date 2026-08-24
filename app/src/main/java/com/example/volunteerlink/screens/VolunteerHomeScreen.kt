@@ -2,6 +2,8 @@ package com.example.volunteerlink.screens
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,6 +13,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -21,10 +25,16 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -42,9 +52,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.volunteerlink.R
+import com.example.volunteerlink.data.VolunteerHomeFeedEngine
+import com.example.volunteerlink.data.VolunteerHomeFeedFilter
 import com.example.volunteerlink.data.VolunteerHomeRecommendation
 import com.example.volunteerlink.data.VolunteerHomeRecommendationEngine
+import com.example.volunteerlink.data.VolunteerMatchFactor
+import com.example.volunteerlink.data.VolunteerMatchFactorStatus
 import com.example.volunteerlink.data.VolunteerOpportunitySessionStore
 import com.example.volunteerlink.model.VolunteerApplicationStatus
 import com.example.volunteerlink.model.VolunteerOpportunityApplication
@@ -71,21 +87,33 @@ fun VolunteerHomeScreen(
     onVolunteerApplicationSelected: (applicationId: Int) -> Unit = {},
     onViewAllApplicationsSelected: () -> Unit = {},
     onVolunteerNotificationsSelected: () -> Unit = {},
-    onVolunteerSearchSelected: () -> Unit = {}
+    unreadNotificationCount: Int = 0,
+    onVolunteerSearchSelected: () -> Unit = {},
+    skillPathViewModel:
+        VolunteerSkillPathViewModel = viewModel()
 ) {
 
     var selectedHomeFilter by rememberSaveable {
-        mutableStateOf("All")
+        mutableStateOf(
+            VolunteerHomeFeedFilter.FOR_YOU
+        )
     }
 
     val homeFilterOptions =
-        listOf(
-            "All",
-            "Physical",
-            "Near Me",
-            "Remote",
-            "Long Term"
-        )
+        VolunteerHomeFeedFilter.entries
+
+    val skillPathUiState by
+        skillPathViewModel.uiState
+            .collectAsStateWithLifecycle()
+
+    val currentSkillPathLevels =
+        remember(skillPathUiState.skillPaths) {
+            skillPathUiState.skillPaths
+                .associate { skillPath ->
+                    skillPath.name to
+                        skillPath.currentLevel
+                }
+        }
 
     val allVolunteerOpportunityEvents =
         VolunteerOpportunitySessionStore
@@ -102,72 +130,27 @@ fun VolunteerHomeScreen(
             selectedHomeFilter,
             allVolunteerOpportunityEvents
         ) {
-
-            allVolunteerOpportunityEvents
-                .filter { volunteerOpportunityEvent ->
-
-                    when (selectedHomeFilter) {
-
-                        "Physical" ->
-                            volunteerOpportunityEvent
-                                .eventOpportunityType == "Physical"
-
-                        "Near Me" ->
-                            volunteerOpportunityEvent
-                                .eventDistanceKm != null &&
-                                    volunteerOpportunityEvent
-                                        .eventDistanceKm <= 10.0
-
-                        "Remote" ->
-                            volunteerOpportunityEvent
-                                .eventOpportunityType == "Remote"
-
-                        "Long Term" ->
-                            volunteerOpportunityEvent
-                                .eventIsLongTerm
-
-                        else -> true
-                    }
-                }
+            VolunteerHomeFeedEngine.filter(
+                events = allVolunteerOpportunityEvents,
+                filter = selectedHomeFilter
+            )
         }
 
 
     val recommendedVolunteerOpportunityEvents =
         remember(
             allVolunteerOpportunityEvents,
-            allVolunteerApplications
+            allVolunteerApplications,
+            currentSkillPathLevels
         ) {
             VolunteerHomeRecommendationEngine.recommend(
                 volunteerOpportunityEvents =
                     allVolunteerOpportunityEvents,
                 volunteerApplications =
-                    allVolunteerApplications
-            ).take(2)
-        }
-
-
-    val mostPopularVolunteerOpportunityEvents =
-        remember(allVolunteerOpportunityEvents) {
-
-            allVolunteerOpportunityEvents
-                .sortedByDescending { volunteerOpportunityEvent ->
-
-                    volunteerOpportunityEvent
-                        .eventApplicationCount
-                }
-                .take(2)
-        }
-
-
-    val remoteVolunteerOpportunityEvents =
-        remember(allVolunteerOpportunityEvents) {
-
-            allVolunteerOpportunityEvents
-                .filter { volunteerOpportunityEvent ->
-
-                    volunteerOpportunityEvent
-                        .eventOpportunityType == "Remote"
-                }
+                    allVolunteerApplications,
+                currentSkillPathLevels =
+                    currentSkillPathLevels
+            ).take(4)
         }
 
 
@@ -208,7 +191,10 @@ fun VolunteerHomeScreen(
                 },
 
                 onVolunteerNotificationsSelected =
-                    onVolunteerNotificationsSelected
+                    onVolunteerNotificationsSelected,
+
+                unreadNotificationCount =
+                    unreadNotificationCount
             )
         }
 
@@ -241,28 +227,10 @@ fun VolunteerHomeScreen(
         }
 
 
-        if (selectedHomeFilter != "All") {
-
-            item(
-                key =
-                    "volunteer_home_filtered_results"
-            ) {
-
-                VolunteerHomeOpportunitySection(
-
-                    sectionTitle =
-                        "Matching Opportunities",
-
-                    volunteerOpportunityEvents =
-                        filteredVolunteerOpportunityEvents,
-
-                    onVolunteerOpportunitySelected =
-                        onVolunteerOpportunitySelected
-                )
-            }
-
-        } else {
-
+        if (
+            selectedHomeFilter ==
+                VolunteerHomeFeedFilter.FOR_YOU
+        ) {
 
             item(
                 key =
@@ -272,7 +240,7 @@ fun VolunteerHomeScreen(
                 VolunteerHomeRecommendationSection(
 
                     sectionTitle =
-                        "Recommended for You",
+                        "Your Best Matches",
 
                     recommendations =
                         recommendedVolunteerOpportunityEvents,
@@ -282,48 +250,31 @@ fun VolunteerHomeScreen(
                 )
             }
 
+        } else {
 
             item(
                 key =
-                    "volunteer_home_popular"
+                    "volunteer_home_filtered_results"
             ) {
 
                 VolunteerHomeOpportunitySection(
 
                     sectionTitle =
-                        "Most Popular",
+                        if (
+                            selectedHomeFilter ==
+                            VolunteerHomeFeedFilter.ALL
+                        ) {
+                            "All Opportunities"
+                        } else {
+                            "${selectedHomeFilter.displayName} Opportunities"
+                        },
 
                     volunteerOpportunityEvents =
-                        mostPopularVolunteerOpportunityEvents,
+                        filteredVolunteerOpportunityEvents,
 
                     onVolunteerOpportunitySelected =
                         onVolunteerOpportunitySelected
                 )
-            }
-
-
-            if (
-                remoteVolunteerOpportunityEvents
-                    .isNotEmpty()
-            ) {
-
-                item(
-                    key =
-                        "volunteer_home_remote"
-                ) {
-
-                    VolunteerHomeOpportunitySection(
-
-                        sectionTitle =
-                            "Remote Opportunities",
-
-                        volunteerOpportunityEvents =
-                            remoteVolunteerOpportunityEvents,
-
-                        onVolunteerOpportunitySelected =
-                            onVolunteerOpportunitySelected
-                    )
-                }
             }
         }
     }
@@ -333,10 +284,12 @@ fun VolunteerHomeScreen(
 @Composable
 private fun VolunteerHomeCompactHeader(
     onVolunteerSearchSelected: () -> Unit,
-    homeFilterOptions: List<String>,
-    selectedHomeFilter: String,
-    onHomeFilterSelected: (String) -> Unit,
-    onVolunteerNotificationsSelected: () -> Unit
+    homeFilterOptions: List<VolunteerHomeFeedFilter>,
+    selectedHomeFilter: VolunteerHomeFeedFilter,
+    onHomeFilterSelected:
+        (VolunteerHomeFeedFilter) -> Unit,
+    onVolunteerNotificationsSelected: () -> Unit,
+    unreadNotificationCount: Int
 ) {
 
     Column(
@@ -386,27 +339,42 @@ private fun VolunteerHomeCompactHeader(
             ) {
 
 
-                IconButton(
-                    onClick =
-                        onVolunteerNotificationsSelected
-                ) {
-
-                    Icon(
-                        painter =
-                            painterResource(
-                                id =
-                                    R.drawable
-                                        .ic_volunteer_notifications
+                Box {
+                    IconButton(
+                        onClick =
+                            onVolunteerNotificationsSelected
+                    ) {
+                        Icon(
+                            painter = painterResource(
+                                id = R.drawable
+                                    .ic_volunteer_notifications
                             ),
+                            contentDescription = "Notifications",
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
 
-                        contentDescription =
-                            "Notifications",
-
-                        tint = Color.White,
-
-                        modifier =
-                            Modifier.size(22.dp)
-                    )
+                    if (unreadNotificationCount > 0) {
+                        Surface(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .size(18.dp),
+                            shape = CircleShape,
+                            color = VolunteerLinkError
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = if (
+                                        unreadNotificationCount > 9
+                                    ) "9+" else unreadNotificationCount.toString(),
+                                    color = Color.White,
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
                 }
 
 
@@ -547,7 +515,8 @@ private fun VolunteerHomeCompactHeader(
 
                         Text(
                             text =
-                                homeFilterOption,
+                                homeFilterOption
+                                    .displayName,
 
                             fontSize = 11.sp
                         )
@@ -802,6 +771,12 @@ private fun VolunteerHomeRecommendationSection(
     onVolunteerOpportunitySelected:
         (eventId: Int) -> Unit
 ) {
+    var selectedRecommendation by remember {
+        mutableStateOf<VolunteerHomeRecommendation?>(
+            null
+        )
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -816,8 +791,8 @@ private fun VolunteerHomeRecommendationSection(
         )
         Text(
             text =
-                "Based on your verified Skill Paths, practised skills " +
-                    "and applications.",
+                "Ranked from verified Skill Path evidence, role eligibility " +
+                    "and practical access.",
             modifier = Modifier.padding(top = 2.dp),
             fontSize = 10.sp,
             lineHeight = 14.sp,
@@ -836,8 +811,12 @@ private fun VolunteerHomeRecommendationSection(
                 VolunteerHomeCompactCard(
                     volunteerOpportunityEvent =
                         recommendation.event,
-                    recommendationReason =
-                        recommendation.reason,
+                    recommendation =
+                        recommendation,
+                    onMatchDetailsSelected = {
+                        selectedRecommendation =
+                            recommendation
+                    },
                     onVolunteerOpportunitySelected = {
                         onVolunteerOpportunitySelected(
                             recommendation.event.eventId
@@ -847,6 +826,21 @@ private fun VolunteerHomeRecommendationSection(
                 Spacer(modifier = Modifier.height(10.dp))
             }
         }
+    }
+
+    selectedRecommendation?.let { recommendation ->
+        VolunteerMatchDetailsSheet(
+            recommendation = recommendation,
+            onDismissRequest = {
+                selectedRecommendation = null
+            },
+            onViewOpportunitySelected = {
+                selectedRecommendation = null
+                onVolunteerOpportunitySelected(
+                    recommendation.event.eventId
+                )
+            }
+        )
     }
 }
 
@@ -1015,13 +1009,21 @@ private fun VolunteerHomeCompactApplicationCard(
 private fun VolunteerHomeCompactCard(
     volunteerOpportunityEvent:
     VolunteerOpportunityEvent,
-    recommendationReason: String? = null,
+    recommendation:
+        VolunteerHomeRecommendation? = null,
+    onMatchDetailsSelected: () -> Unit = {},
     onVolunteerOpportunitySelected: () -> Unit
 ) {
     val primaryVolunteerRole =
-        volunteerOpportunityEvent
-            .eventVolunteerRoles
-            .firstOrNull()
+        recommendation?.let { match ->
+            volunteerOpportunityEvent
+                .eventVolunteerRoles
+                .firstOrNull { role ->
+                    role.roleId == match.bestRoleId
+                }
+        } ?: volunteerOpportunityEvent
+                .eventVolunteerRoles
+                .firstOrNull()
 
     val opportunityCategoryIconResourceId =
         when (
@@ -1104,15 +1106,31 @@ private fun VolunteerHomeCompactCard(
             Column(
                 modifier = Modifier.weight(1f)
             ) {
-                Text(
-                    text =
-                        volunteerOpportunityEvent.eventTitle,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = VolunteerLinkTextPrimary,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement =
+                        Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Text(
+                        text =
+                            volunteerOpportunityEvent.eventTitle,
+                        modifier = Modifier.weight(1f),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = VolunteerLinkTextPrimary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    recommendation?.let { match ->
+                        VolunteerMatchScoreChip(
+                            score = match.score,
+                            onSelected =
+                                onMatchDetailsSelected
+                        )
+                    }
+                }
 
                 Spacer(
                     modifier = Modifier.height(3.dp)
@@ -1236,36 +1254,21 @@ private fun VolunteerHomeCompactCard(
                     modifier = Modifier.height(7.dp)
                 )
 
-                recommendationReason?.let { reason ->
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(7.dp),
-                        color = VolunteerLinkSoftGreenSurface
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(
-                                horizontal = 8.dp,
-                                vertical = 6.dp
-                            ),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "WHY IT MATCHES",
-                                fontSize = 7.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = VolunteerLinkSuccess
-                            )
-                            Text(
-                                text = "  $reason",
-                                modifier = Modifier.weight(1f),
-                                fontSize = 9.sp,
-                                lineHeight = 12.sp,
-                                color = VolunteerLinkPrimaryGreen
-                            )
-                        }
-                    }
+                recommendation?.let { match ->
+                    Text(
+                        text =
+                            "Best role match: ${match.bestRoleTitle}",
+                        fontSize = 10.sp,
+                        lineHeight = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = VolunteerLinkPrimaryGreen,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
 
-                    Spacer(modifier = Modifier.height(7.dp))
+                    Spacer(
+                        modifier = Modifier.height(7.dp)
+                    )
                 }
 
                 Row(
@@ -1313,6 +1316,365 @@ private fun VolunteerHomeCompactCard(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun VolunteerMatchScoreChip(
+    score: Int,
+    onSelected: () -> Unit
+) {
+    val scoreColour = when {
+        score >= 75 -> VolunteerLinkSuccess
+        score >= 60 -> VolunteerLinkInformation
+        else -> VolunteerLinkWarning
+    }
+
+    Surface(
+        onClick = onSelected,
+        shape = RoundedCornerShape(7.dp),
+        color = scoreColour.copy(alpha = 0.12f),
+        border = BorderStroke(
+            width = 1.dp,
+            color = scoreColour.copy(alpha = 0.35f)
+        )
+    ) {
+        Text(
+            text = "$score% Match",
+            modifier = Modifier.padding(
+                horizontal = 7.dp,
+                vertical = 4.dp
+            ),
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Bold,
+            color = scoreColour,
+            maxLines = 1
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun VolunteerMatchDetailsSheet(
+    recommendation: VolunteerHomeRecommendation,
+    onDismissRequest: () -> Unit,
+    onViewOpportunitySelected: () -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismissRequest,
+        containerColor = VolunteerLinkSurface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 700.dp)
+                .verticalScroll(
+                    rememberScrollState()
+                )
+                .navigationBarsPadding()
+                .padding(
+                    start = VolunteerLinkScreenHorizontalPadding,
+                    end = VolunteerLinkScreenHorizontalPadding,
+                    bottom = 24.dp
+                )
+        ) {
+            Text(
+                text = "Your Match Breakdown",
+                fontSize = 19.sp,
+                fontWeight = FontWeight.Bold,
+                color = VolunteerLinkTextPrimary
+            )
+
+            Spacer(
+                modifier = Modifier.height(4.dp)
+            )
+
+            Text(
+                text = recommendation.event.eventTitle,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = VolunteerLinkPrimaryGreen,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Text(
+                text =
+                    "Best role: ${recommendation.bestRoleTitle}",
+                fontSize = 11.sp,
+                color = VolunteerLinkTextSecondary
+            )
+
+            Spacer(
+                modifier = Modifier.height(16.dp)
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement =
+                    Arrangement.spacedBy(14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    modifier = Modifier.size(70.dp),
+                    shape = CircleShape,
+                    color = VolunteerLinkSoftGreenSurface,
+                    border = BorderStroke(
+                        width = 2.dp,
+                        color = VolunteerLinkPrimaryGreen
+                            .copy(alpha = 0.45f)
+                    )
+                ) {
+                    Box(
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "${recommendation.score}%",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = VolunteerLinkPrimaryGreen
+                        )
+                    }
+                }
+
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = recommendation.matchLabel,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = VolunteerLinkTextPrimary
+                    )
+
+                    Spacer(
+                        modifier = Modifier.height(5.dp)
+                    )
+
+                    LinearProgressIndicator(
+                        progress = {
+                            recommendation.score / 100f
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(7.dp),
+                        color = VolunteerLinkPrimaryGreen,
+                        trackColor =
+                            VolunteerLinkBorderColour
+                    )
+
+                    Spacer(
+                        modifier = Modifier.height(5.dp)
+                    )
+
+                    Text(
+                        text = recommendation.reason,
+                        fontSize = 10.sp,
+                        lineHeight = 14.sp,
+                        color = VolunteerLinkTextSecondary
+                    )
+                }
+            }
+
+            Spacer(
+                modifier = Modifier.height(18.dp)
+            )
+
+            HorizontalDivider(
+                color = VolunteerLinkBorderColour
+            )
+
+            Spacer(
+                modifier = Modifier.height(14.dp)
+            )
+
+            Text(
+                text = "How the score was calculated",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = VolunteerLinkTextPrimary
+            )
+
+            Text(
+                text =
+                    "Each role is scored separately across six transparent factors. " +
+                        "The strongest eligible role becomes this event's match.",
+                modifier = Modifier.padding(top = 3.dp),
+                fontSize = 10.sp,
+                lineHeight = 14.sp,
+                color = VolunteerLinkTextSecondary
+            )
+
+            Spacer(
+                modifier = Modifier.height(10.dp)
+            )
+
+            recommendation.factors.forEach { factor ->
+                VolunteerMatchFactorRow(
+                    factor = factor
+                )
+
+                Spacer(
+                    modifier = Modifier.height(8.dp)
+                )
+            }
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(10.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor =
+                        VolunteerLinkSoftGreenSurface
+                ),
+                border = BorderStroke(
+                    width = 1.dp,
+                    color = VolunteerLinkPrimaryGreen
+                        .copy(alpha = 0.22f)
+                )
+            ) {
+                Text(
+                    text =
+                        "Match scores support your decision; they do not guarantee " +
+                            "acceptance. Organisations still review role requirements.",
+                    modifier = Modifier.padding(12.dp),
+                    fontSize = 10.sp,
+                    lineHeight = 15.sp,
+                    color = VolunteerLinkTextSecondary
+                )
+            }
+
+            Spacer(
+                modifier = Modifier.height(14.dp)
+            )
+
+            Button(
+                onClick = onViewOpportunitySelected,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor =
+                        VolunteerLinkPrimaryGreen,
+                    contentColor = Color.White
+                )
+            ) {
+                Text(
+                    text = "View Opportunity",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun VolunteerMatchFactorRow(
+    factor: VolunteerMatchFactor
+) {
+    val factorColour =
+        when (factor.status) {
+            VolunteerMatchFactorStatus.STRENGTH ->
+                VolunteerLinkSuccess
+
+            VolunteerMatchFactorStatus.OPPORTUNITY ->
+                VolunteerLinkInformation
+
+            VolunteerMatchFactorStatus.ATTENTION ->
+                VolunteerLinkWarning
+        }
+
+    val factorLabel =
+        when (factor.status) {
+            VolunteerMatchFactorStatus.STRENGTH ->
+                "Strength"
+
+            VolunteerMatchFactorStatus.OPPORTUNITY ->
+                "Growth"
+
+            VolunteerMatchFactorStatus.ATTENTION ->
+                "Check"
+        }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = VolunteerLinkBackground
+        ),
+        border = BorderStroke(
+            width = 1.dp,
+            color = VolunteerLinkBorderColour
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(11.dp),
+            horizontalArrangement =
+                Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            Box(
+                modifier = Modifier
+                    .padding(top = 4.dp)
+                    .size(9.dp)
+                    .background(
+                        color = factorColour,
+                        shape = CircleShape
+                    )
+            )
+
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement =
+                        Arrangement.SpaceBetween,
+                    verticalAlignment =
+                        Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = factor.title,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = VolunteerLinkTextPrimary
+                    )
+
+                    Text(
+                        text =
+                            "${factor.earnedPoints}/${factor.maximumPoints}",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = factorColour
+                    )
+                }
+
+                Spacer(
+                    modifier = Modifier.height(3.dp)
+                )
+
+                Text(
+                    text = factor.explanation,
+                    fontSize = 10.sp,
+                    lineHeight = 14.sp,
+                    color = VolunteerLinkTextSecondary
+                )
+
+                Spacer(
+                    modifier = Modifier.height(5.dp)
+                )
+
+                Text(
+                    text = factorLabel.uppercase(),
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = factorColour
+                )
             }
         }
     }

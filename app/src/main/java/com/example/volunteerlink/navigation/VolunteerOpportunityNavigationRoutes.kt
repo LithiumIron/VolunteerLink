@@ -26,6 +26,9 @@ object VolunteerOpportunityNavigationRoutes {
     const val VOLUNTEER_MY_APPLICATIONS_ROUTE =
         "volunteer_my_applications"
 
+    const val VOLUNTEER_NOTIFICATIONS_ROUTE =
+        "volunteer_notifications"
+
 
     // Shared navigation arguments
     const val VOLUNTEER_EVENT_ID_ARGUMENT =

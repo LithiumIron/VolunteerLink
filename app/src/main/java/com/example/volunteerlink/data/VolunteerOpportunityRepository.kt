@@ -1,3 +1,4 @@
+
 package com.example.volunteerlink.data
 
 import com.example.volunteerlink.model.VolunteerApplicationStatus
@@ -56,10 +57,33 @@ object VolunteerOpportunityRepository {
                 .select()
                 .decodeList<PostRoleRow>()
 
+        // Organisation Create stores detailed role information in normalized
+        // child tables. Volunteer screens must read these same rows instead
+        // of expecting the old JSON columns on post_roles.
+        val postRoleSkills =
+            supabase.from("post_role_skills")
+                .select()
+                .decodeList<PostRoleSkillRow>()
+
+        val postRoleResponsibilities =
+            supabase.from("post_role_responsibilities")
+                .select()
+                .decodeList<PostRoleResponsibilityRow>()
+
+        val postRoleScreeningQuestions =
+            supabase.from("post_role_screening_questions")
+                .select()
+                .decodeList<PostRoleScreeningQuestionRow>()
+
         val roleTemplates =
             supabase.from("role_templates")
                 .select()
                 .decodeList<RoleTemplateRow>()
+
+        val roleTemplateSkills =
+            supabase.from("role_template_skills")
+                .select()
+                .decodeList<RoleTemplateSkillRow>()
 
         val skillPaths =
             supabase.from("skill_paths")
@@ -76,6 +100,11 @@ object VolunteerOpportunityRepository {
                 .select()
                 .decodeList<ScheduleItemRow>()
 
+        val scheduleItemRoles =
+            supabase.from("schedule_item_roles")
+                .select()
+                .decodeList<ScheduleItemRoleRow>()
+
         val metrics = loadMetricsSafely()
         val roleMetrics = loadRoleMetricsSafely()
 
@@ -85,10 +114,15 @@ object VolunteerOpportunityRepository {
             physicalDetails = physicalDetails,
             remoteDetails = remoteDetails,
             postRoles = postRoles,
+            postRoleSkills = postRoleSkills,
+            postRoleResponsibilities = postRoleResponsibilities,
+            postRoleScreeningQuestions = postRoleScreeningQuestions,
             roleTemplates = roleTemplates,
+            roleTemplateSkills = roleTemplateSkills,
             skillPaths = skillPaths,
             skills = skills,
             scheduleItems = scheduleItems,
+            scheduleItemRoles = scheduleItemRoles,
             metrics = metrics,
             roleMetrics = roleMetrics
         )
@@ -221,10 +255,15 @@ object VolunteerOpportunityRepository {
         physicalDetails: List<PhysicalDetailRow>,
         remoteDetails: List<RemoteDetailRow>,
         postRoles: List<PostRoleRow>,
+        postRoleSkills: List<PostRoleSkillRow>,
+        postRoleResponsibilities: List<PostRoleResponsibilityRow>,
+        postRoleScreeningQuestions: List<PostRoleScreeningQuestionRow>,
         roleTemplates: List<RoleTemplateRow>,
+        roleTemplateSkills: List<RoleTemplateSkillRow>,
         skillPaths: List<SkillPathNameRow>,
         skills: List<SkillNameRow>,
         scheduleItems: List<ScheduleItemRow>,
+        scheduleItemRoles: List<ScheduleItemRoleRow>,
         metrics: Map<String, OpportunityMetricRow>,
         roleMetrics: Map<String, RoleMetricRow>
     ): List<VolunteerOpportunityEvent> {
@@ -236,6 +275,24 @@ object VolunteerOpportunityRepository {
             remoteDetails.associateBy { it.postId }
         val roleTemplatesById =
             roleTemplates.associateBy { it.roleTemplateId }
+        val templateSkillIdsByRoleId =
+            roleTemplateSkills
+                .groupBy { it.roleTemplateId }
+                .mapValues { (_, links) ->
+                    links.map { it.skillId }.distinct()
+                }
+        val postRoleSkillsByRole =
+            postRoleSkills.groupBy { it.databaseRoleId }
+        val responsibilitiesByRole =
+            postRoleResponsibilities.groupBy { it.databaseRoleId }
+        val questionsByRole =
+            postRoleScreeningQuestions.groupBy { it.databaseRoleId }
+        val targetRoleIdsByScheduleId =
+            scheduleItemRoles
+                .groupBy { it.scheduleItemId }
+                .mapValues { (_, links) ->
+                    links.map { it.roleTemplateId }.distinct()
+                }
         val skillPathNames =
             skillPaths.associate { it.skillPathId to it.name }
         val skillNames =
@@ -259,10 +316,26 @@ object VolunteerOpportunityRepository {
 
                 val roles = postRoles
                     .filter { it.postId == post.postId }
-                    .sortedBy { it.postRoleId }
+                    .sortedBy { it.databaseId }
                     .map { postRole ->
+                        val normalizedSkills =
+                            postRoleSkillsByRole[
+                                postRole.databaseId
+                            ].orEmpty()
+                        val normalizedResponsibilities =
+                            responsibilitiesByRole[
+                                postRole.databaseId
+                            ].orEmpty()
+                                .sortedBy { it.responsibilityNo }
+                                .map { it.responsibilityText }
+                        val normalizedQuestions =
+                            questionsByRole[
+                                postRole.databaseId
+                            ].orEmpty()
+                                .sortedBy { it.questionNo }
+                                .map { it.questionText }
                         val roleMetric =
-                            roleMetrics[postRole.postRoleId]
+                            roleMetrics[postRole.databaseId]
                         val template =
                             roleTemplatesById[
                                 postRole.roleTemplateId
@@ -271,11 +344,15 @@ object VolunteerOpportunityRepository {
                         val roleScheduleItems =
                             scheduleItems
                                 .filter { item ->
+                                    val targetRoleIds =
+                                        targetRoleIdsByScheduleId[
+                                            item.scheduleItemId
+                                        ].orEmpty()
                                     item.postId == post.postId &&
-                                            (
-                                                item.targetRoleIds.isEmpty() ||
-                                                    postRole.postRoleId in
-                                                        item.targetRoleIds
+                                        (
+                                                targetRoleIds.isEmpty() ||
+                                                    postRole.roleTemplateId in
+                                                        targetRoleIds
                                             )
                                 }
                                 .sortedWith(
@@ -298,22 +375,37 @@ object VolunteerOpportunityRepository {
                                 }
 
                         val practisedSkillIds =
-                            if (postRole.practisedSkills.isNotEmpty()) {
-                                postRole.practisedSkills
+                            if (normalizedSkills.isNotEmpty()) {
+                                normalizedSkills.map { it.skillId }
                             } else {
-                                template?.skillsPractised.orEmpty()
+                                templateSkillIdsByRoleId[
+                                    postRole.roleTemplateId
+                                ].orEmpty()
+                            }
+
+                        val requiredSkillRequirements =
+                            normalizedSkills.mapNotNull { link ->
+                                link.requiredExperience?.let { experience ->
+                                    RequiredSkillRequirementRow(
+                                        skillId = link.skillId,
+                                        requiredExperience = experience
+                                    )
+                                }
                             }
 
                         VolunteerOpportunityRole(
                             roleId = stableNavigationId(
-                                postRole.postRoleId
+                                postRole.databaseId
                             ),
                             roleTemplateId = postRole.roleTemplateId,
                             roleTitle =
                                 template?.roleName
                                     ?: "Volunteer Role",
                             roleLevel =
-                                postRole.level.toDisplayWords(),
+                                template?.defaultLevel
+                                    .orEmpty()
+                                    .ifBlank { "BEGINNER" }
+                                    .toDisplayWords(),
                             roleVacancies =
                                 roleMetric?.availableSpots
                                     ?: postRole.capacity,
@@ -327,34 +419,42 @@ object VolunteerOpportunityRepository {
                                     skillNames[skillId] ?: skillId
                                 },
                             roleExperienceRequirement =
-                                postRole.experienceRequirement
-                                    .orEmpty()
+                                requiredSkillRequirements
+                                    .joinToString("\n") { requirement ->
+                                        val skillName =
+                                            skillNames[requirement.skillId]
+                                                ?: requirement.skillId
+
+                                        "$skillName: " +
+                                                "${requirement.requiredExperience} " +
+                                                "verified assignment(s)"
+                                    }
                                     .ifBlank {
-                                        postRole
-                                            .requiredSkillRequirements
-                                            .joinToString("\n")
-                                            .ifBlank {
-                                                "No previous experience is required."
-                                            }
+                                        "No previous experience is required."
                                     },
                             roleExtraApplicationQuestions =
-                                postRole.screeningQuestions,
+                                normalizedQuestions,
                             roleSpecificAssignment =
-                                postRole.specificAssignment
+                                postRole.individualSubmissionRequirement
                                     .orEmpty()
+                                    .ifBlank {
+                                        postRole.roleNotes.orEmpty()
+                                    }
                                     .ifBlank {
                                         template?.description.orEmpty()
                                     },
                             roleTrainingDetails =
-                                postRole.trainingDetails,
+                                roleScheduleItems
+                                    .firstOrNull()
+                                    ?.scheduleActivity,
                             roleResponsibilities =
-                                postRole.responsibilities,
+                                normalizedResponsibilities,
                             roleScheduleItems = roleScheduleItems,
                             roleMinimumSkillPathLevel =
-                                postRole.minimumSkillPathLevel,
+                                levelNumber(template?.defaultLevel),
                             roleApplicationFlow =
                                 if (
-                                    postRole.screeningQuestions
+                                    normalizedQuestions
                                         .isEmpty()
                                 ) {
                                     VolunteerRoleApplicationFlow
@@ -374,7 +474,7 @@ object VolunteerOpportunityRepository {
                                     VolunteerRoleApplicationMethod
                                         .REVIEW_APPLICANTS
                                 },
-                            roleDatabaseId = postRole.postRoleId
+                            roleDatabaseId = postRole.databaseId
                         )
                     }
 
@@ -393,7 +493,7 @@ object VolunteerOpportunityRepository {
                             role.postId == post.postId
                         }
                         .sumOf { role ->
-                            roleMetrics[role.postRoleId]
+                            roleMetrics[role.databaseId]
                                 ?.applicationCount
                                 ?: 0
                         }
@@ -442,12 +542,15 @@ object VolunteerOpportunityRepository {
                         } ?: false,
                     eventVolunteerRoles = roles,
                     eventIsGovernmentApproved =
-                        post.isGovernmentApproved,
+                        false,
                     eventFullAddress =
                         physical?.locationAddress
                             ?.ifBlank { physical.locationName }
                             ?: "Online",
-                    eventCauseName = post.causeName.orEmpty(),
+                    eventCauseName =
+                        post.category
+                            ?.toDisplayWords()
+                            .orEmpty(),
                     eventContactEmail =
                         organisation?.contactEmail.orEmpty(),
                     eventContactPhone =
@@ -455,6 +558,8 @@ object VolunteerOpportunityRepository {
                     eventShareLink =
                         "https://volunteerlink.example/opportunities/" +
                             post.postId,
+                    eventLatitude = physical?.latitude,
+                    eventLongitude = physical?.longitude,
                     eventDatabaseId = post.postId,
                     eventStatus = post.status
                 )
@@ -480,7 +585,7 @@ object VolunteerOpportunityRepository {
             .mapNotNull { participation ->
                 val (event, role) =
                     roleAndEventByDatabaseId[
-                        participation.postRoleId
+                        participation.databaseRoleId
                     ] ?: return@mapNotNull null
 
                 val status =
@@ -663,6 +768,13 @@ private fun String.toDisplayWords(): String =
             word.replaceFirstChar(Char::uppercase)
         }
 
+private fun levelNumber(databaseLevel: String?): Int =
+    when (databaseLevel?.uppercase()) {
+        "INTERMEDIATE" -> 2
+        "ADVANCED" -> 3
+        else -> 1
+    }
+
 private fun parseCategory(
     databaseCategory: String?
 ): VolunteerOpportunityCategory {
@@ -770,11 +882,7 @@ private data class VolunteerPostRow(
     val description: String,
     val mode: String,
     val status: String,
-    val category: String? = null,
-    @SerialName("cause_name")
-    val causeName: String? = null,
-    @SerialName("is_government_approved")
-    val isGovernmentApproved: Boolean = false
+    val category: String? = null
 )
 
 @Serializable
@@ -812,14 +920,21 @@ private data class RemoteDetailRow(
 )
 
 @Serializable
+private data class RequiredSkillRequirementRow(
+    @SerialName("skill_id")
+    val skillId: String,
+    @SerialName("required_experience")
+    val requiredExperience: Int = 0
+)
+
+@Serializable
 private data class PostRoleRow(
-    @SerialName("post_role_id")
-    val postRoleId: String,
+    @SerialName("legacy_post_role_id")
+    val legacyPostRoleId: String? = null,
     @SerialName("post_id")
     val postId: String,
     @SerialName("role_template_id")
     val roleTemplateId: String,
-    val level: String,
     val capacity: Int,
     @SerialName("application_method")
     val applicationMethod: String,
@@ -827,18 +942,63 @@ private data class PostRoleRow(
     @SerialName("practised_skills")
     val practisedSkills: List<String> = emptyList(),
     @SerialName("required_skill_requirements")
-    val requiredSkillRequirements: List<String> = emptyList(),
+    val requiredSkillRequirements:
+    List<RequiredSkillRequirementRow> = emptyList(),
     @SerialName("screening_questions")
     val screeningQuestions: List<String> = emptyList(),
-    @SerialName("experience_requirement")
-    val experienceRequirement: String? = null,
-    @SerialName("specific_assignment")
-    val specificAssignment: String? = null,
-    @SerialName("training_details")
-    val trainingDetails: String? = null,
-    @SerialName("minimum_skill_path_level")
-    val minimumSkillPathLevel: Int = 1
-)
+    @SerialName("role_notes")
+    val roleNotes: String? = null,
+    @SerialName("individual_submission_requirement")
+    val individualSubmissionRequirement: String? = null
+) {
+    val databaseId: String
+        get() = "$postId|$roleTemplateId"
+}
+
+@Serializable
+private data class PostRoleSkillRow(
+    @SerialName("post_id")
+    val postId: String,
+    @SerialName("role_template_id")
+    val roleTemplateId: String,
+    @SerialName("skill_id")
+    val skillId: String,
+    @SerialName("required_experience")
+    val requiredExperience: Int? = null
+) {
+    val databaseRoleId: String
+        get() = "$postId|$roleTemplateId"
+}
+
+@Serializable
+private data class PostRoleResponsibilityRow(
+    @SerialName("post_id")
+    val postId: String,
+    @SerialName("role_template_id")
+    val roleTemplateId: String,
+    @SerialName("responsibility_no")
+    val responsibilityNo: Int,
+    @SerialName("responsibility_text")
+    val responsibilityText: String
+) {
+    val databaseRoleId: String
+        get() = "$postId|$roleTemplateId"
+}
+
+@Serializable
+private data class PostRoleScreeningQuestionRow(
+    @SerialName("post_id")
+    val postId: String,
+    @SerialName("role_template_id")
+    val roleTemplateId: String,
+    @SerialName("question_no")
+    val questionNo: Int,
+    @SerialName("question_text")
+    val questionText: String
+) {
+    val databaseRoleId: String
+        get() = "$postId|$roleTemplateId"
+}
 
 @Serializable
 private data class RoleTemplateRow(
@@ -850,7 +1010,17 @@ private data class RoleTemplateRow(
     val skillPathId: String,
     val description: String? = null,
     @SerialName("skills_practised")
-    val skillsPractised: List<String> = emptyList()
+    val skillsPractised: List<String> = emptyList(),
+    @SerialName("default_level")
+    val defaultLevel: String = "BEGINNER"
+)
+
+@Serializable
+private data class RoleTemplateSkillRow(
+    @SerialName("role_template_id")
+    val roleTemplateId: String,
+    @SerialName("skill_id")
+    val skillId: String
 )
 
 @Serializable
@@ -869,34 +1039,70 @@ private data class SkillNameRow(
 
 @Serializable
 private data class ScheduleItemRow(
+    @SerialName("schedule_item_id")
+    val scheduleItemId: String,
     @SerialName("post_id")
     val postId: String,
     @SerialName("schedule_date")
     val scheduleDate: String,
     val title: String,
     @SerialName("start_time")
-    val startTime: String? = null,
-    @SerialName("target_role_ids")
-    val targetRoleIds: List<String> = emptyList()
+    val startTime: String? = null
+)
+
+@Serializable
+private data class ScheduleItemRoleRow(
+    @SerialName("schedule_item_id")
+    val scheduleItemId: String,
+    @SerialName("post_id")
+    val postId: String,
+    @SerialName("role_template_id")
+    val roleTemplateId: String
 )
 
 @Serializable
 private data class RoleParticipationRow(
-    @SerialName("participation_id")
-    val participationId: String,
-    @SerialName("post_role_id")
-    val postRoleId: String,
+    @SerialName("post_id")
+    val postId: String,
+
+    @SerialName("role_template_id")
+    val roleTemplateId: String,
+
+    @SerialName("user_id")
+    val userId: String,
+
     @SerialName("application_status")
     val applicationStatus: String,
+
     @SerialName("completion_status")
     val completionStatus: String,
+
+    @SerialName("auto_completed")
+    val autoCompleted: Boolean = false,
+
+    @SerialName("joined_at")
+    val joinedAt: String? = null,
+
     @SerialName("completed_at")
     val completedAt: String? = null,
-    @SerialName("decision_note")
-    val decisionNote: String? = null,
+
     @SerialName("created_at")
-    val createdAt: String
-)
+    val createdAt: String,
+
+    @SerialName("cancelled_at")
+    val cancelledAt: String? = null,
+
+    @SerialName("decision_note")
+    val decisionNote: String? = null
+) {
+    val participationId: String
+        get() =
+            "$postId|$roleTemplateId|$userId"
+
+    val databaseRoleId: String
+        get() =
+            "$postId|$roleTemplateId"
+}
 
 @Serializable
 private data class OpportunityMetricRow(
@@ -974,3 +1180,5 @@ private data class MyVolunteerApplicationRow(
     @SerialName("created_at")
     val createdAt: String
 )
+
+
