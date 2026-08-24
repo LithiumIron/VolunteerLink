@@ -42,13 +42,15 @@ data class HomePostItem(
 )
 
 enum class HomeAttentionSeverity {
-    ACTION,
+    URGENT,
     WARNING,
-    URGENT
+    NEEDS_REVIEW,
+    REVIEW
 }
 
 enum class HomeAttentionType {
     APPLICATIONS_TO_REVIEW,
+    POST_COMPLETION_REVIEW,
     DRAFT_START_TOO_SOON,
     DRAFT_START_DATE_PASSED,
     TRAINING_DETAILS_WARNING,

@@ -9,6 +9,8 @@ import com.example.volunteerlink.data.post.PostMode
 import com.example.volunteerlink.data.post.PostTimingEvaluator
 import com.example.volunteerlink.data.post.PostTimingInput
 import com.example.volunteerlink.data.post.PostTimingState
+import com.example.volunteerlink.data.post.RoleApplicationWindowEvaluator
+import com.example.volunteerlink.data.post.RoleApplicationWindowInput
 import com.example.volunteerlink.data.post.TrainingAttentionType
 import com.example.volunteerlink.data.post.TrainingLocationMode
 import com.example.volunteerlink.data.post.TrainingMode
@@ -27,9 +29,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Locale
 
 /**
  * Prepares everything Organisation Home needs to display.
@@ -142,6 +141,16 @@ class OrganisationHomeViewModel : ViewModel() {
                     PostTimingState.PAST,
                     null -> Unit
                 }
+            }
+
+            // A published/closed activity that has already ended still needs
+            // organisation close-out work. Keep it visible on Home as Review
+            // until the post is explicitly marked COMPLETED.
+            if (
+                normalizedStatus in setOf("PUBLISHED", "CLOSED") &&
+                timingState == PostTimingState.PAST
+            ) {
+                attentionItems += buildCompletionReviewAttention(post)
             }
 
             // Pending rows only need organisation action when the role actually
@@ -262,14 +271,26 @@ class OrganisationHomeViewModel : ViewModel() {
             compareBy<HomePostItem> { it.startDate.orEmpty() }
                 .thenBy { it.title }
         )
+        // One priority order is used everywhere:
+        // Urgent -> Warning -> Needs Review -> Review.
+        // "Needs Review" means an ended activity still needs close-out;
+        // "Review" means a live human action such as an application review.
         val sortedAttention = attentionItems.sortedWith(
             compareBy<HomeAttentionItem> {
                 when (it.severity) {
                     HomeAttentionSeverity.URGENT -> 0
-                    HomeAttentionSeverity.ACTION -> 1
-                    HomeAttentionSeverity.WARNING -> 2
+                    HomeAttentionSeverity.WARNING -> 1
+                    HomeAttentionSeverity.NEEDS_REVIEW -> 2
+                    HomeAttentionSeverity.REVIEW -> 3
                 }
             }.thenBy { it.daysRemaining ?: Int.MAX_VALUE }
+                .thenBy {
+                    when (it.type) {
+                        HomeAttentionType.APPLICATIONS_TO_REVIEW -> 0
+                        HomeAttentionType.POST_COMPLETION_REVIEW -> 1
+                        else -> 0
+                    }
+                }
                 .thenBy { it.postTitle }
         )
 
@@ -298,6 +319,19 @@ class OrganisationHomeViewModel : ViewModel() {
         )
     }
 
+    private fun buildCompletionReviewAttention(
+        post: OrganisationHomePost
+    ): HomeAttentionItem {
+        return HomeAttentionItem(
+            type = HomeAttentionType.POST_COMPLETION_REVIEW,
+            severity = HomeAttentionSeverity.NEEDS_REVIEW,
+            postId = post.postId,
+            postTitle = post.title,
+            contextLabel = "Post-event close-out",
+            message = "The activity has ended. Finish attendance and volunteer review before marking this post completed."
+        )
+    }
+
     private fun buildApplicationReviewAttention(
         post: OrganisationHomePost,
         nowMillis: Long
@@ -305,8 +339,9 @@ class OrganisationHomeViewModel : ViewModel() {
         // Review attention is role-specific, especially for Hybrid posts. A
         // Physical role follows the Physical start while a Remote role follows
         // the Remote start. If Schedule configured an earlier
-        // closes_applications_on_start cutoff for the role, that earlier cutoff
-        // wins. Once the cutoff is reached, old PENDING rows stay in the DB but
+        // closes_applications_on_start DATE for the role, that earlier date
+        // wins. Exact event/training times are ignored. Once the cutoff date
+        // arrives, old PENDING rows stay in the DB but
         // Home no longer presents them as an action the organisation can take.
         val reviewableRoles = post.roles.filter { role ->
             role.applicationMethod.equals(
@@ -339,7 +374,7 @@ class OrganisationHomeViewModel : ViewModel() {
 
         return HomeAttentionItem(
             type = HomeAttentionType.APPLICATIONS_TO_REVIEW,
-            severity = HomeAttentionSeverity.ACTION,
+            severity = HomeAttentionSeverity.REVIEW,
             postId = post.postId,
             postTitle = post.title,
             contextLabel = roleContext,
@@ -356,37 +391,17 @@ class OrganisationHomeViewModel : ViewModel() {
             post: OrganisationHomePost,
             nowMillis: Long
         ): Boolean {
-        val roleStartCutoff = when (roleMode.uppercase(Locale.US)) {
-            "PHYSICAL" -> combineDateAndTimeMillis(
-                date = post.physicalStartDate,
-                time = post.physicalStartTime
-            )
-
-            "REMOTE" -> combineDateAndTimeMillis(
-                date = post.remoteStartDate,
-                time = null
-            )
-
-            else -> null
-        }
-
-        val scheduleCutoff = applicationClosingSchedules
-            .mapNotNull { schedule ->
-                combineDateAndTimeMillis(
-                    date = schedule.scheduleDate,
-                    time = schedule.startTime
-                )
-            }
-            .minOrNull()
-
-        val effectiveCutoff = listOfNotNull(
-            roleStartCutoff,
-            scheduleCutoff
-        ).minOrNull()
-
-        // Missing cutoff data should not silently hide a legitimate pending
-        // application. The normal Create Post flow supplies the role-mode dates.
-        return effectiveCutoff == null || nowMillis < effectiveCutoff
+        return RoleApplicationWindowEvaluator.evaluate(
+            input = RoleApplicationWindowInput(
+                roleMode = roleMode,
+                postStatus = post.status,
+                physicalStartDate = post.physicalStartDate,
+                remoteStartDate = post.remoteStartDate,
+                applicationClosingScheduleDates = applicationClosingSchedules
+                    .map { it.scheduleDate }
+            ),
+            nowMillis = nowMillis
+        ).isOpen
     }
 
     private fun buildDraftAttention(
@@ -549,37 +564,6 @@ class OrganisationHomeViewModel : ViewModel() {
 
             TrainingAttentionType.NONE -> ""
         }
-    }
-
-    private fun combineDateAndTimeMillis(
-        date: String?,
-        time: String?
-    ): Long? {
-        if (date.isNullOrBlank()) return null
-
-        val parsedDate = runCatching {
-            SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
-                isLenient = false
-            }.parse(date.trim())
-        }.getOrNull() ?: return null
-
-        val timeParts = time
-            ?.trim()
-            ?.split(":")
-            ?.mapNotNull { it.toIntOrNull() }
-            .orEmpty()
-
-        val hour = timeParts.getOrNull(0) ?: 0
-        val minute = timeParts.getOrNull(1) ?: 0
-        val second = timeParts.getOrNull(2) ?: 0
-
-        return Calendar.getInstance().apply {
-            timeInMillis = parsedDate.time
-            set(Calendar.HOUR_OF_DAY, hour)
-            set(Calendar.MINUTE, minute)
-            set(Calendar.SECOND, second)
-            set(Calendar.MILLISECOND, 0)
-        }.timeInMillis
     }
 
     private fun formatHomeDate(value: String): String {

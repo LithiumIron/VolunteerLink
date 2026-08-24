@@ -136,17 +136,11 @@ internal fun OrganisationAttentionSection(
             shadowElevation = 1.dp
         ) {
             Column {
-                visibleItems.forEachIndexed { index, item ->
+                visibleItems.forEach { item ->
                     AttentionRow(item = item)
-
-                    if (index != visibleItems.lastIndex) {
-                        HomeDivider()
-                    }
                 }
 
                 if (items.size > 3) {
-                    HomeDivider()
-
                     val hiddenCount = items.size - 3
                     Row(
                         modifier = Modifier
@@ -193,16 +187,22 @@ internal fun OrganisationAttentionSection(
 @Composable
 private fun AttentionRow(item: HomeAttentionItem) {
     val accent = when (item.severity) {
-        HomeAttentionSeverity.ACTION -> VolunteerLinkPrimaryGreen
-        HomeAttentionSeverity.WARNING -> VolunteerLinkWarning
         HomeAttentionSeverity.URGENT -> VolunteerLinkError
+        HomeAttentionSeverity.WARNING -> VolunteerLinkWarning
+        HomeAttentionSeverity.NEEDS_REVIEW -> VolunteerLinkWarning
+        HomeAttentionSeverity.REVIEW -> VolunteerLinkPrimaryGreen
     }
 
-    Column(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 14.dp)
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        shape = RoundedCornerShape(10.dp),
+        color = accent.copy(alpha = 0.055f)
     ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 11.dp)
+        ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -259,6 +259,7 @@ private fun AttentionRow(item: HomeAttentionItem) {
             lineHeight = 17.sp,
             color = VolunteerLinkTextSecondary
         )
+        }
     }
 }
 
@@ -723,6 +724,7 @@ private fun HomeDivider() {
 private fun HomeAttentionItem.attentionKindLabel(): String {
     return when (type) {
         HomeAttentionType.APPLICATIONS_TO_REVIEW -> "APPLICATION"
+        HomeAttentionType.POST_COMPLETION_REVIEW -> "CLOSE-OUT"
         HomeAttentionType.DRAFT_START_TOO_SOON,
         HomeAttentionType.DRAFT_START_DATE_PASSED -> "DRAFT"
         HomeAttentionType.TRAINING_DETAILS_WARNING,
@@ -733,9 +735,10 @@ private fun HomeAttentionItem.attentionKindLabel(): String {
 
 private fun HomeAttentionItem.severityLabel(): String {
     return when (severity) {
-        HomeAttentionSeverity.ACTION -> "Review"
-        HomeAttentionSeverity.WARNING -> "Warning"
         HomeAttentionSeverity.URGENT -> "Urgent"
+        HomeAttentionSeverity.WARNING -> "Warning"
+        HomeAttentionSeverity.NEEDS_REVIEW -> "Needs Review"
+        HomeAttentionSeverity.REVIEW -> "Review"
     }
 }
 
@@ -751,6 +754,7 @@ private fun HomeAttentionItem.primaryTitle(): String {
 private fun HomeAttentionItem.contextLine(): String? {
     return when (type) {
         HomeAttentionType.APPLICATIONS_TO_REVIEW -> contextLabel ?: "Application review"
+        HomeAttentionType.POST_COMPLETION_REVIEW -> contextLabel ?: "Post-event close-out"
 
         HomeAttentionType.TRAINING_DETAILS_WARNING,
         HomeAttentionType.TRAINING_DETAILS_URGENT,
