@@ -1,3 +1,4 @@
+
 package com.example.volunteerlink.screens
 
 import androidx.compose.foundation.BorderStroke
@@ -72,7 +73,8 @@ private data class VolunteerSkillPathBadge(
     val title: String,
     val description: String,
     val isEarned: Boolean,
-    val progressText: String
+    val progressText: String,
+    val evidenceLabel: String
 )
 
 @Composable
@@ -752,6 +754,29 @@ private fun VolunteerSkillPathBadgesSection(
         skillPaths.count { it.hasVerifiedEvidence }
     val intermediatePaths =
         skillPaths.count { it.currentLevel >= 2 }
+    val advancedPaths =
+        skillPaths.count { it.currentLevel >= 3 }
+    val completedApplications =
+        VolunteerOpportunitySessionStore.volunteerApplications
+            .filter {
+                it.applicationStatus == VolunteerApplicationStatus.COMPLETED
+            }
+    val verifiedOrganisations =
+        completedApplications
+            .map { it.applicationOrganisationName }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .size
+    val verifiedSkills =
+        completedApplications
+            .flatMap { it.applicationPractisedSkills }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .size
+    val certificates =
+        completedApplications.count {
+            !it.applicationCertificateId.isNullOrBlank()
+        }
 
     val badges = listOf(
         VolunteerSkillPathBadge(
@@ -759,7 +784,8 @@ private fun VolunteerSkillPathBadgesSection(
             description =
                 "Complete one organisation-verified volunteer role.",
             isEarned = verifiedRoles >= 1,
-            progressText = "${verifiedRoles.coerceAtMost(1)}/1 role"
+            progressText = "${verifiedRoles.coerceAtMost(1)}/1 role",
+            evidenceLabel = "Verified completion"
         ),
         VolunteerSkillPathBadge(
             title = "Five-Hour Contributor",
@@ -767,14 +793,16 @@ private fun VolunteerSkillPathBadgesSection(
                 "Build at least five hours of verified service.",
             isEarned = verifiedMinutes >= 300,
             progressText =
-                "${verifiedMinutes.coerceAtMost(300)}/300 min"
+                "${verifiedMinutes.coerceAtMost(300)}/300 min",
+            evidenceLabel = "Verified service time"
         ),
         VolunteerSkillPathBadge(
             title = "Multi-Path Explorer",
             description =
                 "Earn verified evidence in two different Skill Paths.",
             isEarned = activePaths >= 2,
-            progressText = "${activePaths.coerceAtMost(2)}/2 paths"
+            progressText = "${activePaths.coerceAtMost(2)}/2 paths",
+            evidenceLabel = "Cross-functional evidence"
         ),
         VolunteerSkillPathBadge(
             title = "Intermediate Ready",
@@ -782,7 +810,58 @@ private fun VolunteerSkillPathBadgesSection(
                 "Reach Intermediate in any one Skill Path.",
             isEarned = intermediatePaths >= 1,
             progressText =
-                "${intermediatePaths.coerceAtMost(1)}/1 path"
+                "${intermediatePaths.coerceAtMost(1)}/1 path",
+            evidenceLabel = "Skill progression"
+        ),
+        VolunteerSkillPathBadge(
+            title = "Trusted Contributor",
+            description =
+                "Complete three organisation-verified volunteer roles.",
+            isEarned = verifiedRoles >= 3,
+            progressText = "${verifiedRoles.coerceAtMost(3)}/3 roles",
+            evidenceLabel = "Repeat contribution"
+        ),
+        VolunteerSkillPathBadge(
+            title = "Community Connector",
+            description =
+                "Contribute successfully with three organisations.",
+            isEarned = verifiedOrganisations >= 3,
+            progressText =
+                "${verifiedOrganisations.coerceAtMost(3)}/3 organisations",
+            evidenceLabel = "Organisation diversity"
+        ),
+        VolunteerSkillPathBadge(
+            title = "Verified Skill Builder",
+            description =
+                "Build evidence for five distinct practical skills.",
+            isEarned = verifiedSkills >= 5,
+            progressText = "${verifiedSkills.coerceAtMost(5)}/5 skills",
+            evidenceLabel = "Verified skill portfolio"
+        ),
+        VolunteerSkillPathBadge(
+            title = "Certified Volunteer",
+            description =
+                "Receive your first organisation-backed certificate.",
+            isEarned = certificates >= 1,
+            progressText = "${certificates.coerceAtMost(1)}/1 certificate",
+            evidenceLabel = "Certificate issued"
+        ),
+        VolunteerSkillPathBadge(
+            title = "Service Champion",
+            description =
+                "Accumulate twenty hours of verified community service.",
+            isEarned = verifiedMinutes >= 1_200,
+            progressText =
+                "${verifiedMinutes.coerceAtMost(1_200)}/1200 min",
+            evidenceLabel = "Sustained service"
+        ),
+        VolunteerSkillPathBadge(
+            title = "Advanced Practitioner",
+            description =
+                "Reach Advanced in any evidence-backed Skill Path.",
+            isEarned = advancedPaths >= 1,
+            progressText = "${advancedPaths.coerceAtMost(1)}/1 path",
+            evidenceLabel = "Advanced capability"
         )
     )
 
@@ -838,8 +917,8 @@ private fun VolunteerSkillPathBadgesSection(
             ) { badge ->
                 Card(
                     modifier = Modifier.size(
-                        width = 174.dp,
-                        height = 122.dp
+                        width = 186.dp,
+                        height = 142.dp
                     ),
                     shape = RoundedCornerShape(13.dp),
                     colors = CardDefaults.cardColors(
@@ -936,6 +1015,18 @@ private fun VolunteerSkillPathBadgesSection(
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis
                         )
+
+                        if (badge.isEarned) {
+                            Text(
+                                text = badge.evidenceLabel,
+                                modifier = Modifier.padding(top = 3.dp),
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = VolunteerLinkSuccess,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
                 }
             }
@@ -1647,11 +1738,26 @@ private fun VolunteerSkillPathEvidenceSection(
 private fun VolunteerSkillPathSkillsSection(
     volunteerSkillPath: VolunteerSkillPath
 ) {
+    val completedEvidence =
+        VolunteerOpportunitySessionStore.volunteerApplications
+            .filter { application ->
+                application.applicationStatus ==
+                    VolunteerApplicationStatus.COMPLETED &&
+                    application.applicationPrimarySkillPath ==
+                    volunteerSkillPath.name
+            }
+
     VolunteerSkillPathSectionContainer(
-        sectionTitle = "Skills in this Path"
+        sectionTitle = "Verified Skill Evidence"
     ) {
         volunteerSkillPath.skills
             .forEachIndexed { skillIndex, skill ->
+                val evidenceCount = completedEvidence.count { application ->
+                    application.applicationPractisedSkills.any { practisedSkill ->
+                        practisedSkill.equals(skill.name, ignoreCase = true)
+                    }
+                }
+
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1660,21 +1766,68 @@ private fun VolunteerSkillPathSkillsSection(
                         Alignment.CenterVertically
                 ) {
                     Surface(
-                        modifier = Modifier.size(7.dp),
+                        modifier = Modifier.size(25.dp),
                         shape = CircleShape,
-                        color = VolunteerLinkPrimaryGreen
-                    ) {}
+                        color =
+                            if (evidenceCount > 0) {
+                                VolunteerLinkSoftGreenSurface
+                            } else {
+                                VolunteerLinkBorderColour.copy(alpha = 0.55f)
+                            }
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector =
+                                    if (evidenceCount > 0) {
+                                        Icons.Filled.CheckCircle
+                                    } else {
+                                        Icons.Filled.Lock
+                                    },
+                                contentDescription = null,
+                                modifier = Modifier.size(15.dp),
+                                tint =
+                                    if (evidenceCount > 0) {
+                                        VolunteerLinkSuccess
+                                    } else {
+                                        VolunteerLinkTextSecondary
+                                    }
+                            )
+                        }
+                    }
 
                     Spacer(
                         modifier = Modifier.size(9.dp)
                     )
 
-                    Text(
-                        text = skill.name,
-                        modifier = Modifier.weight(1f),
-                        fontSize = 12.sp,
-                        color = VolunteerLinkTextPrimary
-                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = skill.name,
+                            fontSize = 12.sp,
+                            fontWeight =
+                                if (evidenceCount > 0) {
+                                    FontWeight.Bold
+                                } else {
+                                    FontWeight.Normal
+                                },
+                            color = VolunteerLinkTextPrimary
+                        )
+                        Text(
+                            text =
+                                if (evidenceCount > 0) {
+                                    "$evidenceCount completed role" +
+                                        if (evidenceCount == 1) "" else "s"
+                                } else {
+                                    "Not yet evidenced"
+                                },
+                            fontSize = 9.sp,
+                            color =
+                                if (evidenceCount > 0) {
+                                    VolunteerLinkSuccess
+                                } else {
+                                    VolunteerLinkTextSecondary
+                                }
+                        )
+                    }
                 }
 
                 if (
@@ -2000,3 +2153,5 @@ private fun volunteerLevelDisplayName(
         else -> "Level $level"
     }
 }
+
+

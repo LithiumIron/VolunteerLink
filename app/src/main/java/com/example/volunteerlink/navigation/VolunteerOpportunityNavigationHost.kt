@@ -1,3 +1,4 @@
+
 package com.example.volunteerlink.navigation
 
 import androidx.compose.foundation.background
@@ -203,7 +204,16 @@ fun VolunteerOpportunityNavigationHost() {
                         },
 
                         unreadNotificationCount =
-                            notificationUiState.unreadCount
+                            notificationUiState.unreadCount,
+
+                        isShowingCachedData =
+                            opportunityUiState.isShowingCachedData,
+
+                        lastSyncedAtEpochMillis =
+                            opportunityUiState.lastSyncedAtEpochMillis,
+
+                        onSyncSelected =
+                            volunteerOpportunityViewModel::refresh
                     )
                 }
 
@@ -899,3 +909,5 @@ private fun VolunteerTemporaryModuleScreen(
         )
     }
 }
+
+

@@ -1,5 +1,9 @@
+
 package com.example.volunteerlink.model
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 data class VolunteerSkillPath(
     val skillPathId: String,
     val name: String,
@@ -81,6 +85,7 @@ data class VolunteerSkillPath(
     }
 }
 
+@Serializable
 data class VolunteerSkillPathLevel(
     val pathLevelId: String,
     val levelNumber: Int,
@@ -89,8 +94,11 @@ data class VolunteerSkillPathLevel(
     val requiredMinutes: Int?
 )
 
+@Serializable
 data class VolunteerSkill(
     val skillId: String,
     val name: String,
     val description: String?
 )
+
+

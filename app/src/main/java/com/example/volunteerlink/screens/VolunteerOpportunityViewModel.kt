@@ -1,9 +1,11 @@
+
 package com.example.volunteerlink.screens
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.volunteerlink.data.VolunteerOpportunityRepository
 import com.example.volunteerlink.data.VolunteerOpportunitySessionStore
+import com.example.volunteerlink.data.VolunteerDashboardDataSource
+import com.example.volunteerlink.data.VolunteerOpportunityRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -16,6 +18,8 @@ data class VolunteerOpportunityUiState(
     val isApplicationActionRunning: Boolean = false,
     val errorMessage: String? = null,
     val applicationActionError: String? = null,
+    val isShowingCachedData: Boolean = false,
+    val lastSyncedAtEpochMillis: Long? = null,
     val dataVersion: Int = 0
 )
 
@@ -158,9 +162,28 @@ class VolunteerOpportunityViewModel : ViewModel() {
                 )
             }
 
+            val cachedDashboard =
+                runCatching {
+                    VolunteerDashboardDataSource.readCached()
+                }.getOrNull()
+
+            if (!isRefresh && cachedDashboard != null) {
+                VolunteerOpportunitySessionStore.replaceWith(
+                    cachedDashboard.data
+                )
+                mutableUiState.update {
+                    it.copy(
+                        isLoading = false,
+                        isShowingCachedData = true,
+                        lastSyncedAtEpochMillis =
+                            cachedDashboard.lastSyncedAtEpochMillis,
+                        dataVersion = it.dataVersion + 1
+                    )
+                }
+            }
+
             try {
-                val data =
-                    VolunteerOpportunityRepository.loadDashboard()
+                val data = VolunteerDashboardDataSource.refreshFromCloud()
                 VolunteerOpportunitySessionStore.replaceWith(data)
 
                 mutableUiState.update {
@@ -169,21 +192,27 @@ class VolunteerOpportunityViewModel : ViewModel() {
                         isRefreshing = false,
                         isApplicationActionRunning = false,
                         errorMessage = null,
+                        isShowingCachedData = false,
+                        lastSyncedAtEpochMillis = System.currentTimeMillis(),
                         dataVersion = it.dataVersion + 1
                     )
                 }
             } catch (exception: Exception) {
                 exception.printStackTrace()
-                mutableUiState.update {
-                    it.copy(
+                mutableUiState.update { currentState ->
+                    currentState.copy(
                         isLoading = false,
                         isRefreshing = false,
                         isApplicationActionRunning = false,
-                        errorMessage =
+                        isShowingCachedData = cachedDashboard != null,
+                        errorMessage = if (cachedDashboard == null) {
                             exception.toVolunteerMessage(
                                 fallback =
                                     "Volunteer opportunities could not be loaded from Supabase."
                             )
+                        } else {
+                            null
+                        }
                     )
                 }
             }
@@ -191,7 +220,7 @@ class VolunteerOpportunityViewModel : ViewModel() {
     }
 
     private suspend fun refreshAfterAction() {
-        val data = VolunteerOpportunityRepository.loadDashboard()
+        val data = VolunteerDashboardDataSource.refreshFromCloud()
         VolunteerOpportunitySessionStore.replaceWith(data)
         mutableUiState.update {
             it.copy(
@@ -226,3 +255,5 @@ private fun Exception.toVolunteerMessage(
         else -> fallback
     }
 }
+
+

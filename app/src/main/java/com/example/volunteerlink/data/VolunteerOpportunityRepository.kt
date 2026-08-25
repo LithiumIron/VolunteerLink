@@ -19,6 +19,7 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlin.math.abs
 
+@Serializable
 data class VolunteerOpportunityDashboardData(
     val events: List<VolunteerOpportunityEvent>,
     val applications: List<VolunteerOpportunityApplication>
@@ -512,13 +513,9 @@ object VolunteerOpportunityRepository {
                     eventLocation =
                         physical?.locationName
                             ?: "Online",
-                    eventDistanceKm = physical?.let {
-                        estimateDemoDistanceKm(
-                            latitude = it.latitude,
-                            longitude = it.longitude,
-                            locationName = it.locationName
-                        )
-                    },
+                    // A real distance is calculated by the session store only
+                    // after Android provides the volunteer's device location.
+                    eventDistanceKm = null,
                     eventDate = formatDatabaseDate(startDate),
                     eventTime =
                         if (physical != null) {
@@ -833,30 +830,6 @@ private fun statusMessage(
         VolunteerApplicationStatus.CANCELLED ->
             "You cancelled this application."
     }
-
-private fun estimateDemoDistanceKm(
-    latitude: Double?,
-    longitude: Double?,
-    locationName: String
-): Double? {
-    if (latitude == null || longitude == null) {
-        return when {
-            locationName.contains("Butterworth", ignoreCase = true) -> 5.1
-            locationName.contains("Kuala Lumpur", ignoreCase = true) -> 350.0
-            else -> null
-        }
-    }
-
-    // Demo reference point: central Butterworth. This can later be replaced by
-    // Android location permission without changing the repository contract.
-    val latitudeDifference = latitude - 5.3992
-    val longitudeDifference = longitude - 100.3638
-    val distance = kotlin.math.sqrt(
-        latitudeDifference * latitudeDifference +
-            longitudeDifference * longitudeDifference
-    ) * 111.0
-    return kotlin.math.round(distance * 10.0) / 10.0
-}
 
 @Serializable
 private data class OrganisationRow(

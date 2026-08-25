@@ -1,3 +1,4 @@
+
 package com.example.volunteerlink.screens
 
 import androidx.lifecycle.ViewModel
@@ -129,9 +130,16 @@ class VolunteerAuthViewModel : ViewModel() {
     }
 
     private suspend fun confirmVolunteerProfile() {
+        val authUserId = supabase.auth.currentUserOrNull()?.id
+            ?: error("The Supabase session is no longer available.")
+
         val profiles =
             supabase.from("user_profiles")
-                .select()
+                .select {
+                    filter {
+                        eq("auth_user_id", authUserId)
+                    }
+                }
                 .decodeList<VolunteerAccountTypeRow>()
 
         val profile = profiles.firstOrNull()
@@ -175,3 +183,5 @@ private data class VolunteerAccountTypeRow(
     @SerialName("account_type")
     val accountType: String
 )
+
+

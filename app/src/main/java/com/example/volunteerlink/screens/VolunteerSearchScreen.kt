@@ -1,3 +1,4 @@
+
 package com.example.volunteerlink.screens
 
 import androidx.compose.foundation.BorderStroke
@@ -320,7 +321,7 @@ fun VolunteerSearchScreen(
                                 )
                             ) {
                                 Text(
-                                    text = "🔥  $term",
+                                    text = "ðŸ”¥  $term",
                                     modifier = Modifier.padding(
                                         horizontal = 11.dp,
                                         vertical = 7.dp
@@ -657,3 +658,5 @@ private fun VolunteerSearchResultCard(
 
 private fun VolunteerOpportunityCategory.displayName(): String =
     name.lowercase().replaceFirstChar(Char::uppercase)
+
+

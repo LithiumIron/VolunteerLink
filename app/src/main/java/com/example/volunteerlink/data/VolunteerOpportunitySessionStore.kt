@@ -1,6 +1,8 @@
+
 package com.example.volunteerlink.data
 
 import androidx.compose.runtime.mutableStateListOf
+import com.example.volunteerlink.data.location.VolunteerDistanceCalculator
 import com.example.volunteerlink.model.VolunteerOpportunityApplication
 import com.example.volunteerlink.model.VolunteerOpportunityEvent
 import com.example.volunteerlink.model.VolunteerOpportunityRole
@@ -12,6 +14,8 @@ import com.example.volunteerlink.model.VolunteerOpportunityRole
  */
 object VolunteerOpportunitySessionStore {
     var mapFocusEventId: Int? = null
+    private var deviceLatitude: Double? = null
+    private var deviceLongitude: Double? = null
     val volunteerOpportunityEvents =
         mutableStateListOf<VolunteerOpportunityEvent>()
 
@@ -24,6 +28,46 @@ object VolunteerOpportunitySessionStore {
 
         volunteerApplications.clear()
         volunteerApplications.addAll(data.applications)
+
+        val latitude = deviceLatitude
+        val longitude = deviceLongitude
+        if (latitude != null && longitude != null) {
+            updateDistancesFromDevice(latitude, longitude)
+        }
+    }
+
+    /**
+     * Recalculates every physical opportunity from the real device location.
+     * The coordinate is kept only in memory; it is not uploaded or persisted.
+     */
+    fun updateDistancesFromDevice(
+        latitude: Double,
+        longitude: Double
+    ) {
+        deviceLatitude = latitude
+        deviceLongitude = longitude
+
+        val updatedEvents = volunteerOpportunityEvents.map { event ->
+            val eventLatitude = event.eventLatitude
+            val eventLongitude = event.eventLongitude
+
+            if (eventLatitude == null || eventLongitude == null) {
+                event.copy(eventDistanceKm = null)
+            } else {
+                event.copy(
+                    eventDistanceKm =
+                        VolunteerDistanceCalculator.kilometres(
+                            fromLatitude = latitude,
+                            fromLongitude = longitude,
+                            toLatitude = eventLatitude,
+                            toLongitude = eventLongitude
+                        )
+                )
+            }
+        }
+
+        volunteerOpportunityEvents.clear()
+        volunteerOpportunityEvents.addAll(updatedEvents)
     }
 
     fun findEventById(eventId: Int): VolunteerOpportunityEvent? =
@@ -55,3 +99,5 @@ object VolunteerOpportunitySessionStore {
                 it.applicationRoleId == roleId
         }
 }
+
+

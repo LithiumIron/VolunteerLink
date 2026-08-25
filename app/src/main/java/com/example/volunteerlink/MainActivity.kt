@@ -1,3 +1,4 @@
+
 package com.example.volunteerlink
 
 import android.os.Bundle
@@ -13,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import com.example.volunteerlink.data.time.AppClock
+import com.example.volunteerlink.data.VolunteerDashboardDataSource
 import com.example.volunteerlink.navigation.AppNavGraph
 import com.example.volunteerlink.ui.theme.VolunteerLinkTheme
 import kotlinx.coroutines.Job
@@ -53,6 +55,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        VolunteerDashboardDataSource.initialise(applicationContext)
+
         setContent {
             VolunteerLinkTheme(
                 dynamicColor = false
@@ -83,6 +87,10 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
-        private const val APP_CLOCK_REFRESH_INTERVAL_MS = 3_000L
+        // The demo clock rarely changes. A one-minute interval avoids polling
+        // Supabase 1,200 times per foreground hour while remaining demo-friendly.
+        private const val APP_CLOCK_REFRESH_INTERVAL_MS = 60_000L
     }
 }
+
+

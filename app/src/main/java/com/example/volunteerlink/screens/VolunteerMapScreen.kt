@@ -1,3 +1,4 @@
+
 package com.example.volunteerlink.screens
 
 import android.Manifest
@@ -51,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.example.volunteerlink.BuildConfig
+import com.example.volunteerlink.data.VolunteerOpportunitySessionStore
 import com.example.volunteerlink.data.location.DeviceLocationHelper
 import com.example.volunteerlink.model.VolunteerOpportunityEvent
 import com.example.volunteerlink.ui.theme.CreamBackground
@@ -154,6 +156,10 @@ fun MapScreen(
                         GeoPoint(it.latitude, it.longitude)
 
                     userLocation = currentPoint
+                    VolunteerOpportunitySessionStore.updateDistancesFromDevice(
+                        latitude = it.latitude,
+                        longitude = it.longitude
+                    )
                     mapView.post {
                         mapView.controller.setCenter(currentPoint)
                         mapView.controller.setZoom(14.5)
@@ -515,3 +521,5 @@ private fun MapEventCard(
         }
     }
 }
+
+

@@ -13,6 +13,18 @@ object VolunteerSkillPathRepository {
 
     suspend fun getSkillPaths():
         List<VolunteerSkillPath> {
+        return try {
+            loadSkillPathsFromCloud().also { skillPaths ->
+                VolunteerDashboardDataSource.cacheSkillPaths(skillPaths)
+            }
+        } catch (exception: Exception) {
+            VolunteerDashboardDataSource.readCachedSkillPaths()
+                ?: throw exception
+        }
+    }
+
+    private suspend fun loadSkillPathsFromCloud():
+        List<VolunteerSkillPath> {
         val skillPathRows =
             supabase
                 .from("skill_paths")

@@ -1,3 +1,4 @@
+
 package com.example.volunteerlink.screens
 
 import androidx.compose.foundation.BorderStroke
@@ -39,6 +40,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,6 +50,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -62,6 +65,7 @@ import com.example.volunteerlink.data.VolunteerHomeRecommendationEngine
 import com.example.volunteerlink.data.VolunteerMatchFactor
 import com.example.volunteerlink.data.VolunteerMatchFactorStatus
 import com.example.volunteerlink.data.VolunteerOpportunitySessionStore
+import com.example.volunteerlink.data.location.DeviceLocationHelper
 import com.example.volunteerlink.model.VolunteerApplicationStatus
 import com.example.volunteerlink.model.VolunteerOpportunityApplication
 import com.example.volunteerlink.model.VolunteerOpportunityEvent
@@ -80,6 +84,8 @@ import com.example.volunteerlink.ui.theme.VolunteerLinkTextPrimary
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextSecondary
 import com.example.volunteerlink.ui.theme.VolunteerLinkWarning
 import com.example.volunteerlink.model.VolunteerOpportunityCategory
+import java.text.DateFormat
+import java.util.Date
 
 @Composable
 fun VolunteerHomeScreen(
@@ -89,9 +95,26 @@ fun VolunteerHomeScreen(
     onVolunteerNotificationsSelected: () -> Unit = {},
     unreadNotificationCount: Int = 0,
     onVolunteerSearchSelected: () -> Unit = {},
+    isShowingCachedData: Boolean = false,
+    lastSyncedAtEpochMillis: Long? = null,
+    onSyncSelected: () -> Unit = {},
     skillPathViewModel:
         VolunteerSkillPathViewModel = viewModel()
 ) {
+    val context = LocalContext.current
+
+    // If permission was previously granted from Map, refresh distances for
+    // Near Me and recommendation scoring without prompting again on Home.
+    LaunchedEffect(Unit) {
+        DeviceLocationHelper.getApproximateCurrentLocation(context) { location ->
+            location?.let {
+                VolunteerOpportunitySessionStore.updateDistancesFromDevice(
+                    latitude = it.latitude,
+                    longitude = it.longitude
+                )
+            }
+        }
+    }
 
     var selectedHomeFilter by rememberSaveable {
         mutableStateOf(
@@ -198,6 +221,15 @@ fun VolunteerHomeScreen(
             )
         }
 
+        if (isShowingCachedData) {
+            item(key = "volunteer_home_offline_status") {
+                VolunteerOfflineStatusCard(
+                    lastSyncedAtEpochMillis = lastSyncedAtEpochMillis,
+                    onSyncSelected = onSyncSelected
+                )
+            }
+        }
+
 
         item(
             key = "volunteer_home_impact"
@@ -274,6 +306,66 @@ fun VolunteerHomeScreen(
 
                     onVolunteerOpportunitySelected =
                         onVolunteerOpportunitySelected
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun VolunteerOfflineStatusCard(
+    lastSyncedAtEpochMillis: Long?,
+    onSyncSelected: () -> Unit
+) {
+    val lastSyncText = remember(lastSyncedAtEpochMillis) {
+        lastSyncedAtEpochMillis?.let { timestamp ->
+            DateFormat.getDateTimeInstance(
+                DateFormat.MEDIUM,
+                DateFormat.SHORT
+            ).format(Date(timestamp))
+        }
+    }
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(
+                horizontal = VolunteerLinkScreenHorizontalPadding,
+                vertical = 10.dp
+            ),
+        shape = RoundedCornerShape(16.dp),
+        color = VolunteerLinkWarning.copy(alpha = 0.13f),
+        border = BorderStroke(
+            width = 1.dp,
+            color = VolunteerLinkWarning.copy(alpha = 0.45f)
+        )
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Offline data",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    color = VolunteerLinkTextPrimary
+                )
+                Text(
+                    text = lastSyncText?.let {
+                        "Showing your last successful sync from $it."
+                    } ?: "Showing your last saved volunteer data.",
+                    modifier = Modifier.padding(top = 3.dp),
+                    fontSize = 12.sp,
+                    color = VolunteerLinkTextSecondary
+                )
+            }
+
+            TextButton(onClick = onSyncSelected) {
+                Text(
+                    text = "SYNC",
+                    fontWeight = FontWeight.Bold,
+                    color = VolunteerLinkPrimaryGreen
                 )
             }
         }
@@ -1861,3 +1953,5 @@ private fun formatVolunteerImpactMinutes(minutes: Int): String {
         else -> "${hours}h ${remainder}m"
     }
 }
+
+

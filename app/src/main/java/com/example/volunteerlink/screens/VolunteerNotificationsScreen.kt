@@ -1,3 +1,4 @@
+
 package com.example.volunteerlink.screens
 
 import androidx.compose.foundation.background
@@ -37,6 +38,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -84,6 +86,12 @@ fun VolunteerNotificationsScreen(
     notificationViewModel: VolunteerNotificationViewModel = viewModel()
 ) {
     val uiState by notificationViewModel.uiState.collectAsStateWithLifecycle()
+
+    // Reload on entry because the dashboard may have finished after this
+    // shared ViewModel was first created.
+    LaunchedEffect(Unit) {
+        notificationViewModel.refresh()
+    }
     var selectedFilter by rememberSaveable {
         mutableStateOf(VolunteerNotificationFilter.ALL)
     }
@@ -403,3 +411,5 @@ private fun VolunteerNotification.category(): VolunteerNotificationCategory {
 
 private fun formatNotificationTime(timestamp: String): String =
     timestamp.take(16).replace('T', ' ')
+
+
