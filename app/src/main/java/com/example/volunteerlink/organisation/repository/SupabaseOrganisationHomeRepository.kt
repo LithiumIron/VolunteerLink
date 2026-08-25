@@ -1,0 +1,323 @@
+package com.example.volunteerlink.organisation.repository
+
+import com.example.volunteerlink.data.supabase
+import com.example.volunteerlink.organisation.home.model.OrganisationHomeParticipation
+import com.example.volunteerlink.organisation.home.model.OrganisationHomePost
+import com.example.volunteerlink.organisation.home.model.OrganisationHomeRole
+import com.example.volunteerlink.organisation.home.model.OrganisationHomeRoleClosingSchedule
+import com.example.volunteerlink.organisation.home.model.OrganisationHomeSchedule
+import com.example.volunteerlink.organisation.home.model.OrganisationHomeSnapshot
+import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.query.Columns
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
+
+/**
+ * Supabase implementation for Organisation Home.
+ *
+ * One post query embeds the normalized one-to-one Physical/Remote details and
+ * one-to-many schedule rows. This avoids placing relational IDs in JSONB and
+ * avoids an N+1 query for every post.
+ */
+class SupabaseOrganisationHomeRepository : OrganisationHomeRepository {
+
+    override suspend fun loadHomeSnapshot(
+        organisationId: String
+    ): OrganisationHomeSnapshot {
+        val organisationRow = supabase
+            .from("organisations")
+            .select(columns = Columns.raw("organisation_id,organisation_name")) {
+                filter {
+                    eq("organisation_id", organisationId)
+                }
+            }
+            .decodeList<JsonObject>()
+            .firstOrNull()
+            ?: error("Organisation $organisationId was not found.")
+
+        val postRows = supabase
+            .from("volunteer_posts")
+            .select(
+                columns = Columns.raw(
+                    """
+                    post_id,
+                    title,
+                    mode,
+                    status,
+                    category,
+                    physical_details (
+                        start_date,
+                        end_date,
+                        start_time,
+                        location_name
+                    ),
+                    remote_details (
+                        start_date,
+                        end_date
+                    ),
+                    schedule_items (
+                        schedule_item_id,
+                        schedule_type,
+                        schedule_date,
+                        title,
+                        start_time,
+                        training_mode,
+                        meeting_link,
+                        training_location_mode,
+                        training_location_name
+                    )
+                    """.trimIndent()
+                )
+            ) {
+                filter {
+                    eq("organisation_id", organisationId)
+                }
+            }
+            .decodeList<JsonObject>()
+
+        val posts = postRows.map { row ->
+            val physical = row.firstRelatedObject("physical_details")
+            val remote = row.firstRelatedObject("remote_details")
+            val schedules = row.relatedObjects("schedule_items")
+                .map { scheduleRow ->
+                    OrganisationHomeSchedule(
+                        scheduleItemId = scheduleRow.requiredText("schedule_item_id"),
+                        scheduleType = scheduleRow.requiredText("schedule_type"),
+                        scheduleDate = scheduleRow.requiredText("schedule_date"),
+                        title = scheduleRow.requiredText("title"),
+                        startTime = scheduleRow.optionalText("start_time"),
+                        trainingMode = scheduleRow.optionalText("training_mode"),
+                        meetingLink = scheduleRow.optionalText("meeting_link"),
+                        trainingLocationMode = scheduleRow.optionalText(
+                            "training_location_mode"
+                        ),
+                        trainingLocationName = scheduleRow.optionalText(
+                            "training_location_name"
+                        )
+                    )
+                }
+                .sortedWith(
+                    compareBy<OrganisationHomeSchedule> { it.scheduleDate }
+                        .thenBy { it.startTime.orEmpty() }
+                )
+
+            OrganisationHomePost(
+                postId = row.requiredText("post_id"),
+                title = row.requiredText("title"),
+                mode = row.requiredText("mode"),
+                status = row.requiredText("status"),
+                category = row.optionalText("category"),
+                physicalStartDate = physical?.optionalText("start_date"),
+                physicalEndDate = physical?.optionalText("end_date"),
+                physicalStartTime = physical?.optionalText("start_time"),
+                physicalLocationName = physical?.optionalText("location_name"),
+                remoteStartDate = remote?.optionalText("start_date"),
+                remoteEndDate = remote?.optionalText("end_date"),
+                schedules = schedules,
+                roles = emptyList()
+            )
+        }
+
+        // Fetch application attention data separately instead of relying on a
+        // deep PostgREST embed. role_participations belongs to a post role by
+        // the pair (post_id, role_template_id), so joining by that pair here is
+        // explicit and stable even when PostgREST relationship inference is
+        // ambiguous.
+        val postIds = posts.map { it.postId }
+
+        val roleRows: List<JsonObject> = if (postIds.isEmpty()) {
+            emptyList()
+        } else {
+            supabase
+                .from("post_roles")
+                .select(
+                    columns = Columns.raw(
+                        "post_id,role_template_id,application_method"
+                    )
+                ) {
+                    filter {
+                        isIn("post_id", postIds)
+                        eq("application_method", "REVIEW_APPLICANTS")
+                    }
+                }
+                .decodeList<JsonObject>()
+        }
+
+        val participationRows: List<JsonObject> = if (postIds.isEmpty()) {
+            emptyList()
+        } else {
+            supabase
+                .from("role_participations")
+                .select(
+                    columns = Columns.raw(
+                        "post_id,role_template_id,user_id,application_status"
+                    )
+                ) {
+                    filter {
+                        isIn("post_id", postIds)
+                        eq("application_status", "PENDING")
+                    }
+                }
+                .decodeList<JsonObject>()
+        }
+
+        val roleTemplateIds = roleRows
+            .map { it.requiredText("role_template_id") }
+            .distinct()
+
+        // role_mode is essential for Hybrid posts: a Physical role closes from
+        // the Physical timeline, while a Remote role closes from the Remote one.
+        val roleTemplateRows: List<JsonObject> = if (roleTemplateIds.isEmpty()) {
+            emptyList()
+        } else {
+            supabase
+                .from("role_templates")
+                .select(
+                    columns = Columns.raw(
+                        "role_template_id,role_name,role_mode"
+                    )
+                ) {
+                    filter {
+                        isIn("role_template_id", roleTemplateIds)
+                    }
+                }
+                .decodeList<JsonObject>()
+        }
+
+        val roleTemplatesById = roleTemplateRows.associateBy { row ->
+            row.requiredText("role_template_id")
+        }
+
+        // A Training schedule may explicitly close applications for selected
+        // roles when that schedule starts. Keep this normalized relationship
+        // separate and use it as a more specific cutoff than the role-mode
+        // volunteering start when present.
+        val closingScheduleRoleRows: List<JsonObject> = if (postIds.isEmpty()) {
+            emptyList()
+        } else {
+            supabase
+                .from("schedule_item_roles")
+                .select(
+                    columns = Columns.raw(
+                        "schedule_item_id,post_id,role_template_id,closes_applications_on_start"
+                    )
+                ) {
+                    filter {
+                        isIn("post_id", postIds)
+                        eq("closes_applications_on_start", true)
+                    }
+                }
+                .decodeList<JsonObject>()
+        }
+
+        val schedulesByPostAndId = posts.flatMap { post ->
+            post.schedules.map { schedule ->
+                (post.postId to schedule.scheduleItemId) to schedule
+            }
+        }.toMap()
+
+        val closingSchedulesByRole = closingScheduleRoleRows
+            .mapNotNull { relationRow ->
+                val postId = relationRow.requiredText("post_id")
+                val roleTemplateId = relationRow.requiredText("role_template_id")
+                val scheduleItemId = relationRow.requiredText("schedule_item_id")
+                val schedule = schedulesByPostAndId[postId to scheduleItemId]
+                    ?: return@mapNotNull null
+
+                (postId to roleTemplateId) to OrganisationHomeRoleClosingSchedule(
+                    scheduleItemId = scheduleItemId,
+                    scheduleDate = schedule.scheduleDate,
+                    startTime = schedule.startTime
+                )
+            }
+            .groupBy(
+                keySelector = { it.first },
+                valueTransform = { it.second }
+            )
+
+        val participationsByRole = participationRows.groupBy { participationRow ->
+            participationRow.requiredText("post_id") to
+                    participationRow.requiredText("role_template_id")
+        }
+
+        val rolesByPost = roleRows
+            .mapNotNull { roleRow ->
+                val postId = roleRow.requiredText("post_id")
+                val roleTemplateId = roleRow.requiredText("role_template_id")
+                val template = roleTemplatesById[roleTemplateId]
+                    ?: return@mapNotNull null
+
+                postId to OrganisationHomeRole(
+                    roleTemplateId = roleTemplateId,
+                    roleName = template.requiredText("role_name"),
+                    roleMode = template.requiredText("role_mode"),
+                    applicationMethod = roleRow.requiredText("application_method"),
+                    participations = participationsByRole[
+                        postId to roleTemplateId
+                    ].orEmpty().map { participationRow ->
+                        OrganisationHomeParticipation(
+                            userId = participationRow.requiredText("user_id"),
+                            applicationStatus = participationRow.requiredText(
+                                "application_status"
+                            )
+                        )
+                    },
+                    applicationClosingSchedules = closingSchedulesByRole[
+                        postId to roleTemplateId
+                    ].orEmpty()
+                )
+            }
+            .groupBy(
+                keySelector = { it.first },
+                valueTransform = { it.second }
+            )
+
+        val postsWithApplications = posts.map { post ->
+            post.copy(roles = rolesByPost[post.postId].orEmpty())
+        }
+
+        return OrganisationHomeSnapshot(
+            organisationId = organisationId,
+            organisationName = organisationRow.requiredText("organisation_name"),
+            posts = postsWithApplications
+        )
+    }
+
+    /**
+     * PostgREST may represent a one-to-one embed as an object and some schema
+     * configurations may still return a one-item array. Accept both shapes so
+     * this repository remains stable if the relationship representation changes.
+     */
+    private fun JsonObject.firstRelatedObject(key: String): JsonObject? {
+        return when (val element = this[key]) {
+            is JsonObject -> element
+            is JsonArray -> element.firstOrNull() as? JsonObject
+            else -> null
+        }
+    }
+
+    private fun JsonObject.relatedObjects(key: String): List<JsonObject> {
+        return when (val element = this[key]) {
+            is JsonArray -> element.mapNotNull { it as? JsonObject }
+            is JsonObject -> listOf(element)
+            else -> emptyList()
+        }
+    }
+
+    private fun JsonObject.requiredText(key: String): String {
+        return optionalText(key)
+            ?: error("Missing required Supabase field: $key")
+    }
+
+    private fun JsonObject.optionalText(key: String): String? {
+        val element: JsonElement = this[key] ?: return null
+        if (element is JsonNull) return null
+        return runCatching {
+            element.jsonPrimitive.contentOrNull
+        }.getOrNull()
+    }
+}

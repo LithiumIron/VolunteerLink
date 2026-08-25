@@ -24,7 +24,10 @@ import com.example.volunteerlink.navigation.AppBottomNavigationBar
 import com.example.volunteerlink.organisation.screens.OrganisationChatsScreen
 import com.example.volunteerlink.organisation.screens.OrganisationCreateScreen
 import com.example.volunteerlink.organisation.screens.OrganisationHomeScreen
+import com.example.volunteerlink.organisation.screens.OrganisationManageEmptyModuleScreen
 import com.example.volunteerlink.organisation.screens.OrganisationManageScreen
+import com.example.volunteerlink.organisation.screens.OrganisationPostManagementScreen
+import com.example.volunteerlink.organisation.screens.OrganisationVolunteerPostsScreen
 import com.example.volunteerlink.organisation.screens.OrganisationProfileScreen
 
 /**
@@ -40,6 +43,18 @@ fun OrganisationNavigationHost() {
 
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
+
+    // Keep the Manage bottom-navigation item selected while a Manage sub-page
+    // is open. The sub-pages are part of the same module, not new bottom tabs.
+    val bottomBarRoute = when (currentRoute) {
+        OrganisationNavigationRoutes.MANAGE_POSTS,
+        OrganisationNavigationRoutes.MANAGE_POST_DETAIL,
+        OrganisationNavigationRoutes.MANAGE_IMPACT_WEAVE,
+        OrganisationNavigationRoutes.MANAGE_PROMOTIONS ->
+            OrganisationNavigationRoutes.MANAGE
+
+        else -> currentRoute
+    }
 
     /*
      * Match the keyboard behaviour used by AssignmentTest.
@@ -84,7 +99,7 @@ fun OrganisationNavigationHost() {
         bottomBar = {
             AppBottomNavigationBar(
                 items = organisationBottomNavigationItems,
-                currentRoute = currentRoute,
+                currentRoute = bottomBarRoute,
                 onItemClick = { item ->
                     if (item.route != currentRoute) {
                         navController.navigate(item.route) {
@@ -109,11 +124,66 @@ fun OrganisationNavigationHost() {
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(OrganisationNavigationRoutes.HOME) {
-                OrganisationHomeScreen()
+                OrganisationHomeScreen(
+                    onViewAllPosts = {
+                        navController.navigate(OrganisationNavigationRoutes.MANAGE_POSTS) {
+                            popUpTo(OrganisationNavigationRoutes.HOME) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                )
             }
 
             composable(OrganisationNavigationRoutes.MANAGE) {
-                OrganisationManageScreen()
+                OrganisationManageScreen(
+                    onVolunteerPostsClick = {
+                        navController.navigate(OrganisationNavigationRoutes.MANAGE_POSTS)
+                    },
+                    onImpactWeaveClick = {
+                        navController.navigate(OrganisationNavigationRoutes.MANAGE_IMPACT_WEAVE)
+                    },
+                    onPromotionsClick = {
+                        navController.navigate(OrganisationNavigationRoutes.MANAGE_PROMOTIONS)
+                    }
+                )
+            }
+
+            composable(OrganisationNavigationRoutes.MANAGE_POSTS) {
+                OrganisationVolunteerPostsScreen(
+                    onBack = { navController.popBackStack() },
+                    onPostClick = { postId ->
+                        navController.navigate(
+                            OrganisationNavigationRoutes.managePostDetail(postId)
+                        )
+                    }
+                )
+            }
+
+            composable(OrganisationNavigationRoutes.MANAGE_POST_DETAIL) { backStackEntry ->
+                val postId = backStackEntry.arguments?.getString("postId").orEmpty()
+                OrganisationPostManagementScreen(
+                    postId = postId,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(OrganisationNavigationRoutes.MANAGE_IMPACT_WEAVE) {
+                OrganisationManageEmptyModuleScreen(
+                    title = "Impact Weave",
+                    message = "No Impact Weave projects to manage yet. This section will use its own collaboration lifecycle when we implement it.",
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(OrganisationNavigationRoutes.MANAGE_PROMOTIONS) {
+                OrganisationManageEmptyModuleScreen(
+                    title = "Promotions",
+                    message = "No promotions to manage here yet.",
+                    onBack = { navController.popBackStack() }
+                )
             }
 
             composable(OrganisationNavigationRoutes.CREATE) {
