@@ -54,17 +54,13 @@ object VolunteerSkillPathRepository {
             exception.printStackTrace()
         }
 
+        // Do not turn a schema/permission error into a fake zero-progress
+        // result. Let getSkillPaths() use the last valid local cache instead.
         val progressRows =
-            runCatching {
-                supabase
-                    .from("volunteer_skill_path_progress")
-                    .select()
-                    .decodeList<VolunteerSkillPathProgressRow>()
-            }.onFailure { exception ->
-                exception.printStackTrace()
-            }.getOrDefault(
-                emptyList()
-            )
+            supabase
+                .from("volunteer_skill_path_progress")
+                .select()
+                .decodeList<VolunteerSkillPathProgressRow>()
 
         val progressByPathId =
             progressRows.associateBy {
@@ -142,7 +138,7 @@ object VolunteerSkillPathRepository {
                                 ?.verifiedAssignments
                                 ?: 0,
                         verifiedMinutes =
-                            progress?.verifiedMinutes
+                            progress?.verifiedMinutes ?: 0
                     )
                 }
     }
@@ -189,8 +185,6 @@ private data class VolunteerSkillRow(
 
 @Serializable
 private data class VolunteerSkillPathProgressRow(
-    @SerialName("path_progress_id")
-    val pathProgressId: String,
     @SerialName("user_id")
     val userId: String,
     @SerialName("skill_path_id")

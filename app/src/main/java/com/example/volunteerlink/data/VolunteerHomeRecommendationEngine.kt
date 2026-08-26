@@ -128,7 +128,7 @@ object VolunteerHomeRecommendationEngine {
                         pathName.isNotBlank()
                     }
                     .forEach { pathName ->
-                        add(pathName)
+                        add(pathName.matchKey())
                     }
 
                 currentSkillPathLevels
@@ -137,7 +137,7 @@ object VolunteerHomeRecommendationEngine {
                     }
                     .keys
                     .forEach { pathName ->
-                        add(pathName)
+                        add(pathName.matchKey())
                     }
             }
 
@@ -151,6 +151,7 @@ object VolunteerHomeRecommendationEngine {
                     application.applicationPrimarySkillPath
                 }
                 .filter { pathName -> pathName.isNotBlank() }
+                .map(String::matchKey)
                 .toSet()
 
         val verifiedSkills =
@@ -161,6 +162,7 @@ object VolunteerHomeRecommendationEngine {
                 .filter { skillName ->
                     skillName.isNotBlank()
                 }
+                .map(String::matchKey)
                 .toSet()
 
         val appliedEventIds =
@@ -260,15 +262,19 @@ object VolunteerHomeRecommendationEngine {
         currentSkillPathLevels: Map<String, Int>
     ): RoleMatch {
         val volunteerLevel =
-            currentSkillPathLevels[
-                role.rolePrimarySkillPath
-            ] ?: 1
+            currentSkillPathLevels.entries
+                .firstOrNull { (pathName, _) ->
+                    pathName.matchKey() ==
+                        role.rolePrimarySkillPath.matchKey()
+                }
+                ?.value
+                ?: 1
 
         val pathIsExperienced =
-            role.rolePrimarySkillPath in experiencedPaths
+            role.rolePrimarySkillPath.matchKey() in experiencedPaths
 
         val pathWasPreviouslySelected =
-            role.rolePrimarySkillPath in interestPaths
+            role.rolePrimarySkillPath.matchKey() in interestPaths
 
         val pathPoints = when {
             pathIsExperienced -> 30
@@ -286,7 +292,7 @@ object VolunteerHomeRecommendationEngine {
 
         val matchingSkills =
             roleSkills.filter { skillName ->
-                skillName in verifiedSkills
+                skillName.matchKey() in verifiedSkills
             }
 
         val skillPoints =
@@ -308,7 +314,7 @@ object VolunteerHomeRecommendationEngine {
 
         val newSkills =
             roleSkills.filterNot { skillName ->
-                skillName in verifiedSkills
+                skillName.matchKey() in verifiedSkills
             }
 
         val growthPoints =
@@ -412,13 +418,13 @@ object VolunteerHomeRecommendationEngine {
                         other = "Remote",
                         ignoreCase = true
                     ) ->
-                        "Remote participation removes travel; ${role.roleVacancies} open ${if (role.roleVacancies == 1) "place" else "places"}."
+                        "Remote role: no travel distance is required. ${role.roleVacancies} ${if (role.roleVacancies == 1) "vacancy" else "vacancies"} currently available."
 
                     event.eventDistanceKm != null ->
-                        "${event.eventDistanceKm} km away with ${role.roleVacancies} open ${if (role.roleVacancies == 1) "place" else "places"}."
+                        "Travel distance from your current device location: ${event.eventDistanceKm} km. ${role.roleVacancies} ${if (role.roleVacancies == 1) "vacancy" else "vacancies"} currently available."
 
                     else ->
-                        "Distance is unavailable; ${role.roleVacancies} open ${if (role.roleVacancies == 1) "place" else "places"}."
+                        "Travel distance cannot be calculated until location access is available. ${role.roleVacancies} ${if (role.roleVacancies == 1) "vacancy" else "vacancies"} currently available."
                 },
                 earnedPoints = accessPoints,
                 maximumPoints = 10,
@@ -475,19 +481,17 @@ object VolunteerHomeRecommendationEngine {
     ): String {
         val matchingSkills =
             role.roleSkillsPractised.filter { skillName ->
-                skillName in verifiedSkills
+                skillName.matchKey() in verifiedSkills
             }
 
         return when {
             matchingSkills.isNotEmpty() ->
-                "Builds on your verified ${
-                    matchingSkills.take(2).joinToString(" and ")
-                } evidence in ${role.rolePrimarySkillPath}."
+                "Builds on your verified ${matchingSkills.take(2).joinToString(" and ")} evidence in ${role.rolePrimarySkillPath}."
 
-            role.rolePrimarySkillPath in experiencedPaths ->
+            role.rolePrimarySkillPath.matchKey() in experiencedPaths ->
                 "Continues your verified ${role.rolePrimarySkillPath} experience."
 
-            role.rolePrimarySkillPath in interestPaths ->
+            role.rolePrimarySkillPath.matchKey() in interestPaths ->
                 "Continues an area you previously selected; completion is still required before it becomes verified experience."
 
             else ->
@@ -501,5 +505,12 @@ object VolunteerHomeRecommendationEngine {
         val factors: List<VolunteerMatchFactor>
     )
 }
+
+private fun String.matchKey(): String =
+    trim()
+        .lowercase()
+        .replace("&", "and")
+        .replace(Regex("[^a-z0-9]+"), " ")
+        .trim()
 
 

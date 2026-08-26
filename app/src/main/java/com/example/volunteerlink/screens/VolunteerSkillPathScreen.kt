@@ -568,13 +568,19 @@ private fun VolunteerSkillPathDetailsTopBar(
 private fun VolunteerSkillPathSummaryCard(
     skillPaths: List<VolunteerSkillPath>
 ) {
+    // Overall impact must use the same verified completion records as Home.
+    // Per-path values below the summary remain path-specific evidence.
+    val completedApplications =
+        VolunteerOpportunitySessionStore.volunteerApplications
+            .filter {
+                it.applicationStatus ==
+                    VolunteerApplicationStatus.COMPLETED
+            }
     val verifiedRoles =
-        skillPaths.sumOf { skillPath ->
-            skillPath.verifiedAssignments
-        }
+        completedApplications.size
     val verifiedMinutes =
-        skillPaths.sumOf { skillPath ->
-            skillPath.verifiedMinutes ?: 0
+        completedApplications.sumOf { application ->
+            application.applicationVerifiedMinutes ?: 0
         }
     val activePaths =
         skillPaths.count { skillPath ->
@@ -746,21 +752,23 @@ private fun VolunteerSkillPathStat(
 private fun VolunteerSkillPathBadgesSection(
     skillPaths: List<VolunteerSkillPath>
 ) {
+    val completedApplications =
+        VolunteerOpportunitySessionStore.volunteerApplications
+            .filter {
+                it.applicationStatus == VolunteerApplicationStatus.COMPLETED
+            }
     val verifiedRoles =
-        skillPaths.sumOf { it.verifiedAssignments }
+        completedApplications.size
     val verifiedMinutes =
-        skillPaths.sumOf { it.verifiedMinutes ?: 0 }
+        completedApplications.sumOf {
+            it.applicationVerifiedMinutes ?: 0
+        }
     val activePaths =
         skillPaths.count { it.hasVerifiedEvidence }
     val intermediatePaths =
         skillPaths.count { it.currentLevel >= 2 }
     val advancedPaths =
         skillPaths.count { it.currentLevel >= 3 }
-    val completedApplications =
-        VolunteerOpportunitySessionStore.volunteerApplications
-            .filter {
-                it.applicationStatus == VolunteerApplicationStatus.COMPLETED
-            }
     val verifiedOrganisations =
         completedApplications
             .map { it.applicationOrganisationName }

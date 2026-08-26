@@ -90,6 +90,7 @@ import java.util.Date
 @Composable
 fun VolunteerHomeScreen(
     onVolunteerOpportunitySelected: (eventId: Int) -> Unit = {},
+    onVolunteerRoleSelected: (eventId: Int, roleId: Int) -> Unit = { _, _ -> },
     onVolunteerApplicationSelected: (applicationId: Int) -> Unit = {},
     onViewAllApplicationsSelected: () -> Unit = {},
     onVolunteerNotificationsSelected: () -> Unit = {},
@@ -278,7 +279,10 @@ fun VolunteerHomeScreen(
                         recommendedVolunteerOpportunityEvents,
 
                     onVolunteerOpportunitySelected =
-                        onVolunteerOpportunitySelected
+                        onVolunteerOpportunitySelected,
+
+                    onVolunteerRoleSelected =
+                        onVolunteerRoleSelected
                 )
             }
 
@@ -861,7 +865,9 @@ private fun VolunteerHomeRecommendationSection(
     sectionTitle: String,
     recommendations: List<VolunteerHomeRecommendation>,
     onVolunteerOpportunitySelected:
-        (eventId: Int) -> Unit
+        (eventId: Int) -> Unit,
+    onVolunteerRoleSelected:
+        (eventId: Int, roleId: Int) -> Unit
 ) {
     var selectedRecommendation by remember {
         mutableStateOf<VolunteerHomeRecommendation?>(
@@ -910,8 +916,9 @@ private fun VolunteerHomeRecommendationSection(
                             recommendation
                     },
                     onVolunteerOpportunitySelected = {
-                        onVolunteerOpportunitySelected(
-                            recommendation.event.eventId
+                        onVolunteerRoleSelected(
+                            recommendation.event.eventId,
+                            recommendation.bestRoleId
                         )
                     }
                 )
@@ -928,8 +935,9 @@ private fun VolunteerHomeRecommendationSection(
             },
             onViewOpportunitySelected = {
                 selectedRecommendation = null
-                onVolunteerOpportunitySelected(
-                    recommendation.event.eventId
+                onVolunteerRoleSelected(
+                    recommendation.event.eventId,
+                    recommendation.bestRoleId
                 )
             }
         )
@@ -1397,7 +1405,12 @@ private fun VolunteerHomeCompactCard(
                         color = VolunteerLinkPrimaryGreen
                     ) {
                         Text(
-                            text = "View Details",
+                            text =
+                                if (recommendation != null) {
+                                    "View Role Details"
+                                } else {
+                                    "View Opportunity Details"
+                                },
                             modifier = Modifier.padding(
                                 horizontal = 10.dp,
                                 vertical = 6.dp
@@ -1654,7 +1667,7 @@ private fun VolunteerMatchDetailsSheet(
                 )
             ) {
                 Text(
-                    text = "View Opportunity",
+                    text = "View Role Details",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold
                 )

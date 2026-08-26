@@ -55,6 +55,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        AppClock.initialise(applicationContext)
         VolunteerDashboardDataSource.initialise(applicationContext)
 
         setContent {

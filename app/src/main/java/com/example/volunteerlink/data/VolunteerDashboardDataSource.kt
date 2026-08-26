@@ -38,9 +38,15 @@ object VolunteerDashboardDataSource {
         )
     }
 
-    private fun currentUserScope(): String =
-        supabase.auth.currentUserOrNull()?.id
+    private fun currentUserScope(): String {
+        val authUserId = supabase.auth.currentUserOrNull()?.id
             ?: error("A signed-in user is required to load volunteer data.")
+
+        // A cache key is a contract, not only a user ID. Bumping this value
+        // prevents an older public-schema/demo snapshot from being displayed
+        // after the app migrates to the normalized v1_erd_test source.
+        return "$CACHE_CONTRACT_VERSION:$authUserId"
+    }
 
     private fun database(): VolunteerLocalDatabase {
         check(::localDatabase.isInitialized) {
@@ -48,4 +54,6 @@ object VolunteerDashboardDataSource {
         }
         return localDatabase
     }
+
+    private const val CACHE_CONTRACT_VERSION = "v1_erd_test:v13"
 }

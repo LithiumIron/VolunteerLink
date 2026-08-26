@@ -176,6 +176,19 @@ fun VolunteerOpportunityNavigationHost() {
                                 )
                         },
 
+                        onVolunteerRoleSelected = {
+                                volunteerEventId,
+                                volunteerRoleId ->
+
+                            volunteerNavigationController.navigate(
+                                VolunteerOpportunityNavigationRoutes
+                                    .createVolunteerRoleDetailsRoute(
+                                        volunteerEventId = volunteerEventId,
+                                        volunteerRoleId = volunteerRoleId
+                                    )
+                            )
+                        },
+
                         onVolunteerApplicationSelected = {
                                 volunteerApplicationId ->
 

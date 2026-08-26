@@ -2,7 +2,6 @@ package com.example.volunteerlink.model
 
 import kotlinx.serialization.Serializable
 
-
 @Serializable
 enum class VolunteerRoleApplicationFlow {
     DIRECT_SUBMISSION,
@@ -87,7 +86,6 @@ data class VolunteerOpportunityEvent(
     val eventDatabaseId: String = "",
     val eventStatus: String = "PUBLISHED"
 )
-
 
 @Serializable
 enum class VolunteerApplicationStatus {
