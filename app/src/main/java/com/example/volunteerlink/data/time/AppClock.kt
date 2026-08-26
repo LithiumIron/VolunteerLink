@@ -1,5 +1,7 @@
+
 package com.example.volunteerlink.data.time
 
+import android.content.Context
 import android.util.Log
 import com.example.volunteerlink.data.supabase
 import io.github.jan.supabase.postgrest.from
@@ -25,9 +27,38 @@ object AppClock {
 
     private const val CLOCK_NAME = "APP"
     private const val TAG = "AppClock"
+    private const val PREFERENCES_NAME = "volunteerlink_app_clock"
+    private const val KEY_HAS_CACHED_CLOCK = "has_cached_clock"
+    private const val KEY_USE_TEST_TIME = "use_test_time"
+    private const val KEY_TEST_TIME_MILLIS = "test_time_millis"
+
+    private var applicationContext: Context? = null
 
     private val _state = MutableStateFlow(AppClockState())
     val state = _state.asStateFlow()
+
+    /**
+     * Restores the last successfully downloaded clock before Compose starts.
+     * Offline mode therefore uses the same date as the cached dashboard instead
+     * of silently changing to the phone clock after every process restart.
+     */
+    fun initialise(context: Context) {
+        applicationContext = context.applicationContext
+        val preferences = context.getSharedPreferences(
+            PREFERENCES_NAME,
+            Context.MODE_PRIVATE
+        )
+
+        if (!preferences.getBoolean(KEY_HAS_CACHED_CLOCK, false)) return
+
+        val useTestTime = preferences.getBoolean(KEY_USE_TEST_TIME, false)
+        val storedMillis = preferences.getLong(KEY_TEST_TIME_MILLIS, Long.MIN_VALUE)
+        updateState(
+            useTestTime = useTestTime,
+            testTimeMillis = storedMillis.takeUnless { it == Long.MIN_VALUE },
+            persist = false
+        )
+    }
 
     /**
      * Returns the time the rest of the app should treat as "now".
@@ -70,11 +101,14 @@ object AppClock {
                 .firstOrNull()
 
             if (row == null) {
-                updateState(
-                    useTestTime = false,
-                    testTimeMillis = null
-                )
-                Log.w(TAG, "APP clock row not found. Using phone time.")
+                if (!_state.value.isLoaded) {
+                    updateState(
+                        useTestTime = false,
+                        testTimeMillis = null,
+                        persist = false
+                    )
+                }
+                Log.w(TAG, "APP clock row not found. Keeping cached clock when available.")
                 return
             }
 
@@ -87,7 +121,8 @@ object AppClock {
 
             updateState(
                 useTestTime = useTestTime,
-                testTimeMillis = testTimeMillis
+                testTimeMillis = testTimeMillis,
+                persist = true
             )
 
             when {
@@ -101,10 +136,15 @@ object AppClock {
                     Log.d(TAG, "Test clock disabled. Using phone time.")
             }
         } catch (exception: Exception) {
-            updateState(
-                useTestTime = false,
-                testTimeMillis = null
-            )
+            // Keep the last successful cloud clock when offline. Only fall
+            // back to phone time when this installation has never synced it.
+            if (!_state.value.isLoaded) {
+                updateState(
+                    useTestTime = false,
+                    testTimeMillis = null,
+                    persist = false
+                )
+            }
             Log.w(
                 TAG,
                 "Could not read app_test_clock. Using phone time instead.",
@@ -121,7 +161,8 @@ object AppClock {
      */
     private fun updateState(
         useTestTime: Boolean,
-        testTimeMillis: Long?
+        testTimeMillis: Long?,
+        persist: Boolean = false
     ) {
         _state.value = AppClockState(
             useTestTime = useTestTime,
@@ -129,6 +170,22 @@ object AppClock {
             isLoaded = true,
             refreshVersion = _state.value.refreshVersion + 1L
         )
+
+        if (persist) {
+            applicationContext
+                ?.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
+                ?.edit()
+                ?.putBoolean(KEY_HAS_CACHED_CLOCK, true)
+                ?.putBoolean(KEY_USE_TEST_TIME, useTestTime)
+                ?.apply {
+                    if (testTimeMillis == null) {
+                        remove(KEY_TEST_TIME_MILLIS)
+                    } else {
+                        putLong(KEY_TEST_TIME_MILLIS, testTimeMillis)
+                    }
+                }
+                ?.apply()
+        }
     }
 
     /**
@@ -175,3 +232,5 @@ data class AppClockState(
     val isLoaded: Boolean = false,
     val refreshVersion: Long = 0L
 )
+
+
