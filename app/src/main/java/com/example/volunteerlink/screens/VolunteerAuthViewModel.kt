@@ -1,7 +1,9 @@
 
 package com.example.volunteerlink.screens
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import android.content.Context
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.volunteerlink.data.supabase
 import io.github.jan.supabase.auth.auth
@@ -24,7 +26,14 @@ data class VolunteerAuthUiState(
     val errorMessage: String? = null
 )
 
-class VolunteerAuthViewModel : ViewModel() {
+class VolunteerAuthViewModel(
+    application: Application
+) : AndroidViewModel(application) {
+    private val offlineAccountPreferences =
+        application.getSharedPreferences(
+            "volunteer_offline_account",
+            Context.MODE_PRIVATE
+        )
     private val mutableUiState =
         MutableStateFlow(VolunteerAuthUiState())
 
@@ -63,6 +72,7 @@ class VolunteerAuthViewModel : ViewModel() {
                     this.password = password
                 }
                 confirmVolunteerProfile()
+                rememberVerifiedVolunteer()
                 mutableUiState.value =
                     VolunteerAuthUiState(
                         isCheckingSession = false,
@@ -102,7 +112,14 @@ class VolunteerAuthViewModel : ViewModel() {
 
                 when (restoredSessionStatus) {
                     is SessionStatus.Authenticated -> {
-                        confirmVolunteerProfile()
+                        try {
+                            confirmVolunteerProfile()
+                            rememberVerifiedVolunteer()
+                        } catch (exception: Exception) {
+                            if (!isPreviouslyVerifiedVolunteer()) {
+                                throw exception
+                            }
+                        }
                         mutableUiState.value =
                             VolunteerAuthUiState(
                                 isCheckingSession = false,
@@ -110,8 +127,16 @@ class VolunteerAuthViewModel : ViewModel() {
                             )
                     }
 
+                    is SessionStatus.RefreshFailure -> {
+                        mutableUiState.value =
+                            VolunteerAuthUiState(
+                                isCheckingSession = false,
+                                isAuthenticated =
+                                    isPreviouslyVerifiedVolunteer()
+                            )
+                    }
+
                     is SessionStatus.NotAuthenticated,
-                    is SessionStatus.RefreshFailure,
                     SessionStatus.Initializing -> {
                         mutableUiState.value =
                             VolunteerAuthUiState(
@@ -120,13 +145,28 @@ class VolunteerAuthViewModel : ViewModel() {
                     }
                 }
             } catch (_: Exception) {
-                runCatching { supabase.auth.signOut() }
                 mutableUiState.value =
                     VolunteerAuthUiState(
                         isCheckingSession = false
                     )
             }
         }
+    }
+
+    private fun rememberVerifiedVolunteer() {
+        val authUserId = supabase.auth.currentUserOrNull()?.id ?: return
+        offlineAccountPreferences.edit()
+            .putString("verified_auth_user_id", authUserId)
+            .apply()
+    }
+
+    private fun isPreviouslyVerifiedVolunteer(): Boolean {
+        val currentAuthUserId =
+            supabase.auth.currentUserOrNull()?.id ?: return false
+        return offlineAccountPreferences.getString(
+            "verified_auth_user_id",
+            null
+        ) == currentAuthUserId
     }
 
     private suspend fun confirmVolunteerProfile() {
@@ -183,5 +223,3 @@ private data class VolunteerAccountTypeRow(
     @SerialName("account_type")
     val accountType: String
 )
-
-

@@ -1345,7 +1345,8 @@ private fun VolunteerSkillPathCard(
                 Text(
                     text =
                         if (nextLevel.requiredMinutes == null) {
-                            "Completed roles are verified by the organisation."
+                            "Remote assignments are verified by the organisation. " +
+                                "They build completed-role progress but do not add service hours."
                         } else {
                             "Both completed roles and verified time are required."
                         },
@@ -1584,7 +1585,8 @@ private fun VolunteerSkillPathProgressSection(
             Text(
                 text =
                     if (nextLevel.requiredMinutes == null) {
-                        "Reach the completed-role requirement to level up."
+                        "Reach the completed-role requirement to level up. " +
+                            "Remote assignment time is not counted as verified service hours."
                     } else {
                         "You must reach BOTH requirements. One requirement alone does not level up."
                     },
@@ -1652,11 +1654,28 @@ private fun VolunteerSkillPathEvidenceSection(
 
                 VolunteerSkillPathStat(
                     value =
-                        (volunteerSkillPath
-                            .verifiedMinutes
-                            ?: 0)
-                            .toString(),
-                    label = "Verified\nminutes",
+                        if (
+                            volunteerSkillPath.progressionType ==
+                                "ASSIGNMENTS_ONLY"
+                        ) {
+                            volunteerSkillPath
+                                .verifiedAssignments
+                                .toString()
+                        } else {
+                            (volunteerSkillPath
+                                .verifiedMinutes
+                                ?: 0)
+                                .toString()
+                        },
+                    label =
+                        if (
+                            volunteerSkillPath.progressionType ==
+                                "ASSIGNMENTS_ONLY"
+                        ) {
+                            "Verified\nassignments"
+                        } else {
+                            "Verified\nminutes"
+                        },
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -2161,5 +2180,3 @@ private fun volunteerLevelDisplayName(
         else -> "Level $level"
     }
 }
-
-

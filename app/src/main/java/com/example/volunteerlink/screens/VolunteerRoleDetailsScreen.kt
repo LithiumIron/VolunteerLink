@@ -433,7 +433,6 @@ private fun VolunteerRoleAssignmentSection(
             color = VolunteerLinkTextPrimary
         )
 
-
     }
 }
 
@@ -600,7 +599,11 @@ private fun VolunteerRoleScheduleSection(
                 ) {
                     Text(
                         text =
-                            scheduleItem.scheduleTime,
+                            listOf(
+                                scheduleItem.scheduleDate,
+                                scheduleItem.scheduleTime
+                            ).filter { it.isNotBlank() }
+                                .joinToString(" · "),
                         modifier = Modifier
                             .padding(end = 12.dp),
                         fontSize = 12.sp,
@@ -1107,5 +1110,3 @@ private fun VolunteerRoleNotFoundScreen(
         }
     }
 }
-
-

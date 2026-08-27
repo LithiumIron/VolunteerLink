@@ -321,7 +321,9 @@ fun VolunteerSearchScreen(
                                 )
                             ) {
                                 Text(
-                                    text = "ðŸ”¥  $term",
+                                    // Unicode escape avoids mojibake when a
+                                    // source file is copied between editors.
+                                    text = "\uD83D\uDD25  $term",
                                     modifier = Modifier.padding(
                                         horizontal = 11.dp,
                                         vertical = 7.dp
@@ -658,5 +660,4 @@ private fun VolunteerSearchResultCard(
 
 private fun VolunteerOpportunityCategory.displayName(): String =
     name.lowercase().replaceFirstChar(Char::uppercase)
-
 

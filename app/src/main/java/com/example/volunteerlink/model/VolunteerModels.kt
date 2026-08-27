@@ -17,6 +17,7 @@ enum class VolunteerRoleApplicationMethod {
 
 @Serializable
 data class VolunteerRoleScheduleItem(
+    val scheduleDate: String = "",
     val scheduleTime: String,
     val scheduleActivity: String
 )

@@ -5,6 +5,7 @@ import com.example.volunteerlink.data.local.CachedVolunteerDashboard
 import com.example.volunteerlink.data.local.VolunteerLocalDatabase
 import io.github.jan.supabase.auth.auth
 import com.example.volunteerlink.model.VolunteerSkillPath
+import com.example.volunteerlink.data.local.PendingVolunteerAction
 
 /** Coordinates Supabase (cloud) and SQLite (local) dashboard data. */
 object VolunteerDashboardDataSource {
@@ -28,6 +29,13 @@ object VolunteerDashboardDataSource {
         return dashboard
     }
 
+    suspend fun cacheCurrentSession() {
+        database().writeDashboard(
+            userScope = currentUserScope(),
+            dashboard = VolunteerOpportunitySessionStore.snapshot()
+        )
+    }
+
     suspend fun readCachedSkillPaths(): List<VolunteerSkillPath>? =
         database().readSkillPaths(currentUserScope())
 
@@ -36,6 +44,33 @@ object VolunteerDashboardDataSource {
             userScope = currentUserScope(),
             skillPaths = skillPaths
         )
+    }
+
+    suspend fun enqueuePendingAction(
+        actionType: String,
+        targetId: String,
+        payloadJson: String
+    ) {
+        val scope = currentUserScope()
+        database().setPendingActionUserScope(scope)
+        database().enqueueAction(actionType, targetId, payloadJson)
+    }
+
+    suspend fun readPendingActions(): List<PendingVolunteerAction> =
+        database().readPendingActions(currentUserScope())
+
+    suspend fun deletePendingAction(actionId: Long) =
+        database().deletePendingAction(actionId)
+
+    suspend fun syncPendingActions() {
+        readPendingActions().forEach { action ->
+            VolunteerOpportunityRepository.replayPendingAction(
+                actionType = action.actionType,
+                targetId = action.targetId,
+                payloadJson = action.payloadJson
+            )
+            deletePendingAction(action.actionId)
+        }
     }
 
     private fun currentUserScope(): String {
