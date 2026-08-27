@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.CardDefaults
@@ -29,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -43,6 +45,58 @@ import com.example.volunteerlink.organisation.create.model.VolunteerPostType
 val CreateGreen = Color(0xFF2A4A1E)
 val CreateLightGreen = Color(0xFFE5EFE1)
 val CreateCardBackground = Color(0xFFFBFCF9)
+
+@Composable
+fun EditRestrictionNotice(
+    title: String,
+    message: String,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = Color(0xFFFFF7E8),
+        border = BorderStroke(1.dp, Color(0xFFE3C472))
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Surface(
+                modifier = Modifier.size(26.dp),
+                shape = CircleShape,
+                color = Color(0xFFFFE8B5)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = "!",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF6D5318)
+                    )
+                }
+            }
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF5F4815)
+                )
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
 
 @Composable
 fun CreateSectionCard(
@@ -93,13 +147,22 @@ fun PostTypeCard(
     iconRes: Int,
     selected: Boolean,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
 ) {
-    val borderColor = if (selected) CreateGreen else Color(0xFFD5D8D2)
-    val background = if (selected) CreateLightGreen else Color.White
+    val borderColor = when {
+        !enabled -> Color(0xFFC7CBC5)
+        selected -> CreateGreen
+        else -> Color(0xFFD5D8D2)
+    }
+    val background = when {
+        !enabled -> Color(0xFFF1F2F0)
+        selected -> CreateLightGreen
+        else -> Color.White
+    }
 
     Surface(
-        modifier = modifier.clickable(onClick = onClick),
+        modifier = modifier.clickable(enabled = enabled, onClick = onClick),
         shape = RoundedCornerShape(16.dp),
         color = background,
         border = BorderStroke(1.2.dp, borderColor)
@@ -121,7 +184,9 @@ fun PostTypeCard(
                 Image(
                     painter = painterResource(iconRes),
                     contentDescription = null,
-                    modifier = Modifier.size(28.dp)
+                    modifier = Modifier
+                        .size(28.dp)
+                        .alpha(if (enabled) 1f else 0.42f)
                 )
             }
 
@@ -139,7 +204,11 @@ fun PostTypeCard(
                     modifier = Modifier.fillMaxWidth(),
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
-                    color = if (selected) CreateGreen else Color(0xFF263824),
+                    color = when {
+                        !enabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+                        selected -> CreateGreen
+                        else -> Color(0xFF263824)
+                    },
                     maxLines = 2,
                     textAlign = TextAlign.Center
                 )
@@ -171,9 +240,11 @@ fun PostTypeCard(
 fun CategoryPicker(
     selectedCategory: VolunteerPostCategory?,
     onCategorySelected: (VolunteerPostCategory) -> Unit,
-    errorMessage: String?
+    errorMessage: String?,
+    enabled: Boolean = true
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val visibleError = errorMessage.takeIf { enabled }
 
     Column(
         verticalArrangement = Arrangement.spacedBy(5.dp)
@@ -181,22 +252,27 @@ fun CategoryPicker(
         Text(
             text = "Category",
             style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Medium
+            fontWeight = FontWeight.Medium,
+            color = if (enabled) {
+                MaterialTheme.colorScheme.onSurface
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+            }
         )
 
         Box(modifier = Modifier.fillMaxWidth()) {
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { expanded = true },
+                    .clickable(enabled = enabled) { expanded = true },
                 shape = RoundedCornerShape(14.dp),
-                color = Color.Transparent,
+                color = if (enabled) Color.Transparent else Color(0xFFF1F2F0),
                 border = BorderStroke(
                     1.dp,
-                    if (errorMessage != null) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        Color(0xFF777A76)
+                    when {
+                        visibleError != null -> MaterialTheme.colorScheme.error
+                        !enabled -> Color(0xFFC7CBC5)
+                        else -> Color(0xFF777A76)
                     }
                 )
             ) {
@@ -212,23 +288,25 @@ fun CategoryPicker(
                         text = selectedCategory?.displayName
                             ?: "Select a category",
                         style = MaterialTheme.typography.bodyLarge,
-                        color = if (selectedCategory == null) {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
+                        color = when {
+                            !enabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+                            selectedCategory == null -> MaterialTheme.colorScheme.onSurfaceVariant
+                            else -> MaterialTheme.colorScheme.onSurface
                         }
                     )
 
                     Image(
                         painter = painterResource(R.drawable.org_create_dropdown),
                         contentDescription = "Open categories",
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier
+                            .size(18.dp)
+                            .alpha(if (enabled) 1f else 0.42f)
                     )
                 }
             }
 
             DropdownMenu(
-                expanded = expanded,
+                expanded = expanded && enabled,
                 onDismissRequest = { expanded = false }
             ) {
                 VolunteerPostCategory.entries.forEach { category ->
@@ -243,7 +321,7 @@ fun CategoryPicker(
             }
         }
 
-        FormError(errorMessage)
+        FormError(visibleError)
     }
 }
 
@@ -255,8 +333,11 @@ fun FormSelectionField(
     iconRes: Int? = null,
     errorMessage: String? = null,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
 ) {
+    val visibleError = errorMessage.takeIf { enabled }
+
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(5.dp)
@@ -264,21 +345,26 @@ fun FormSelectionField(
         Text(
             text = label,
             style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Medium
+            fontWeight = FontWeight.Medium,
+            color = if (enabled) {
+                MaterialTheme.colorScheme.onSurface
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+            }
         )
 
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable(onClick = onClick),
+                .clickable(enabled = enabled, onClick = onClick),
             shape = RoundedCornerShape(14.dp),
-            color = Color.Transparent,
+            color = if (enabled) Color.Transparent else Color(0xFFF1F2F0),
             border = BorderStroke(
                 1.dp,
-                if (errorMessage != null) {
-                    MaterialTheme.colorScheme.error
-                } else {
-                    Color(0xFF777A76)
+                when {
+                    visibleError != null -> MaterialTheme.colorScheme.error
+                    !enabled -> Color(0xFFC7CBC5)
+                    else -> Color(0xFF777A76)
                 }
             )
         ) {
@@ -294,7 +380,9 @@ fun FormSelectionField(
                     Image(
                         painter = painterResource(iconRes),
                         contentDescription = null,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier
+                            .size(20.dp)
+                            .alpha(if (enabled) 1f else 0.42f)
                     )
                 }
 
@@ -302,16 +390,16 @@ fun FormSelectionField(
                     text = value.ifBlank { placeholder },
                     modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.bodyLarge,
-                    color = if (value.isBlank()) {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
+                    color = when {
+                        !enabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+                        value.isBlank() -> MaterialTheme.colorScheme.onSurfaceVariant
+                        else -> MaterialTheme.colorScheme.onSurface
                     }
                 )
             }
         }
 
-        FormError(errorMessage)
+        FormError(visibleError)
     }
 }
 
@@ -322,7 +410,8 @@ fun VolunteerCapacityField(
     label: String = "Volunteers Needed",
     supportingText: String? = null,
     errorMessage: String? = null,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
 ) {
     Column(
         modifier = modifier,
@@ -336,6 +425,7 @@ fun VolunteerCapacityField(
             singleLine = true,
             isError = errorMessage != null,
             shape = RoundedCornerShape(14.dp),
+            enabled = enabled,
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Number,
                 imeAction = ImeAction.Done

@@ -47,8 +47,9 @@ import com.example.volunteerlink.organisation.viewmodel.CreatePostViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.delay
 
-/** Step 4 of Create Post: optional Physical, Remote and Training schedules before Review. */
+/** Step 4 of Create Post: optional Physical and Remote schedules before Review. */
 @Composable
 fun ScheduleStep(
     uiState: CreatePostUiState,
@@ -95,6 +96,15 @@ fun ScheduleOverview(
     var replaceTargetDate by rememberSaveable { mutableStateOf<Long?>(null) }
     var overviewDeleteItemId by rememberSaveable { mutableStateOf<String?>(null) }
     var continueWarning by rememberSaveable { mutableStateOf<String?>(null) }
+    val overviewListState = rememberLazyListState()
+
+    val editPolicy = uiState.editPolicy
+    fun scheduleCanEdit(itemId: String): Boolean =
+        !uiState.isExistingPostEdit || editPolicy?.schedulePolicies?.get(itemId)?.canEdit != false
+    fun scheduleCanDelete(itemId: String): Boolean =
+        !uiState.isExistingPostEdit || editPolicy?.schedulePolicies?.get(itemId)?.canRemove != false
+    fun scheduleLockedReason(itemId: String): String? =
+        if (uiState.isExistingPostEdit) editPolicy?.schedulePolicies?.get(itemId)?.reason else null
 
     LaunchedEffect(activeSection) {
         if (
@@ -114,10 +124,21 @@ fun ScheduleOverview(
         }
     }
 
+    LaunchedEffect(uiState.validationFocusRequest) {
+        if (uiState.showScheduleErrors && uiState.scheduleError != null) {
+            delay(30)
+            val totalItems = overviewListState.layoutInfo.totalItemsCount
+            if (totalItems > 0) {
+                overviewListState.animateScrollToItem((totalItems - 2).coerceAtLeast(0))
+            }
+        }
+    }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .statusBarsPadding(),
+        state = overviewListState,
         contentPadding = PaddingValues(
             start = 20.dp,
             top = 16.dp,
@@ -178,6 +199,10 @@ fun ScheduleOverview(
                                 physicalDates = physicalDates,
                                 selectedDate = selectedPhysicalDate,
                                 getItemError = viewModel::getScheduleItemValidationMessage,
+                                canAddItem = !uiState.isExistingPostEdit || editPolicy?.canAddPhysicalSchedule != false,
+                                canEditItem = ::scheduleCanEdit,
+                                canDeleteItem = ::scheduleCanDelete,
+                                getItemLockedReason = ::scheduleLockedReason,
                                 onDateSelected = viewModel::selectPhysicalScheduleDate,
                                 onAddItem = viewModel::addPhysicalScheduleItem,
                                 onEditItem = viewModel::openScheduleItemEditor,
@@ -199,6 +224,10 @@ fun ScheduleOverview(
                             draft = draft,
                             roleCatalogue = uiState.roleCatalogue,
                             getItemError = viewModel::getScheduleItemValidationMessage,
+                            canAddItem = !uiState.isExistingPostEdit || editPolicy?.canAddRemoteSchedule != false,
+                            canEditItem = ::scheduleCanEdit,
+                            canDeleteItem = ::scheduleCanDelete,
+                            getItemLockedReason = ::scheduleLockedReason,
                             onAddItem = viewModel::addRemoteScheduleItem,
                             onEditItem = viewModel::openScheduleItemEditor,
                             onDeleteItem = { itemId ->
@@ -208,21 +237,6 @@ fun ScheduleOverview(
                     }
                 }
 
-                ScheduleType.TRAINING -> {
-                    item {
-                        TrainingScheduleSection(
-                            draft = draft,
-                            roleCatalogue = uiState.roleCatalogue,
-                            getItemError = viewModel::getScheduleItemValidationMessage,
-                            getItemWarning = viewModel::getScheduleItemWarning,
-                            onAddItem = viewModel::addTrainingScheduleItem,
-                            onEditItem = viewModel::openScheduleItemEditor,
-                            onDeleteItem = { itemId ->
-                                overviewDeleteItemId = itemId
-                            }
-                        )
-                    }
-                }
             }
         }
 
@@ -311,7 +325,7 @@ fun ScheduleOverview(
                 Text(
                     "${formatScheduleDate(replaceTarget)} already has Physical activities. " +
                         "Copying ${formatScheduleDate(replaceSource)} will replace only the " +
-                        "Physical activities on that day. Training and Remote items are unchanged."
+                        "Physical activities on that day. Remote items are unchanged."
                 )
             },
             dismissButton = {
@@ -434,15 +448,19 @@ fun ScheduleItemEditorScreen(
 ) {
     val listState = rememberLazyListState()
     val isEditingExisting = uiState.editingScheduleItemId != null
-    var saveWarning by rememberSaveable(item.draftId) {
-        mutableStateOf<String?>(null)
-    }
     var showDeleteDialog by rememberSaveable(item.draftId) {
         mutableStateOf(false)
     }
 
     LaunchedEffect(item.draftId) {
         listState.scrollToItem(0)
+    }
+
+    LaunchedEffect(uiState.validationFocusRequest) {
+        if (uiState.showScheduleErrors && uiState.scheduleError != null) {
+            // Header = 0, editor form = 1, validation card = 2.
+            listState.animateScrollToItem(2)
+        }
     }
 
     LazyColumn(
@@ -515,12 +533,7 @@ fun ScheduleItemEditorScreen(
                 Button(
                     onClick = {
                         if (viewModel.validateScheduleEditor()) {
-                            val warning = viewModel.getScheduleEditorWarning()
-                            if (warning == null) {
-                                viewModel.saveScheduleEditor()
-                            } else {
-                                saveWarning = warning
-                            }
+                            viewModel.saveScheduleEditor()
                         }
                     },
                     modifier = Modifier.weight(1f),
@@ -536,46 +549,6 @@ fun ScheduleItemEditorScreen(
                 }
             }
         }
-    }
-
-    val warning = saveWarning
-    if (warning != null) {
-        AlertDialog(
-            onDismissRequest = {
-                saveWarning = null
-            },
-            title = {
-                Text(
-                    text = "Short-notice training",
-                    fontWeight = FontWeight.Bold
-                )
-            },
-            text = {
-                Text(warning)
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        saveWarning = null
-                    }
-                ) {
-                    Text("Go Back")
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        saveWarning = null
-                        viewModel.saveScheduleEditor()
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = CreateGreen
-                    )
-                ) {
-                    Text("Schedule Anyway")
-                }
-            }
-        )
     }
 
     if (showDeleteDialog) {
@@ -644,7 +617,6 @@ private fun PausedScheduleDraftCard(
                     "Unfinished ${when (item.scheduleType) {
                         ScheduleType.PHYSICAL -> "Physical activity"
                         ScheduleType.REMOTE -> "Remote milestone"
-                        ScheduleType.TRAINING -> "Training / briefing"
                     }}"
                 },
                 style = MaterialTheme.typography.titleSmall,
@@ -752,11 +724,6 @@ fun ScheduleEditorHeader(
                         "Add Remote Milestone"
                     }
 
-                    ScheduleType.TRAINING -> if (isEditingExisting) {
-                        "Edit Training / Briefing"
-                    } else {
-                        "Add Training / Briefing"
-                    }
                 },
                 style = MaterialTheme.typography.headlineSmall,
                 color = CreateGreen,
@@ -852,19 +819,16 @@ private fun scheduleSectionsForPostType(
 ): List<ScheduleType> {
     return when (postType) {
         VolunteerPostType.PHYSICAL -> listOf(
-            ScheduleType.PHYSICAL,
-            ScheduleType.TRAINING
+            ScheduleType.PHYSICAL
         )
 
         VolunteerPostType.REMOTE -> listOf(
-            ScheduleType.REMOTE,
-            ScheduleType.TRAINING
+            ScheduleType.REMOTE
         )
 
         VolunteerPostType.HYBRID -> listOf(
             ScheduleType.PHYSICAL,
-            ScheduleType.REMOTE,
-            ScheduleType.TRAINING
+            ScheduleType.REMOTE
         )
 
         null -> emptyList()

@@ -72,12 +72,6 @@ data class PostManagementScheduleItem(
     val endTime: String? = null,
     val location: String? = null,
     val notes: String? = null,
-    val trainingMode: String? = null,
-    val onlinePlatform: String? = null,
-    val meetingLink: String? = null,
-    val trainingTimeZone: String? = null,
-    val trainingLocationMode: String? = null,
-    val trainingLocationName: String? = null
 )
 
 data class PostManagementRole(
@@ -89,7 +83,6 @@ data class PostManagementRole(
     val applicationMethod: String,
     val roleNotes: String? = null,
     val individualSubmissionRequirement: String? = null,
-    val applicationClosingSchedules: List<PostManagementRoleClosingSchedule> = emptyList(),
     val applicationWindowState: RoleApplicationWindowState = RoleApplicationWindowState.OPEN,
     val applicationCutoffDate: String? = null,
     val applicationCutoffReason: RoleApplicationCutoffReason? = null
@@ -98,10 +91,6 @@ data class PostManagementRole(
         get() = applicationWindowState == RoleApplicationWindowState.OPEN
 }
 
-data class PostManagementRoleClosingSchedule(
-    val scheduleItemId: String,
-    val scheduleDate: String
-)
 
 data class PostManagementPerson(
     val userId: String,

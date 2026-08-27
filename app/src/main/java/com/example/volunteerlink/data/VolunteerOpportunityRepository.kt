@@ -444,10 +444,6 @@ object VolunteerOpportunityRepository {
                                     .ifBlank {
                                         template?.description.orEmpty()
                                     },
-                            roleTrainingDetails =
-                                roleScheduleItems
-                                    .firstOrNull()
-                                    ?.scheduleActivity,
                             roleResponsibilities =
                                 normalizedResponsibilities,
                             roleScheduleItems = roleScheduleItems,

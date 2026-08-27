@@ -48,8 +48,6 @@ import com.example.volunteerlink.organisation.create.model.RemoteSubmissionMode
 import com.example.volunteerlink.organisation.create.model.ScheduleItemDraft
 import com.example.volunteerlink.organisation.create.model.ScheduleType
 import com.example.volunteerlink.organisation.create.model.SelectedRoleDraft
-import com.example.volunteerlink.organisation.create.model.TrainingLocationMode
-import com.example.volunteerlink.organisation.create.model.TrainingMode
 import com.example.volunteerlink.organisation.create.model.VolunteerPostType
 import com.example.volunteerlink.organisation.create.model.VolunteerRoleMode
 import java.text.SimpleDateFormat

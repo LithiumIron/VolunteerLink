@@ -4,17 +4,12 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.volunteerlink.data.post.DraftAttentionType
-import com.example.volunteerlink.data.post.MissingTrainingDetail
 import com.example.volunteerlink.data.post.PostMode
 import com.example.volunteerlink.data.post.PostTimingEvaluator
 import com.example.volunteerlink.data.post.PostTimingInput
 import com.example.volunteerlink.data.post.PostTimingState
 import com.example.volunteerlink.data.post.RoleApplicationWindowEvaluator
 import com.example.volunteerlink.data.post.RoleApplicationWindowInput
-import com.example.volunteerlink.data.post.TrainingAttentionType
-import com.example.volunteerlink.data.post.TrainingLocationMode
-import com.example.volunteerlink.data.post.TrainingMode
-import com.example.volunteerlink.data.post.TrainingTimingInput
 import com.example.volunteerlink.data.time.AppClock
 import com.example.volunteerlink.organisation.home.model.OrganisationHomePost
 import com.example.volunteerlink.organisation.home.model.OrganisationHomeRole
@@ -111,10 +106,6 @@ class OrganisationManageViewModel : ViewModel() {
                             post = post,
                             input = timingInput,
                             nowMillis = nowMillis
-                        ) + buildTrainingAttention(
-                            post = post,
-                            nowMillis = nowMillis,
-                            allowOutdated = true
                         )
                     )
                 }
@@ -131,11 +122,6 @@ class OrganisationManageViewModel : ViewModel() {
                             )?.let(attention::add)
                         }
 
-                        attention += buildTrainingAttention(
-                            post = post,
-                            nowMillis = nowMillis,
-                            allowOutdated = false
-                        )
 
                         active += post.toManageItem(
                             timingState = timingState,
@@ -254,81 +240,6 @@ class OrganisationManageViewModel : ViewModel() {
         }
     }
 
-    private fun buildTrainingAttention(
-        post: OrganisationHomePost,
-        nowMillis: Long,
-        allowOutdated: Boolean
-    ): List<ManageAttentionItem> {
-        return post.schedules
-            .filter { it.scheduleType.equals("TRAINING", ignoreCase = true) }
-            .mapNotNull { schedule ->
-                val trainingMode = TrainingMode.fromDatabaseValue(
-                    schedule.trainingMode
-                ) ?: return@mapNotNull null
-
-                val attention = PostTimingEvaluator.evaluateTrainingAttention(
-                    input = TrainingTimingInput(
-                        scheduleDate = schedule.scheduleDate,
-                        startTime = schedule.startTime,
-                        trainingMode = trainingMode,
-                        meetingLink = schedule.meetingLink,
-                        trainingLocationMode = TrainingLocationMode.fromDatabaseValue(
-                            schedule.trainingLocationMode
-                        ),
-                        trainingLocationName = schedule.trainingLocationName
-                    ),
-                    nowMillis = nowMillis
-                )
-
-                if (!attention.needsAttention) return@mapNotNull null
-                if (
-                    attention.type == TrainingAttentionType.OUTDATED &&
-                    !allowOutdated
-                ) {
-                    return@mapNotNull null
-                }
-
-                val missing = when (attention.missingDetail) {
-                    MissingTrainingDetail.MEETING_LINK -> "meeting link"
-                    MissingTrainingDetail.LOCATION -> "on-site location"
-                    null -> "training details"
-                }
-
-                when (attention.type) {
-                    TrainingAttentionType.WARNING -> ManageAttentionItem(
-                        type = ManageAttentionType.TRAINING_DETAILS_WARNING,
-                        severity = ManageAttentionSeverity.WARNING,
-                        kindLabel = "TRAINING",
-                        title = schedule.title,
-                        message = "${formatShortDate(schedule.scheduleDate)} · Add the $missing before volunteers attend."
-                    )
-
-                    TrainingAttentionType.URGENT -> ManageAttentionItem(
-                        type = ManageAttentionType.TRAINING_DETAILS_URGENT,
-                        severity = ManageAttentionSeverity.URGENT,
-                        kindLabel = "TRAINING",
-                        title = schedule.title,
-                        message = when (attention.daysUntilTraining) {
-                            0 -> "Training is today. Add the $missing now."
-                            1 -> "Training is tomorrow. Add the $missing now."
-                            else -> "Training is in ${attention.daysUntilTraining} days. Add the $missing now."
-                        }
-                    )
-
-                    TrainingAttentionType.OUTDATED -> ManageAttentionItem(
-                        type = ManageAttentionType.TRAINING_OUTDATED,
-                        severity = ManageAttentionSeverity.URGENT,
-                        kindLabel = "TRAINING",
-                        title = schedule.title,
-                        message = "This draft contains a passed training date with incomplete details."
-                    )
-
-                    TrainingAttentionType.NONE -> null
-                }
-            }
-            .sortedBySeverity()
-    }
-
     private fun buildApplicationAttention(
         post: OrganisationHomePost,
         nowMillis: Long
@@ -378,9 +289,7 @@ class OrganisationManageViewModel : ViewModel() {
                 roleMode = roleMode,
                 postStatus = post.status,
                 physicalStartDate = post.physicalStartDate,
-                remoteStartDate = post.remoteStartDate,
-                applicationClosingScheduleDates = applicationClosingSchedules
-                    .map { it.scheduleDate }
+                remoteStartDate = post.remoteStartDate
             ),
             nowMillis = nowMillis
         ).isOpen

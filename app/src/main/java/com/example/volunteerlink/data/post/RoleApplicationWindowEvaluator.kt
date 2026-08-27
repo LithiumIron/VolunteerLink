@@ -8,17 +8,10 @@ import java.util.Locale
 /**
  * Shared role-level application cutoff rules.
  *
- * VolunteerLink closes applications at the START OF the cutoff DATE, not at an
- * exact event/training clock time. Therefore the day before the cutoff date is
- * the final day for joining/reviewing applications.
- *
+ * Applications stay open until the volunteering phase for that role starts.
  * Hybrid posts are evaluated per role:
  * - PHYSICAL role -> Physical volunteering start date
  * - REMOTE role   -> Remote volunteering start date
- *
- * A schedule linked through schedule_item_roles with
- * closes_applications_on_start = true may close that role earlier. Only the
- * schedule date matters for V1; its start_time is deliberately ignored.
  */
 object RoleApplicationWindowEvaluator {
 
@@ -43,42 +36,11 @@ object RoleApplicationWindowEvaluator {
             else -> null
         }
 
-        val validRoleStart = roleStartDate?.takeIf(::isValidDate)
-        val validScheduleDates = input.applicationClosingScheduleDates
-            .map(String::trim)
-            .filter(::isValidDate)
+        val cutoffDate = roleStartDate?.takeIf(::isValidDate)
 
-        val earliestScheduleDate = validScheduleDates.minByOrNull {
-            parseDateAtStartOfDay(it) ?: Long.MAX_VALUE
-        }
-
-        val cutoffCandidates = buildList {
-            validRoleStart?.let {
-                add(
-                    CutoffCandidate(
-                        date = it,
-                        reason = RoleApplicationCutoffReason.ROLE_START
-                    )
-                )
-            }
-            earliestScheduleDate?.let {
-                add(
-                    CutoffCandidate(
-                        date = it,
-                        reason = RoleApplicationCutoffReason.SCHEDULE_START
-                    )
-                )
-            }
-        }
-
-        val effectiveCutoff = cutoffCandidates.minByOrNull {
-            parseDateAtStartOfDay(it.date) ?: Long.MAX_VALUE
-        }
-
-        // If old/incomplete test data has no usable cutoff date, do not
-        // silently hide legitimate applications. Treat the role as open until
-        // a valid start date is available.
-        if (effectiveCutoff == null) {
+        // Incomplete legacy/test data with no usable start date stays open
+        // rather than silently hiding legitimate applications.
+        if (cutoffDate == null) {
             return RoleApplicationWindow(
                 state = RoleApplicationWindowState.OPEN,
                 cutoffDate = null,
@@ -87,7 +49,7 @@ object RoleApplicationWindowEvaluator {
         }
 
         val today = startOfDay(nowMillis)
-        val cutoffDay = parseDateAtStartOfDay(effectiveCutoff.date)
+        val cutoffDay = parseDateAtStartOfDay(cutoffDate)
             ?: return RoleApplicationWindow(
                 state = RoleApplicationWindowState.OPEN,
                 cutoffDate = null,
@@ -100,14 +62,13 @@ object RoleApplicationWindowEvaluator {
             } else {
                 RoleApplicationWindowState.CLOSED
             },
-            cutoffDate = effectiveCutoff.date,
-            cutoffReason = effectiveCutoff.reason
+            cutoffDate = cutoffDate,
+            cutoffReason = RoleApplicationCutoffReason.ROLE_START
         )
     }
 
-    private fun isValidDate(value: String): Boolean {
-        return parseDateAtStartOfDay(value) != null
-    }
+    private fun isValidDate(value: String): Boolean =
+        parseDateAtStartOfDay(value) != null
 
     private fun parseDateAtStartOfDay(value: String): Long? {
         val parsed = runCatching {
@@ -132,19 +93,13 @@ object RoleApplicationWindowEvaluator {
             isLenient = false
         }
     }
-
-    private data class CutoffCandidate(
-        val date: String,
-        val reason: RoleApplicationCutoffReason
-    )
 }
 
 data class RoleApplicationWindowInput(
     val roleMode: String,
     val postStatus: String? = null,
     val physicalStartDate: String? = null,
-    val remoteStartDate: String? = null,
-    val applicationClosingScheduleDates: List<String> = emptyList()
+    val remoteStartDate: String? = null
 )
 
 enum class RoleApplicationWindowState {
@@ -154,7 +109,6 @@ enum class RoleApplicationWindowState {
 
 enum class RoleApplicationCutoffReason {
     ROLE_START,
-    SCHEDULE_START,
     POST_STATUS
 }
 

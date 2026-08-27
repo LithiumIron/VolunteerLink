@@ -1,6 +1,14 @@
 package com.example.volunteerlink.organisation.create.model
 
 import com.example.volunteerlink.data.location.LocationSuggestion
+import com.example.volunteerlink.organisation.create.PostEditPolicy
+
+
+/** Which database action the shared post editor represents. */
+sealed interface CreatePostEditorMode {
+    data object NewPost : CreatePostEditorMode
+    data class ExistingPostEdit(val postId: String) : CreatePostEditorMode
+}
 
 /** Field-level validation messages for Create Post Step 1. */
 data class CreatePostErrors(
@@ -60,12 +68,25 @@ data class RoleSelectionErrors(
  */
 data class CreatePostUiState(
     val draft: CreatePostDraft = CreatePostDraft(),
+
+    // The same Step 1-5 editor is reused by Manage > Edit.
+    val editorMode: CreatePostEditorMode = CreatePostEditorMode.NewPost,
+    val editPolicy: PostEditPolicy? = null,
+    val isLoadingExistingPost: Boolean = false,
+    val existingPostLoadError: String? = null,
+    val editRestrictionMessage: String? = null,
+    val isSavingChanges: Boolean = false,
+    val saveChangesError: String? = null,
+    val updatedPostId: String? = null,
     val locationSuggestions: List<LocationSuggestion> = emptyList(),
     val isLocationSearching: Boolean = false,
     val locationSearchError: String? = null,
     val physicalTimeError: String? = null,
     val errors: CreatePostErrors = CreatePostErrors(),
     val showValidationErrors: Boolean = false,
+    // Incremented only when a validation action fails. Long forms observe this
+    // value to jump to the relevant error once, without fighting normal typing.
+    val validationFocusRequest: Long = 0L,
     val isStepOneReady: Boolean = false,
 
     // Current Create Post page. Steps 1-4 are editable form pages and
@@ -99,9 +120,6 @@ data class CreatePostUiState(
     val editingScheduleItemId: String? = null,
     val scheduleEditorDraft: ScheduleItemDraft? = null,
     val isScheduleEditorOpen: Boolean = false,
-    val trainingLocationSuggestions: List<LocationSuggestion> = emptyList(),
-    val isTrainingLocationSearching: Boolean = false,
-    val trainingLocationSearchError: String? = null,
     val scheduleError: String? = null,
     val showScheduleErrors: Boolean = false,
     val isStepFourReady: Boolean = false,
@@ -121,6 +139,12 @@ data class CreatePostUiState(
     val pendingPostType: VolunteerPostType? = null,
     val isPostTypeCommitted: Boolean = false
 ) {
+    val isExistingPostEdit: Boolean
+        get() = editorMode is CreatePostEditorMode.ExistingPostEdit
+
+    val existingPostId: String?
+        get() = (editorMode as? CreatePostEditorMode.ExistingPostEdit)?.postId
+
     /** Hide field errors until the organiser first presses Continue. */
     val visibleErrors: CreatePostErrors
         get() = if (showValidationErrors) errors else CreatePostErrors()

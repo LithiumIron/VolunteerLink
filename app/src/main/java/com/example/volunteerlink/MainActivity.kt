@@ -90,7 +90,7 @@ class MainActivity : ComponentActivity() {
     companion object {
         // The demo clock rarely changes. A one-minute interval avoids polling
         // Supabase 1,200 times per foreground hour while remaining demo-friendly.
-        private const val APP_CLOCK_REFRESH_INTERVAL_MS = 60_000L
+        private const val APP_CLOCK_REFRESH_INTERVAL_MS = 3_000L
     }
 }
 

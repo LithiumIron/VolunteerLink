@@ -26,6 +26,7 @@ import com.example.volunteerlink.organisation.create.CreatePostValidator
 import com.example.volunteerlink.organisation.create.components.CreateGreen
 import com.example.volunteerlink.organisation.create.components.CreateSectionCard
 import com.example.volunteerlink.organisation.create.components.DateSelectionField
+import com.example.volunteerlink.organisation.create.components.EditRestrictionNotice
 import com.example.volunteerlink.organisation.create.components.FormError
 import com.example.volunteerlink.organisation.create.components.LocationAutocompleteField
 import com.example.volunteerlink.organisation.create.components.TimeSelectionField
@@ -43,6 +44,10 @@ fun PhysicalEventDetailsSection(
 ) {
     val draft = uiState.draft
     val errors = uiState.visibleErrors
+    val editPolicy = uiState.editPolicy
+    val canEditPhysicalCore = !uiState.isExistingPostEdit || editPolicy?.canEditPhysicalCore != false
+    val canEditMeetingPoint = !uiState.isExistingPostEdit || editPolicy?.canEditPhysicalMeetingPoint != false
+    val canEditPhysicalCapacity = !uiState.isExistingPostEdit || editPolicy?.canEditPhysicalCapacity != false
 
     // Observe AppClock directly so changing the Supabase test date while the
     // app is already open recalculates the 7-day minimum immediately.
@@ -50,16 +55,26 @@ fun PhysicalEventDetailsSection(
     val minimumStartDateMillis = remember(clockState.refreshVersion) {
         CreatePostValidator.minimumStartDateMillis()
     }
-    val physicalStartDateError = if (draft.physicalStartDateMillis == null) {
-        errors.physicalStartDate
-    } else {
-        CreatePostValidator.minimumLeadTimeError(draft.physicalStartDateMillis)
+    val physicalStartDateError = when {
+        uiState.isExistingPostEdit -> errors.physicalStartDate
+        draft.physicalStartDateMillis == null -> errors.physicalStartDate
+        else -> CreatePostValidator.minimumLeadTimeError(draft.physicalStartDateMillis)
     }
 
     CreateSectionCard(
         title = "Event Schedule",
-        subtitle = "Choose when the physical event will take place. Start dates must be at least 7 days from today."
+        subtitle = if (uiState.isExistingPostEdit && !canEditPhysicalCore) {
+            "Current event dates and times are fixed for this post."
+        } else {
+            "Choose when the physical event will take place. Start dates must be at least 7 days from today."
+        }
     ) {
+        if (uiState.isExistingPostEdit && !canEditPhysicalCore) {
+            EditRestrictionNotice(
+                title = "Schedule locked",
+                message = "Dates and times are fixed because volunteers or the event lifecycle already depend on them."
+            )
+        }
         Text(
             text = "Event Duration",
             style = MaterialTheme.typography.labelLarge,
@@ -74,6 +89,7 @@ fun PhysicalEventDetailsSection(
                 title = "One Day",
                 selected = !draft.isMultiDayPhysicalEvent,
                 onClick = { viewModel.updateIsMultiDay(false) },
+                enabled = canEditPhysicalCore,
                 modifier = Modifier.weight(1f)
             )
 
@@ -81,6 +97,7 @@ fun PhysicalEventDetailsSection(
                 title = "Multiple Days",
                 selected = draft.isMultiDayPhysicalEvent,
                 onClick = { viewModel.updateIsMultiDay(true) },
+                enabled = canEditPhysicalCore,
                 modifier = Modifier.weight(1f)
             )
         }
@@ -96,6 +113,7 @@ fun PhysicalEventDetailsSection(
                     minimumDateMillis = minimumStartDateMillis,
                     errorMessage = physicalStartDateError,
                     onDateSelected = viewModel::updatePhysicalStartDate,
+                    enabled = canEditPhysicalCore,
                     modifier = Modifier.weight(1f)
                 )
 
@@ -109,6 +127,7 @@ fun PhysicalEventDetailsSection(
                     minimumDateMillis = minimumEndDate,
                     errorMessage = errors.physicalEndDate,
                     onDateSelected = viewModel::updatePhysicalEndDate,
+                    enabled = canEditPhysicalCore,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -118,7 +137,8 @@ fun PhysicalEventDetailsSection(
                 selectedDateMillis = draft.physicalStartDateMillis,
                 minimumDateMillis = minimumStartDateMillis,
                 errorMessage = physicalStartDateError,
-                onDateSelected = viewModel::updatePhysicalStartDate
+                onDateSelected = viewModel::updatePhysicalStartDate,
+                enabled = canEditPhysicalCore
             )
         }
 
@@ -138,6 +158,7 @@ fun PhysicalEventDetailsSection(
                     viewModel.updatePhysicalStartTime(hour, minute)
                     null
                 },
+                enabled = canEditPhysicalCore,
                 modifier = Modifier.weight(1f)
             )
 
@@ -158,6 +179,7 @@ fun PhysicalEventDetailsSection(
                     },
                 onDialogOpened = viewModel::clearPhysicalTimeError,
                 onTimeSelected = viewModel::updatePhysicalEndTime,
+                enabled = canEditPhysicalCore,
                 modifier = Modifier.weight(1f)
             )
         }
@@ -167,6 +189,16 @@ fun PhysicalEventDetailsSection(
         title = "Event Location",
         subtitle = "Select a real location from Geoapify so its address and coordinates can be saved later."
     ) {
+        if (uiState.isExistingPostEdit && (!canEditPhysicalCore || !canEditMeetingPoint)) {
+            EditRestrictionNotice(
+                title = "Location editing limited",
+                message = if (!canEditPhysicalCore && canEditMeetingPoint) {
+                    "Event location is fixed. The meeting point can still be updated before the event starts."
+                } else {
+                    "Event location and meeting point can no longer be changed."
+                }
+            )
+        }
         LocationAutocompleteField(
             query = draft.physicalLocationQuery,
             selectedLocation = draft.physicalLocation,
@@ -176,7 +208,8 @@ fun PhysicalEventDetailsSection(
             validationError = errors.physicalLocation,
             onQueryChanged = viewModel::onLocationQueryChanged,
             onLocationSelected = viewModel::onLocationSelected,
-            onClearLocation = viewModel::clearLocation
+            onClearLocation = viewModel::clearLocation,
+            enabled = canEditPhysicalCore
         )
 
         OutlinedTextField(
@@ -189,6 +222,7 @@ fun PhysicalEventDetailsSection(
             },
             minLines = 2,
             maxLines = 3,
+            enabled = canEditMeetingPoint,
             shape = RoundedCornerShape(14.dp)
         )
     }
@@ -201,7 +235,8 @@ fun PhysicalEventDetailsSection(
             VolunteerCapacityField(
                 value = draft.physicalVolunteerCapacity,
                 onValueChanged = viewModel::updatePhysicalVolunteerCapacity,
-                errorMessage = errors.physicalCapacity
+                errorMessage = errors.physicalCapacity,
+                enabled = canEditPhysicalCapacity
             )
         }
     }
@@ -216,22 +251,56 @@ fun RemoteProjectDetailsSection(
 ) {
     val draft = uiState.draft
     val errors = uiState.visibleErrors
+    val editPolicy = uiState.editPolicy
+    val canEditRemoteStart = !uiState.isExistingPostEdit || editPolicy?.canEditRemoteStart != false
+    val canEditRemoteDue = !uiState.isExistingPostEdit || editPolicy?.canEditRemoteDueDate != false
+    val canEditRemoteSetup = !uiState.isExistingPostEdit || editPolicy?.canEditRemoteSubmissionSetup != false
+    val canEditRemoteCapacity = !uiState.isExistingPostEdit || editPolicy?.canEditRemoteCapacity != false
+    val remoteDueExtensionOnly = uiState.isExistingPostEdit &&
+        canEditRemoteDue &&
+        editPolicy?.minimumRemoteDueDateMillis != null
 
     // Remote dates use the same observable AppClock as Physical dates.
     val clockState by AppClock.state.collectAsStateWithLifecycle()
     val minimumStartDateMillis = remember(clockState.refreshVersion) {
         CreatePostValidator.minimumStartDateMillis()
     }
-    val remoteStartDateError = if (draft.remoteStartDateMillis == null) {
-        errors.remoteStartDate
-    } else {
-        CreatePostValidator.minimumLeadTimeError(draft.remoteStartDateMillis)
+    val remoteStartDateError = when {
+        uiState.isExistingPostEdit -> errors.remoteStartDate
+        draft.remoteStartDateMillis == null -> errors.remoteStartDate
+        else -> CreatePostValidator.minimumLeadTimeError(draft.remoteStartDateMillis)
     }
 
     CreateSectionCard(
         title = "Remote Project Timeline",
-        subtitle = "Set the working period for the remote part. Start dates must be at least 7 days from today."
+        subtitle = if (
+            uiState.isExistingPostEdit &&
+            (!canEditRemoteStart || !canEditRemoteDue || remoteDueExtensionOnly)
+        ) {
+            "This existing post has timeline limits based on volunteer and submission history."
+        } else {
+            "Set the working period for the remote part. Start dates must be at least 7 days from today."
+        }
     ) {
+        if (
+            uiState.isExistingPostEdit &&
+            (!canEditRemoteStart || !canEditRemoteDue || remoteDueExtensionOnly)
+        ) {
+            EditRestrictionNotice(
+                title = "Timeline editing limited",
+                message = when {
+                    !canEditRemoteDue -> editPolicy?.remoteDueDateLockedReason
+                        ?: "The Remote due date is locked."
+                    !canEditRemoteStart && remoteDueExtensionOnly ->
+                        "Start date is locked. The due date may only be extended; it cannot be shortened after volunteers have joined or Individual work has been submitted."
+                    !canEditRemoteStart ->
+                        "Start date is locked. The due date can still be changed where allowed."
+                    remoteDueExtensionOnly ->
+                        "The due date may only be extended; it cannot be shortened after volunteers have joined or Individual work has been submitted."
+                    else -> "Some timeline dates are restricted."
+                }
+            )
+        }
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -242,12 +311,21 @@ fun RemoteProjectDetailsSection(
                 minimumDateMillis = minimumStartDateMillis,
                 errorMessage = remoteStartDateError,
                 onDateSelected = viewModel::updateRemoteStartDate,
+                enabled = canEditRemoteStart,
                 modifier = Modifier.weight(1f)
             )
 
-            val minimumDueDate = draft.remoteStartDateMillis?.let {
+            val minimumDueDateFromStart = draft.remoteStartDateMillis?.let {
                 CreatePostValidator.nextDayMillis(it)
             } ?: minimumStartDateMillis
+            val minimumDueDate = if (uiState.isExistingPostEdit) {
+                maxOf(
+                    minimumDueDateFromStart,
+                    editPolicy?.minimumRemoteDueDateMillis ?: minimumDueDateFromStart
+                )
+            } else {
+                minimumDueDateFromStart
+            }
 
             DateSelectionField(
                 label = "Due Date",
@@ -255,6 +333,7 @@ fun RemoteProjectDetailsSection(
                 minimumDateMillis = minimumDueDate,
                 errorMessage = errors.remoteDueDate,
                 onDateSelected = viewModel::updateRemoteDueDate,
+                enabled = canEditRemoteDue,
                 modifier = Modifier.weight(1f)
             )
         }
@@ -264,6 +343,12 @@ fun RemoteProjectDetailsSection(
         title = "Remote Submission Setup",
         subtitle = "Choose how completed remote work will be submitted."
     ) {
+        if (uiState.isExistingPostEdit && !canEditRemoteSetup) {
+            EditRestrictionNotice(
+                title = "Submission setup locked",
+                message = "Existing applicants, volunteers or submitted work already depend on this setup."
+            )
+        }
         Column(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -271,6 +356,7 @@ fun RemoteProjectDetailsSection(
                 title = "Shared Team Deliverable",
                 description = "The remote team works toward one final output. A responsible role can be chosen later.",
                 selected = draft.remoteSubmissionMode == RemoteSubmissionMode.SHARED_TEAM,
+                enabled = canEditRemoteSetup,
                 onClick = {
                     viewModel.updateRemoteSubmissionMode(
                         RemoteSubmissionMode.SHARED_TEAM
@@ -282,6 +368,7 @@ fun RemoteProjectDetailsSection(
                 title = "Individual Deliverables",
                 description = "Each remote volunteer submits their own required output. Role-specific requirements are set later.",
                 selected = draft.remoteSubmissionMode == RemoteSubmissionMode.INDIVIDUAL,
+                enabled = canEditRemoteSetup,
                 onClick = {
                     viewModel.updateRemoteSubmissionMode(
                         RemoteSubmissionMode.INDIVIDUAL
@@ -303,6 +390,7 @@ fun RemoteProjectDetailsSection(
                 },
                 minLines = 2,
                 maxLines = 4,
+                enabled = canEditRemoteSetup,
                 isError = errors.sharedDeliverable != null,
                 shape = RoundedCornerShape(14.dp)
             )
@@ -319,7 +407,8 @@ fun RemoteProjectDetailsSection(
             VolunteerCapacityField(
                 value = draft.remoteVolunteerCapacity,
                 onValueChanged = viewModel::updateRemoteVolunteerCapacity,
-                errorMessage = errors.remoteCapacity
+                errorMessage = errors.remoteCapacity,
+                enabled = canEditRemoteCapacity
             )
         }
     }
@@ -333,6 +422,9 @@ fun HybridVolunteerRequirementSection(
 ) {
     val draft = uiState.draft
     val errors = uiState.visibleErrors
+    val editPolicy = uiState.editPolicy
+    val canEditPhysicalCapacity = !uiState.isExistingPostEdit || editPolicy?.canEditPhysicalCapacity != false
+    val canEditRemoteCapacity = !uiState.isExistingPostEdit || editPolicy?.canEditRemoteCapacity != false
 
     CreateSectionCard(
         title = "Hybrid Volunteer Requirement",
@@ -347,6 +439,7 @@ fun HybridVolunteerRequirementSection(
                 onValueChanged = viewModel::updateHybridPhysicalVolunteerCapacity,
                 label = "Physical",
                 errorMessage = errors.hybridPhysicalCapacity,
+                enabled = canEditPhysicalCapacity,
                 modifier = Modifier.weight(1f)
             )
 
@@ -355,6 +448,7 @@ fun HybridVolunteerRequirementSection(
                 onValueChanged = viewModel::updateHybridRemoteVolunteerCapacity,
                 label = "Remote",
                 errorMessage = errors.hybridRemoteCapacity,
+                enabled = canEditRemoteCapacity,
                 modifier = Modifier.weight(1f)
             )
         }
@@ -366,22 +460,23 @@ private fun DurationOption(
     title: String,
     selected: Boolean,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
 ) {
     Surface(
-        modifier = modifier.clickable(onClick = onClick),
+        modifier = modifier.clickable(enabled = enabled, onClick = onClick),
         shape = RoundedCornerShape(12.dp),
-        color = if (selected) {
-            Color(0xFFE5EFE1)
-        } else {
-            MaterialTheme.colorScheme.surface
+        color = when {
+            !enabled -> Color(0xFFF1F2F0)
+            selected -> Color(0xFFE5EFE1)
+            else -> MaterialTheme.colorScheme.surface
         },
         border = BorderStroke(
             1.dp,
-            if (selected) {
-                CreateGreen
-            } else {
-                MaterialTheme.colorScheme.outlineVariant
+            when {
+                !enabled -> Color(0xFFC7CBC5)
+                selected -> CreateGreen
+                else -> MaterialTheme.colorScheme.outlineVariant
             }
         )
     ) {
@@ -393,10 +488,10 @@ private fun DurationOption(
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.SemiBold,
             textAlign = TextAlign.Center,
-            color = if (selected) {
-                CreateGreen
-            } else {
-                MaterialTheme.colorScheme.onSurface
+            color = when {
+                !enabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+                selected -> CreateGreen
+                else -> MaterialTheme.colorScheme.onSurface
             }
         )
     }
@@ -407,24 +502,25 @@ private fun SubmissionModeOption(
     title: String,
     description: String,
     selected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    enabled: Boolean = true
 ) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .clickable(enabled = enabled, onClick = onClick),
         shape = RoundedCornerShape(14.dp),
-        color = if (selected) {
-            Color(0xFFE5EFE1)
-        } else {
-            MaterialTheme.colorScheme.surface
+        color = when {
+            !enabled -> Color(0xFFF1F2F0)
+            selected -> Color(0xFFE5EFE1)
+            else -> MaterialTheme.colorScheme.surface
         },
         border = BorderStroke(
             1.dp,
-            if (selected) {
-                CreateGreen
-            } else {
-                MaterialTheme.colorScheme.outlineVariant
+            when {
+                !enabled -> Color(0xFFC7CBC5)
+                selected -> CreateGreen
+                else -> MaterialTheme.colorScheme.outlineVariant
             }
         )
     ) {
@@ -436,10 +532,10 @@ private fun SubmissionModeOption(
                 text = title,
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
-                color = if (selected) {
-                    CreateGreen
-                } else {
-                    MaterialTheme.colorScheme.onSurface
+                color = when {
+                    !enabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+                    selected -> CreateGreen
+                    else -> MaterialTheme.colorScheme.onSurface
                 }
             )
 

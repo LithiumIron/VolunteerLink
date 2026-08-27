@@ -433,42 +433,7 @@ private fun VolunteerRoleAssignmentSection(
             color = VolunteerLinkTextPrimary
         )
 
-        volunteerOpportunityRole
-            .roleTrainingDetails
-            ?.takeIf { trainingDetails ->
-                trainingDetails.isNotBlank()
-            }
-            ?.let { trainingDetails ->
-                Spacer(
-                    modifier = Modifier.height(14.dp)
-                )
 
-                HorizontalDivider(
-                    color = VolunteerLinkBorderColour
-                )
-
-                Spacer(
-                    modifier = Modifier.height(12.dp)
-                )
-
-                Text(
-                    text = "Training provided",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = VolunteerLinkSuccess
-                )
-
-                Spacer(
-                    modifier = Modifier.height(3.dp)
-                )
-
-                Text(
-                    text = trainingDetails,
-                    fontSize = 12.sp,
-                    lineHeight = 18.sp,
-                    color = VolunteerLinkTextSecondary
-                )
-            }
     }
 }
 

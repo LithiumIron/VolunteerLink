@@ -34,7 +34,6 @@ data class VolunteerOpportunityRole(
     val roleExperienceRequirement: String,
     val roleExtraApplicationQuestions: List<String> = emptyList(),
     val roleSpecificAssignment: String = "",
-    val roleTrainingDetails: String? = null,
     val roleResponsibilities: List<String> = emptyList(),
     val roleScheduleItems: List<VolunteerRoleScheduleItem> = emptyList(),
     val roleMinimumSkillPathLevel: Int = 1,

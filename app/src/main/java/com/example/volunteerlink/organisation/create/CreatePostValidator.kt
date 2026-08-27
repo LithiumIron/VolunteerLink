@@ -7,8 +7,6 @@ import com.example.volunteerlink.organisation.create.model.CreateRoleTemplate
 import com.example.volunteerlink.organisation.create.model.RemoteSubmissionMode
 import com.example.volunteerlink.organisation.create.model.ScheduleItemDraft
 import com.example.volunteerlink.organisation.create.model.ScheduleType
-import com.example.volunteerlink.organisation.create.model.TrainingMode
-import com.example.volunteerlink.organisation.create.model.TrainingLocationMode
 import com.example.volunteerlink.organisation.create.model.RoleApplicationMethod
 import com.example.volunteerlink.organisation.create.model.SelectedRoleDraft
 import com.example.volunteerlink.organisation.create.model.RoleSelectionErrors
@@ -28,7 +26,6 @@ import java.util.Locale
 object CreatePostValidator {
 
     const val MINIMUM_LEAD_DAYS = 7
-    const val SHORT_NOTICE_TRAINING_HOURS = 72
 
     fun startOfDayMillis(
         timeMillis: Long = AppClock.nowMillis()
@@ -119,7 +116,9 @@ object CreatePostValidator {
      */
     fun withoutMinimumLeadTimeErrors(
         draft: CreatePostDraft,
-        errors: CreatePostErrors
+        errors: CreatePostErrors,
+        ignorePhysical: Boolean = true,
+        ignoreRemote: Boolean = true
     ): CreatePostErrors {
         val physicalTooSoon =
             draft.physicalStartDateMillis != null &&
@@ -129,8 +128,8 @@ object CreatePostValidator {
                 minimumLeadTimeError(draft.remoteStartDateMillis) != null
 
         return errors.copy(
-            physicalStartDate = if (physicalTooSoon) null else errors.physicalStartDate,
-            remoteStartDate = if (remoteTooSoon) null else errors.remoteStartDate
+            physicalStartDate = if (ignorePhysical && physicalTooSoon) null else errors.physicalStartDate,
+            remoteStartDate = if (ignoreRemote && remoteTooSoon) null else errors.remoteStartDate
         )
     }
 
@@ -598,7 +597,7 @@ object CreatePostValidator {
 
 
     // ---------------------------------------------------------------------
-    // Step 4: schedule
+    // Step 4: optional Physical / Remote schedule
     // ---------------------------------------------------------------------
 
     /** Every Physical event date that can appear in the Step 4 timetable. */
@@ -621,28 +620,20 @@ object CreatePostValidator {
 
         val dates = mutableListOf<Long>()
         var current = start
-
-        // Safety limit prevents a broken draft from producing an endless loop.
         while (current <= end && dates.size < 366) {
             dates += current
             current = nextDayMillis(current)
         }
-
         return dates
     }
 
-    /**
-     * Returns the selected ROLE... IDs that may be targeted by one schedule type.
-     * Training can target Physical roles, Remote roles, or a mixture of both.
-     */
+    /** Returns selected ROLE... IDs that match the schedule side. */
     fun applicableScheduleRoleIds(
         draft: CreatePostDraft,
         scheduleType: ScheduleType,
         roleCatalogue: List<CreateRoleTemplate>
     ): List<String> {
-        val templatesById = roleCatalogue.associateBy { template ->
-            template.roleTemplateId
-        }
+        val templatesById = roleCatalogue.associateBy { it.roleTemplateId }
 
         return draft.selectedRoles.mapNotNull { selectedRole ->
             val template = templatesById[selectedRole.roleTemplateId]
@@ -651,11 +642,8 @@ object CreatePostValidator {
             val allowed = when (scheduleType) {
                 ScheduleType.PHYSICAL ->
                     template.roleMode == VolunteerRoleMode.PHYSICAL
-
                 ScheduleType.REMOTE ->
                     template.roleMode == VolunteerRoleMode.REMOTE
-
-                ScheduleType.TRAINING -> true
             }
 
             selectedRole.roleTemplateId.takeIf { allowed }
@@ -673,7 +661,6 @@ object CreatePostValidator {
             return when (item.scheduleType) {
                 ScheduleType.PHYSICAL -> "Enter an activity name."
                 ScheduleType.REMOTE -> "Enter a milestone or checkpoint title."
-                ScheduleType.TRAINING -> "Enter a training or briefing title."
             }
         }
 
@@ -691,12 +678,8 @@ object CreatePostValidator {
             return when (item.scheduleType) {
                 ScheduleType.PHYSICAL ->
                     "Return to Step 2 and select at least one Physical role."
-
                 ScheduleType.REMOTE ->
                     "Return to Step 2 and select at least one Remote role."
-
-                ScheduleType.TRAINING ->
-                    "Return to Step 2 and select at least one role."
             }
         }
 
@@ -726,10 +709,6 @@ object CreatePostValidator {
                 if (start < eventStart || end > eventEnd) {
                     return "Keep this activity within the event time set in Step 1."
                 }
-
-                if (hasTrainingOnlyData(item)) {
-                    return "Physical timetable items cannot contain Training-only details."
-                }
             }
 
             ScheduleType.REMOTE -> {
@@ -751,188 +730,28 @@ object CreatePostValidator {
                 ) {
                     return "Remote milestones use a date only, without time or location."
                 }
-
-                if (hasTrainingOnlyData(item)) {
-                    return "Remote milestones cannot contain Training-only details."
-                }
-            }
-
-            ScheduleType.TRAINING -> {
-                val trainingMode = item.trainingMode
-                    ?: return "Choose Online or On-site training."
-                val start = item.startTimeMinutes
-                    ?: return "Select a training start time."
-                val end = item.endTimeMinutes
-                    ?: return "Select a training end time."
-
-                if (end <= start) {
-                    return "Training end time must be later than start time."
-                }
-
-                if (!trainingClosingRolesAreValid(
-                        draft = draft,
-                        item = item,
-                        roleCatalogue = roleCatalogue
-                    )
-                ) {
-                    return "Application-closing roles must also be targeted by this training."
-                }
-
-                val latestAllowedDate = trainingLatestAllowedDate(
-                    draft = draft,
-                    item = item,
-                    roleCatalogue = roleCatalogue
-                ) ?: return "The targeted roles do not have a valid opportunity end date."
-
-                if (date > latestAllowedDate) {
-                    return "Training cannot be scheduled after the targeted role opportunity has ended."
-                }
-
-                val trainingStartMillis = timedStartEpochMillis(item)
-                    ?: return "Complete the training date and start time."
-
-                if (trainingStartMillis <= nowMillis) {
-                    return "Training must start in the future."
-                }
-
-                when (trainingMode) {
-                    TrainingMode.ONLINE -> {
-                        if (
-                            item.location.isNotBlank() ||
-                            item.trainingLocationMode != null ||
-                            item.trainingLocation != null ||
-                            item.trainingLocationQuery.isNotBlank()
-                        ) {
-                            return "Online training should not contain an on-site location."
-                        }
-
-                        val noticeWindowMillis =
-                            SHORT_NOTICE_TRAINING_HOURS * 60L * 60L * 1000L
-
-                        if (
-                            trainingStartMillis - nowMillis <= noticeWindowMillis &&
-                            item.meetingLink.isBlank()
-                        ) {
-                            return "Add the online meeting link because the session starts within 3 days."
-                        }
-                    }
-
-                    TrainingMode.ONSITE -> {
-                        if (
-                            item.onlinePlatform.isNotBlank() ||
-                            item.meetingLink.isNotBlank()
-                        ) {
-                            return "On-site training should not contain online platform or meeting-link details."
-                        }
-
-                        when (item.trainingLocationMode) {
-                            TrainingLocationMode.EVENT_LOCATION -> {
-                                val hasPhysicalPart =
-                                    draft.postType == VolunteerPostType.PHYSICAL ||
-                                        draft.postType == VolunteerPostType.HYBRID
-
-                                if (!hasPhysicalPart || draft.physicalLocation == null) {
-                                    return "The main event location is not available for this training."
-                                }
-                            }
-
-                            TrainingLocationMode.CUSTOM -> {
-                                if (item.trainingLocation == null) {
-                                    return "Select the on-site training location from the Geoapify suggestions."
-                                }
-                            }
-
-                            TrainingLocationMode.TBA -> {
-                                val noticeWindowMillis =
-                                    SHORT_NOTICE_TRAINING_HOURS * 60L * 60L * 1000L
-
-                                if (trainingStartMillis - nowMillis <= noticeWindowMillis) {
-                                    return "Confirm the on-site training location because the session starts within 3 days."
-                                }
-                            }
-
-                            null -> return "Choose how the on-site training location will be provided."
-                        }
-                    }
-                }
             }
         }
 
         if (
-            item.scheduleType != ScheduleType.REMOTE &&
+            item.scheduleType == ScheduleType.PHYSICAL &&
             hasTimedScheduleConflict(
                 draft = draft,
                 item = item,
                 roleCatalogue = roleCatalogue
             )
         ) {
-            return "This time overlaps another Physical or Training item for the same role(s)."
+            return "This time overlaps another Physical item for the same role(s)."
         }
 
         return null
     }
 
-    fun trainingStartsWithinShortNotice(
-        item: ScheduleItemDraft,
-        nowMillis: Long = AppClock.nowMillis()
-    ): Boolean {
-        if (item.scheduleType != ScheduleType.TRAINING) return false
-
-        val trainingStartMillis = timedStartEpochMillis(item) ?: return false
-        val noticeWindowMillis =
-            SHORT_NOTICE_TRAINING_HOURS * 60L * 60L * 1000L
-
-        return trainingStartMillis > nowMillis &&
-            trainingStartMillis - nowMillis <= noticeWindowMillis
-    }
-
-    /**
-     * Short-notice training is allowed. It is a warning rather than a blocker
-     * when the details needed to attend are complete.
-     */
-    fun scheduleItemWarning(
-        draft: CreatePostDraft,
-        item: ScheduleItemDraft,
-        nowMillis: Long = AppClock.nowMillis()
-    ): String? {
-        if (item.scheduleType != ScheduleType.TRAINING) return null
-
-        val shortNotice = trainingStartsWithinShortNotice(
-            item = item,
-            nowMillis = nowMillis
-        )
-
-        if (shortNotice) {
-            return "This training starts within 3 days. Some volunteers may have little time to prepare or attend. You can still schedule it if this timing is necessary."
-        }
-
-        return when {
-            item.trainingMode == TrainingMode.ONSITE &&
-                item.trainingLocationMode == TrainingLocationMode.TBA ->
-                "Location is still to be confirmed. Add the on-site location at least 3 days before this training."
-
-            item.trainingMode == TrainingMode.ONLINE &&
-                item.meetingLink.isBlank() ->
-                "Meeting link is still to be confirmed. Add it at least 3 days before this training."
-
-            else -> null
-        }
-    }
-
-    /** Empty Step 4 is valid; any saved item that exists must be complete. */
     fun validateStepFour(
         draft: CreatePostDraft,
         roleCatalogue: List<CreateRoleTemplate>,
         nowMillis: Long = AppClock.nowMillis()
     ): String? {
-        duplicateTrainingClosingRoleId(draft)?.let { roleId ->
-            val roleName = roleCatalogue.firstOrNull { role ->
-                role.roleTemplateId == roleId
-            }?.roleName ?: roleId
-
-            return "$roleName can have only one Training responsible for closing applications. Review the Application Closing choices."
-        }
-
         draft.scheduleItems.forEach { item ->
             val error = validateScheduleItem(
                 draft = draft,
@@ -940,17 +759,12 @@ object CreatePostValidator {
                 roleCatalogue = roleCatalogue,
                 nowMillis = nowMillis
             )
-
             if (error != null) return error
         }
-
         return null
     }
 
-    /**
-     * Step 4 stays optional. The final Continue action gives one concise
-     * confirmation for intentionally empty schedule sections.
-     */
+    /** Step 4 stays optional; warn only about empty relevant schedule sections. */
     fun scheduleProceedWarning(
         draft: CreatePostDraft,
         nowMillis: Long = AppClock.nowMillis()
@@ -964,24 +778,18 @@ object CreatePostValidator {
                 draft.postType == VolunteerPostType.HYBRID
 
         if (hasPhysicalPart) {
-            val physicalItems = draft.scheduleItems.filter { item ->
-                item.scheduleType == ScheduleType.PHYSICAL
+            val physicalItems = draft.scheduleItems.filter {
+                it.scheduleType == ScheduleType.PHYSICAL
             }
-
             if (physicalItems.isEmpty()) {
                 warnings += "Physical Schedule is empty."
             } else {
                 val physicalDates = physicalScheduleDates(draft)
                 if (physicalDates.size > 1) {
                     val scheduledDates = physicalItems
-                        .mapNotNull { item ->
-                            item.scheduleDateMillis?.let(::startOfDayMillis)
-                        }
+                        .mapNotNull { it.scheduleDateMillis?.let(::startOfDayMillis) }
                         .toSet()
-                    val missingDays = physicalDates.count { date ->
-                        date !in scheduledDates
-                    }
-
+                    val missingDays = physicalDates.count { it !in scheduledDates }
                     if (missingDays > 0) {
                         warnings += "$missingDays Physical event day(s) have no timetable."
                     }
@@ -991,30 +799,9 @@ object CreatePostValidator {
 
         if (
             hasRemotePart &&
-            draft.scheduleItems.none { item ->
-                item.scheduleType == ScheduleType.REMOTE
-            }
+            draft.scheduleItems.none { it.scheduleType == ScheduleType.REMOTE }
         ) {
             warnings += "Remote Schedule is empty."
-        }
-
-        if (
-            draft.scheduleItems.none { item ->
-                item.scheduleType == ScheduleType.TRAINING
-            }
-        ) {
-            warnings += "Training & Briefing is empty."
-        }
-
-        if (
-            draft.scheduleItems.any { item ->
-                trainingStartsWithinShortNotice(
-                    item = item,
-                    nowMillis = nowMillis
-                )
-            }
-        ) {
-            warnings += "At least one Training / Briefing starts within 3 days."
         }
 
         return if (warnings.isEmpty()) {
@@ -1025,50 +812,15 @@ object CreatePostValidator {
         }
     }
 
-    private fun duplicateTrainingClosingRoleId(
-        draft: CreatePostDraft
-    ): String? {
-        val counts = mutableMapOf<String, Int>()
-
-        draft.scheduleItems
-            .filter { item -> item.scheduleType == ScheduleType.TRAINING }
-            .forEach { item ->
-                item.closingRoleTemplateIds
-                    .distinct()
-                    .forEach { roleId ->
-                        val nextCount = (counts[roleId] ?: 0) + 1
-                        if (nextCount > 1) return roleId
-                        counts[roleId] = nextCount
-                    }
-            }
-
-        return null
-    }
-
-    private fun hasTrainingOnlyData(item: ScheduleItemDraft): Boolean {
-        return item.trainingMode != null ||
-            item.trainingLocationMode != null ||
-            item.trainingLocationQuery.isNotBlank() ||
-            item.trainingLocation != null ||
-            item.onlinePlatform.isNotBlank() ||
-            item.meetingLink.isNotBlank() ||
-            item.trainingTimeZoneId != null ||
-            item.closingRoleTemplateIds.isNotEmpty()
-    }
-
     private fun scheduleRoleTargetsAreValid(
         item: ScheduleItemDraft,
         applicableRoleIds: List<String>
     ): Boolean {
-        if (item.appliesToAllRoles) {
-            return applicableRoleIds.isNotEmpty()
-        }
-
+        if (item.appliesToAllRoles) return applicableRoleIds.isNotEmpty()
         val selectedTargets = item.targetRoleTemplateIds.distinct()
         if (selectedTargets.isEmpty()) return false
-
         val validIds = applicableRoleIds.toSet()
-        return selectedTargets.all { roleId -> roleId in validIds }
+        return selectedTargets.all { it in validIds }
     }
 
     private fun effectiveScheduleRoleIds(
@@ -1081,72 +833,13 @@ object CreatePostValidator {
             scheduleType = item.scheduleType,
             roleCatalogue = roleCatalogue
         )
-
         return if (item.appliesToAllRoles) {
             applicable.toSet()
         } else {
             item.targetRoleTemplateIds
-                .filter { roleId -> roleId in applicable }
+                .filter { it in applicable }
                 .toSet()
         }
-    }
-
-    private fun trainingClosingRolesAreValid(
-        draft: CreatePostDraft,
-        item: ScheduleItemDraft,
-        roleCatalogue: List<CreateRoleTemplate>
-    ): Boolean {
-        if (item.scheduleType != ScheduleType.TRAINING) {
-            return item.closingRoleTemplateIds.isEmpty()
-        }
-
-        val targetedRoleIds = effectiveScheduleRoleIds(
-            draft = draft,
-            item = item,
-            roleCatalogue = roleCatalogue
-        )
-
-        return item.closingRoleTemplateIds
-            .distinct()
-            .all { roleId -> roleId in targetedRoleIds }
-    }
-
-    /**
-     * Training may be before volunteering begins, but not after any targeted
-     * role has already finished. A mixed training uses the earliest end date.
-     */
-    private fun trainingLatestAllowedDate(
-        draft: CreatePostDraft,
-        item: ScheduleItemDraft,
-        roleCatalogue: List<CreateRoleTemplate>
-    ): Long? {
-        val templatesById = roleCatalogue.associateBy { template ->
-            template.roleTemplateId
-        }
-        val targetIds = effectiveScheduleRoleIds(
-            draft = draft,
-            item = item,
-            roleCatalogue = roleCatalogue
-        )
-        val targetModes = targetIds.mapNotNull { roleId ->
-            templatesById[roleId]?.roleMode
-        }.toSet()
-
-        val candidateDates = mutableListOf<Long>()
-
-        if (VolunteerRoleMode.PHYSICAL in targetModes) {
-            val physicalEnd =
-                draft.physicalEndDateMillis ?: draft.physicalStartDateMillis
-            physicalEnd?.let { candidateDates += startOfDayMillis(it) }
-        }
-
-        if (VolunteerRoleMode.REMOTE in targetModes) {
-            draft.remoteDueDateMillis?.let {
-                candidateDates += startOfDayMillis(it)
-            }
-        }
-
-        return candidateDates.minOrNull()
     }
 
     private fun hasTimedScheduleConflict(
@@ -1154,36 +847,23 @@ object CreatePostValidator {
         item: ScheduleItemDraft,
         roleCatalogue: List<CreateRoleTemplate>
     ): Boolean {
+        if (item.scheduleType != ScheduleType.PHYSICAL) return false
         val itemStart = timedStartEpochMillis(item) ?: return false
         val itemEnd = timedEndEpochMillis(item) ?: return false
-        val itemRoles = effectiveScheduleRoleIds(
-            draft = draft,
-            item = item,
-            roleCatalogue = roleCatalogue
-        )
-
+        val itemRoles = effectiveScheduleRoleIds(draft, item, roleCatalogue)
         if (itemRoles.isEmpty()) return false
 
         return draft.scheduleItems.any { other ->
             if (
                 other.draftId == item.draftId ||
-                other.scheduleType == ScheduleType.REMOTE
-            ) {
-                return@any false
-            }
+                other.scheduleType != ScheduleType.PHYSICAL
+            ) return@any false
 
-            val otherRoles = effectiveScheduleRoleIds(
-                draft = draft,
-                item = other,
-                roleCatalogue = roleCatalogue
-            )
-            if (itemRoles.intersect(otherRoles).isEmpty()) {
-                return@any false
-            }
+            val otherRoles = effectiveScheduleRoleIds(draft, other, roleCatalogue)
+            if (itemRoles.intersect(otherRoles).isEmpty()) return@any false
 
             val otherStart = timedStartEpochMillis(other) ?: return@any false
             val otherEnd = timedEndEpochMillis(other) ?: return@any false
-
             itemStart < otherEnd && otherStart < itemEnd
         }
     }
@@ -1198,19 +878,12 @@ object CreatePostValidator {
         return timedEpochMillis(item, time)
     }
 
-    /**
-     * Time-zone support is intentionally postponed. For now Step 4 compares
-     * the selected local date/time using the device calendar and stores no
-     * training timezone value. This helper can later be replaced centrally.
-     */
     private fun timedEpochMillis(
         item: ScheduleItemDraft,
         timeMinutes: Int
     ): Long? {
         val dateMillis = item.scheduleDateMillis ?: return null
-        val sourceDate = Calendar.getInstance().apply {
-            timeInMillis = dateMillis
-        }
+        val sourceDate = Calendar.getInstance().apply { timeInMillis = dateMillis }
 
         return Calendar.getInstance().apply {
             clear()
@@ -1225,5 +898,4 @@ object CreatePostValidator {
             set(Calendar.MILLISECOND, 0)
         }.timeInMillis
     }
-
 }

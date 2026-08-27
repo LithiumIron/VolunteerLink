@@ -19,7 +19,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -28,10 +27,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -39,23 +34,17 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.volunteerlink.data.time.AppClock
 import com.example.volunteerlink.R
 import com.example.volunteerlink.organisation.create.CreatePostValidator
 import com.example.volunteerlink.organisation.create.components.CreateGreen
 import com.example.volunteerlink.organisation.create.components.CreateLightGreen
 import com.example.volunteerlink.organisation.create.components.DateSelectionField
-import com.example.volunteerlink.organisation.create.components.LocationAutocompleteField
 import com.example.volunteerlink.organisation.create.components.TimeSelectionField
 import com.example.volunteerlink.organisation.create.model.CreatePostDraft
 import com.example.volunteerlink.organisation.create.model.CreatePostUiState
 import com.example.volunteerlink.organisation.create.model.CreateRoleTemplate
 import com.example.volunteerlink.organisation.create.model.ScheduleItemDraft
 import com.example.volunteerlink.organisation.create.model.ScheduleType
-import com.example.volunteerlink.organisation.create.model.TrainingLocationMode
-import com.example.volunteerlink.organisation.create.model.TrainingMode
-import com.example.volunteerlink.organisation.create.model.VolunteerPostType
 import com.example.volunteerlink.organisation.create.model.VolunteerRoleMode
 import com.example.volunteerlink.organisation.viewmodel.CreatePostViewModel
 import java.text.SimpleDateFormat
@@ -104,7 +93,6 @@ fun ScheduleSectionSelector(
                             text = when (section) {
                                 ScheduleType.PHYSICAL -> "Physical"
                                 ScheduleType.REMOTE -> "Remote"
-                                ScheduleType.TRAINING -> "Training"
                             },
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.Bold,
@@ -134,6 +122,10 @@ fun PhysicalScheduleSection(
     physicalDates: List<Long>,
     selectedDate: Long,
     getItemError: (String) -> String?,
+    canAddItem: Boolean = true,
+    canEditItem: (String) -> Boolean = { true },
+    canDeleteItem: (String) -> Boolean = { true },
+    getItemLockedReason: (String) -> String? = { null },
     onDateSelected: (Long) -> Unit,
     onAddItem: (Long) -> String?,
     onEditItem: (String) -> Unit,
@@ -223,7 +215,7 @@ fun PhysicalScheduleSection(
             if (physicalDates.size > 1 && items.isNotEmpty()) {
                 TextButton(
                     onClick = { onCopyDay(selectedDate) },
-                    enabled = canCopyDay(selectedDate)
+                    enabled = canAddItem && canCopyDay(selectedDate)
                 ) {
                     Text("Copy Day")
                 }
@@ -242,6 +234,9 @@ fun PhysicalScheduleSection(
                     item = item,
                     error = getItemError(item.draftId),
                     warning = null,
+                    canEdit = canEditItem(item.draftId),
+                    canDelete = canDeleteItem(item.draftId),
+                    lockedReason = getItemLockedReason(item.draftId),
                     onEdit = { onEditItem(item.draftId) },
                     onDelete = { onDeleteItem(item.draftId) }
                 )
@@ -258,6 +253,7 @@ fun PhysicalScheduleSection(
 
         AddScheduleButton(
             text = "Add Physical Activity",
+            enabled = canAddItem,
             onClick = { onAddItem(selectedDate) }
         )
     }
@@ -268,6 +264,10 @@ fun RemoteScheduleSection(
     draft: CreatePostDraft,
     roleCatalogue: List<CreateRoleTemplate>,
     getItemError: (String) -> String?,
+    canAddItem: Boolean = true,
+    canEditItem: (String) -> Boolean = { true },
+    canDeleteItem: (String) -> Boolean = { true },
+    getItemLockedReason: (String) -> String? = { null },
     onAddItem: () -> String?,
     onEditItem: (String) -> Unit,
     onDeleteItem: (String) -> Unit
@@ -302,6 +302,9 @@ fun RemoteScheduleSection(
                     item = item,
                     error = getItemError(item.draftId),
                     warning = null,
+                    canEdit = canEditItem(item.draftId),
+                    canDelete = canDeleteItem(item.draftId),
+                    lockedReason = getItemLockedReason(item.draftId),
                     onEdit = { onEditItem(item.draftId) },
                     onDelete = { onDeleteItem(item.draftId) }
                 )
@@ -310,63 +313,7 @@ fun RemoteScheduleSection(
 
         AddScheduleButton(
             text = "Add Remote Milestone",
-            onClick = { onAddItem() }
-        )
-    }
-}
-
-@Composable
-fun TrainingScheduleSection(
-    draft: CreatePostDraft,
-    roleCatalogue: List<CreateRoleTemplate>,
-    getItemError: (String) -> String?,
-    getItemWarning: (String) -> String?,
-    onAddItem: () -> String?,
-    onEditItem: (String) -> Unit,
-    onDeleteItem: (String) -> Unit
-) {
-    val items = draft.scheduleItems
-        .filter { item -> item.scheduleType == ScheduleType.TRAINING }
-        .sortedWith(
-            compareBy<ScheduleItemDraft> { item ->
-                item.scheduleDateMillis ?: Long.MAX_VALUE
-            }.thenBy { item -> item.startTimeMinutes ?: Int.MAX_VALUE }
-        )
-
-    Column(
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        ScheduleSectionIntro(
-            iconRes = R.drawable.instructions,
-            title = "Training & Briefing",
-            subtitle = "Add preparation sessions for any selected roles. Training can be Online or On-site, including for Remote opportunities."
-        )
-
-        ScheduleContextCard(
-            primary = "Optional preparation",
-            secondary = "A location or online meeting link may be TBA while training is more than 3 days away. Confirm the detail volunteers need to attend before the 3-day point."
-        )
-
-        if (items.isEmpty()) {
-            EmptyScheduleState(
-                text = "No Training or Briefing session has been added yet."
-            )
-        } else {
-            items.forEach { item ->
-                ScheduleOverviewItemCard(
-                    draft = draft,
-                    roleCatalogue = roleCatalogue,
-                    item = item,
-                    error = getItemError(item.draftId),
-                    warning = getItemWarning(item.draftId),
-                    onEdit = { onEditItem(item.draftId) },
-                    onDelete = { onDeleteItem(item.draftId) }
-                )
-            }
-        }
-
-        AddScheduleButton(
-            text = "Add Training / Briefing",
+            enabled = canAddItem,
             onClick = { onAddItem() }
         )
     }
@@ -456,12 +403,6 @@ fun ScheduleItemEditor(
         )
 
         ScheduleType.REMOTE -> RemoteScheduleItemEditor(
-            uiState = uiState,
-            item = item,
-            viewModel = viewModel
-        )
-
-        ScheduleType.TRAINING -> TrainingScheduleItemEditor(
             uiState = uiState,
             item = item,
             viewModel = viewModel
@@ -602,340 +543,6 @@ private fun RemoteScheduleItemEditor(
 }
 
 @Composable
-private fun TrainingScheduleItemEditor(
-    uiState: CreatePostUiState,
-    item: ScheduleItemDraft,
-    viewModel: CreatePostViewModel
-) {
-    val clockState by AppClock.state.collectAsStateWithLifecycle()
-    val today = remember(clockState.refreshVersion) {
-        CreatePostValidator.startOfDayMillis()
-    }
-    val maximumDate = listOfNotNull(
-        uiState.draft.physicalEndDateMillis
-            ?: uiState.draft.physicalStartDateMillis,
-        uiState.draft.remoteDueDateMillis
-    )
-        .map(CreatePostValidator::startOfDayMillis)
-        .maxOrNull()
-
-    Column(
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        EditorGroup(
-            title = "Training Details",
-            subtitle = "Training may happen before the volunteering work begins, but it must have a confirmed date and time."
-        ) {
-            OutlinedTextField(
-                value = item.title,
-                onValueChange = viewModel::updateScheduleEditorTitle,
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Training / Briefing Title *") },
-                placeholder = { Text("Example: Volunteer safety briefing") },
-                singleLine = true,
-                shape = RoundedCornerShape(14.dp)
-            )
-
-            DateSelectionField(
-                label = "Date *",
-                selectedDateMillis = item.scheduleDateMillis,
-                minimumDateMillis = today,
-                maximumDateMillis = maximumDate,
-                onDateSelected = viewModel::updateScheduleEditorDate,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                TimeSelectionField(
-                    label = "Start Time *",
-                    selectedTimeMinutes = item.startTimeMinutes,
-                    onTimeSelected = viewModel::updateScheduleEditorStartTime,
-                    modifier = Modifier.weight(1f)
-                )
-                TimeSelectionField(
-                    label = "End Time *",
-                    selectedTimeMinutes = item.endTimeMinutes,
-                    onTimeSelected = viewModel::updateScheduleEditorEndTime,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
-
-        if (CreatePostValidator.trainingStartsWithinShortNotice(item)) {
-            ScheduleReminderCard(
-                message = "Short-notice training: this session starts within 3 days. Confirm the details volunteers need to attend before saving."
-            )
-        }
-
-        EditorGroup(
-            title = "Format",
-            subtitle = "Choose how volunteers will attend this preparation session."
-        ) {
-            ScheduleChoiceOption(
-                title = "Online",
-                description = "Volunteers join through an online platform.",
-                selected = item.trainingMode == TrainingMode.ONLINE,
-                onClick = { viewModel.updateTrainingMode(TrainingMode.ONLINE) }
-            )
-            ScheduleChoiceOption(
-                title = "On-site",
-                description = "Volunteers attend a physical training location.",
-                selected = item.trainingMode == TrainingMode.ONSITE,
-                onClick = { viewModel.updateTrainingMode(TrainingMode.ONSITE) }
-            )
-
-            when (item.trainingMode) {
-                TrainingMode.ONLINE -> OnlineTrainingFields(
-                    uiState = uiState,
-                    item = item,
-                    viewModel = viewModel
-                )
-
-                TrainingMode.ONSITE -> OnsiteTrainingFields(
-                    uiState = uiState,
-                    item = item,
-                    viewModel = viewModel
-                )
-
-                null -> Unit
-            }
-        }
-
-        RoleTargetEditor(
-            draft = uiState.draft,
-            roleCatalogue = uiState.roleCatalogue,
-            item = item,
-            onAppliesToAllChanged = viewModel::updateScheduleEditorAppliesToAll,
-            onRoleToggled = viewModel::toggleScheduleEditorRole
-        )
-
-        TrainingApplicationClosingEditor(
-            draft = uiState.draft,
-            roleCatalogue = uiState.roleCatalogue,
-            item = item,
-            viewModel = viewModel
-        )
-
-        NotesEditor(
-            value = item.notes,
-            onValueChanged = viewModel::updateScheduleEditorNotes
-        )
-    }
-}
-
-@Composable
-private fun OnlineTrainingFields(
-    uiState: CreatePostUiState,
-    item: ScheduleItemDraft,
-    viewModel: CreatePostViewModel
-) {
-    val shortNotice = CreatePostValidator.trainingStartsWithinShortNotice(item)
-    val missingLink = item.meetingLink.isBlank()
-
-    HorizontalDivider(color = ScheduleBorder)
-
-    OutlinedTextField(
-        value = item.onlinePlatform,
-        onValueChange = viewModel::updateTrainingOnlinePlatform,
-        modifier = Modifier.fillMaxWidth(),
-        label = { Text("Online Platform (Optional)") },
-        placeholder = { Text("Example: Google Meet") },
-        singleLine = true,
-        shape = RoundedCornerShape(14.dp)
-    )
-
-    OutlinedTextField(
-        value = item.meetingLink,
-        onValueChange = viewModel::updateTrainingMeetingLink,
-        modifier = Modifier.fillMaxWidth(),
-        label = {
-            Text(if (shortNotice) "Meeting Link *" else "Meeting Link (Optional for now)")
-        },
-        placeholder = {
-            Text(if (shortNotice) "Add the confirmed meeting link" else "Can be confirmed later")
-        },
-        isError = uiState.showScheduleErrors && shortNotice && missingLink,
-        supportingText = {
-            when {
-                uiState.showScheduleErrors && shortNotice && missingLink ->
-                    Text("The meeting link is required because this training starts within 3 days.")
-
-                !shortNotice && missingLink ->
-                    Text("You may leave this blank for now, but confirm the link at least 3 days before training.")
-            }
-        },
-        singleLine = true,
-        shape = RoundedCornerShape(14.dp)
-    )
-
-    if (!shortNotice && missingLink) {
-        ScheduleReminderCard(
-            message = "Meeting link is still TBA. VolunteerLink will require it once the training is within 3 days."
-        )
-    } else if (shortNotice && missingLink) {
-        ScheduleInlineErrorCard(
-            message = "Add the online meeting link before saving this training."
-        )
-    }
-
-    DisabledTimeZoneField()
-}
-
-@Composable
-private fun OnsiteTrainingFields(
-    uiState: CreatePostUiState,
-    item: ScheduleItemDraft,
-    viewModel: CreatePostViewModel
-) {
-    val hasEventLocation =
-        (uiState.draft.postType == VolunteerPostType.PHYSICAL ||
-            uiState.draft.postType == VolunteerPostType.HYBRID) &&
-            uiState.draft.physicalLocation != null
-    val shortNotice = CreatePostValidator.trainingStartsWithinShortNotice(item)
-
-    HorizontalDivider(color = ScheduleBorder)
-
-    Text(
-        text = "Training Location *",
-        style = MaterialTheme.typography.titleSmall,
-        fontWeight = FontWeight.Bold,
-        color = CreateGreen
-    )
-
-    if (hasEventLocation) {
-        val eventLocation = uiState.draft.physicalLocation?.displayName.orEmpty()
-        ScheduleChoiceOption(
-            title = "Same as event location",
-            description = eventLocation,
-            selected = item.trainingLocationMode == TrainingLocationMode.EVENT_LOCATION,
-            onClick = {
-                viewModel.updateTrainingLocationMode(
-                    TrainingLocationMode.EVENT_LOCATION
-                )
-            }
-        )
-    }
-
-    ScheduleChoiceOption(
-        title = "Choose another location",
-        description = "Search and select a real venue or address with Geoapify.",
-        selected = item.trainingLocationMode == TrainingLocationMode.CUSTOM,
-        onClick = {
-            viewModel.updateTrainingLocationMode(TrainingLocationMode.CUSTOM)
-        }
-    )
-
-    if (item.trainingLocationMode == TrainingLocationMode.CUSTOM) {
-        LocationAutocompleteField(
-            query = item.trainingLocationQuery,
-            selectedLocation = item.trainingLocation,
-            suggestions = uiState.trainingLocationSuggestions,
-            isSearching = uiState.isTrainingLocationSearching,
-            searchError = uiState.trainingLocationSearchError,
-            validationError = if (
-                uiState.showScheduleErrors &&
-                item.trainingLocation == null
-            ) {
-                "Select a location from the suggestions."
-            } else {
-                null
-            },
-            label = "Training Location",
-            placeholder = "Search a venue or address",
-            onQueryChanged = viewModel::onTrainingLocationQueryChanged,
-            onLocationSelected = viewModel::onTrainingLocationSelected,
-            onClearLocation = viewModel::clearTrainingLocation
-        )
-    }
-
-    ScheduleChoiceOption(
-        title = "To be confirmed",
-        description = if (shortNotice) {
-            "Unavailable because this session starts within 3 days."
-        } else {
-            "The location can be confirmed later while the session is still more than 3 days away."
-        },
-        selected = item.trainingLocationMode == TrainingLocationMode.TBA,
-        enabled = !shortNotice,
-        onClick = {
-            viewModel.updateTrainingLocationMode(TrainingLocationMode.TBA)
-        }
-    )
-
-    if (item.trainingLocationMode == TrainingLocationMode.TBA) {
-        if (shortNotice) {
-            ScheduleInlineErrorCard(
-                message = "Confirm the on-site training location before saving. The session starts within 3 days."
-            )
-        } else {
-            ScheduleReminderCard(
-                message = "Location is still TBA. VolunteerLink will require a confirmed location once the training is within 3 days."
-            )
-        }
-    }
-
-    if (
-        uiState.draft.postType == VolunteerPostType.REMOTE &&
-        item.trainingLocationMode == TrainingLocationMode.TBA
-    ) {
-        DisabledTimeZoneField()
-    }
-}
-
-@Composable
-private fun ScheduleReminderCard(message: String) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        color = ScheduleWarning
-    ) {
-        Text(
-            text = message,
-            modifier = Modifier.padding(12.dp),
-            style = MaterialTheme.typography.bodySmall,
-            color = Color(0xFF8A4B08),
-            fontWeight = FontWeight.SemiBold
-        )
-    }
-}
-
-@Composable
-private fun ScheduleInlineErrorCard(message: String) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        color = ScheduleAttention
-    ) {
-        Text(
-            text = message,
-            modifier = Modifier.padding(12.dp),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.error,
-            fontWeight = FontWeight.SemiBold
-        )
-    }
-}
-
-@Composable
-private fun DisabledTimeZoneField() {
-    OutlinedTextField(
-        value = "Not enabled yet",
-        onValueChange = {},
-        modifier = Modifier.fillMaxWidth(),
-        enabled = false,
-        label = { Text("Time Zone") },
-        supportingText = {
-            Text("Timezone support is postponed for now and will be stored as NULL.")
-        },
-        singleLine = true,
-        shape = RoundedCornerShape(14.dp)
-    )
-}
-
-@Composable
 private fun RoleTargetEditor(
     draft: CreatePostDraft,
     roleCatalogue: List<CreateRoleTemplate>,
@@ -960,7 +567,6 @@ private fun RoleTargetEditor(
         subtitle = when (item.scheduleType) {
             ScheduleType.PHYSICAL -> "Choose the Physical roles involved in this activity."
             ScheduleType.REMOTE -> "Choose the Remote roles affected by this milestone."
-            ScheduleType.TRAINING -> "Training may target Physical roles, Remote roles, or both."
         }
     ) {
         if (roles.size <= 1) {
@@ -975,7 +581,6 @@ private fun RoleTargetEditor(
                 title = when (item.scheduleType) {
                     ScheduleType.PHYSICAL -> "All Physical Roles"
                     ScheduleType.REMOTE -> "All Remote Roles"
-                    ScheduleType.TRAINING -> "All Selected Roles"
                 },
                 description = "Apply this schedule item to every applicable selected role.",
                 selected = item.appliesToAllRoles,
@@ -1071,154 +676,6 @@ private fun RoleCheckRow(
             }
         }
     }
-}
-
-@Composable
-private fun TrainingApplicationClosingEditor(
-    draft: CreatePostDraft,
-    roleCatalogue: List<CreateRoleTemplate>,
-    item: ScheduleItemDraft,
-    viewModel: CreatePostViewModel
-) {
-    var pendingMoveRoleId by remember(item.draftId) {
-        mutableStateOf<String?>(null)
-    }
-
-    val applicableIds = CreatePostValidator.applicableScheduleRoleIds(
-        draft = draft,
-        scheduleType = ScheduleType.TRAINING,
-        roleCatalogue = roleCatalogue
-    )
-    val targetedIds = if (item.appliesToAllRoles) {
-        applicableIds
-    } else {
-        item.targetRoleTemplateIds
-            .filter { roleId -> roleId in applicableIds }
-            .distinct()
-    }
-
-    val rolesById = roleCatalogue.associateBy { role ->
-        role.roleTemplateId
-    }
-    val targetedRoles = targetedIds.mapNotNull { roleId ->
-        rolesById[roleId]
-    }
-
-    EditorGroup(
-        title = "Application Closing",
-        subtitle = "Each role can have only one training responsible for closing new applications or Instant Joins. A role may still attend other trainings."
-    ) {
-        if (targetedRoles.isEmpty()) {
-            Text(
-                text = "Choose at least one role in Applies To first.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error
-            )
-        } else {
-            targetedRoles.forEach { role ->
-                val roleId = role.roleTemplateId
-                val checked = roleId in item.closingRoleTemplateIds
-                val otherCutoff = viewModel.otherTrainingApplicationCutoff(roleId)
-                val currentStart = trainingStartOrderValue(item)
-                val otherStart = otherCutoff?.let(::trainingStartOrderValue)
-                val currentIsEarlier = otherCutoff != null &&
-                    currentStart != null &&
-                    otherStart != null &&
-                    currentStart < otherStart
-                val canMoveEarlier = !checked && currentIsEarlier
-
-                val enabled = checked || otherCutoff == null || canMoveEarlier
-
-                val supportingText = when {
-                    checked && otherCutoff != null && currentIsEarlier ->
-                        "Will move the cutoff from ${trainingCutoffText(otherCutoff)} to this earlier training when you save."
-
-                    checked && otherCutoff != null ->
-                        "This selection is no longer earlier than the existing cutoff. Uncheck it or move this training earlier before saving."
-
-                    otherCutoff == null -> null
-
-                    currentStart == null || otherStart == null ->
-                        "${role.roleName} already has an application cutoff. Set this training's date and start time before deciding whether to move it."
-
-                    canMoveEarlier ->
-                        "Currently closes ${trainingCutoffText(otherCutoff)}. Selecting this will move the cutoff to this earlier training."
-
-                    else ->
-                        "Already closes ${trainingCutoffText(otherCutoff)}. This later training cannot create another cutoff."
-                }
-
-                RoleCheckRow(
-                    role = role,
-                    checked = checked,
-                    enabled = enabled,
-                    supportingText = supportingText,
-                    onCheckedChange = {
-                        when {
-                            checked -> viewModel.toggleTrainingClosingRole(roleId)
-                            otherCutoff == null ->
-                                viewModel.toggleTrainingClosingRole(roleId)
-                            canMoveEarlier -> pendingMoveRoleId = roleId
-                        }
-                    }
-                )
-            }
-
-            Text(
-                text = "If a role already has a cutoff, later trainings cannot select it again. An earlier training may take over only after you confirm the move.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-
-    pendingMoveRoleId?.let { roleId ->
-        val role = rolesById[roleId]
-        val oldCutoff = viewModel.otherTrainingApplicationCutoff(roleId)
-
-        if (role != null && oldCutoff != null) {
-            AlertDialog(
-                onDismissRequest = { pendingMoveRoleId = null },
-                title = { Text("Move application cutoff?") },
-                text = {
-                    Text(
-                        "${role.roleName} currently stops accepting new applications ${trainingCutoffText(oldCutoff)}. Moving it here will make this earlier training the only application-closing training for that role."
-                    )
-                },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            viewModel.moveTrainingApplicationCutoff(roleId)
-                            pendingMoveRoleId = null
-                        }
-                    ) {
-                        Text("Move Cutoff")
-                    }
-                },
-                dismissButton = {
-                    TextButton(
-                        onClick = { pendingMoveRoleId = null }
-                    ) {
-                        Text("Cancel")
-                    }
-                }
-            )
-        }
-    }
-}
-
-private fun trainingStartOrderValue(item: ScheduleItemDraft): Long? {
-    val date = item.scheduleDateMillis ?: return null
-    val startMinutes = item.startTimeMinutes ?: return null
-    return CreatePostValidator.startOfDayMillis(date) +
-        startMinutes * 60L * 1000L
-}
-
-private fun trainingCutoffText(item: ScheduleItemDraft): String {
-    val date = item.scheduleDateMillis?.let(::formatScheduleDate) ?: "on an unset date"
-    val time = formatScheduleTime(item.startTimeMinutes)
-    val title = item.title.ifBlank { "another training" }
-    return "on $date at $time from \"$title\""
 }
 
 @Composable
@@ -1465,10 +922,12 @@ private fun EmptyScheduleState(text: String) {
 @Composable
 private fun AddScheduleButton(
     text: String,
+    enabled: Boolean = true,
     onClick: () -> Unit
 ) {
     OutlinedButton(
         onClick = onClick,
+        enabled = enabled,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp)
     ) {
@@ -1513,7 +972,7 @@ private fun ScheduleDateChip(
             Text(
                 text = SimpleDateFormat(
                     "EEE",
-                    Locale.getDefault()
+                    Locale.ENGLISH
                 ).format(Date(dateMillis)),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -1521,7 +980,7 @@ private fun ScheduleDateChip(
             Text(
                 text = SimpleDateFormat(
                     "dd MMM",
-                    Locale.getDefault()
+                    Locale.ENGLISH
                 ).format(Date(dateMillis)),
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Bold,
@@ -1538,6 +997,9 @@ private fun ScheduleOverviewItemCard(
     item: ScheduleItemDraft,
     error: String?,
     warning: String?,
+    canEdit: Boolean = true,
+    canDelete: Boolean = true,
+    lockedReason: String? = null,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -1620,7 +1082,7 @@ private fun ScheduleOverviewItemCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            itemLocationOrFormatText(draft, item)
+            itemLocationOrFormatText(item)
                 ?.takeIf { text -> text.isNotBlank() }
                 ?.let { text ->
                     Text(
@@ -1629,17 +1091,6 @@ private fun ScheduleOverviewItemCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-
-            trainingApplicationClosingSummary(
-                roleCatalogue = roleCatalogue,
-                item = item
-            )?.let { text ->
-                Text(
-                    text = text,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
 
             if (error != null) {
                 Text(
@@ -1657,17 +1108,36 @@ private fun ScheduleOverviewItemCard(
                 )
             }
 
+            if ((!canEdit || !canDelete) && !lockedReason.isNullOrBlank()) {
+                Text(
+                    text = lockedReason,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
             ) {
-                TextButton(onClick = onEdit) {
+                TextButton(
+                    onClick = onEdit,
+                    enabled = canEdit
+                ) {
                     Text("Edit")
                 }
-                TextButton(onClick = onDelete) {
+                TextButton(
+                    onClick = onDelete,
+                    enabled = canDelete
+                ) {
                     Text(
                         text = "Delete",
-                        color = MaterialTheme.colorScheme.error
+                        color = if (canDelete) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
                     )
                 }
             }
@@ -1686,18 +1156,6 @@ private fun itemEyebrow(item: ScheduleItemDraft): String {
             ?.let(::formatScheduleDate)
             ?: "Date not set"
 
-        ScheduleType.TRAINING -> buildString {
-            item.scheduleDateMillis?.let { date ->
-                append(formatScheduleDate(date))
-            }
-            if (item.startTimeMinutes != null || item.endTimeMinutes != null) {
-                if (isNotEmpty()) append("  ·  ")
-                append(scheduleTimeRangeText(
-                    item.startTimeMinutes,
-                    item.endTimeMinutes
-                ))
-            }
-        }.ifBlank { "Training schedule" }
     }
 }
 
@@ -1710,7 +1168,6 @@ private fun roleSummary(
         return when (item.scheduleType) {
             ScheduleType.PHYSICAL -> "All Physical Roles"
             ScheduleType.REMOTE -> "All Remote Roles"
-            ScheduleType.TRAINING -> "All Selected Roles"
         }
     }
 
@@ -1728,67 +1185,14 @@ private fun roleSummary(
         .ifBlank { "Selected roles need review" }
 }
 
-private fun trainingApplicationClosingSummary(
-    roleCatalogue: List<CreateRoleTemplate>,
-    item: ScheduleItemDraft
-): String? {
-    if (item.scheduleType != ScheduleType.TRAINING) return null
-
-    if (item.closingRoleTemplateIds.isEmpty()) {
-        return "Applications: no cutoff from this training"
-    }
-
-    val roleNamesById = roleCatalogue.associate { role ->
-        role.roleTemplateId to role.roleName
-    }
-    val names = item.closingRoleTemplateIds
-        .distinct()
-        .mapNotNull { roleId -> roleNamesById[roleId] }
-
-    return if (names.isEmpty()) {
-        "Applications: closing roles need review"
-    } else {
-        "Closes applications on start: ${names.joinToString(" · ")}"
-    }
-}
-
 private fun itemLocationOrFormatText(
-    draft: CreatePostDraft,
     item: ScheduleItemDraft
 ): String? {
     return when (item.scheduleType) {
         ScheduleType.PHYSICAL -> item.location
             .takeIf { it.isNotBlank() }
             ?: "Main event location"
-
         ScheduleType.REMOTE -> null
-
-        ScheduleType.TRAINING -> when (item.trainingMode) {
-            TrainingMode.ONLINE -> buildString {
-                append("Online")
-                item.onlinePlatform.takeIf { it.isNotBlank() }?.let { platform ->
-                    append(" · $platform")
-                }
-                if (item.meetingLink.isBlank()) {
-                    append(" · Link TBA")
-                }
-            }
-
-            TrainingMode.ONSITE -> when (item.trainingLocationMode) {
-                TrainingLocationMode.EVENT_LOCATION ->
-                    "On-site · Same as event location"
-
-                TrainingLocationMode.CUSTOM ->
-                    "On-site · ${item.trainingLocation?.displayName ?: item.location}"
-
-                TrainingLocationMode.TBA ->
-                    "On-site · Location TBA"
-
-                null -> "On-site · Location not set"
-            }
-
-            null -> "Training format not set"
-        }
     }
 }
 
@@ -1834,7 +1238,7 @@ private fun formatScheduleTime(minutes: Int?): String {
         else -> adjusted
     }
     return String.format(
-        Locale.getDefault(),
+        Locale.ENGLISH,
         "%d:%02d %s",
         hour12,
         minute,
@@ -1845,6 +1249,6 @@ private fun formatScheduleTime(minutes: Int?): String {
 private fun formatDayHeading(dateMillis: Long): String {
     return SimpleDateFormat(
         "EEE, dd MMM",
-        Locale.getDefault()
-    ).format(Date(dateMillis)).uppercase(Locale.getDefault())
+        Locale.ENGLISH
+    ).format(Date(dateMillis)).uppercase(Locale.ENGLISH)
 }

@@ -21,8 +21,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.volunteerlink.data.location.DeviceLocationHelper
 import com.example.volunteerlink.organisation.components.OrganisationModulePage
-import com.example.volunteerlink.organisation.create.model.TrainingLocationMode
-import com.example.volunteerlink.organisation.create.model.TrainingMode
 import com.example.volunteerlink.organisation.create.model.VolunteerPostType
 import com.example.volunteerlink.organisation.create.steps.PostDetailsStep
 import com.example.volunteerlink.organisation.create.steps.ReviewSummaryStep
@@ -41,10 +39,17 @@ import com.example.volunteerlink.organisation.viewmodel.CreatePostViewModel
 @Composable
 fun OrganisationCreateScreen(
     onExitCreate: () -> Unit = {},
+    editPostId: String? = null,
     viewModel: CreatePostViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+
+    LaunchedEffect(editPostId) {
+        if (!editPostId.isNullOrBlank()) {
+            viewModel.loadExistingPostForEdit(editPostId)
+        }
+    }
     var showDiscardDialog by remember { mutableStateOf(false) }
     var hasRequestedLocationPermission by rememberSaveable { mutableStateOf(false) }
 
@@ -72,15 +77,7 @@ fun OrganisationCreateScreen(
         uiState.draft.postType == VolunteerPostType.PHYSICAL ||
                 uiState.draft.postType == VolunteerPostType.HYBRID
 
-    val needsLocationBiasForTraining =
-        uiState.currentStep == 4 &&
-                uiState.isScheduleEditorOpen &&
-                uiState.scheduleEditorDraft?.trainingMode == TrainingMode.ONSITE &&
-                uiState.scheduleEditorDraft?.trainingLocationMode ==
-                TrainingLocationMode.CUSTOM
-
-    val needsLocationBias =
-        needsLocationBiasForPost || needsLocationBiasForTraining
+    val needsLocationBias = needsLocationBiasForPost
 
     LaunchedEffect(needsLocationBias) {
         if (!needsLocationBias) return@LaunchedEffect
@@ -109,7 +106,7 @@ fun OrganisationCreateScreen(
     }
 
     val requestBack: () -> Unit = {
-        if (uiState.publishedPostId != null || uiState.savedDraftPostId != null) {
+        if (uiState.publishedPostId != null || uiState.savedDraftPostId != null || uiState.updatedPostId != null) {
             onExitCreate()
         } else {
             when (uiState.currentStep) {
@@ -139,7 +136,24 @@ fun OrganisationCreateScreen(
 
     BackHandler(onBack = requestBack)
 
-    if (uiState.savedDraftPostId != null) {
+    if (uiState.isLoadingExistingPost) {
+        OrganisationModulePage(
+            title = "Loading Post",
+            message = "Loading the existing Volunteer Post and its edit restrictions..."
+        )
+    } else if (uiState.existingPostLoadError != null) {
+        OrganisationModulePage(
+            title = "Couldn't Open Edit",
+            message = uiState.existingPostLoadError ?: "Unable to load this post."
+        )
+    } else if (uiState.updatedPostId != null) {
+        OrganisationModulePage(
+            title = "Changes Saved",
+            message =
+                "Post ${uiState.updatedPostId} was updated successfully. " +
+                    "Use Back to return to Post Management."
+        )
+    } else if (uiState.savedDraftPostId != null) {
         OrganisationModulePage(
             title = "Draft Saved",
             message =
@@ -193,7 +207,8 @@ fun OrganisationCreateScreen(
                 onUp = requestExit,
                 onEditStep = viewModel::editStepFromReview,
                 onSaveDraft = { viewModel.saveDraft(context) },
-                onPublish = { viewModel.publishPost(context) }
+                onPublish = { viewModel.publishPost(context) },
+                onSaveChanges = { viewModel.saveChanges(context) }
             )
         }
 
@@ -205,6 +220,19 @@ fun OrganisationCreateScreen(
                 onStepOneComplete = viewModel::openStepTwo
             )
         }
+    }
+
+    uiState.editRestrictionMessage?.let { message ->
+        AlertDialog(
+            onDismissRequest = viewModel::dismissEditRestrictionMessage,
+            title = { Text("This part is locked") },
+            text = { Text(message) },
+            confirmButton = {
+                TextButton(onClick = viewModel::dismissEditRestrictionMessage) {
+                    Text("OK")
+                }
+            }
+        )
     }
 
     uiState.saveDraftDateWarning?.let { warning ->
@@ -274,11 +302,21 @@ fun OrganisationCreateScreen(
                 showDiscardDialog = false
             },
             title = {
-                Text("Discard this volunteer post?")
+                Text(
+                    if (uiState.isExistingPostEdit) {
+                        "Discard unsaved changes?"
+                    } else {
+                        "Discard this volunteer post?"
+                    }
+                )
             },
             text = {
                 Text(
-                    "Your current Create Post information will be cleared if you leave."
+                    if (uiState.isExistingPostEdit) {
+                        "Your unsaved edits will be lost. The existing post in VolunteerLink will remain unchanged."
+                    } else {
+                        "Your current Create Post information will be cleared if you leave."
+                    }
                 )
             },
             confirmButton = {
@@ -289,7 +327,7 @@ fun OrganisationCreateScreen(
                         onExitCreate()
                     }
                 ) {
-                    Text("Discard")
+                    Text(if (uiState.isExistingPostEdit) "Discard Changes" else "Discard")
                 }
             },
             dismissButton = {

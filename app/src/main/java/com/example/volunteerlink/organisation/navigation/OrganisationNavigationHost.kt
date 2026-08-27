@@ -49,6 +49,7 @@ fun OrganisationNavigationHost() {
     val bottomBarRoute = when (currentRoute) {
         OrganisationNavigationRoutes.MANAGE_POSTS,
         OrganisationNavigationRoutes.MANAGE_POST_DETAIL,
+        OrganisationNavigationRoutes.MANAGE_POST_EDIT,
         OrganisationNavigationRoutes.MANAGE_IMPACT_WEAVE,
         OrganisationNavigationRoutes.MANAGE_PROMOTIONS ->
             OrganisationNavigationRoutes.MANAGE
@@ -166,7 +167,20 @@ fun OrganisationNavigationHost() {
                 val postId = backStackEntry.arguments?.getString("postId").orEmpty()
                 OrganisationPostManagementScreen(
                     postId = postId,
-                    onBack = { navController.popBackStack() }
+                    onBack = { navController.popBackStack() },
+                    onEdit = {
+                        navController.navigate(
+                            OrganisationNavigationRoutes.managePostEdit(postId)
+                        )
+                    }
+                )
+            }
+
+            composable(OrganisationNavigationRoutes.MANAGE_POST_EDIT) { backStackEntry ->
+                val postId = backStackEntry.arguments?.getString("postId").orEmpty()
+                OrganisationCreateScreen(
+                    editPostId = postId,
+                    onExitCreate = { navController.popBackStack() }
                 )
             }
 

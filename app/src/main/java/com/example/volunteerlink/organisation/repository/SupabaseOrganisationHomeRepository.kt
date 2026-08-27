@@ -4,7 +4,6 @@ import com.example.volunteerlink.data.supabase
 import com.example.volunteerlink.organisation.home.model.OrganisationHomeParticipation
 import com.example.volunteerlink.organisation.home.model.OrganisationHomePost
 import com.example.volunteerlink.organisation.home.model.OrganisationHomeRole
-import com.example.volunteerlink.organisation.home.model.OrganisationHomeRoleClosingSchedule
 import com.example.volunteerlink.organisation.home.model.OrganisationHomeSchedule
 import com.example.volunteerlink.organisation.home.model.OrganisationHomeSnapshot
 import io.github.jan.supabase.postgrest.from
@@ -64,11 +63,7 @@ class SupabaseOrganisationHomeRepository : OrganisationHomeRepository {
                         schedule_type,
                         schedule_date,
                         title,
-                        start_time,
-                        training_mode,
-                        meeting_link,
-                        training_location_mode,
-                        training_location_name
+                        start_time
                     )
                     """.trimIndent()
                 )
@@ -89,15 +84,7 @@ class SupabaseOrganisationHomeRepository : OrganisationHomeRepository {
                         scheduleType = scheduleRow.requiredText("schedule_type"),
                         scheduleDate = scheduleRow.requiredText("schedule_date"),
                         title = scheduleRow.requiredText("title"),
-                        startTime = scheduleRow.optionalText("start_time"),
-                        trainingMode = scheduleRow.optionalText("training_mode"),
-                        meetingLink = scheduleRow.optionalText("meeting_link"),
-                        trainingLocationMode = scheduleRow.optionalText(
-                            "training_location_mode"
-                        ),
-                        trainingLocationName = scheduleRow.optionalText(
-                            "training_location_name"
-                        )
+                        startTime = scheduleRow.optionalText("start_time")
                     )
                 }
                 .sortedWith(
@@ -192,53 +179,6 @@ class SupabaseOrganisationHomeRepository : OrganisationHomeRepository {
             row.requiredText("role_template_id")
         }
 
-        // A Training schedule may explicitly close applications for selected
-        // roles when that schedule starts. Keep this normalized relationship
-        // separate and use it as a more specific cutoff than the role-mode
-        // volunteering start when present.
-        val closingScheduleRoleRows: List<JsonObject> = if (postIds.isEmpty()) {
-            emptyList()
-        } else {
-            supabase
-                .from("schedule_item_roles")
-                .select(
-                    columns = Columns.raw(
-                        "schedule_item_id,post_id,role_template_id,closes_applications_on_start"
-                    )
-                ) {
-                    filter {
-                        isIn("post_id", postIds)
-                        eq("closes_applications_on_start", true)
-                    }
-                }
-                .decodeList<JsonObject>()
-        }
-
-        val schedulesByPostAndId = posts.flatMap { post ->
-            post.schedules.map { schedule ->
-                (post.postId to schedule.scheduleItemId) to schedule
-            }
-        }.toMap()
-
-        val closingSchedulesByRole = closingScheduleRoleRows
-            .mapNotNull { relationRow ->
-                val postId = relationRow.requiredText("post_id")
-                val roleTemplateId = relationRow.requiredText("role_template_id")
-                val scheduleItemId = relationRow.requiredText("schedule_item_id")
-                val schedule = schedulesByPostAndId[postId to scheduleItemId]
-                    ?: return@mapNotNull null
-
-                (postId to roleTemplateId) to OrganisationHomeRoleClosingSchedule(
-                    scheduleItemId = scheduleItemId,
-                    scheduleDate = schedule.scheduleDate,
-                    startTime = schedule.startTime
-                )
-            }
-            .groupBy(
-                keySelector = { it.first },
-                valueTransform = { it.second }
-            )
-
         val participationsByRole = participationRows.groupBy { participationRow ->
             participationRow.requiredText("post_id") to
                     participationRow.requiredText("role_template_id")
@@ -265,10 +205,7 @@ class SupabaseOrganisationHomeRepository : OrganisationHomeRepository {
                                 "application_status"
                             )
                         )
-                    },
-                    applicationClosingSchedules = closingSchedulesByRole[
-                        postId to roleTemplateId
-                    ].orEmpty()
+                    }
                 )
             }
             .groupBy(

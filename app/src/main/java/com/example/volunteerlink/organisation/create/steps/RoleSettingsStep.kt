@@ -45,6 +45,7 @@ import com.example.volunteerlink.R
 import com.example.volunteerlink.organisation.create.components.CreateCardBackground
 import com.example.volunteerlink.organisation.create.components.CreateGreen
 import com.example.volunteerlink.organisation.create.components.CreateLightGreen
+import com.example.volunteerlink.organisation.create.components.EditRestrictionNotice
 import com.example.volunteerlink.organisation.create.model.CreatePostDraft
 import com.example.volunteerlink.organisation.create.model.CreatePostUiState
 import com.example.volunteerlink.organisation.create.model.CreateRoleTemplate
@@ -53,6 +54,7 @@ import com.example.volunteerlink.organisation.create.model.SelectedRoleDraft
 import com.example.volunteerlink.organisation.create.model.VolunteerPostType
 import com.example.volunteerlink.organisation.create.model.VolunteerRoleMode
 import com.example.volunteerlink.organisation.viewmodel.CreatePostViewModel
+import kotlinx.coroutines.delay
 
 /** Step 3 of Create Post: configure every role selected in Step 2. */
 @Composable
@@ -100,17 +102,23 @@ fun RoleSettingsOverview(
 ) {
     val readyCount = uiState.draft.selectedRoles.count { it.isConfigured }
     val totalRoles = uiState.draft.selectedRoles.size
-    val allRolesReady = totalRoles > 0 && readyCount == totalRoles
-    val remoteReady = isRemoteSubmissionReady(
-        draft = uiState.draft,
-        catalogue = uiState.roleCatalogue
-    )
-    val canContinue = allRolesReady && remoteReady
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(uiState.validationFocusRequest) {
+        if (uiState.roleSettingsError != null) {
+            delay(30)
+            val totalItems = listState.layoutInfo.totalItemsCount
+            if (totalItems > 0) {
+                listState.animateScrollToItem((totalItems - 1).coerceAtLeast(0))
+            }
+        }
+    }
 
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .statusBarsPadding(),
+        state = listState,
         contentPadding = PaddingValues(
             start = 20.dp,
             top = 20.dp,
@@ -138,6 +146,8 @@ fun RoleSettingsOverview(
                 RemoteSubmissionOverviewCard(
                     draft = uiState.draft,
                     catalogue = uiState.roleCatalogue,
+                    enabled = !uiState.isExistingPostEdit ||
+                        uiState.editPolicy?.canEditRemoteSubmissionSetup != false,
                     onResponsibleRoleChanged = onResponsibleRoleChanged
                 )
             }
@@ -185,7 +195,7 @@ fun RoleSettingsOverview(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),
-                enabled = canContinue,
+                enabled = totalRoles > 0 && uiState.roleCatalogue.isNotEmpty(),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = CreateGreen
                 ),
@@ -198,24 +208,30 @@ fun RoleSettingsOverview(
             }
         }
 
-        if (!canContinue || uiState.roleSettingsError != null) {
+        uiState.roleSettingsError?.let { message ->
             item {
-                Text(
-                    text = uiState.roleSettingsError ?: when {
-                        !allRolesReady ->
-                            "Review and save every selected role before continuing."
-
-                        !remoteReady &&
-                                uiState.draft.remoteSubmissionMode ==
-                                RemoteSubmissionMode.SHARED_TEAM ->
-                            "Choose which Remote role will submit the shared team deliverable."
-
-                        else ->
-                            "Complete the Remote submission setup before continuing."
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    color = RoleSettingsOrangeBackground
+                ) {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = "Fix before continuing",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = RoleSettingsOrange,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = message,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             }
         }
     }
@@ -229,9 +245,48 @@ fun RoleConfigurationEditor(
     viewModel: CreatePostViewModel
 ) {
     val listState = rememberLazyListState()
-    val canSave = viewModel.canSaveRoleConfiguration(
-        selectedRole.roleTemplateId
-    )
+    val editRolePolicy = uiState.editPolicy?.rolePolicies?.get(selectedRole.roleTemplateId)
+    val canEditSkills = !uiState.isExistingPostEdit || editRolePolicy?.canChangeSkills != false
+    val canEditResponsibilities = !uiState.isExistingPostEdit || editRolePolicy?.canChangeResponsibilities != false
+    val canEditApplicationMethod = !uiState.isExistingPostEdit || editRolePolicy?.canChangeApplicationMethod != false
+    val canEditQuestions = !uiState.isExistingPostEdit || editRolePolicy?.canChangeScreeningQuestions != false
+    val canEditDeliverable = !uiState.isExistingPostEdit || editRolePolicy?.canChangeIndividualDeliverable != false
+    val canEditNotes = !uiState.isExistingPostEdit || editRolePolicy?.canChangeRoleNotes != false
+    val showsRestrictionNotice = uiState.isExistingPostEdit && editRolePolicy != null && (
+        !editRolePolicy.canChangeSkills ||
+            !editRolePolicy.canChangeResponsibilities ||
+            !editRolePolicy.canChangeApplicationMethod ||
+            !editRolePolicy.canChangeScreeningQuestions ||
+            !editRolePolicy.canChangeIndividualDeliverable ||
+            !editRolePolicy.canChangeRoleNotes
+        )
+
+    val roleInformationIndex = 2 + if (showsRestrictionNotice) 1 else 0
+    val skillsIndex = roleInformationIndex + 1
+    val requiredSkillsIndex = roleInformationIndex + 2
+    val responsibilitiesIndex = roleInformationIndex + 3
+    val applicantMethodIndex = roleInformationIndex + 4
+    val submissionAndNotesIndex = roleInformationIndex + 5
+    val errorCardIndex = roleInformationIndex + 6
+
+    // Validation should take the organiser to the section that actually needs
+    // attention. This is especially useful on long role forms.
+    LaunchedEffect(uiState.validationFocusRequest) {
+        val message = uiState.roleSettingsError ?: return@LaunchedEffect
+        val target = when {
+            message.contains("Skills Practised", ignoreCase = true) ||
+                message.contains("selected skill", ignoreCase = true) -> skillsIndex
+            message.contains("Required skill", ignoreCase = true) ||
+                message.contains("Beginner roles", ignoreCase = true) -> requiredSkillsIndex
+            message.contains("responsibil", ignoreCase = true) -> responsibilitiesIndex
+            message.contains("application method", ignoreCase = true) ||
+                message.contains("screening", ignoreCase = true) -> applicantMethodIndex
+            message.contains("deliverable", ignoreCase = true) ||
+                message.contains("submission setup", ignoreCase = true) -> submissionAndNotesIndex
+            else -> errorCardIndex
+        }
+        listState.animateScrollToItem(target.coerceAtLeast(0))
+    }
 
     // Save & Next swaps the role while this composable remains visible.
     // Resetting here prevents the next role from opening at the old scroll spot.
@@ -296,6 +351,23 @@ fun RoleConfigurationEditor(
             )
         }
 
+        if (showsRestrictionNotice) {
+            item {
+                val noticeTitle = when {
+                    editRolePolicy.hasAcceptedOrJoinedHistory -> "Core settings locked"
+                    editRolePolicy.hasPendingApplications -> "Active applicants"
+                    editRolePolicy.hasScreeningAnswerHistory -> "Past screening answers"
+                    else -> "Limited editing"
+                }
+
+                EditRestrictionNotice(
+                    title = noticeTitle,
+                    message = editRolePolicy.settingsLockedReason
+                        ?: "Some settings are protected by existing volunteer history."
+                )
+            }
+        }
+
         item {
             RoleInformationSection(template)
         }
@@ -304,6 +376,7 @@ fun RoleConfigurationEditor(
             SkillsPractisedSection(
                 template = template,
                 selectedRole = selectedRole,
+                enabled = canEditSkills,
                 onToggleSkill = { skillId ->
                     viewModel.togglePractisedSkill(
                         roleTemplateId = selectedRole.roleTemplateId,
@@ -317,6 +390,7 @@ fun RoleConfigurationEditor(
             RequiredSkillsSection(
                 template = template,
                 selectedRole = selectedRole,
+                enabled = canEditSkills,
                 onToggleRequiredSkill = { skillId ->
                     viewModel.toggleRequiredSkill(
                         roleTemplateId = selectedRole.roleTemplateId,
@@ -341,6 +415,7 @@ fun RoleConfigurationEditor(
         item {
             ResponsibilitiesSection(
                 responsibilities = selectedRole.responsibilities,
+                enabled = canEditResponsibilities,
                 onAdd = {
                     viewModel.addResponsibility(selectedRole.roleTemplateId)
                 },
@@ -364,6 +439,8 @@ fun RoleConfigurationEditor(
             ApplicantMethodSection(
                 template = template,
                 selectedRole = selectedRole,
+                methodEnabled = canEditApplicationMethod,
+                questionsEnabled = canEditQuestions,
                 onMethodChanged = { method ->
                     viewModel.updateRoleApplicationMethod(
                         roleTemplateId = selectedRole.roleTemplateId,
@@ -396,6 +473,8 @@ fun RoleConfigurationEditor(
                 draft = uiState.draft,
                 template = template,
                 selectedRole = selectedRole,
+                notesEnabled = canEditNotes,
+                individualDeliverableEnabled = canEditDeliverable,
                 onRoleNotesChanged = { text ->
                     viewModel.updateRoleNotes(
                         roleTemplateId = selectedRole.roleTemplateId,
@@ -411,24 +490,29 @@ fun RoleConfigurationEditor(
             )
         }
 
-        if (uiState.roleSettingsError != null || !canSave) {
+        uiState.roleSettingsError?.let { message ->
             item {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(14.dp),
                     color = RoleSettingsOrangeBackground
                 ) {
-                    Text(
-                        text = uiState.roleSettingsError ?: roleSaveHint(
-                            draft = uiState.draft,
-                            template = template,
-                            selectedRole = selectedRole
-                        ),
-                        modifier = Modifier.padding(12.dp),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = RoleSettingsOrange,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = "Fix before saving this role",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = RoleSettingsOrange,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = message,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
         }
@@ -451,7 +535,6 @@ fun RoleConfigurationEditor(
                     modifier = Modifier
                         .weight(1f)
                         .height(52.dp),
-                    enabled = canSave,
                     shape = RoundedCornerShape(14.dp)
                 ) {
                     Text("Save Role")
@@ -466,7 +549,6 @@ fun RoleConfigurationEditor(
                     modifier = Modifier
                         .weight(1f)
                         .height(52.dp),
-                    enabled = canSave,
                     shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = CreateGreen
@@ -605,6 +687,7 @@ fun SetupProgressCard(
 fun RemoteSubmissionOverviewCard(
     draft: CreatePostDraft,
     catalogue: List<CreateRoleTemplate>,
+    enabled: Boolean = true,
     onResponsibleRoleChanged: (String) -> Unit
 ) {
     OutlinedCard(
@@ -721,7 +804,7 @@ fun RemoteSubmissionOverviewCard(
                         Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable {
+                                .clickable(enabled = enabled) {
                                     onResponsibleRoleChanged(
                                         selectedRole.roleTemplateId
                                     )
@@ -740,6 +823,7 @@ fun RemoteSubmissionOverviewCard(
                                 RadioButton(
                                     selected = selected,
                                     onClick = null,
+                                    enabled = enabled,
                                     colors = RadioButtonDefaults.colors(
                                         selectedColor = CreateGreen
                                     )

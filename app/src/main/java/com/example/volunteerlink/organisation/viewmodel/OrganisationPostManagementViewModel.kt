@@ -155,9 +155,7 @@ class OrganisationPostManagementViewModel : ViewModel() {
                     roleMode = role.roleMode,
                     postStatus = post.databaseStatus,
                     physicalStartDate = post.physical?.startDate,
-                    remoteStartDate = post.remote?.startDate,
-                    applicationClosingScheduleDates = role.applicationClosingSchedules
-                        .map { it.scheduleDate }
+                    remoteStartDate = post.remote?.startDate
                 ),
                 nowMillis = nowMillis
             )

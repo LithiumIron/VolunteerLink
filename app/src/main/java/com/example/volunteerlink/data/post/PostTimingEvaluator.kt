@@ -16,8 +16,6 @@ import java.util.Locale
 object PostTimingEvaluator {
 
     private const val MIN_PUBLISH_LEAD_DAYS = 7
-    private const val TRAINING_URGENT_DAYS = 3
-    private const val TRAINING_WARNING_DAYS = 7
 
     /**
      * Calculates whether an opportunity is Upcoming, Ongoing or Past.
@@ -108,54 +106,6 @@ object PostTimingEvaluator {
         }
     }
 
-    /**
-     * Returns attention information for Training schedule items with unresolved
-     * access details.
-     *
-     * Agreed V1 behaviour:
-     * - > 7 days away: no Home attention yet
-     * - 4..7 days away: WARNING
-     * - 0..3 days away (including today): URGENT
-     * - a training date before today while still unresolved: OUTDATED
-     *
-     * Missing future training details do not automatically unpublish a post.
-     */
-    fun evaluateTrainingAttention(
-        input: TrainingTimingInput,
-        nowMillis: Long = AppClock.nowMillis()
-    ): TrainingAttention {
-        val missingDetail = missingTrainingDetail(input)
-            ?: return TrainingAttention.none()
-
-        val trainingDay = parseDateAtStartOfDay(input.scheduleDate)
-            ?: return TrainingAttention.none()
-        val today = startOfDay(nowMillis)
-        val daysUntilTraining = daysBetween(today, trainingDay)
-
-        val type = when {
-            // Home still treats the whole scheduled date as actionable.
-            // A training happening today remains URGENT even if its start time
-            // has already passed; only an earlier calendar date is OUTDATED.
-            daysUntilTraining < 0 -> TrainingAttentionType.OUTDATED
-
-            daysUntilTraining <= TRAINING_URGENT_DAYS -> {
-                TrainingAttentionType.URGENT
-            }
-
-            daysUntilTraining <= TRAINING_WARNING_DAYS -> {
-                TrainingAttentionType.WARNING
-            }
-
-            else -> TrainingAttentionType.NONE
-        }
-
-        return TrainingAttention(
-            type = type,
-            missingDetail = missingDetail,
-            daysUntilTraining = daysUntilTraining
-        )
-    }
-
     /** Earliest actual volunteering start for the post mode. */
     fun earliestStartDate(input: PostTimingInput): String? {
         return when (input.mode) {
@@ -190,37 +140,6 @@ object PostTimingEvaluator {
             today < start -> PostTimingState.UPCOMING
             today > end -> PostTimingState.PAST
             else -> PostTimingState.ONGOING
-        }
-    }
-
-    private fun missingTrainingDetail(
-        input: TrainingTimingInput
-    ): MissingTrainingDetail? {
-        return when (input.trainingMode) {
-            TrainingMode.ONLINE -> {
-                if (input.meetingLink.isNullOrBlank()) {
-                    MissingTrainingDetail.MEETING_LINK
-                } else {
-                    null
-                }
-            }
-
-            TrainingMode.ONSITE -> {
-                when (input.trainingLocationMode) {
-                    TrainingLocationMode.EVENT_LOCATION -> null
-
-                    TrainingLocationMode.CUSTOM -> {
-                        if (input.trainingLocationName.isNullOrBlank()) {
-                            MissingTrainingDetail.LOCATION
-                        } else {
-                            null
-                        }
-                    }
-
-                    TrainingLocationMode.TBA,
-                    null -> MissingTrainingDetail.LOCATION
-                }
-            }
         }
     }
 
@@ -352,71 +271,6 @@ data class DraftAttention(
             type = DraftAttentionType.NONE,
             startDate = startDate,
             daysUntilStart = daysUntilStart
-        )
-    }
-}
-
-enum class TrainingMode {
-    ONLINE,
-    ONSITE;
-
-    companion object {
-        fun fromDatabaseValue(value: String?): TrainingMode? {
-            if (value.isNullOrBlank()) return null
-            return entries.firstOrNull {
-                it.name.equals(value.trim(), ignoreCase = true)
-            }
-        }
-    }
-}
-
-enum class TrainingLocationMode {
-    EVENT_LOCATION,
-    CUSTOM,
-    TBA;
-
-    companion object {
-        fun fromDatabaseValue(value: String?): TrainingLocationMode? {
-            if (value.isNullOrBlank()) return null
-            return entries.firstOrNull {
-                it.name.equals(value.trim(), ignoreCase = true)
-            }
-        }
-    }
-}
-
-enum class MissingTrainingDetail {
-    MEETING_LINK,
-    LOCATION
-}
-
-enum class TrainingAttentionType {
-    NONE,
-    WARNING,
-    URGENT,
-    OUTDATED
-}
-
-data class TrainingTimingInput(
-    val scheduleDate: String,
-    val startTime: String? = null,
-    val trainingMode: TrainingMode,
-    val meetingLink: String? = null,
-    val trainingLocationMode: TrainingLocationMode? = null,
-    val trainingLocationName: String? = null
-)
-
-data class TrainingAttention(
-    val type: TrainingAttentionType,
-    val missingDetail: MissingTrainingDetail? = null,
-    val daysUntilTraining: Int? = null
-) {
-    val needsAttention: Boolean
-        get() = type != TrainingAttentionType.NONE
-
-    companion object {
-        fun none() = TrainingAttention(
-            type = TrainingAttentionType.NONE
         )
     }
 }
