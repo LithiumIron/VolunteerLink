@@ -44,7 +44,8 @@ fun ReviewSummaryStep(
     onUp: () -> Unit,
     onEditStep: (Int) -> Unit,
     onSaveDraft: () -> Unit,
-    onPublish: () -> Unit
+    onPublish: () -> Unit,
+    onSaveChanges: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -127,11 +128,19 @@ fun ReviewSummaryStep(
                 )
         ) {
             ReviewSummaryActions(
+                isExistingPostEdit = uiState.isExistingPostEdit,
                 isSavingDraft = uiState.isSavingDraft,
                 isPublishing = uiState.isPublishing,
-                errorMessage = uiState.saveDraftError ?: uiState.publishError,
+                isSavingChanges = uiState.isSavingChanges,
+                canSaveChanges = uiState.editPolicy?.isReadOnly != true,
+                errorMessage = if (uiState.isExistingPostEdit) {
+                    uiState.saveChangesError ?: uiState.editPolicy?.readOnlyReason
+                } else {
+                    uiState.saveDraftError ?: uiState.publishError
+                },
                 onSaveDraft = onSaveDraft,
-                onPublish = onPublish
+                onPublish = onPublish,
+                onSaveChanges = onSaveChanges
             )
         }
     }
@@ -139,13 +148,17 @@ fun ReviewSummaryStep(
 
 @Composable
 fun ReviewSummaryActions(
+    isExistingPostEdit: Boolean,
     isSavingDraft: Boolean,
     isPublishing: Boolean,
+    isSavingChanges: Boolean,
+    canSaveChanges: Boolean = true,
     errorMessage: String?,
     onSaveDraft: () -> Unit,
-    onPublish: () -> Unit
+    onPublish: () -> Unit,
+    onSaveChanges: () -> Unit
 ) {
-    val isBusy = isSavingDraft || isPublishing
+    val isBusy = isSavingDraft || isPublishing || isSavingChanges
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -159,42 +172,58 @@ fun ReviewSummaryActions(
             )
         }
 
-        // Final actions sit side-by-side on phone screens so they stay compact
-        // and clearly read as the two choices for finishing the Create Post flow.
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            OutlinedButton(
-                onClick = onSaveDraft,
-                enabled = !isBusy,
-                modifier = Modifier.weight(1f),
-                border = BorderStroke(1.dp, CreateGreen)
-            ) {
-                Text(
-                    text = if (isSavingDraft) "Saving Draft..." else "Save as Draft",
-                    color = if (isBusy) {
-                        CreateGreen.copy(alpha = 0.38f)
-                    } else {
-                        CreateGreen
-                    },
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-
+        if (isExistingPostEdit) {
             Button(
-                onClick = onPublish,
-                enabled = !isBusy,
-                modifier = Modifier.weight(1f),
+                onClick = onSaveChanges,
+                enabled = !isBusy && canSaveChanges,
+                modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = CreateGreen,
                     contentColor = Color.White
                 )
             ) {
                 Text(
-                    text = if (isPublishing) "Publishing..." else "Publish Post",
+                    text = if (isSavingChanges) "Saving Changes..." else "Save Changes",
                     fontWeight = FontWeight.SemiBold
                 )
+            }
+        } else {
+            // Create mode keeps the original Save Draft + Publish actions.
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onSaveDraft,
+                    enabled = !isBusy,
+                    modifier = Modifier.weight(1f),
+                    border = BorderStroke(1.dp, CreateGreen)
+                ) {
+                    Text(
+                        text = if (isSavingDraft) "Saving Draft..." else "Save as Draft",
+                        color = if (isBusy) {
+                            CreateGreen.copy(alpha = 0.38f)
+                        } else {
+                            CreateGreen
+                        },
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                Button(
+                    onClick = onPublish,
+                    enabled = !isBusy,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = CreateGreen,
+                        contentColor = Color.White
+                    )
+                ) {
+                    Text(
+                        text = if (isPublishing) "Publishing..." else "Publish Post",
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             }
         }
     }

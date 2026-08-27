@@ -72,7 +72,8 @@ fun DateSelectionField(
     maximumDateMillis: Long? = null,
     errorMessage: String? = null,
     onDateSelected: (Long) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
 ) {
     val context = LocalContext.current
 
@@ -83,6 +84,7 @@ fun DateSelectionField(
         iconRes = R.drawable.calendar,
         errorMessage = errorMessage,
         modifier = modifier,
+        enabled = enabled,
         onClick = {
             // Keep an outdated date visible in the form so the organiser can
             // see what needs fixing, but open the picker on the first valid
@@ -132,7 +134,8 @@ fun TimeSelectionField(
     errorMessage: String? = null,
     onDialogOpened: () -> Unit = {},
     onTimeSelected: (hour24: Int, minute: Int) -> String?,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
 ) {
     var showDialog by remember { mutableStateOf(false) }
 
@@ -142,13 +145,14 @@ fun TimeSelectionField(
         placeholder = "Set time",
         errorMessage = errorMessage,
         modifier = modifier,
+        enabled = enabled,
         onClick = {
             onDialogOpened()
             showDialog = true
         }
     )
 
-    if (showDialog) {
+    if (showDialog && enabled) {
         KeyboardTimeInputDialog(
             title = label,
             initialTimeMinutes = dialogInitialTimeMinutes,
@@ -403,7 +407,8 @@ private fun TimePeriodOption(
 @Composable
 fun ThumbnailPickerSection(
     thumbnailUri: String?,
-    onThumbnailChanged: (String?) -> Unit
+    onThumbnailChanged: (String?) -> Unit,
+    enabled: Boolean = true
 ) {
     val context = LocalContext.current
 
@@ -441,7 +446,8 @@ fun ThumbnailPickerSection(
 
         if (thumbnailUri == null) {
             OutlinedButton(
-                onClick = { launcher.launch(arrayOf("image/*")) }
+                onClick = { launcher.launch(arrayOf("image/*")) },
+                enabled = enabled
             ) {
                 Text("Choose Image")
             }
@@ -483,6 +489,7 @@ fun ThumbnailPickerSection(
                     ) {
                         Button(
                             onClick = { launcher.launch(arrayOf("image/*")) },
+                            enabled = enabled,
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = CreateGreen
                             )
@@ -491,7 +498,8 @@ fun ThumbnailPickerSection(
                         }
 
                         OutlinedButton(
-                            onClick = { onThumbnailChanged(null) }
+                            onClick = { onThumbnailChanged(null) },
+                            enabled = enabled
                         ) {
                             Text("Remove")
                         }

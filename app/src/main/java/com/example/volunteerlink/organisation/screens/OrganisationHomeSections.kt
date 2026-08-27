@@ -727,9 +727,6 @@ private fun HomeAttentionItem.attentionKindLabel(): String {
         HomeAttentionType.POST_COMPLETION_REVIEW -> "CLOSE-OUT"
         HomeAttentionType.DRAFT_START_TOO_SOON,
         HomeAttentionType.DRAFT_START_DATE_PASSED -> "DRAFT"
-        HomeAttentionType.TRAINING_DETAILS_WARNING,
-        HomeAttentionType.TRAINING_DETAILS_URGENT,
-        HomeAttentionType.TRAINING_OUTDATED -> "TRAINING"
     }
 }
 
@@ -742,30 +739,12 @@ private fun HomeAttentionItem.severityLabel(): String {
     }
 }
 
-private fun HomeAttentionItem.primaryTitle(): String {
-    return when (type) {
-        HomeAttentionType.TRAINING_DETAILS_WARNING,
-        HomeAttentionType.TRAINING_DETAILS_URGENT,
-        HomeAttentionType.TRAINING_OUTDATED -> scheduleTitle ?: postTitle
-        else -> postTitle
-    }
-}
+private fun HomeAttentionItem.primaryTitle(): String = postTitle
 
 private fun HomeAttentionItem.contextLine(): String? {
     return when (type) {
         HomeAttentionType.APPLICATIONS_TO_REVIEW -> contextLabel ?: "Application review"
         HomeAttentionType.POST_COMPLETION_REVIEW -> contextLabel ?: "Post-event close-out"
-
-        HomeAttentionType.TRAINING_DETAILS_WARNING,
-        HomeAttentionType.TRAINING_DETAILS_URGENT,
-        HomeAttentionType.TRAINING_OUTDATED -> buildString {
-            append(postTitle)
-            formatSingleDate(scheduleDate)?.let { date ->
-                append(" · ")
-                append(date)
-            }
-        }
-
         HomeAttentionType.DRAFT_START_TOO_SOON,
         HomeAttentionType.DRAFT_START_DATE_PASSED -> null
     }

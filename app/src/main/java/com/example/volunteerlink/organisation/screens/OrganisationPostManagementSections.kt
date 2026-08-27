@@ -609,7 +609,7 @@ private fun PostManagementRoleRow(
 @Composable
 private fun PostManagementScheduleSection(post: PostManagementPost) {
     PostManagementSectionCard(
-        title = "Schedule & Training",
+        title = "Schedule",
         subtitle = if (post.schedules.isEmpty()) null else "${post.schedules.size} item${if (post.schedules.size == 1) "" else "s"}"
     ) {
         if (post.schedules.isEmpty()) {
@@ -641,13 +641,7 @@ private fun PostManagementScheduleRow(schedule: PostManagementScheduleItem) {
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
-                    painter = painterResource(
-                        if (schedule.scheduleType.equals("TRAINING", true)) {
-                            R.drawable.instructions
-                        } else {
-                            R.drawable.calendar
-                        }
-                    ),
+                    painter = painterResource(R.drawable.calendar),
                     contentDescription = null,
                     modifier = Modifier.size(19.dp),
                     tint = VolunteerLinkPrimaryGreen
@@ -688,15 +682,7 @@ private fun PostManagementScheduleRow(schedule: PostManagementScheduleItem) {
                 color = VolunteerLinkTextSecondary
             )
 
-            val place = when {
-                schedule.scheduleType.equals("TRAINING", true) &&
-                        schedule.trainingMode.equals("ONLINE", true) -> {
-                    schedule.onlinePlatform?.takeIf { it.isNotBlank() } ?: "Online"
-                }
-                schedule.scheduleType.equals("TRAINING", true) ->
-                    schedule.trainingLocationName?.takeIf { it.isNotBlank() }
-                else -> schedule.location?.takeIf { it.isNotBlank() }
-            }
+            val place = schedule.location?.takeIf { it.isNotBlank() }
 
             if (!place.isNullOrBlank()) {
                 Text(
@@ -1275,23 +1261,6 @@ internal fun PostManagementProfilePreviewDialog(
     )
 }
 
-@Composable
-internal fun PostManagementEditComingSoonDialog(onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Edit post") },
-        text = {
-            Text(
-                "The Edit action is already placed here, but loading an existing post back into the five-step Create Post flow is the next function to connect."
-            )
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("OK")
-            }
-        }
-    )
-}
 
 @Composable
 private fun PostManagementSectionCard(

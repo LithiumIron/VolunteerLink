@@ -1,6 +1,7 @@
 package com.example.volunteerlink.organisation.repository
 
 import com.example.volunteerlink.organisation.create.model.CreatePostDraft
+import com.example.volunteerlink.organisation.create.PostEditPolicyInput
 import com.example.volunteerlink.organisation.create.model.CreateRoleTemplate
 
 /** Selected thumbnail bytes prepared by the ViewModel for saving or publishing. */
@@ -16,6 +17,17 @@ data class SavedPostResult(
     val thumbnailPath: String?
 )
 
+
+/** Existing normalized post loaded back into the shared Create/Edit wizard. */
+data class ExistingPostEditData(
+    val postId: String,
+    val databaseStatus: String,
+    val originalUpdatedAt: String,
+    val existingThumbnailPath: String?,
+    val draft: CreatePostDraft,
+    val policyInput: PostEditPolicyInput
+)
+
 /**
  * Database access used by the Organisation Create Post flow.
  *
@@ -24,6 +36,15 @@ data class SavedPostResult(
  */
 interface CreatePostRepository {
     suspend fun loadRoleCatalogue(): List<CreateRoleTemplate>
+
+    suspend fun loadExistingPostForEdit(postId: String): ExistingPostEditData
+
+    suspend fun updateExistingPost(
+        latest: ExistingPostEditData,
+        editedDraft: CreatePostDraft,
+        roleCatalogue: List<CreateRoleTemplate>,
+        thumbnail: PublishThumbnail?
+    ): SavedPostResult
 
     suspend fun saveDraft(
         draft: CreatePostDraft,

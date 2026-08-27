@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
@@ -27,6 +28,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -54,11 +56,57 @@ fun PostDetailsStep(
 ) {
     val draft = uiState.draft
     val errors = uiState.visibleErrors
+    val editPolicy = uiState.editPolicy
+    val isExistingEdit = uiState.isExistingPostEdit
+    val canChangePostType = !isExistingEdit || editPolicy?.postStatus == "DRAFT"
+    val canEditSharedInfo = !isExistingEdit || editPolicy?.canEditSharedPostInfo != false
+    val listState = rememberLazyListState()
+
+    // Continue may reveal an error far above the button. Move the organiser
+    // straight to the first section that needs attention instead of making
+    // them hunt through the form.
+    val firstErrorSectionIndex = run {
+        val existingInfoOffset = if (uiState.isExistingPostEdit) 1 else 0
+        val postTypeIndex = 1 + existingInfoOffset
+        val postInformationIndex = postTypeIndex + 1
+        var nextIndex = postInformationIndex + 1
+        val hasPhysical = draft.postType == VolunteerPostType.PHYSICAL ||
+            draft.postType == VolunteerPostType.HYBRID
+        val hasRemote = draft.postType == VolunteerPostType.REMOTE ||
+            draft.postType == VolunteerPostType.HYBRID
+        val physicalIndex = if (hasPhysical) nextIndex++ else null
+        val remoteIndex = if (hasRemote) nextIndex++ else null
+        val hybridCapacityIndex = if (draft.postType == VolunteerPostType.HYBRID) nextIndex else null
+
+        when {
+            errors.postType != null -> postTypeIndex
+            errors.category != null || errors.title != null || errors.description != null ->
+                postInformationIndex
+            errors.physicalStartDate != null || errors.physicalEndDate != null ||
+                errors.physicalTime != null || errors.physicalLocation != null ||
+                errors.physicalCapacity != null -> physicalIndex
+            errors.remoteStartDate != null || errors.remoteDueDate != null ||
+                errors.remoteCapacity != null || errors.remoteSubmissionMode != null ||
+                errors.sharedDeliverable != null -> remoteIndex
+            errors.hybridPhysicalCapacity != null || errors.hybridRemoteCapacity != null ->
+                hybridCapacityIndex
+            else -> null
+        }
+    }
+
+    LaunchedEffect(uiState.validationFocusRequest) {
+        if (uiState.showValidationErrors && errors.hasErrors()) {
+            firstErrorSectionIndex?.let { target ->
+                listState.animateScrollToItem(target.coerceAtLeast(0))
+            }
+        }
+    }
 
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .statusBarsPadding(),
+        state = listState,
         contentPadding = PaddingValues(
             start = 20.dp,
             top = 12.dp,
@@ -86,17 +134,65 @@ fun PostDetailsStep(
                     verticalArrangement = Arrangement.spacedBy(3.dp)
                 ) {
                     Text(
-                        text = if (uiState.reviewEditStep == 1) "Edit Post Details" else "Create Volunteer Post",
+                        text = when {
+                            uiState.isExistingPostEdit -> "Edit Volunteer Post"
+                            uiState.reviewEditStep == 1 -> "Edit Post Details"
+                            else -> "Create Volunteer Post"
+                        },
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
                         color = CreateGreen
                     )
 
                     Text(
-                        text = if (uiState.reviewEditStep == 1) "Editing from Review · Post Details" else "Step 1 of 5 · Post Details",
+                        text = when {
+                            uiState.isExistingPostEdit -> "Manage Post · Step 1 of 5 · Post Details"
+                            uiState.reviewEditStep == 1 -> "Editing from Review · Post Details"
+                            else -> "Step 1 of 5 · Post Details"
+                        },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+            }
+        }
+
+        if (uiState.isExistingPostEdit) {
+            item {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    color = if (editPolicy?.isReadOnly == true) {
+                        MaterialTheme.colorScheme.errorContainer
+                    } else {
+                        Color(0xFFF1F7EE)
+                    }
+                ) {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = if (editPolicy?.isReadOnly == true) {
+                                "This post is read-only"
+                            } else {
+                                "Editing an existing post"
+                            },
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (editPolicy?.isReadOnly == true) {
+                                MaterialTheme.colorScheme.onErrorContainer
+                            } else {
+                                CreateGreen
+                            }
+                        )
+                        Text(
+                            text = editPolicy?.readOnlyReason
+                                ?: "Fields already relied on by applicants or volunteers are locked. Safe future details remain editable.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
         }
@@ -137,6 +233,7 @@ fun PostDetailsStep(
                                 VolunteerPostType.PHYSICAL
                             )
                         },
+                        enabled = canChangePostType,
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight()
@@ -151,6 +248,7 @@ fun PostDetailsStep(
                                 VolunteerPostType.REMOTE
                             )
                         },
+                        enabled = canChangePostType,
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight()
@@ -165,13 +263,14 @@ fun PostDetailsStep(
                                 VolunteerPostType.HYBRID
                             )
                         },
+                        enabled = canChangePostType,
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight()
                     )
                 }
 
-                FormError(errors.postType)
+                FormError(errors.postType.takeIf { canChangePostType })
 
 
             }
@@ -186,7 +285,8 @@ fun PostDetailsStep(
                     CategoryPicker(
                         selectedCategory = draft.category,
                         onCategorySelected = viewModel::updateCategory,
-                        errorMessage = errors.category
+                        errorMessage = errors.category,
+                        enabled = canEditSharedInfo
                     )
 
                     Column(
@@ -211,10 +311,11 @@ fun PostDetailsStep(
                                 )
                             },
                             singleLine = true,
-                            isError = errors.title != null,
+                            enabled = canEditSharedInfo,
+                            isError = canEditSharedInfo && errors.title != null,
                             shape = RoundedCornerShape(14.dp)
                         )
-                        FormError(errors.title)
+                        FormError(errors.title.takeIf { canEditSharedInfo })
                     }
 
                     Column(
@@ -230,15 +331,17 @@ fun PostDetailsStep(
                             },
                             minLines = 4,
                             maxLines = 7,
-                            isError = errors.description != null,
+                            enabled = canEditSharedInfo,
+                            isError = canEditSharedInfo && errors.description != null,
                             shape = RoundedCornerShape(14.dp)
                         )
-                        FormError(errors.description)
+                        FormError(errors.description.takeIf { canEditSharedInfo })
                     }
 
                     ThumbnailPickerSection(
                         thumbnailUri = draft.thumbnailUri,
-                        onThumbnailChanged = viewModel::updateThumbnailUri
+                        onThumbnailChanged = viewModel::updateThumbnailUri,
+                        enabled = canEditSharedInfo
                     )
                 }
             }

@@ -1,8 +1,6 @@
 package com.example.volunteerlink.organisation.create.model
 
-import com.example.volunteerlink.data.location.LocationSuggestion
-
-/** The three Step 4 schedule sections. */
+/** The two optional Step 4 schedule sections kept in the reduced project scope. */
 enum class ScheduleType(
     val displayName: String,
     val databaseValue: String
@@ -14,32 +12,7 @@ enum class ScheduleType(
     REMOTE(
         displayName = "Remote Schedule",
         databaseValue = "REMOTE"
-    ),
-    TRAINING(
-        displayName = "Training & Briefing",
-        databaseValue = "TRAINING"
     )
-}
-
-/** Format used only by Training / Briefing items. */
-enum class TrainingMode(
-    val displayName: String,
-    val databaseValue: String
-) {
-    ONLINE("Online", "ONLINE"),
-    ONSITE("On-site", "ONSITE")
-}
-
-/**
- * Wizard-only choice for an on-site training location.
- *
- * The final schedule_items row stores this choice in training_location_mode.
- * CUSTOM also persists the selected structured Geoapify location fields.
- */
-enum class TrainingLocationMode {
-    EVENT_LOCATION,
-    CUSTOM,
-    TBA
 }
 
 /**
@@ -47,7 +20,7 @@ enum class TrainingLocationMode {
  *
  * draftId is local wizard state, not schedule_items.schedule_item_id.
  * targetRoleTemplateIds uses ROLE... IDs while creating the post and those
- * same template IDs are stored in schedule_items for the generated post_id.
+ * same template IDs are stored through schedule_item_roles for the post.
  */
 data class ScheduleItemDraft(
     val draftId: String,
@@ -58,27 +31,9 @@ data class ScheduleItemDraft(
     val endTimeMinutes: Int? = null,
 
     // PHYSICAL may use a simple location override. Blank = main event venue.
-    // TRAINING resolves this from its location mode before it is saved.
     val location: String = "",
 
     val appliesToAllRoles: Boolean = true,
     val targetRoleTemplateIds: List<String> = emptyList(),
-    val notes: String = "",
-
-    // TRAINING-only values.
-    val trainingMode: TrainingMode? = null,
-    val trainingLocationMode: TrainingLocationMode? = null,
-    val trainingLocationQuery: String = "",
-    val trainingLocation: LocationSuggestion? = null,
-    val onlinePlatform: String = "",
-    val meetingLink: String = "",
-
-    // Time-zone support is intentionally postponed. Keep this nullable so a
-    // future SQL insert can send NULL until the lecturer confirms it is needed.
-    val trainingTimeZoneId: String? = null,
-
-    // TRAINING-only. A role ID appears here only when this training should
-    // create an application cutoff for that targeted role. An empty list means
-    // this training does not close applications for any of its targeted roles.
-    val closingRoleTemplateIds: List<String> = emptyList()
+    val notes: String = ""
 )

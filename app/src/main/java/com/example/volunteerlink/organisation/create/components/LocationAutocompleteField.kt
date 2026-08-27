@@ -37,7 +37,8 @@ fun LocationAutocompleteField(
     placeholder: String = "Search a venue or address",
     onQueryChanged: (String) -> Unit,
     onLocationSelected: (LocationSuggestion) -> Unit,
-    onClearLocation: () -> Unit
+    onClearLocation: () -> Unit,
+    enabled: Boolean = true
 ) {
     Column(
         verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -50,7 +51,8 @@ fun LocationAutocompleteField(
             placeholder = { Text(placeholder) },
             singleLine = true,
             isError = validationError != null,
-            shape = RoundedCornerShape(14.dp)
+            shape = RoundedCornerShape(14.dp),
+            enabled = enabled
         )
 
         if (isSearching) {
@@ -71,7 +73,7 @@ fun LocationAutocompleteField(
             }
         }
 
-        if (suggestions.isNotEmpty() && selectedLocation == null) {
+        if (enabled && suggestions.isNotEmpty() && selectedLocation == null) {
             LocationSuggestionList(
                 suggestions = suggestions,
                 onLocationSelected = onLocationSelected
@@ -106,7 +108,7 @@ fun LocationAutocompleteField(
                             color = CreateGreen
                         )
 
-                        TextButton(onClick = onClearLocation) {
+                        TextButton(onClick = onClearLocation, enabled = enabled) {
                             Text("Change")
                         }
                     }

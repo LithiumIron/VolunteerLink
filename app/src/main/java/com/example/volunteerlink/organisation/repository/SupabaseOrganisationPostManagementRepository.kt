@@ -6,7 +6,6 @@ import com.example.volunteerlink.organisation.manage.model.PostManagementPhysica
 import com.example.volunteerlink.organisation.manage.model.PostManagementPost
 import com.example.volunteerlink.organisation.manage.model.PostManagementRemoteDetails
 import com.example.volunteerlink.organisation.manage.model.PostManagementRole
-import com.example.volunteerlink.organisation.manage.model.PostManagementRoleClosingSchedule
 import com.example.volunteerlink.organisation.manage.model.PostManagementScheduleItem
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.query.Columns
@@ -66,48 +65,12 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
             .select(
                 columns = Columns.raw(
                     "schedule_item_id,schedule_type,schedule_date,title,start_time,end_time," +
-                            "location,notes,training_mode,online_platform,meeting_link," +
-                            "training_time_zone,training_location_mode,training_location_name"
+                            "location,notes"
                 )
             ) {
                 filter { eq("post_id", postId) }
             }
             .decodeList<JsonObject>()
-
-        val scheduleDatesById = scheduleRows.associate { row ->
-            row.requiredText("schedule_item_id") to row.requiredText("schedule_date")
-        }
-
-        val closingScheduleRoleRows = supabase
-            .from("schedule_item_roles")
-            .select(
-                columns = Columns.raw(
-                    "schedule_item_id,role_template_id,closes_applications_on_start"
-                )
-            ) {
-                filter {
-                    eq("post_id", postId)
-                    eq("closes_applications_on_start", true)
-                }
-            }
-            .decodeList<JsonObject>()
-
-        val closingSchedulesByRole = closingScheduleRoleRows
-            .mapNotNull { relationRow ->
-                val scheduleItemId = relationRow.requiredText("schedule_item_id")
-                val roleTemplateId = relationRow.requiredText("role_template_id")
-                val scheduleDate = scheduleDatesById[scheduleItemId]
-                    ?: return@mapNotNull null
-
-                roleTemplateId to PostManagementRoleClosingSchedule(
-                    scheduleItemId = scheduleItemId,
-                    scheduleDate = scheduleDate
-                )
-            }
-            .groupBy(
-                keySelector = { it.first },
-                valueTransform = { it.second }
-            )
 
         val roleRows = supabase
             .from("post_roles")
@@ -159,10 +122,7 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
                 roleNotes = roleRow.optionalText("role_notes"),
                 individualSubmissionRequirement = roleRow.optionalText(
                     "individual_submission_requirement"
-                ),
-                applicationClosingSchedules = closingSchedulesByRole[roleTemplateId]
-                    .orEmpty()
-                    .sortedBy { it.scheduleDate }
+                )
             )
         }.sortedBy { it.roleName }
 
@@ -275,13 +235,7 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
                     startTime = it.optionalText("start_time"),
                     endTime = it.optionalText("end_time"),
                     location = it.optionalText("location"),
-                    notes = it.optionalText("notes"),
-                    trainingMode = it.optionalText("training_mode"),
-                    onlinePlatform = it.optionalText("online_platform"),
-                    meetingLink = it.optionalText("meeting_link"),
-                    trainingTimeZone = it.optionalText("training_time_zone"),
-                    trainingLocationMode = it.optionalText("training_location_mode"),
-                    trainingLocationName = it.optionalText("training_location_name")
+                    notes = it.optionalText("notes")
                 )
             }.sortedWith(
                 compareBy<PostManagementScheduleItem> { it.scheduleDate }

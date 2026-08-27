@@ -1,25 +1,38 @@
 package com.example.volunteerlink.organisation.repository
 
 import com.example.volunteerlink.data.supabase
-import com.example.volunteerlink.data.time.AppClock
+import com.example.volunteerlink.data.location.LocationSuggestion
 import com.example.volunteerlink.organisation.create.CreatePostValidator
+import com.example.volunteerlink.organisation.create.PostEditParticipationInput
+import com.example.volunteerlink.organisation.create.PostEditPolicyInput
+import com.example.volunteerlink.organisation.create.PostEditRoleInput
+import com.example.volunteerlink.organisation.create.PostEditScheduleInput
 import com.example.volunteerlink.organisation.create.model.CreatePostDraft
 import com.example.volunteerlink.organisation.create.model.CreateRoleSkill
 import com.example.volunteerlink.organisation.create.model.CreateRoleTemplate
 import com.example.volunteerlink.organisation.create.model.RemoteSubmissionMode
+import com.example.volunteerlink.organisation.create.model.RoleApplicationMethod
+import com.example.volunteerlink.organisation.create.model.SelectedRoleDraft
 import com.example.volunteerlink.organisation.create.model.ScheduleItemDraft
 import com.example.volunteerlink.organisation.create.model.ScheduleType
-import com.example.volunteerlink.organisation.create.model.TrainingLocationMode
-import com.example.volunteerlink.organisation.create.model.TrainingMode
 import com.example.volunteerlink.organisation.create.model.VolunteerPostType
 import com.example.volunteerlink.organisation.create.model.VolunteerRoleLevel
 import com.example.volunteerlink.organisation.create.model.VolunteerRoleMode
 import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.storage.storage
 import io.ktor.http.ContentType
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import java.text.SimpleDateFormat
@@ -31,10 +44,9 @@ import java.util.UUID
 /**
  * Supabase implementation used by the Create Post wizard.
  *
- * Saving is a client-side multi-table operation for this university project.
- * Both actions first create a DRAFT parent and all normalized child rows.
- * Publish changes the parent to PUBLISHED only after everything succeeds;
- * Save Draft deliberately leaves status DRAFT and published_at NULL.
+ * New-post Save Draft / Publish remain client-side multi-table operations for this
+ * university project. Existing-post Edit uses one PostgreSQL RPC transaction because
+ * application/activity history makes partial multi-table updates unsafe.
  */
 class SupabaseCreatePostRepository : CreatePostRepository {
 
@@ -185,10 +197,6 @@ class SupabaseCreatePostRepository : CreatePostRepository {
                         put("schedule_item_id", scheduleItemId)
                         put("post_id", postId)
                         put("role_template_id", roleId)
-                        put(
-                            "closes_applications_on_start",
-                            roleId in scheduleData.closingRoleTemplateIds
-                        )
                     }
                 }
 
@@ -255,6 +263,471 @@ class SupabaseCreatePostRepository : CreatePostRepository {
                 thumbnailPath = uploadedThumbnailPath
             )
             throw e
+        }
+    }
+
+    override suspend fun loadExistingPostForEdit(postId: String): ExistingPostEditData {
+        val postRow = supabase.from("volunteer_posts")
+            .select(columns = Columns.raw(
+                "post_id,title,description,mode,status,category,thumbnail_path,updated_at"
+            )) { filter { eq("post_id", postId) } }
+            .decodeList<JsonObject>()
+            .firstOrNull()
+            ?: error("Volunteer post $postId was not found.")
+
+        val physicalRow = supabase.from("physical_details")
+            .select { filter { eq("post_id", postId) } }
+            .decodeList<JsonObject>()
+            .firstOrNull()
+        val remoteRow = supabase.from("remote_details")
+            .select { filter { eq("post_id", postId) } }
+            .decodeList<JsonObject>()
+            .firstOrNull()
+        val roleRows = supabase.from("post_roles")
+            .select { filter { eq("post_id", postId) } }
+            .decodeList<JsonObject>()
+        val skillRows = supabase.from("post_role_skills")
+            .select { filter { eq("post_id", postId) } }
+            .decodeList<JsonObject>()
+        val responsibilityRows = supabase.from("post_role_responsibilities")
+            .select { filter { eq("post_id", postId) } }
+            .decodeList<JsonObject>()
+        val questionRows = supabase.from("post_role_screening_questions")
+            .select { filter { eq("post_id", postId) } }
+            .decodeList<JsonObject>()
+        val scheduleRows = supabase.from("schedule_items")
+            .select { filter { eq("post_id", postId) } }
+            .decodeList<JsonObject>()
+        val scheduleRoleRows = supabase.from("schedule_item_roles")
+            .select { filter { eq("post_id", postId) } }
+            .decodeList<JsonObject>()
+        val participationRows = supabase.from("role_participations")
+            .select(columns = Columns.raw(
+                "role_template_id,application_status,completion_status,joined_at"
+            )) { filter { eq("post_id", postId) } }
+            .decodeList<JsonObject>()
+        val screeningAnswerRows = supabase.from("participation_screening_answers")
+            .select(columns = Columns.raw("role_template_id")) {
+                filter { eq("post_id", postId) }
+            }.decodeList<JsonObject>()
+        val attendanceRows = supabase.from("attendance_records")
+            .select(columns = Columns.raw("event_date,role_template_id")) {
+                filter { eq("post_id", postId) }
+            }.decodeList<JsonObject>()
+        val submissionRows = supabase.from("remote_submissions")
+            .select(columns = Columns.raw("role_template_id,submission_type")) {
+                filter { eq("post_id", postId) }
+            }.decodeList<JsonObject>()
+        val evaluationRows = supabase.from("volunteer_evaluations")
+            .select(columns = Columns.raw("role_template_id")) {
+                filter { eq("post_id", postId) }
+            }.decodeList<JsonObject>()
+        val skillExperienceRows = supabase.from("volunteer_skill_experiences")
+            .select(columns = Columns.raw("role_template_id")) {
+                filter { eq("post_id", postId) }
+            }.decodeList<JsonObject>()
+        val certificateRows = supabase.from("volunteer_certificates")
+            .select(columns = Columns.raw("role_template_id")) {
+                filter { eq("post_id", postId) }
+            }.decodeList<JsonObject>()
+
+        val roleTemplateIds = roleRows.map { it.requiredText("role_template_id") }.distinct()
+        val templateRows = if (roleTemplateIds.isEmpty()) emptyList() else {
+            supabase.from("role_templates")
+                .select(columns = Columns.raw("role_template_id,role_mode")) {
+                    filter { isIn("role_template_id", roleTemplateIds) }
+                }.decodeList<JsonObject>()
+        }
+        val roleModes = templateRows.associate {
+            it.requiredText("role_template_id") to VolunteerRoleMode.valueOf(
+                it.requiredText("role_mode")
+            )
+        }
+
+        val skillsByRole = skillRows.groupBy { it.requiredText("role_template_id") }
+        val responsibilitiesByRole = responsibilityRows
+            .groupBy { it.requiredText("role_template_id") }
+        val questionsByRole = questionRows.groupBy { it.requiredText("role_template_id") }
+
+        val selectedRoles = roleRows.map { row ->
+            val roleId = row.requiredText("role_template_id")
+            val roleSkills = skillsByRole[roleId].orEmpty()
+            SelectedRoleDraft(
+                roleTemplateId = roleId,
+                capacity = row.requiredInt("capacity"),
+                practisedSkillIds = roleSkills
+                    .map { it.requiredText("skill_id") }
+                    .distinct(),
+                requiredSkillExperience = roleSkills.mapNotNull { skillRow ->
+                    skillRow.optionalInt("required_experience")?.let { experience ->
+                        skillRow.requiredText("skill_id") to experience
+                    }
+                }.toMap(),
+                responsibilities = responsibilitiesByRole[roleId].orEmpty()
+                    .sortedBy { it.requiredInt("responsibility_no") }
+                    .map { it.requiredText("responsibility_text") },
+                applicationMethod = RoleApplicationMethod.valueOf(
+                    row.requiredText("application_method")
+                ),
+                screeningQuestions = questionsByRole[roleId].orEmpty()
+                    .sortedBy { it.requiredInt("question_no") }
+                    .map { it.requiredText("question_text") },
+                roleNotes = row.optionalText("role_notes").orEmpty(),
+                individualSubmissionRequirement = row
+                    .optionalText("individual_submission_requirement").orEmpty(),
+                isConfigured = true
+            )
+        }
+
+        val scheduleTargets = scheduleRoleRows.groupBy {
+            it.requiredText("schedule_item_id")
+        }
+        val schedules = scheduleRows.map { row ->
+            val scheduleId = row.requiredText("schedule_item_id")
+            val relations = scheduleTargets[scheduleId].orEmpty()
+            val targetRoleIds = relations.map { it.requiredText("role_template_id") }
+            val scheduleType = ScheduleType.valueOf(row.requiredText("schedule_type"))
+
+            ScheduleItemDraft(
+                draftId = scheduleId,
+                scheduleType = scheduleType,
+                scheduleDateMillis = parseSqlDate(row.requiredText("schedule_date")),
+                title = row.requiredText("title"),
+                startTimeMinutes = row.optionalText("start_time")?.let(::parseSqlTime),
+                endTimeMinutes = row.optionalText("end_time")?.let(::parseSqlTime),
+                location = row.optionalText("location").orEmpty(),
+                appliesToAllRoles = false,
+                targetRoleTemplateIds = targetRoleIds,
+                notes = row.optionalText("notes").orEmpty()
+            )
+        }
+
+        val postType = VolunteerPostType.valueOf(postRow.requiredText("mode"))
+        val physicalLocation = physicalRow?.let { row ->
+            LocationSuggestion(
+                placeId = "existing:$postId",
+                name = row.requiredText("location_name"),
+                address = row.optionalText("location_address").orEmpty(),
+                city = null,
+                state = row.optionalText("state_region"),
+                country = row.optionalText("country"),
+                latitude = row.optionalDouble("latitude") ?: 0.0,
+                longitude = row.optionalDouble("longitude") ?: 0.0
+            )
+        }
+
+        val draft = CreatePostDraft(
+            postType = postType,
+            category = postRow.optionalText("category")?.let {
+                com.example.volunteerlink.organisation.create.model.VolunteerPostCategory.valueOf(it)
+            },
+            title = postRow.requiredText("title"),
+            description = postRow.requiredText("description"),
+            thumbnailUri = null,
+            isMultiDayPhysicalEvent = physicalRow?.let {
+                it.requiredText("start_date") != it.requiredText("end_date")
+            } ?: false,
+            physicalStartDateMillis = physicalRow?.requiredText("start_date")?.let(::parseSqlDate),
+            physicalEndDateMillis = physicalRow?.requiredText("end_date")?.let(::parseSqlDate),
+            physicalStartTimeMinutes = physicalRow?.requiredText("start_time")?.let(::parseSqlTime),
+            physicalEndTimeMinutes = physicalRow?.requiredText("end_time")?.let(::parseSqlTime),
+            physicalLocationQuery = physicalLocation?.displayName.orEmpty(),
+            physicalLocation = physicalLocation,
+            meetingPoint = physicalRow?.optionalText("meeting_point").orEmpty(),
+            physicalVolunteerCapacity = if (postType == VolunteerPostType.PHYSICAL) {
+                physicalRow?.requiredInt("volunteer_capacity")
+            } else null,
+            physicalTimeZoneId = physicalRow?.optionalText("time_zone"),
+            remoteStartDateMillis = remoteRow?.requiredText("start_date")?.let(::parseSqlDate),
+            remoteDueDateMillis = remoteRow?.requiredText("end_date")?.let(::parseSqlDate),
+            remoteVolunteerCapacity = if (postType == VolunteerPostType.REMOTE) {
+                remoteRow?.requiredInt("volunteer_capacity")
+            } else null,
+            remoteSubmissionMode = remoteRow?.requiredText("submission_mode")
+                ?.let(RemoteSubmissionMode::valueOf),
+            sharedDeliverable = remoteRow?.optionalText("shared_deliverable").orEmpty(),
+            hybridPhysicalVolunteerCapacity = if (postType == VolunteerPostType.HYBRID) {
+                physicalRow?.requiredInt("volunteer_capacity")
+            } else null,
+            hybridRemoteVolunteerCapacity = if (postType == VolunteerPostType.HYBRID) {
+                remoteRow?.requiredInt("volunteer_capacity")
+            } else null,
+            selectedRoles = selectedRoles,
+            sharedSubmissionResponsibleRoleTemplateId = remoteRow
+                ?.optionalText("responsible_role_template_id"),
+            scheduleItems = schedules
+        )
+
+        val submissionRoleIds = submissionRows.mapNotNull {
+            it.optionalText("role_template_id")
+        }.toSet()
+        // A valid SHARED_TEAM post writes SHARED submissions. The mode fallback
+        // is deliberately conservative for older/inconsistent rows so Manage Edit
+        // never offers a global deadline edit after shared work already exists.
+        val hasSharedRemoteSubmission = submissionRows.any { row ->
+            row.optionalText("submission_type").equals("SHARED", ignoreCase = true)
+        } || (
+            draft.remoteSubmissionMode == RemoteSubmissionMode.SHARED_TEAM &&
+                submissionRows.isNotEmpty()
+            )
+        val completedHistoryRoleIds = buildSet {
+            addAll(attendanceRows.map { it.requiredText("role_template_id") })
+            addAll(submissionRoleIds)
+            addAll(evaluationRows.map { it.requiredText("role_template_id") })
+            addAll(skillExperienceRows.map { it.requiredText("role_template_id") })
+            addAll(certificateRows.map { it.requiredText("role_template_id") })
+            addAll(participationRows.filter {
+                !it.requiredText("completion_status").equals("IN_PROGRESS", true)
+            }.map { it.requiredText("role_template_id") })
+        }
+
+        return ExistingPostEditData(
+            postId = postId,
+            databaseStatus = postRow.requiredText("status"),
+            originalUpdatedAt = postRow.requiredText("updated_at"),
+            existingThumbnailPath = postRow.optionalText("thumbnail_path"),
+            draft = draft,
+            policyInput = PostEditPolicyInput(
+                postStatus = postRow.requiredText("status"),
+                physicalStartDateMillis = draft.physicalStartDateMillis,
+                physicalEndDateMillis = draft.physicalEndDateMillis,
+                remoteStartDateMillis = draft.remoteStartDateMillis,
+                remoteEndDateMillis = draft.remoteDueDateMillis,
+                roles = selectedRoles.map { selected ->
+                    PostEditRoleInput(
+                        roleTemplateId = selected.roleTemplateId,
+                        roleMode = roleModes[selected.roleTemplateId]
+                            ?: error("Missing role mode for ${selected.roleTemplateId}."),
+                        hasConfiguredScreeningQuestions = selected.screeningQuestions.isNotEmpty()
+                    )
+                },
+                participations = participationRows.map { row ->
+                    PostEditParticipationInput(
+                        roleTemplateId = row.requiredText("role_template_id"),
+                        applicationStatus = row.requiredText("application_status"),
+                        joinedAt = row.optionalText("joined_at")
+                    )
+                },
+                schedules = schedules.map { item ->
+                    PostEditScheduleInput(
+                        scheduleItemId = item.draftId,
+                        scheduleType = item.scheduleType,
+                        scheduleDateMillis = item.scheduleDateMillis
+                            ?: error("Existing schedule has no date.")
+                    )
+                },
+                attendanceDatesMillis = attendanceRows.map {
+                    parseSqlDate(it.requiredText("event_date"))
+                },
+                remoteSubmissionRoleIds = submissionRoleIds,
+                hasAnyRemoteSubmission = submissionRows.isNotEmpty(),
+                hasSharedRemoteSubmission = hasSharedRemoteSubmission,
+                completedHistoryRoleIds = completedHistoryRoleIds,
+                screeningAnswerRoleIds = screeningAnswerRows
+                    .map { it.requiredText("role_template_id") }
+                    .toSet()
+            )
+        )
+    }
+
+    override suspend fun updateExistingPost(
+        latest: ExistingPostEditData,
+        editedDraft: CreatePostDraft,
+        roleCatalogue: List<CreateRoleTemplate>,
+        thumbnail: PublishThumbnail?
+    ): SavedPostResult {
+        val postId = latest.postId
+        val postType = editedDraft.postType ?: error("Post Type is missing.")
+        editedDraft.category ?: error("Category is missing.")
+
+        var thumbnailPath = latest.existingThumbnailPath
+        var newlyUploadedThumbnailPath: String? = null
+
+        try {
+            // Storage is outside PostgreSQL, so upload the new object first and
+            // remove it again if the atomic database RPC rejects/rolls back.
+            if (thumbnail != null) {
+                val safeExtension = thumbnail.fileExtension.lowercase()
+                    .filter { it.isLetterOrDigit() }
+                    .ifBlank { "jpg" }
+                val storagePath = "$TEST_STORAGE_PREFIX/$TEST_ORGANISATION_ID/$postId/" +
+                    "${UUID.randomUUID()}.$safeExtension"
+
+                supabase.storage.from(THUMBNAIL_BUCKET).upload(
+                    path = storagePath,
+                    data = thumbnail.bytes
+                ) {
+                    upsert = false
+                    contentType = ContentType.parse(thumbnail.mimeType)
+                }
+
+                newlyUploadedThumbnailPath = storagePath
+                thumbnailPath = storagePath
+            }
+
+            val payload = buildExistingEditPayload(
+                latest = latest,
+                editedDraft = editedDraft,
+                roleCatalogue = roleCatalogue,
+                thumbnailPath = thumbnailPath,
+                postType = postType
+            )
+
+            // One PostgreSQL function call = one transaction for parent, side
+            // details, roles, child role data and schedules. The function locks
+            // volunteer_posts first and verifies originalUpdatedAt before any
+            // child row is touched.
+            supabase.postgrest.rpc(
+                function = "update_volunteer_post_editor",
+                parameters = buildJsonObject {
+                    put("p_payload", payload)
+                }
+            )
+
+            // Only after the DB transaction succeeds may the previous image be
+            // cleaned up. Failure to delete the old object does not corrupt DB
+            // state, so this remains deliberately best-effort.
+            if (
+                newlyUploadedThumbnailPath != null &&
+                latest.existingThumbnailPath != null &&
+                latest.existingThumbnailPath != newlyUploadedThumbnailPath
+            ) {
+                runCatching {
+                    supabase.storage.from(THUMBNAIL_BUCKET)
+                        .delete(latest.existingThumbnailPath)
+                }
+            }
+
+            return SavedPostResult(
+                postId = postId,
+                thumbnailPath = thumbnailPath
+            )
+        } catch (exception: Exception) {
+            newlyUploadedThumbnailPath?.let { uploadedPath ->
+                runCatching {
+                    supabase.storage.from(THUMBNAIL_BUCKET).delete(uploadedPath)
+                }
+            }
+            throw exception
+        }
+    }
+
+    private fun buildExistingEditPayload(
+        latest: ExistingPostEditData,
+        editedDraft: CreatePostDraft,
+        roleCatalogue: List<CreateRoleTemplate>,
+        thumbnailPath: String?,
+        postType: VolunteerPostType
+    ): JsonObject {
+        val postId = latest.postId
+        val category = editedDraft.category ?: error("Category is missing.")
+        val originalRoles = latest.draft.selectedRoles.associateBy { it.roleTemplateId }
+        val originalSchedules = latest.draft.scheduleItems.associateBy { it.draftId }
+
+        val needsPhysical = postType == VolunteerPostType.PHYSICAL ||
+            postType == VolunteerPostType.HYBRID
+        val needsRemote = postType == VolunteerPostType.REMOTE ||
+            postType == VolunteerPostType.HYBRID
+
+        return buildJsonObject {
+            put("post_id", postId)
+            put("expected_updated_at", latest.originalUpdatedAt)
+            put("title", editedDraft.title.trim())
+            put("description", editedDraft.description.trim())
+            put("category", category.databaseValue)
+            put("mode", postType.databaseValue)
+            put("thumbnail_path", thumbnailPath?.let(::JsonPrimitive) ?: JsonNull)
+
+            put(
+                "physical",
+                if (needsPhysical) buildPhysicalDetailsRow(postId, editedDraft) else JsonNull
+            )
+            put(
+                "remote",
+                if (needsRemote) buildRemoteDetailsRow(postId, editedDraft) else JsonNull
+            )
+
+            put("roles", buildJsonArray {
+                editedDraft.selectedRoles.forEach { role ->
+                    val original = originalRoles[role.roleTemplateId]
+                    val skillsChanged = original == null ||
+                        original.practisedSkillIds != role.practisedSkillIds ||
+                        original.requiredSkillExperience != role.requiredSkillExperience
+                    val responsibilitiesChanged = original == null ||
+                        original.responsibilities != role.responsibilities
+                    val questionsChanged = original == null ||
+                        original.screeningQuestions != role.screeningQuestions
+
+                    add(buildJsonObject {
+                        put("role_template_id", role.roleTemplateId)
+                        put("capacity", role.capacity)
+                        put(
+                            "application_method",
+                            role.applicationMethod?.databaseValue
+                                ?: error("Choose an application method for ${role.roleTemplateId}.")
+                        )
+                        put(
+                            "role_notes",
+                            role.roleNotes.nullIfBlank()?.let(::JsonPrimitive) ?: JsonNull
+                        )
+                        put(
+                            "individual_submission_requirement",
+                            role.individualSubmissionRequirement.nullIfBlank()
+                                ?.let(::JsonPrimitive) ?: JsonNull
+                        )
+                        put("replace_skills", skillsChanged)
+                        put("replace_responsibilities", responsibilitiesChanged)
+                        put("replace_questions", questionsChanged)
+
+                        put("skills", buildJsonArray {
+                            role.practisedSkillIds.distinct().forEach { skillId ->
+                                add(buildJsonObject {
+                                    put("skill_id", skillId)
+                                    role.requiredSkillExperience[skillId]?.let { experience ->
+                                        put("required_experience", experience)
+                                    } ?: put("required_experience", JsonNull)
+                                })
+                            }
+                        })
+
+                        put("responsibilities", buildJsonArray {
+                            role.responsibilities
+                                .mapNotNull { it.nullIfBlank() }
+                                .forEach { add(JsonPrimitive(it)) }
+                        })
+
+                        put("screening_questions", buildJsonArray {
+                            role.screeningQuestions
+                                .mapNotNull { it.nullIfBlank() }
+                                .forEach { add(JsonPrimitive(it)) }
+                        })
+                    })
+                }
+            })
+
+            put("schedules", buildJsonArray {
+                editedDraft.scheduleItems.forEach { item ->
+                    val original = originalSchedules[item.draftId]
+                    val data = buildSchedulePublishData(
+                        postId = postId,
+                        draft = editedDraft,
+                        item = item,
+                        roleCatalogue = roleCatalogue
+                    )
+
+                    add(buildJsonObject {
+                        data.row.forEach { (key, value) -> put(key, value) }
+                        put(
+                            "schedule_item_id",
+                            if (original != null) JsonPrimitive(item.draftId) else JsonNull
+                        )
+                        put("changed", original == null || original != item)
+                        put("target_role_template_ids", buildJsonArray {
+                            data.targetRoleTemplateIds.forEach { add(JsonPrimitive(it)) }
+                        })
+                    })
+                }
+            })
         }
     }
 
@@ -557,76 +1030,12 @@ class SupabaseCreatePostRepository : CreatePostRepository {
                 put("notes", notes)
             }
 
-            if (item.scheduleType == ScheduleType.TRAINING) {
-                val trainingMode = item.trainingMode
-                    ?: error("A Training item is missing its format.")
-                put("training_mode", trainingMode.databaseValue)
 
-                item.trainingTimeZoneId.nullIfBlank()?.let { timeZone ->
-                    put("training_time_zone", timeZone)
-                }
-
-                when (trainingMode) {
-                    TrainingMode.ONLINE -> {
-                        item.onlinePlatform.nullIfBlank()?.let { platform ->
-                            put("online_platform", platform)
-                        }
-                        item.meetingLink.nullIfBlank()?.let { link ->
-                            put("meeting_link", link)
-                        }
-                    }
-
-                    TrainingMode.ONSITE -> {
-                        val locationMode = item.trainingLocationMode
-                            ?: error("An on-site Training item is missing its location choice.")
-                        put("training_location_mode", locationMode.name)
-
-                        if (locationMode == TrainingLocationMode.CUSTOM) {
-                            val location = item.trainingLocation
-                                ?: error("Choose the custom Training location before saving.")
-
-                            location.placeId.nullIfBlank()?.let { placeId ->
-                                put("training_location_place_id", placeId)
-                            }
-                            location.displayName.nullIfBlank()?.let { name ->
-                                put("training_location_name", name)
-                            }
-                            location.address.nullIfBlank()?.let { address ->
-                                put("training_location_address", address)
-                            }
-                            location.city.nullIfBlank()?.let { city ->
-                                put("training_location_city", city)
-                            }
-                            location.state.nullIfBlank()?.let { state ->
-                                put("training_location_state_region", state)
-                            }
-                            location.country.nullIfBlank()?.let { country ->
-                                put("training_location_country", country)
-                            }
-                            put("training_location_latitude", location.latitude)
-                            put("training_location_longitude", location.longitude)
-                        }
-                    }
-                }
-            }
-        }
-
-        val closingRoleIds = if (item.scheduleType == ScheduleType.TRAINING) {
-            item.closingRoleTemplateIds
-                .distinct()
-                .toSet()
-        } else {
-            emptySet()
-        }
-
-        if (!targetRoleIds.containsAll(closingRoleIds)) {
-            error("A Training item can only close applications for its targeted roles.")
         }
 
         return SchedulePublishData(
             row = row,
-            targetRoleTemplateIds = targetRoleIds,
-            closingRoleTemplateIds = closingRoleIds
+            targetRoleTemplateIds = targetRoleIds
         )
     }
 
@@ -718,7 +1127,7 @@ class SupabaseCreatePostRepository : CreatePostRepository {
             Locale.US
         ).apply {
             timeZone = TimeZone.getTimeZone("UTC")
-        }.format(Date(AppClock.nowMillis()))
+        }.format(Date())
     }
 
     private fun String?.nullIfBlank(): String? {
@@ -757,10 +1166,41 @@ class SupabaseCreatePostRepository : CreatePostRepository {
         return optionalText(key)?.toBooleanStrictOrNull()
     }
 
+    private fun JsonObject.optionalInt(key: String): Int? {
+        val element: JsonElement = this[key] ?: return null
+        if (element is JsonNull) return null
+        return runCatching { element.jsonPrimitive.intOrNull }.getOrNull()
+    }
+
+    private fun JsonObject.requiredInt(key: String): Int {
+        return optionalInt(key) ?: error("Missing required integer '$key'.")
+    }
+
+    private fun JsonObject.optionalDouble(key: String): Double? {
+        val element: JsonElement = this[key] ?: return null
+        if (element is JsonNull) return null
+        return runCatching { element.jsonPrimitive.doubleOrNull }.getOrNull()
+    }
+
+    private fun JsonObject.requiredDouble(key: String): Double {
+        return optionalDouble(key) ?: error("Missing required number '$key'.")
+    }
+
+    private fun parseSqlDate(value: String): Long {
+        return SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
+            isLenient = false
+        }.parse(value)?.time ?: error("Invalid database date: $value")
+    }
+
+    private fun parseSqlTime(value: String): Int {
+        val parts = value.take(5).split(":")
+        if (parts.size != 2) error("Invalid database time: $value")
+        return parts[0].toInt() * 60 + parts[1].toInt()
+    }
+
     private data class SchedulePublishData(
         val row: JsonObject,
-        val targetRoleTemplateIds: List<String>,
-        val closingRoleTemplateIds: Set<String>
+        val targetRoleTemplateIds: List<String>
     )
 
     private companion object {

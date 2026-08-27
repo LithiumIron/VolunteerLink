@@ -34,10 +34,6 @@ data class OrganisationHomeSchedule(
     val scheduleDate: String,
     val title: String,
     val startTime: String? = null,
-    val trainingMode: String? = null,
-    val meetingLink: String? = null,
-    val trainingLocationMode: String? = null,
-    val trainingLocationName: String? = null
 )
 
 /**
@@ -49,22 +45,10 @@ data class OrganisationHomeRole(
     val roleName: String,
     val roleMode: String,
     val applicationMethod: String,
-    val participations: List<OrganisationHomeParticipation> = emptyList(),
-    val applicationClosingSchedules: List<OrganisationHomeRoleClosingSchedule> = emptyList()
+    val participations: List<OrganisationHomeParticipation> = emptyList()
 )
 
 data class OrganisationHomeParticipation(
     val userId: String,
     val applicationStatus: String
-)
-
-/**
- * A schedule explicitly configured to close applications for one role when it starts.
- * The schedule row remains normalized in schedule_items + schedule_item_roles; Home only
- * carries the small piece of that relationship needed to derive whether review is open.
- */
-data class OrganisationHomeRoleClosingSchedule(
-    val scheduleItemId: String,
-    val scheduleDate: String,
-    val startTime: String? = null
 )

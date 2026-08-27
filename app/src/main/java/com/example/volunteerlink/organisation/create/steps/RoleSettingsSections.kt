@@ -29,6 +29,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
@@ -92,6 +93,7 @@ fun RoleInformationSection(
 fun SkillsPractisedSection(
     template: CreateRoleTemplate,
     selectedRole: SelectedRoleDraft,
+    enabled: Boolean = true,
     onToggleSkill: (String) -> Unit
 ) {
     RoleSettingsSectionCard(
@@ -134,7 +136,7 @@ fun SkillsPractisedSection(
             // Selected skills can be removed only above the minimum of two.
             // Unselected skills can be added only below the maximum of four.
             // Required skills stay locked until their requirement is removed.
-            val canToggle = when {
+            val canToggle = enabled && when {
                 isRequired -> false
                 isSelected -> selectedRole.practisedSkillIds.size > 2
                 else -> selectedRole.practisedSkillIds.size < 4
@@ -173,6 +175,7 @@ fun SkillsPractisedSection(
 fun RequiredSkillsSection(
     template: CreateRoleTemplate,
     selectedRole: SelectedRoleDraft,
+    enabled: Boolean = true,
     onToggleRequiredSkill: (String) -> Unit,
     onIncreaseExperience: (String) -> Unit,
     onDecreaseExperience: (String) -> Unit
@@ -230,6 +233,7 @@ fun RequiredSkillsSection(
                     isRequired = isRequired,
                     minimumExperience = minimumExperience ?: 1,
                     canToggleRequirement = canToggleRequirement,
+                    enabled = enabled,
                     onToggleRequired = {
                         onToggleRequiredSkill(skill.skillId)
                     },
@@ -258,6 +262,7 @@ fun RequiredSkillsSection(
 @Composable
 fun ResponsibilitiesSection(
     responsibilities: List<String>,
+    enabled: Boolean = true,
     onAdd: () -> Unit,
     onUpdate: (Int, String) -> Unit,
     onRemove: (Int) -> Unit
@@ -274,6 +279,7 @@ fun ResponsibilitiesSection(
                     onUpdate(index, text)
                 },
                 modifier = Modifier.fillMaxWidth(),
+                enabled = enabled,
                 label = {
                     Text(text = "Responsibility ${index + 1}")
                 },
@@ -284,7 +290,8 @@ fun ResponsibilitiesSection(
                     IconButton(
                         onClick = {
                             onRemove(index)
-                        }
+                        },
+                        enabled = enabled
                     ) {
                         Image(
                             painter = painterResource(R.drawable.delete),
@@ -307,7 +314,7 @@ fun ResponsibilitiesSection(
 
         OutlinedButton(
             onClick = onAdd,
-            enabled = responsibilities.lastOrNull()?.isNotBlank() != false,
+            enabled = enabled && responsibilities.lastOrNull()?.isNotBlank() != false,
             shape = RoundedCornerShape(12.dp)
         ) {
             Image(
@@ -327,6 +334,8 @@ fun ResponsibilitiesSection(
 fun ApplicantMethodSection(
     template: CreateRoleTemplate,
     selectedRole: SelectedRoleDraft,
+    methodEnabled: Boolean = true,
+    questionsEnabled: Boolean = true,
     onMethodChanged: (RoleApplicationMethod) -> Unit,
     onAddQuestion: () -> Unit,
     onUpdateQuestion: (Int, String) -> Unit,
@@ -345,13 +354,18 @@ fun ApplicantMethodSection(
     RoleSettingsSectionCard(
         iconRes = R.drawable.review_applicants,
         title = "Application Method",
-        subtitle = "Choose how volunteers join this role. VolunteerLink preselects a recommendation, but you can change it."
+        subtitle = if (methodEnabled) {
+            "Choose how volunteers join this role. VolunteerLink preselects a recommendation, but you can change it."
+        } else {
+            "The current application method is locked for this existing role."
+        }
     ) {
         ApplicationMethodOption(
             method = RoleApplicationMethod.INSTANT_JOIN,
             description = "Volunteers join immediately while places are available.",
             selected = method == RoleApplicationMethod.INSTANT_JOIN,
             recommended = recommendedMethod == RoleApplicationMethod.INSTANT_JOIN,
+            enabled = methodEnabled,
             onClick = {
                 onMethodChanged(RoleApplicationMethod.INSTANT_JOIN)
             }
@@ -362,6 +376,7 @@ fun ApplicantMethodSection(
             description = "Review volunteers before accepting them into this role.",
             selected = method == RoleApplicationMethod.REVIEW_APPLICANTS,
             recommended = recommendedMethod == RoleApplicationMethod.REVIEW_APPLICANTS,
+            enabled = methodEnabled,
             onClick = {
                 onMethodChanged(RoleApplicationMethod.REVIEW_APPLICANTS)
             }
@@ -396,16 +411,28 @@ fun ApplicantMethodSection(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "Optional · Up to 3 short screening questions.",
+                        text = if (questionsEnabled) {
+                            "Optional · Up to 3 short screening questions."
+                        } else {
+                            "Locked · Previous application answers depend on these questions."
+                        },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
                 Text(
-                    text = "${selectedRole.screeningQuestions.size} / 3",
+                    text = if (questionsEnabled) {
+                        "${selectedRole.screeningQuestions.size} / 3"
+                    } else {
+                        "Locked"
+                    },
                     style = MaterialTheme.typography.labelMedium,
-                    color = CreateGreen,
+                    color = if (questionsEnabled) {
+                        CreateGreen
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+                    },
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -417,6 +444,7 @@ fun ApplicantMethodSection(
                         onUpdateQuestion(index, text)
                     },
                     modifier = Modifier.fillMaxWidth(),
+                    enabled = questionsEnabled,
                     label = {
                         Text(text = "Question ${index + 1}")
                     },
@@ -427,14 +455,19 @@ fun ApplicantMethodSection(
                         IconButton(
                             onClick = {
                                 onRemoveQuestion(index)
-                            }
+                            },
+                            enabled = questionsEnabled
                         ) {
                             Image(
                                 painter = painterResource(R.drawable.delete),
                                 contentDescription = "Remove applicant question",
                                 modifier = Modifier.size(20.dp),
                                 colorFilter = ColorFilter.tint(
-                                    MaterialTheme.colorScheme.error
+                                    if (questionsEnabled) {
+                                        MaterialTheme.colorScheme.error
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                                    }
                                 )
                             )
                         }
@@ -450,7 +483,8 @@ fun ApplicantMethodSection(
 
             OutlinedButton(
                 onClick = onAddQuestion,
-                enabled = selectedRole.screeningQuestions.size < 3 &&
+                enabled = questionsEnabled &&
+                        selectedRole.screeningQuestions.size < 3 &&
                         selectedRole.screeningQuestions.lastOrNull()?.isNotBlank() != false,
                 shape = RoundedCornerShape(12.dp)
             ) {
@@ -458,7 +492,13 @@ fun ApplicantMethodSection(
                     painter = painterResource(R.drawable.add),
                     contentDescription = null,
                     modifier = Modifier.size(18.dp),
-                    colorFilter = ColorFilter.tint(CreateGreen)
+                    colorFilter = ColorFilter.tint(
+                        if (questionsEnabled) {
+                            CreateGreen
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                        }
+                    )
                 )
 
                 Spacer(modifier = Modifier.width(7.dp))
@@ -474,26 +514,28 @@ fun ApplicationMethodOption(
     description: String,
     selected: Boolean,
     recommended: Boolean,
+    enabled: Boolean = true,
     onClick: () -> Unit
 ) {
     OutlinedCard(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .alpha(if (enabled) 1f else 0.55f)
+            .clickable(enabled = enabled, onClick = onClick),
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.outlinedCardColors(
-            containerColor = if (selected) {
-                CreateLightGreen
-            } else {
-                CreateCardBackground
+            containerColor = when {
+                !enabled -> Color(0xFFF1F2F0)
+                selected -> CreateLightGreen
+                else -> CreateCardBackground
             }
         ),
         border = BorderStroke(
             width = 1.dp,
-            color = if (selected) {
-                CreateGreen
-            } else {
-                RoleSettingsBorder
+            color = when {
+                !enabled -> Color(0xFFC7CBC5)
+                selected -> CreateGreen
+                else -> RoleSettingsBorder
             }
         )
     ) {
@@ -504,6 +546,7 @@ fun ApplicationMethodOption(
             RadioButton(
                 selected = selected,
                 onClick = onClick,
+                enabled = enabled,
                 colors = RadioButtonDefaults.colors(
                     selectedColor = CreateGreen
                 )
@@ -565,6 +608,8 @@ fun RoleSubmissionAndNotesSection(
     draft: CreatePostDraft,
     template: CreateRoleTemplate,
     selectedRole: SelectedRoleDraft,
+    notesEnabled: Boolean = true,
+    individualDeliverableEnabled: Boolean = true,
     onRoleNotesChanged: (String) -> Unit,
     onIndividualSubmissionRequirementChanged: (String) -> Unit
 ) {
@@ -579,6 +624,7 @@ fun RoleSubmissionAndNotesSection(
                     value = selectedRole.roleNotes,
                     onValueChange = onRoleNotesChanged,
                     modifier = Modifier.fillMaxWidth(),
+                    enabled = notesEnabled,
                     placeholder = {
                         Text("Example: This role will use the QR scanner provided at Counter B.")
                     },
@@ -644,6 +690,7 @@ fun RoleSubmissionAndNotesSection(
                                 value = selectedRole.individualSubmissionRequirement,
                                 onValueChange = onIndividualSubmissionRequirementChanged,
                                 modifier = Modifier.fillMaxWidth(),
+                                enabled = individualDeliverableEnabled,
                                 placeholder = {
                                     Text("Example: Each volunteer submits 2 final poster designs in PNG format.")
                                 },
@@ -684,6 +731,7 @@ fun RoleSubmissionAndNotesSection(
                         value = selectedRole.roleNotes,
                         onValueChange = onRoleNotesChanged,
                         modifier = Modifier.fillMaxWidth(),
+                        enabled = notesEnabled,
                         placeholder = {
                             Text("Example: Canva access and the shared Drive folder will be provided after joining.")
                         },
@@ -1057,6 +1105,7 @@ fun RequiredSkillCard(
     isRequired: Boolean,
     minimumExperience: Int,
     canToggleRequirement: Boolean,
+    enabled: Boolean = true,
     onToggleRequired: () -> Unit,
     onIncreaseExperience: () -> Unit,
     onDecreaseExperience: () -> Unit
@@ -1088,7 +1137,7 @@ fun RequiredSkillCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable(
-                        enabled = canToggleRequirement || isRequired,
+                        enabled = enabled && (canToggleRequirement || isRequired),
                         onClick = onToggleRequired
                     ),
                 verticalAlignment = Alignment.CenterVertically
@@ -1152,7 +1201,7 @@ fun RequiredSkillCard(
                 ) {
                     OutlinedButton(
                         onClick = onDecreaseExperience,
-                        enabled = minimumExperience > 1,
+                        enabled = enabled && minimumExperience > 1,
                         modifier = Modifier.size(42.dp),
                         contentPadding = PaddingValues(0.dp),
                         shape = RoundedCornerShape(10.dp),
@@ -1181,7 +1230,7 @@ fun RequiredSkillCard(
 
                     OutlinedButton(
                         onClick = onIncreaseExperience,
-                        enabled = minimumExperience < 5,
+                        enabled = enabled && minimumExperience < 5,
                         modifier = Modifier.size(42.dp),
                         contentPadding = PaddingValues(0.dp),
                         shape = RoundedCornerShape(10.dp),

@@ -4,17 +4,12 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.volunteerlink.data.post.DraftAttentionType
-import com.example.volunteerlink.data.post.MissingTrainingDetail
 import com.example.volunteerlink.data.post.PostMode
 import com.example.volunteerlink.data.post.PostTimingEvaluator
 import com.example.volunteerlink.data.post.PostTimingInput
 import com.example.volunteerlink.data.post.PostTimingState
 import com.example.volunteerlink.data.post.RoleApplicationWindowEvaluator
 import com.example.volunteerlink.data.post.RoleApplicationWindowInput
-import com.example.volunteerlink.data.post.TrainingAttentionType
-import com.example.volunteerlink.data.post.TrainingLocationMode
-import com.example.volunteerlink.data.post.TrainingMode
-import com.example.volunteerlink.data.post.TrainingTimingInput
 import com.example.volunteerlink.data.time.AppClock
 import com.example.volunteerlink.organisation.home.model.HomeAttentionItem
 import com.example.volunteerlink.organisation.home.model.HomeAttentionSeverity
@@ -168,99 +163,6 @@ class OrganisationHomeViewModel : ViewModel() {
                 )?.let(attentionItems::add)
             }
 
-            // For published/closed posts, training warnings are useful while the
-            // opportunity is Upcoming/Ongoing, but not forever after it is Past.
-            // Drafts still keep their training checks so approaching incomplete
-            // draft schedules can be noticed before publish.
-            val shouldCheckTraining = normalizedStatus == "DRAFT" ||
-                    (
-                        normalizedStatus in setOf("PUBLISHED", "CLOSED") &&
-                                timingState != PostTimingState.PAST
-                    )
-
-            if (shouldCheckTraining) {
-                post.schedules
-                    .filter { schedule ->
-                        schedule.scheduleType.equals(
-                            "TRAINING",
-                            ignoreCase = true
-                        )
-                    }
-                    .mapNotNull { schedule ->
-                        val trainingMode = TrainingMode.fromDatabaseValue(
-                            schedule.trainingMode
-                        ) ?: return@mapNotNull null
-
-                        val attention = PostTimingEvaluator.evaluateTrainingAttention(
-                            input = TrainingTimingInput(
-                                scheduleDate = schedule.scheduleDate,
-                                startTime = schedule.startTime,
-                                trainingMode = trainingMode,
-                                meetingLink = schedule.meetingLink,
-                                trainingLocationMode =
-                                    TrainingLocationMode.fromDatabaseValue(
-                                        schedule.trainingLocationMode
-                                    ),
-                                trainingLocationName = schedule.trainingLocationName
-                            ),
-                            nowMillis = nowMillis
-                        )
-
-                        if (!attention.needsAttention) {
-                            return@mapNotNull null
-                        }
-
-                        // A missed training date on an already published/closed
-                        // opportunity is historical, not something Home can fix.
-                        // Keep OUTDATED in the shared evaluator for history/other
-                        // features, but do not surface it as Home attention.
-                        if (
-                            attention.type == TrainingAttentionType.OUTDATED &&
-                            normalizedStatus in setOf("PUBLISHED", "CLOSED")
-                        ) {
-                            return@mapNotNull null
-                        }
-
-                        HomeAttentionItem(
-                            type = when (attention.type) {
-                                TrainingAttentionType.WARNING ->
-                                    HomeAttentionType.TRAINING_DETAILS_WARNING
-
-                                TrainingAttentionType.URGENT ->
-                                    HomeAttentionType.TRAINING_DETAILS_URGENT
-
-                                TrainingAttentionType.OUTDATED ->
-                                    HomeAttentionType.TRAINING_OUTDATED
-
-                                TrainingAttentionType.NONE ->
-                                    return@mapNotNull null
-                            },
-                            severity = when (attention.type) {
-                                TrainingAttentionType.WARNING ->
-                                    HomeAttentionSeverity.WARNING
-
-                                TrainingAttentionType.URGENT,
-                                TrainingAttentionType.OUTDATED ->
-                                    HomeAttentionSeverity.URGENT
-
-                                TrainingAttentionType.NONE ->
-                                    HomeAttentionSeverity.WARNING
-                            },
-                            postId = post.postId,
-                            postTitle = post.title,
-                            scheduleItemId = schedule.scheduleItemId,
-                            scheduleTitle = schedule.title,
-                            scheduleDate = schedule.scheduleDate,
-                            daysRemaining = attention.daysUntilTraining,
-                            message = trainingAttentionMessage(
-                                missingDetail = attention.missingDetail,
-                                type = attention.type,
-                                daysRemaining = attention.daysUntilTraining
-                            )
-                        )
-                    }
-                    .forEach(attentionItems::add)
-            }
         }
 
         val sortedOngoing = ongoingPosts.sortedWith(
@@ -336,13 +238,10 @@ class OrganisationHomeViewModel : ViewModel() {
         post: OrganisationHomePost,
         nowMillis: Long
     ): HomeAttentionItem? {
-        // Review attention is role-specific, especially for Hybrid posts. A
-        // Physical role follows the Physical start while a Remote role follows
-        // the Remote start. If Schedule configured an earlier
-        // closes_applications_on_start DATE for the role, that earlier date
-        // wins. Exact event/training times are ignored. Once the cutoff date
-        // arrives, old PENDING rows stay in the DB but
-        // Home no longer presents them as an action the organisation can take.
+        // Review attention is role-specific, especially for Hybrid posts.
+        // A Physical role follows the Physical start while a Remote role follows
+        // the Remote start. Once that role's volunteering phase starts, new
+        // applications are closed for that role.
         val reviewableRoles = post.roles.filter { role ->
             role.applicationMethod.equals(
                 "REVIEW_APPLICANTS",
@@ -396,9 +295,7 @@ class OrganisationHomeViewModel : ViewModel() {
                 roleMode = roleMode,
                 postStatus = post.status,
                 physicalStartDate = post.physicalStartDate,
-                remoteStartDate = post.remoteStartDate,
-                applicationClosingScheduleDates = applicationClosingSchedules
-                    .map { it.scheduleDate }
+                remoteStartDate = post.remoteStartDate
             ),
             nowMillis = nowMillis
         ).isOpen
@@ -518,52 +415,6 @@ class OrganisationHomeViewModel : ViewModel() {
             },
             nowMillis = nowMillis
         )
-    }
-
-    private fun trainingAttentionMessage(
-        missingDetail: MissingTrainingDetail?,
-        type: TrainingAttentionType,
-        daysRemaining: Int?
-    ): String {
-        val detail = when (missingDetail) {
-            MissingTrainingDetail.MEETING_LINK -> "meeting link"
-            MissingTrainingDetail.LOCATION -> "training location"
-            null -> "training details"
-        }
-
-        return when (type) {
-            TrainingAttentionType.WARNING -> when (missingDetail) {
-                MissingTrainingDetail.MEETING_LINK ->
-                    "Training is approaching. Add the meeting link before volunteers attend."
-                MissingTrainingDetail.LOCATION ->
-                    "Training is approaching. Add the on-site location before volunteers attend."
-                null -> "Training is approaching. Complete the remaining training details."
-            }
-
-            TrainingAttentionType.URGENT -> {
-                val timing = when (daysRemaining) {
-                    0 -> "Training is today."
-                    1 -> "Training is tomorrow."
-                    else -> "Training is in $daysRemaining days."
-                }
-                val action = when (missingDetail) {
-                    MissingTrainingDetail.MEETING_LINK -> " Add the meeting link now."
-                    MissingTrainingDetail.LOCATION -> " Add the on-site location now."
-                    null -> " Complete the remaining details now."
-                }
-                timing + action
-            }
-
-            TrainingAttentionType.OUTDATED -> when (missingDetail) {
-                MissingTrainingDetail.MEETING_LINK ->
-                    "Training has passed and the meeting link was never added."
-                MissingTrainingDetail.LOCATION ->
-                    "Training has passed and the on-site location was never added."
-                null -> "Training has passed with incomplete details."
-            }
-
-            TrainingAttentionType.NONE -> ""
-        }
     }
 
     private fun formatHomeDate(value: String): String {

@@ -13,7 +13,7 @@ data class OrganisationManageUiState(
     val errorMessage: String? = null
 ) {
     /**
-     * Counts live draft/training/application attention items. Ended posts that
+     * Counts live draft/application attention items. Ended posts that
      * need close-out are tracked separately by the Needs Review lifecycle.
      */
     val attentionItemCount: Int
@@ -91,9 +91,6 @@ enum class ManageAttentionType {
     APPLICATIONS_TO_REVIEW,
     DRAFT_START_TOO_SOON,
     DRAFT_START_DATE_PASSED,
-    TRAINING_DETAILS_WARNING,
-    TRAINING_DETAILS_URGENT,
-    TRAINING_OUTDATED,
     COMPLETION_REVIEW
 }
 

@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -58,6 +59,7 @@ import com.example.volunteerlink.R
 import com.example.volunteerlink.organisation.create.components.CreateCardBackground
 import com.example.volunteerlink.organisation.create.components.CreateGreen
 import com.example.volunteerlink.organisation.create.components.CreateLightGreen
+import com.example.volunteerlink.organisation.create.components.EditRestrictionNotice
 import com.example.volunteerlink.organisation.create.model.CreatePostDraft
 import com.example.volunteerlink.organisation.create.model.CreatePostUiState
 import com.example.volunteerlink.organisation.create.model.CreateRoleTemplate
@@ -66,6 +68,7 @@ import com.example.volunteerlink.organisation.create.model.VolunteerPostType
 import com.example.volunteerlink.organisation.create.model.VolunteerRoleLevel
 import com.example.volunteerlink.organisation.create.model.VolunteerRoleMode
 import com.example.volunteerlink.organisation.viewmodel.CreatePostViewModel
+import kotlinx.coroutines.delay
 
 val RoleSelectionBorder = Color(0xFFC8D4C4)
 
@@ -168,16 +171,29 @@ fun SelectRolesStep(
         templatesById = templatesById
     )
 
-    val roleSelectionIsValid =
-        catalogue.isNotEmpty() &&
-                !uiState.isRoleCatalogueLoading &&
-                uiState.roleCatalogueError == null &&
-                !uiState.roleSelectionErrors.hasErrors()
+    val listState = rememberLazyListState()
+
+    // Let Continue perform validation even when the allocation is incomplete.
+    // If it fails, take the organiser directly to the status/error area.
+    LaunchedEffect(uiState.validationFocusRequest) {
+        if (
+            uiState.showRoleSelectionErrors &&
+            uiState.roleSelectionErrors.hasErrors()
+        ) {
+            // Give LazyColumn one frame to lay out the newly-visible status.
+            delay(30)
+            val totalItems = listState.layoutInfo.totalItemsCount
+            if (totalItems > 0) {
+                listState.animateScrollToItem((totalItems - 3).coerceAtLeast(0))
+            }
+        }
+    }
 
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .statusBarsPadding(),
+        state = listState,
         contentPadding = PaddingValues(
             start = 20.dp,
             top = 12.dp,
@@ -460,10 +476,22 @@ fun SelectRolesStep(
                             templatesById = templatesById
                         )
 
+                        val editRolePolicy = uiState.editPolicy
+                            ?.rolePolicies
+                            ?.get(role.roleTemplateId)
+                        val canEditCapacity = !uiState.isExistingPostEdit ||
+                            editRolePolicy?.canChangeCapacity != false
+                        val minimumCapacity = editRolePolicy?.minimumCapacity ?: 1
+
                         SelectedRoleSelectionCard(
                             role = role,
                             selectedRole = selectedRole,
-                            canIncrease = remaining > 0,
+                            canIncrease = remaining > 0 && canEditCapacity,
+                            canDecrease = canEditCapacity && selectedRole.capacity > minimumCapacity,
+                            canEditCapacity = canEditCapacity,
+                            minimumCapacity = minimumCapacity,
+                            canRemove = !uiState.isExistingPostEdit || editRolePolicy?.canRemove != false,
+                            lockedReason = editRolePolicy?.selectionLockedReason,
                             maxCapacity =
                                 selectedRole.capacity + remaining.coerceAtLeast(0),
                             onIncrease = {
@@ -507,7 +535,9 @@ fun SelectRolesStep(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(52.dp),
-                    enabled = roleSelectionIsValid,
+                    enabled = catalogue.isNotEmpty() &&
+                        !uiState.isRoleCatalogueLoading &&
+                        uiState.roleCatalogueError == null,
                     shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = CreateGreen
@@ -1023,6 +1053,11 @@ fun SelectedRoleSelectionCard(
     role: CreateRoleTemplate,
     selectedRole: SelectedRoleDraft,
     canIncrease: Boolean,
+    canDecrease: Boolean,
+    canEditCapacity: Boolean,
+    minimumCapacity: Int,
+    canRemove: Boolean,
+    lockedReason: String?,
     maxCapacity: Int,
     onIncrease: () -> Unit,
     onDecrease: () -> Unit,
@@ -1077,23 +1112,28 @@ fun SelectedRoleSelectionCard(
                     }
                 }
 
+                val removeColor = if (canRemove) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                }
+
                 TextButton(
-                    onClick = onRemove
+                    onClick = onRemove,
+                    enabled = canRemove
                 ) {
                     Image(
                         painter = painterResource(R.drawable.delete),
                         contentDescription = null,
                         modifier = Modifier.size(18.dp),
-                        colorFilter = ColorFilter.tint(
-                            MaterialTheme.colorScheme.error
-                        )
+                        colorFilter = ColorFilter.tint(removeColor)
                     )
 
                     Spacer(modifier = Modifier.width(5.dp))
 
                     Text(
                         text = "Remove",
-                        color = MaterialTheme.colorScheme.error
+                        color = removeColor
                     )
                 }
             }
@@ -1105,6 +1145,23 @@ fun SelectedRoleSelectionCard(
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis
             )
+
+            if (!canRemove || !canEditCapacity) {
+                val noticeTitle = when {
+                    !canEditCapacity -> "Role editing limited"
+                    minimumCapacity > 1 -> "Accepted volunteers"
+                    lockedReason?.contains("accepted", ignoreCase = true) == true -> "Accepted volunteer"
+                    lockedReason?.contains("active applicant", ignoreCase = true) == true -> "Active applicants"
+                    lockedReason?.contains("history", ignoreCase = true) == true -> "Past application"
+                    else -> "Role protected"
+                }
+
+                EditRestrictionNotice(
+                    title = noticeTitle,
+                    message = lockedReason
+                        ?: "Some role settings are protected by existing volunteer activity."
+                )
+            }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1132,14 +1189,16 @@ fun SelectedRoleSelectionCard(
                     RoleCapacityIconButton(
                         iconRes = R.drawable.remove,
                         contentDescription = "Decrease capacity",
-                        enabled = selectedRole.capacity > 1,
+                        enabled = canDecrease,
                         onClick = onDecrease
                     )
 
                     RoleCapacityNumberField(
                         roleTemplateId = role.roleTemplateId,
                         value = selectedRole.capacity,
+                        minValue = minimumCapacity,
                         maxValue = maxCapacity,
+                        enabled = canEditCapacity,
                         onValueChange = onSetCapacity
                     )
 
@@ -1159,7 +1218,9 @@ fun SelectedRoleSelectionCard(
 fun RoleCapacityNumberField(
     roleTemplateId: String,
     value: Int,
+    minValue: Int = 1,
     maxValue: Int,
+    enabled: Boolean = true,
     onValueChange: (Int) -> Unit
 ) {
     val initialText = value.toString()
@@ -1205,6 +1266,7 @@ fun RoleCapacityNumberField(
         ) {
             BasicTextField(
                 value = input,
+                enabled = enabled,
                 onValueChange = { newValue ->
                     val digitsOnly = newValue.text
                         .filter { character -> character.isDigit() }
@@ -1221,8 +1283,8 @@ fun RoleCapacityNumberField(
                             ?: return@BasicTextField
 
                         val accepted = requested.coerceIn(
-                            minimumValue = 1,
-                            maximumValue = maxValue.coerceAtLeast(1)
+                            minimumValue = minValue.coerceAtLeast(1),
+                            maximumValue = maxValue.coerceAtLeast(minValue.coerceAtLeast(1))
                         )
 
                         val acceptedText = accepted.toString()

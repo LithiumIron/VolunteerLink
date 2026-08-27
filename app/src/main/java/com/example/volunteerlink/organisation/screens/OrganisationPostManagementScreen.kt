@@ -37,6 +37,7 @@ import java.util.Locale
 fun OrganisationPostManagementScreen(
     postId: String,
     onBack: () -> Unit,
+    onEdit: () -> Unit,
     viewModel: OrganisationPostManagementViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -56,6 +57,7 @@ fun OrganisationPostManagementScreen(
         post != null -> OrganisationPostManagementContent(
             post = post,
             onBack = onBack,
+            onEdit = onEdit,
             onToggleShortlist = viewModel::toggleApplicantShortlist
         )
     }
@@ -65,6 +67,7 @@ fun OrganisationPostManagementScreen(
 private fun OrganisationPostManagementContent(
     post: com.example.volunteerlink.organisation.manage.model.PostManagementPost,
     onBack: () -> Unit,
+    onEdit: () -> Unit,
     onToggleShortlist: (PostManagementPerson) -> Unit
 ) {
     var selectedTabName by rememberSaveable {
@@ -76,7 +79,6 @@ private fun OrganisationPostManagementContent(
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var selectedRoleId by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedPerson by remember { mutableStateOf<PostManagementPerson?>(null) }
-    var showEditInfo by rememberSaveable { mutableStateOf(false) }
 
     val selectedTab = runCatching {
         PostManagementTab.valueOf(selectedTabName)
@@ -145,7 +147,7 @@ private fun OrganisationPostManagementContent(
     ) {
         PostManagementTopBar(
             onBack = onBack,
-            onEdit = { showEditInfo = true }
+            onEdit = onEdit
         )
 
         LazyColumn(
@@ -249,9 +251,4 @@ private fun OrganisationPostManagementContent(
         )
     }
 
-    if (showEditInfo) {
-        PostManagementEditComingSoonDialog(
-            onDismiss = { showEditInfo = false }
-        )
-    }
 }

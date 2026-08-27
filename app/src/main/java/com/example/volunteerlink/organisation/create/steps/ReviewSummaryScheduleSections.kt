@@ -48,8 +48,6 @@ import com.example.volunteerlink.organisation.create.model.RemoteSubmissionMode
 import com.example.volunteerlink.organisation.create.model.ScheduleItemDraft
 import com.example.volunteerlink.organisation.create.model.ScheduleType
 import com.example.volunteerlink.organisation.create.model.SelectedRoleDraft
-import com.example.volunteerlink.organisation.create.model.TrainingLocationMode
-import com.example.volunteerlink.organisation.create.model.TrainingMode
 import com.example.volunteerlink.organisation.create.model.VolunteerPostType
 import com.example.volunteerlink.organisation.create.model.VolunteerRoleMode
 import java.text.SimpleDateFormat
@@ -74,7 +72,6 @@ fun ReviewScheduleSection(
 
     val physicalCount = items.count { it.scheduleType == ScheduleType.PHYSICAL }
     val remoteCount = items.count { it.scheduleType == ScheduleType.REMOTE }
-    val trainingCount = items.count { it.scheduleType == ScheduleType.TRAINING }
 
     Column(
         verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -86,8 +83,7 @@ fun ReviewScheduleSection(
 
         ReviewScheduleStats(
             physicalCount = physicalCount,
-            remoteCount = remoteCount,
-            trainingCount = trainingCount
+            remoteCount = remoteCount
         )
 
         if (items.isEmpty()) {
@@ -99,8 +95,7 @@ fun ReviewScheduleSection(
         } else {
             listOf(
                 ScheduleType.PHYSICAL,
-                ScheduleType.REMOTE,
-                ScheduleType.TRAINING
+                ScheduleType.REMOTE
             ).forEach { type ->
                 val typeItems = items
                     .filter { it.scheduleType == type }
@@ -144,8 +139,7 @@ fun ReviewScheduleSection(
 @Composable
 fun ReviewScheduleStats(
     physicalCount: Int,
-    remoteCount: Int,
-    trainingCount: Int
+    remoteCount: Int
 ) {
     ReviewWhiteCard {
         Row(
@@ -159,10 +153,6 @@ fun ReviewScheduleStats(
             ReviewStat(
                 value = remoteCount.toString(),
                 label = "Remote"
-            )
-            ReviewStat(
-                value = trainingCount.toString(),
-                label = "Training"
             )
         }
     }
@@ -183,7 +173,6 @@ fun ReviewScheduleGroupCard(
     val groupTitle = when (type) {
         ScheduleType.PHYSICAL -> "Physical Activities"
         ScheduleType.REMOTE -> "Remote Milestones"
-        ScheduleType.TRAINING -> "Training"
     }
 
     OutlinedCard(
@@ -264,9 +253,6 @@ fun ReviewScheduleItemCard(
     val targetNames = effectiveTargetIds.map { roleId ->
         templatesById[roleId]?.roleName ?: roleId
     }
-    val closingNames = item.closingRoleTemplateIds.map { roleId ->
-        templatesById[roleId]?.roleName ?: roleId
-    }
 
     Surface(
         modifier = Modifier
@@ -292,7 +278,6 @@ fun ReviewScheduleItemCard(
                             when (item.scheduleType) {
                                 ScheduleType.PHYSICAL -> "Physical activity"
                                 ScheduleType.REMOTE -> "Remote milestone"
-                                ScheduleType.TRAINING -> "Training / briefing"
                             }
                         },
                         style = MaterialTheme.typography.bodyLarge,
@@ -321,20 +306,6 @@ fun ReviewScheduleItemCard(
                     )
                 }
 
-                if (item.scheduleType == ScheduleType.TRAINING) {
-                    ReviewCompactLabelValue(
-                        label = "Training mode",
-                        value = item.trainingMode?.displayName ?: "Not set"
-                    )
-                    ReviewCompactLabelValue(
-                        label = "Location / access",
-                        value = reviewTrainingLocation(
-                            uiState = uiState,
-                            item = item
-                        )
-                    )
-                }
-
                 ReviewCompactLabelValue(
                     label = "Applies to",
                     value = if (targetNames.isEmpty()) {
@@ -344,34 +315,6 @@ fun ReviewScheduleItemCard(
                     }
                 )
 
-                if (item.scheduleType == ScheduleType.TRAINING) {
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        color = ReviewChipBackground,
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(3.dp)
-                        ) {
-                            Text(
-                                text = "Application closing",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = CreateGreen,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = if (closingNames.isEmpty()) {
-                                    "No application cutoff from this training"
-                                } else {
-                                    closingNames.joinToString(" · ")
-                                },
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = ReviewText
-                            )
-                        }
-                    }
-                }
 
                 item.notes
                     .takeIf { it.isNotBlank() }
@@ -400,41 +343,4 @@ fun reviewScheduleSummaryLine(
     }
 
     return date + time
-}
-
-
-fun reviewTrainingLocation(
-    uiState: CreatePostUiState,
-    item: ScheduleItemDraft
-): String {
-    return when (item.trainingMode) {
-        TrainingMode.ONLINE -> {
-            when {
-                item.onlinePlatform.isNotBlank() && item.meetingLink.isNotBlank() ->
-                    "${item.onlinePlatform} · ${item.meetingLink}"
-                item.onlinePlatform.isNotBlank() -> item.onlinePlatform
-                item.meetingLink.isNotBlank() -> item.meetingLink
-                else -> "Online details to be announced"
-            }
-        }
-
-        TrainingMode.ONSITE -> {
-            when (item.trainingLocationMode) {
-                TrainingLocationMode.EVENT_LOCATION ->
-                    uiState.draft.physicalLocation?.displayName
-                        ?: "Main event location"
-
-                TrainingLocationMode.CUSTOM ->
-                    item.trainingLocation?.displayName
-                        ?: item.trainingLocationQuery.ifBlank {
-                            "Custom location not set"
-                        }
-
-                TrainingLocationMode.TBA -> "Location to be announced"
-                null -> "Location not set"
-            }
-        }
-
-        null -> "Not set"
-    }
 }
