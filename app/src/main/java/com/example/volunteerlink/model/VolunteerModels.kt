@@ -42,6 +42,7 @@ data class VolunteerOpportunityRole(
         VolunteerRoleApplicationFlow.DIRECT_SUBMISSION,
     val roleApplicationMethod: VolunteerRoleApplicationMethod =
         VolunteerRoleApplicationMethod.REVIEW_APPLICANTS,
+    val roleMode: String = "",
     // Composite/normalized role identity used by application RPC calls.
     val roleDatabaseId: String = ""
 )
@@ -68,6 +69,7 @@ data class VolunteerOpportunityEvent(
     val eventLocation: String,
     val eventDistanceKm: Double?,
     val eventDate: String,
+    val eventEndDate: String = "",
     val eventTime: String,
     val eventAvailableSpots: Int,
     val eventApplicationCount: Int,
@@ -83,6 +85,7 @@ data class VolunteerOpportunityEvent(
     // Coordinates written by Organisation Create's Geoapify selection.
     val eventLatitude: Double? = null,
     val eventLongitude: Double? = null,
+    val eventThumbnailPath: String? = null,
     val eventDatabaseId: String = "",
     val eventStatus: String = "PUBLISHED"
 )
@@ -119,6 +122,7 @@ data class VolunteerOpportunityApplication(
     val applicationEventLocation: String? = null,
     val applicationPrimarySkillPath: String? = null,
     val applicationPractisedSkills: List<String> = emptyList(),
+    val applicationRoleMode: String = "",
     val applicationDatabaseId: String = ""
 )
 

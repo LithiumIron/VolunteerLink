@@ -361,25 +361,40 @@ fun VolunteerApplicationDetailsScreen(
             item(
                 key = "application_information"
             ) {
+                val applicationIsRemote =
+                    volunteerOpportunityRole?.roleMode == "REMOTE" ||
+                        volunteerApplication.applicationRoleMode == "REMOTE" ||
+                        volunteerOpportunityEvent
+                            ?.eventOpportunityType == "Remote"
+
                 VolunteerApplicationInformationCard(
                     volunteerApplication =
                         volunteerApplication,
+                    applicationIsRemote =
+                        applicationIsRemote,
                     eventDate =
                         volunteerOpportunityEvent?.eventDate
                             ?: volunteerApplication.applicationEventDate,
+                    eventEndDate =
+                        volunteerOpportunityEvent?.eventEndDate
+                            ?.takeIf(String::isNotBlank),
                     eventTime =
                         volunteerOpportunityEvent?.eventTime
                             ?: volunteerApplication.applicationEventTime,
                     eventLocation =
-                        volunteerOpportunityEvent
-                            ?.let { event ->
-                                event.eventFullAddress
-                                    .ifBlank {
-                                        event.eventLocation
-                                    }
-                            }
-                            ?: volunteerApplication
-                                .applicationEventLocation
+                        if (applicationIsRemote) {
+                            "Online"
+                        } else {
+                            volunteerOpportunityEvent
+                                ?.let { event ->
+                                    event.eventFullAddress
+                                        .ifBlank {
+                                            event.eventLocation
+                                        }
+                                }
+                                ?: volunteerApplication
+                                    .applicationEventLocation
+                        }
                 )
             }
 
@@ -1072,7 +1087,9 @@ private fun volunteerApplicationTimelineSteps(
 private fun VolunteerApplicationInformationCard(
     volunteerApplication:
         VolunteerOpportunityApplication,
+    applicationIsRemote: Boolean,
     eventDate: String?,
+    eventEndDate: String?,
     eventTime: String?,
     eventLocation: String?
 ) {
@@ -1136,16 +1153,20 @@ private fun VolunteerApplicationInformationCard(
                         .applicationSubmittedDate
             )
 
-            if (
-                eventDate != null ||
-                eventTime != null
-            ) {
+            if (eventDate != null || eventTime != null) {
+                val scheduleText =
+                    if (applicationIsRemote) {
+                        val endDate = eventEndDate
+                            ?.takeUnless { it == eventDate }
+                        listOfNotNull(eventDate, endDate)
+                            .joinToString(" - ")
+                    } else {
+                        listOfNotNull(eventDate, eventTime)
+                            .joinToString(" • ")
+                    }
                 VolunteerApplicationInformationRow(
                     label = "Event schedule",
-                    value = listOfNotNull(
-                        eventDate,
-                        eventTime
-                    ).joinToString(" • ")
+                    value = scheduleText
                 )
             }
 
@@ -1355,5 +1376,3 @@ private fun VolunteerApplicationDetailsNotFoundScreen(
         }
     }
 }
-
-

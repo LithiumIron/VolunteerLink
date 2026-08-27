@@ -475,6 +475,19 @@ private fun MapEventCard(
         colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
+            VolunteerOpportunityThumbnail(
+                storagePath = event.eventThumbnailPath,
+                fallbackIconResourceId =
+                    com.example.volunteerlink.R.drawable
+                        .ic_volunteer_physical_event,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(72.dp),
+                contentDescription =
+                    "${event.eventTitle} thumbnail",
+                cornerRadius = 12.dp
+            )
+            Spacer(Modifier.height(9.dp))
             Text(
                 event.eventTitle,
                 color = TextDark,
@@ -521,5 +534,4 @@ private fun MapEventCard(
         }
     }
 }
-
 

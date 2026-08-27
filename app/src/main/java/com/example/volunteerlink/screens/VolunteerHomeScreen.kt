@@ -45,6 +45,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -61,7 +62,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.volunteerlink.R
 import com.example.volunteerlink.data.VolunteerHomeFeedEngine
@@ -109,6 +113,10 @@ fun VolunteerHomeScreen(
         VolunteerSkillPathViewModel = viewModel()
 ) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var selectedHomeFilter by rememberSaveable {
+        mutableStateOf(VolunteerHomeFeedFilter.FOR_YOU)
+    }
     val matchLocationPermissionLauncher =
         rememberLauncherForActivityResult(
             ActivityResultContracts.RequestMultiplePermissions()
@@ -130,9 +138,18 @@ fun VolunteerHomeScreen(
             }
         }
 
-    // Ask once when matches first need a Physical travel distance. Android
-    // remembers the decision; subsequent visits only reuse granted access.
-    LaunchedEffect(Unit) {
+    val requestLocationAccess: () -> Unit = {
+        matchLocationPermissionLauncher.launch(
+            arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            )
+        )
+    }
+
+    // Ask through Android directly on every new For You visit while access is
+    // disabled. The app never redirects the volunteer to Settings.
+    LaunchedEffect(selectedHomeFilter) {
         val fineGranted = ContextCompat.checkSelfPermission(
             context,
             Manifest.permission.ACCESS_FINE_LOCATION
@@ -141,24 +158,13 @@ fun VolunteerHomeScreen(
             context,
             Manifest.permission.ACCESS_COARSE_LOCATION
         ) == PackageManager.PERMISSION_GRANTED
-        val permissionPreferences = context.getSharedPreferences(
-            "volunteer_location_preferences",
-            android.content.Context.MODE_PRIVATE
-        )
-        val alreadyPrompted =
-            permissionPreferences.getBoolean("match_location_prompted", false)
-
-        if (!fineGranted && !coarseGranted && !alreadyPrompted) {
-            permissionPreferences.edit()
-                .putBoolean("match_location_prompted", true)
-                .apply()
-            matchLocationPermissionLauncher.launch(
-                arrayOf(
-                    Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.ACCESS_COARSE_LOCATION
-                )
-            )
-        } else {
+        if (
+            selectedHomeFilter == VolunteerHomeFeedFilter.FOR_YOU &&
+            !fineGranted &&
+            !coarseGranted
+        ) {
+            requestLocationAccess()
+        } else if (fineGranted || coarseGranted) {
             DeviceLocationHelper.getApproximateCurrentLocation(context) {
                     location ->
                 location?.let {
@@ -172,10 +178,38 @@ fun VolunteerHomeScreen(
         }
     }
 
-    var selectedHomeFilter by rememberSaveable {
-        mutableStateOf(
-            VolunteerHomeFeedFilter.FOR_YOU
-        )
+    // Refresh distances immediately after the app resumes with location access.
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                val locationGranted =
+                    ContextCompat.checkSelfPermission(
+                        context,
+                        Manifest.permission.ACCESS_FINE_LOCATION
+                    ) == PackageManager.PERMISSION_GRANTED ||
+                        ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.ACCESS_COARSE_LOCATION
+                        ) == PackageManager.PERMISSION_GRANTED
+
+                if (locationGranted) {
+                    DeviceLocationHelper.getApproximateCurrentLocation(context) {
+                            location ->
+                        location?.let {
+                            VolunteerOpportunitySessionStore
+                                .updateDistancesFromDevice(
+                                    latitude = it.latitude,
+                                    longitude = it.longitude
+                                )
+                        }
+                    }
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
     }
 
     val homeFilterOptions =
@@ -231,7 +265,6 @@ fun VolunteerHomeScreen(
                     currentSkillPathLevels
             ).take(4)
         }
-
 
     LazyColumn(
         modifier = Modifier
@@ -337,7 +370,10 @@ fun VolunteerHomeScreen(
                         onVolunteerOpportunitySelected,
 
                     onVolunteerRoleSelected =
-                        onVolunteerRoleSelected
+                        onVolunteerRoleSelected,
+
+                    onEnableLocationSelected =
+                        requestLocationAccess
                 )
             }
 
@@ -922,7 +958,8 @@ private fun VolunteerHomeRecommendationSection(
     onVolunteerOpportunitySelected:
         (eventId: Int) -> Unit,
     onVolunteerRoleSelected:
-        (eventId: Int, roleId: Int) -> Unit
+        (eventId: Int, roleId: Int) -> Unit,
+    onEnableLocationSelected: () -> Unit
 ) {
     var selectedRecommendation by remember {
         mutableStateOf<VolunteerHomeRecommendation?>(
@@ -994,6 +1031,9 @@ private fun VolunteerHomeRecommendationSection(
                     recommendation.event.eventId,
                     recommendation.bestRoleId
                 )
+            },
+            onEnableLocationSelected = {
+                onEnableLocationSelected()
             }
         )
     }
@@ -1238,25 +1278,15 @@ private fun VolunteerHomeCompactCard(
                 Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.Top
         ) {
-            Surface(
+            VolunteerOpportunityThumbnail(
+                storagePath =
+                    volunteerOpportunityEvent.eventThumbnailPath,
+                fallbackIconResourceId =
+                    opportunityCategoryIconResourceId,
                 modifier = Modifier.size(52.dp),
-                shape = RoundedCornerShape(10.dp),
-                color = VolunteerLinkSoftGreenSurface
-            ) {
-                Box(
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        painter = painterResource(
-                            id = opportunityCategoryIconResourceId
-                        ),
-                        contentDescription =
-                            "${volunteerOpportunityEvent.eventOpportunityType} opportunity",
-                        tint = VolunteerLinkPrimaryGreen,
-                        modifier = Modifier.size(26.dp)
-                    )
-                }
-            }
+                contentDescription =
+                    "${volunteerOpportunityEvent.eventTitle} thumbnail"
+            )
 
             Column(
                 modifier = Modifier.weight(1f)
@@ -1523,7 +1553,8 @@ private fun VolunteerMatchScoreChip(
 private fun VolunteerMatchDetailsSheet(
     recommendation: VolunteerHomeRecommendation,
     onDismissRequest: () -> Unit,
-    onViewOpportunitySelected: () -> Unit
+    onViewOpportunitySelected: () -> Unit,
+    onEnableLocationSelected: () -> Unit
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
@@ -1682,6 +1713,49 @@ private fun VolunteerMatchDetailsSheet(
                 Spacer(
                     modifier = Modifier.height(8.dp)
                 )
+            }
+
+            if (
+                recommendation.event.eventOpportunityType != "Remote" &&
+                recommendation.event.eventDistanceKm == null
+            ) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color(0xFFFFF8E1)
+                    ),
+                    border = BorderStroke(
+                        1.dp,
+                        VolunteerLinkWarning.copy(alpha = 0.35f)
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp)
+                    ) {
+                        Text(
+                            text = "Travel distance is unavailable",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = VolunteerLinkTextPrimary
+                        )
+                        Text(
+                            text = "Enable approximate location to calculate " +
+                                "the distance from your device to this event.",
+                            modifier = Modifier.padding(top = 3.dp),
+                            fontSize = 10.sp,
+                            lineHeight = 14.sp,
+                            color = VolunteerLinkTextSecondary
+                        )
+                        TextButton(
+                            onClick = onEnableLocationSelected
+                        ) {
+                            Text("Enable location")
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
             }
 
             Card(

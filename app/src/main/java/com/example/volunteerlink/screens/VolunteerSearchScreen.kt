@@ -67,6 +67,7 @@ import com.example.volunteerlink.ui.theme.VolunteerLinkSurface
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextPrimary
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextSecondary
 import kotlinx.coroutines.delay
+import com.example.volunteerlink.R
 
 @Composable
 fun VolunteerSearchScreen(
@@ -584,23 +585,15 @@ private fun VolunteerSearchResultCard(
             modifier = Modifier.padding(13.dp),
             verticalAlignment = Alignment.Top
         ) {
-            Surface(
+            VolunteerOpportunityThumbnail(
+                storagePath =
+                    volunteerOpportunityEvent.eventThumbnailPath,
+                fallbackIconResourceId =
+                    R.drawable.ic_volunteer_physical_event,
                 modifier = Modifier.size(50.dp),
-                shape = RoundedCornerShape(10.dp),
-                color = VolunteerLinkSoftGreenSurface
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        text = volunteerOpportunityEvent
-                            .eventCategory
-                            .displayName()
-                            .take(1),
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = VolunteerLinkPrimaryGreen
-                    )
-                }
-            }
+                contentDescription =
+                    "${volunteerOpportunityEvent.eventTitle} thumbnail"
+            )
 
             Spacer(modifier = Modifier.size(11.dp))
 
@@ -660,4 +653,3 @@ private fun VolunteerSearchResultCard(
 
 private fun VolunteerOpportunityCategory.displayName(): String =
     name.lowercase().replaceFirstChar(Char::uppercase)
-

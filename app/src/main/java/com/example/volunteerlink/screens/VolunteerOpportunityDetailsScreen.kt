@@ -259,24 +259,16 @@ private fun VolunteerOpportunitySummarySection(
             horizontalArrangement =
                 Arrangement.spacedBy(14.dp)
         ) {
-            Surface(
+            VolunteerOpportunityThumbnail(
+                storagePath =
+                    volunteerOpportunityEvent.eventThumbnailPath,
+                fallbackIconResourceId =
+                    categoryIconResourceId,
                 modifier = Modifier.size(64.dp),
-                shape = RoundedCornerShape(14.dp),
-                color = VolunteerLinkSoftGreenSurface
-            ) {
-                Box(
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        painter = painterResource(
-                            id = categoryIconResourceId
-                        ),
-                        contentDescription = null,
-                        tint = VolunteerLinkPrimaryGreen,
-                        modifier = Modifier.size(32.dp)
-                    )
-                }
-            }
+                contentDescription =
+                    "${volunteerOpportunityEvent.eventTitle} thumbnail",
+                cornerRadius = 14.dp
+            )
 
             Column(
                 modifier = Modifier.weight(1f)
@@ -1310,5 +1302,4 @@ private fun startVolunteerIntent(
         ).show()
     }
 }
-
 

@@ -21,6 +21,9 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.TimeZone
 
 @Serializable
 data class VolunteerOpportunityDashboardData(
@@ -147,7 +150,9 @@ object VolunteerOpportunityRepository {
             },
             applications =
                 rpcApplications
-                    ?.let(::mapRpcApplications)
+                    ?.let { rows ->
+                        mapRpcApplications(rows, allMappedEvents)
+                    }
                     ?: mapApplications(
                         participationRows = participationRows,
                         events = allMappedEvents,
@@ -506,6 +511,7 @@ object VolunteerOpportunityRepository {
                                     VolunteerRoleApplicationMethod
                                         .REVIEW_APPLICANTS
                                 },
+                            roleMode = template?.roleMode.orEmpty(),
                             roleDatabaseId = postRole.databaseId
                         )
                     }
@@ -548,6 +554,9 @@ object VolunteerOpportunityRepository {
                     // after Android provides the volunteer's device location.
                     eventDistanceKm = null,
                     eventDate = formatDatabaseDate(startDate),
+                    eventEndDate = formatDatabaseDate(
+                        remote?.endDate ?: startDate
+                    ),
                     eventTime =
                         if (physical != null) {
                             "${formatDatabaseTime(physical.startTime)} - " +
@@ -588,6 +597,7 @@ object VolunteerOpportunityRepository {
                             post.postId,
                     eventLatitude = physical?.latitude,
                     eventLongitude = physical?.longitude,
+                    eventThumbnailPath = post.thumbnailPath,
                     eventDatabaseId = post.postId,
                     eventStatus = post.status
                 )
@@ -702,6 +712,7 @@ object VolunteerOpportunityRepository {
                         role.rolePrimarySkillPath,
                     applicationPractisedSkills =
                         role.roleSkillsPractised,
+                    applicationRoleMode = role.roleMode,
                     applicationDatabaseId =
                         participation.participationId
                 )
@@ -709,7 +720,8 @@ object VolunteerOpportunityRepository {
     }
 
     private fun mapRpcApplications(
-        applicationRows: List<MyVolunteerApplicationRow>
+        applicationRows: List<MyVolunteerApplicationRow>,
+        events: List<VolunteerOpportunityEvent>
     ): List<VolunteerOpportunityApplication> {
         return applicationRows
             .sortedByDescending { row -> row.createdAt }
@@ -759,6 +771,12 @@ object VolunteerOpportunityRepository {
                     applicationPrimarySkillPath = row.primarySkillPath,
                     applicationPractisedSkills =
                         row.practisedSkillNames,
+                    applicationRoleMode =
+                        events.firstOrNull {
+                            it.eventDatabaseId == row.postId
+                        }?.eventVolunteerRoles?.firstOrNull {
+                            it.roleDatabaseId == row.postRoleId
+                        }?.roleMode.orEmpty(),
                     applicationDatabaseId = row.participationId
                 )
             }
@@ -839,7 +857,29 @@ private fun formatDatabaseTime(databaseTime: String): String {
 }
 
 private fun formatSubmittedDate(timestamp: String): String {
-    return timestamp.take(10).let(::formatDatabaseDate)
+    val normalizedTimestamp = timestamp
+        .trim()
+        .replace(' ', 'T')
+        .replace(Regex("([+-]\\d{2})$"), "$1:00")
+        .replace(Regex("(\\.\\d{3})\\d+(?=[+-]|Z$)"), "$1")
+
+    val parsedDate = listOf(
+        "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+        "yyyy-MM-dd'T'HH:mm:ssXXX",
+        "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+        "yyyy-MM-dd'T'HH:mm:ss'Z'"
+    ).firstNotNullOfOrNull { pattern ->
+        runCatching {
+            SimpleDateFormat(pattern, Locale.US).apply {
+                isLenient = false
+                timeZone = TimeZone.getTimeZone("UTC")
+            }.parse(normalizedTimestamp)
+        }.getOrNull()
+    } ?: return timestamp.take(10).let(::formatDatabaseDate)
+
+    return SimpleDateFormat("d MMM yyyy", Locale.US).apply {
+        timeZone = TimeZone.getTimeZone("Asia/Kuala_Lumpur")
+    }.format(parsedDate)
 }
 
 private fun statusMessage(
@@ -886,6 +926,8 @@ private data class VolunteerPostRow(
     val description: String,
     val mode: String,
     val status: String,
+    @SerialName("thumbnail_path")
+    val thumbnailPath: String? = null,
     val category: String? = null
 )
 
@@ -1013,6 +1055,8 @@ private data class RoleTemplateRow(
     @SerialName("skill_path_id")
     val skillPathId: String,
     val description: String? = null,
+    @SerialName("role_mode")
+    val roleMode: String = "",
     @SerialName("skills_practised")
     val skillsPractised: List<String> = emptyList(),
     @SerialName("default_level")
