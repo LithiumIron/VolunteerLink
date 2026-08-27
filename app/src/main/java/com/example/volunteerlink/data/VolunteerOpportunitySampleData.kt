@@ -63,9 +63,6 @@ object VolunteerOpportunitySampleData {
                                 "Welcome participants, answer event " +
                                         "questions and guide attendees to " +
                                         "registration, activity and refreshment areas.",
-                            roleTrainingDetails =
-                                "A 30-minute briefing will be provided " +
-                                        "before the event begins.",
                             roleResponsibilities =
                                 listOf(
                                     "Welcome and guide event participants",
@@ -129,9 +126,6 @@ object VolunteerOpportunitySampleData {
                             roleSpecificAssignment =
                                 "Support equipment preparation, inventory " +
                                         "tracking and distribution of event supplies.",
-                            roleTrainingDetails =
-                                "A logistics and safety briefing will be " +
-                                        "conducted before deployment.",
                             roleResponsibilities =
                                 listOf(
                                     "Prepare and organise event supplies",
@@ -227,9 +221,6 @@ object VolunteerOpportunitySampleData {
                             roleSpecificAssignment =
                                 "Pack food items, organise distribution " +
                                         "stations and assist recipients during collection.",
-                            roleTrainingDetails =
-                                "A short food-handling and distribution " +
-                                        "briefing will be provided.",
                             roleResponsibilities =
                                 listOf(
                                     "Pack essential food supplies",
@@ -331,9 +322,6 @@ object VolunteerOpportunitySampleData {
                             roleSpecificAssignment =
                                 "Prepare simple guides that teach senior " +
                                         "citizens how to use common digital services.",
-                            roleTrainingDetails =
-                                "Online training materials and a content " +
-                                        "template will be provided.",
                             roleResponsibilities =
                                 listOf(
                                     "Write clear step-by-step instructions",

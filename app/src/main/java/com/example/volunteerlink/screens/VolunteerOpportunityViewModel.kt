@@ -1,11 +1,22 @@
 
 package com.example.volunteerlink.screens
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.Network
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.volunteerlink.data.VolunteerOpportunitySessionStore
 import com.example.volunteerlink.data.VolunteerDashboardDataSource
 import com.example.volunteerlink.data.VolunteerOpportunityRepository
+import com.example.volunteerlink.model.VolunteerApplicationStatus
+import com.example.volunteerlink.model.VolunteerOpportunityApplication
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
+import java.text.DateFormat
+import java.util.Date
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,15 +34,40 @@ data class VolunteerOpportunityUiState(
     val dataVersion: Int = 0
 )
 
-class VolunteerOpportunityViewModel : ViewModel() {
+class VolunteerOpportunityViewModel(
+    application: Application
+) : AndroidViewModel(application) {
     private val mutableUiState =
         MutableStateFlow(VolunteerOpportunityUiState())
 
     val uiState: StateFlow<VolunteerOpportunityUiState> =
         mutableUiState.asStateFlow()
 
+    private val connectivityManager =
+        application.getSystemService(Context.CONNECTIVITY_SERVICE)
+            as ConnectivityManager
+    private var initialNetworkCallbackReceived = false
+    private val networkCallback =
+        object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                if (initialNetworkCallbackReceived) {
+                    refresh()
+                } else {
+                    initialNetworkCallbackReceived = true
+                }
+            }
+        }
+
     init {
+        connectivityManager.registerDefaultNetworkCallback(networkCallback)
         loadDashboard()
+    }
+
+    override fun onCleared() {
+        runCatching {
+            connectivityManager.unregisterNetworkCallback(networkCallback)
+        }
+        super.onCleared()
     }
 
     fun retry() {
@@ -82,6 +118,77 @@ class VolunteerOpportunityViewModel : ViewModel() {
                 onSuccess()
             } catch (exception: Exception) {
                 exception.printStackTrace()
+                if (exception.isConnectivityFailure()) {
+                    val event =
+                        VolunteerOpportunitySessionStore
+                            .findEventById(eventId)
+                    if (event != null) {
+                        val payload = buildJsonObject {
+                            putJsonArray("answers") {
+                                role.roleExtraApplicationQuestions
+                                    .forEachIndexed { index, question ->
+                                        add(
+                                            buildJsonObject {
+                                                put("question", question)
+                                                put(
+                                                    "answer",
+                                                    answers.getOrElse(index) { "" }
+                                                )
+                                            }
+                                        )
+                                    }
+                            }
+                        }.toString()
+                        VolunteerDashboardDataSource.enqueuePendingAction(
+                            actionType = "SUBMIT",
+                            targetId = role.roleDatabaseId,
+                            payloadJson = payload
+                        )
+                        VolunteerOpportunitySessionStore
+                            .addOfflinePendingApplication(
+                                VolunteerOpportunityApplication(
+                                    applicationId =
+                                        ("offline|" + role.roleDatabaseId)
+                                            .hashCode(),
+                                    applicationEventId = event.eventId,
+                                    applicationEventTitle = event.eventTitle,
+                                    applicationOrganisationName =
+                                        event.eventOrganisationName,
+                                    applicationRoleTitle = role.roleTitle,
+                                    applicationSubmittedDate =
+                                        DateFormat.getDateInstance(
+                                            DateFormat.MEDIUM
+                                        ).format(Date()),
+                                    applicationStatus =
+                                        VolunteerApplicationStatus.PENDING,
+                                    applicationRoleId = role.roleId,
+                                    applicationStatusMessage =
+                                        "Waiting for internet connection to sync.",
+                                    applicationEventDate = event.eventDate,
+                                    applicationEventTime = event.eventTime,
+                                    applicationEventLocation =
+                                        event.eventFullAddress,
+                                    applicationPrimarySkillPath =
+                                        role.rolePrimarySkillPath,
+                                    applicationPractisedSkills =
+                                        role.roleSkillsPractised,
+                                    applicationDatabaseId =
+                                        "offline|" + role.roleDatabaseId
+                                )
+                            )
+                        VolunteerDashboardDataSource.cacheCurrentSession()
+                        mutableUiState.update {
+                            it.copy(
+                                isApplicationActionRunning = false,
+                                applicationActionError = null,
+                                isShowingCachedData = true,
+                                dataVersion = it.dataVersion + 1
+                            )
+                        }
+                        onSuccess()
+                        return@launch
+                    }
+                }
                 mutableUiState.update {
                     it.copy(
                         isApplicationActionRunning = false,
@@ -130,6 +237,32 @@ class VolunteerOpportunityViewModel : ViewModel() {
                 onSuccess()
             } catch (exception: Exception) {
                 exception.printStackTrace()
+                if (exception.isConnectivityFailure()) {
+                    VolunteerDashboardDataSource.enqueuePendingAction(
+                        actionType = "CANCEL",
+                        targetId = application.applicationDatabaseId,
+                        payloadJson = "{}"
+                    )
+                    VolunteerOpportunitySessionStore.replaceApplication(
+                        application.copy(
+                            applicationStatus =
+                                VolunteerApplicationStatus.CANCELLED,
+                            applicationStatusMessage =
+                                "Cancellation is waiting to sync."
+                        )
+                    )
+                    VolunteerDashboardDataSource.cacheCurrentSession()
+                    mutableUiState.update {
+                        it.copy(
+                            isApplicationActionRunning = false,
+                            applicationActionError = null,
+                            isShowingCachedData = true,
+                            dataVersion = it.dataVersion + 1
+                        )
+                    }
+                    onSuccess()
+                    return@launch
+                }
                 mutableUiState.update {
                     it.copy(
                         isApplicationActionRunning = false,
@@ -183,6 +316,7 @@ class VolunteerOpportunityViewModel : ViewModel() {
             }
 
             try {
+                VolunteerDashboardDataSource.syncPendingActions()
                 val data = VolunteerDashboardDataSource.refreshFromCloud()
                 VolunteerOpportunitySessionStore.replaceWith(data)
 
@@ -256,4 +390,11 @@ private fun Exception.toVolunteerMessage(
     }
 }
 
-
+private fun Exception.isConnectivityFailure(): Boolean {
+    val raw = message.orEmpty()
+    return raw.contains("network", true) ||
+        raw.contains("connect", true) ||
+        raw.contains("resolve host", true) ||
+        raw.contains("timeout", true) ||
+        this is java.io.IOException
+}

@@ -17,7 +17,10 @@ import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
-import kotlin.math.abs
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 @Serializable
 data class VolunteerOpportunityDashboardData(
@@ -199,6 +202,33 @@ object VolunteerOpportunityRepository {
         )
     }
 
+    suspend fun replayPendingAction(
+        actionType: String,
+        targetId: String,
+        payloadJson: String
+    ) {
+        when (actionType) {
+            "SUBMIT" -> {
+                val answers = Json.parseToJsonElement(payloadJson)
+                    .jsonObject["answers"]
+                    ?.jsonArray
+                    .orEmpty()
+                supabase.postgrest.rpc(
+                    function = "submit_role_application",
+                    parameters = buildJsonObject {
+                        put("target_post_role_id", targetId)
+                        putJsonArray("provided_screening_answers") {
+                            answers.forEach { add(it) }
+                        }
+                    }
+                )
+            }
+
+            "CANCEL" -> cancelApplication(targetId)
+            else -> error("Unsupported pending action: $actionType")
+        }
+    }
+
     private suspend fun loadMetricsSafely():
         Map<String, OpportunityMetricRow> {
         return try {
@@ -350,6 +380,7 @@ object VolunteerOpportunityRepository {
                                             item.scheduleItemId
                                         ].orEmpty()
                                     item.postId == post.postId &&
+                                        item.scheduleType != "TRAINING" &&
                                         (
                                                 targetRoleIds.isEmpty() ||
                                                     postRole.roleTemplateId in
@@ -365,6 +396,10 @@ object VolunteerOpportunityRepository {
                                 )
                                 .map { item ->
                                     VolunteerRoleScheduleItem(
+                                        scheduleDate =
+                                            formatDatabaseDate(
+                                                item.scheduleDate
+                                            ),
                                         scheduleTime =
                                             item.startTime
                                                 ?.let(::formatDatabaseTime)
@@ -444,10 +479,6 @@ object VolunteerOpportunityRepository {
                                     .ifBlank {
                                         template?.description.orEmpty()
                                     },
-                            roleTrainingDetails =
-                                roleScheduleItems
-                                    .firstOrNull()
-                                    ?.scheduleActivity,
                             roleResponsibilities =
                                 normalizedResponsibilities,
                             roleScheduleItems = roleScheduleItems,
@@ -752,10 +783,10 @@ private fun applicationStatus(
 }
 
 private fun stableNavigationId(databaseId: String): Int {
-    return databaseId
-        .filter(Char::isDigit)
-        .toIntOrNull()
-        ?: abs(databaseId.hashCode())
+    // Hash the complete database identifier. Extracting only digits made
+    // DEMO_POST_003 and POST003 both navigate as event 3, which mixed map
+    // markers, details and directions from unrelated opportunities.
+    return databaseId.hashCode() and Int.MAX_VALUE
 }
 
 private fun String.toDisplayWords(): String =
@@ -1018,6 +1049,8 @@ private data class ScheduleItemRow(
     val postId: String,
     @SerialName("schedule_date")
     val scheduleDate: String,
+    @SerialName("schedule_type")
+    val scheduleType: String? = null,
     val title: String,
     @SerialName("start_time")
     val startTime: String? = null
@@ -1153,5 +1186,3 @@ private data class MyVolunteerApplicationRow(
     @SerialName("created_at")
     val createdAt: String
 )
-
-

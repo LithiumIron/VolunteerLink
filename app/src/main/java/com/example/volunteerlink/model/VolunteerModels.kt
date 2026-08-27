@@ -17,6 +17,7 @@ enum class VolunteerRoleApplicationMethod {
 
 @Serializable
 data class VolunteerRoleScheduleItem(
+    val scheduleDate: String = "",
     val scheduleTime: String,
     val scheduleActivity: String
 )
@@ -34,7 +35,6 @@ data class VolunteerOpportunityRole(
     val roleExperienceRequirement: String,
     val roleExtraApplicationQuestions: List<String> = emptyList(),
     val roleSpecificAssignment: String = "",
-    val roleTrainingDetails: String? = null,
     val roleResponsibilities: List<String> = emptyList(),
     val roleScheduleItems: List<VolunteerRoleScheduleItem> = emptyList(),
     val roleMinimumSkillPathLevel: Int = 1,

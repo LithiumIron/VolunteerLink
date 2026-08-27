@@ -16,6 +16,14 @@ data class CachedVolunteerDashboard(
     val lastSyncedAtEpochMillis: Long
 )
 
+data class PendingVolunteerAction(
+    val actionId: Long,
+    val actionType: String,
+    val targetId: String,
+    val payloadJson: String,
+    val createdAtEpochMillis: Long
+)
+
 /**
  * Small, user-scoped local SQLite cache for the volunteer dashboard.
  *
@@ -48,6 +56,7 @@ class VolunteerLocalDatabase private constructor(
             """.trimIndent()
         )
         createSkillPathCacheTable(database)
+        createPendingActionTable(database)
     }
 
     override fun onUpgrade(
@@ -57,6 +66,9 @@ class VolunteerLocalDatabase private constructor(
     ) {
         if (oldVersion < 2) {
             createSkillPathCacheTable(database)
+        }
+        if (oldVersion < 3) {
+            createPendingActionTable(database)
         }
     }
 
@@ -172,6 +184,81 @@ class VolunteerLocalDatabase private constructor(
         )
     }
 
+    suspend fun enqueueAction(
+        actionType: String,
+        targetId: String,
+        payloadJson: String
+    ) = withContext(Dispatchers.IO) {
+        val values = ContentValues().apply {
+            put(COLUMN_USER_SCOPE, targetUserScope())
+            put(COLUMN_ACTION_TYPE, actionType)
+            put(COLUMN_TARGET_ID, targetId)
+            put(COLUMN_PAYLOAD_JSON, payloadJson)
+            put(COLUMN_CREATED_AT, System.currentTimeMillis())
+        }
+        writableDatabase.insert(
+            TABLE_PENDING_ACTIONS,
+            null,
+            values
+        )
+    }
+
+    suspend fun readPendingActions(
+        userScope: String
+    ): List<PendingVolunteerAction> = withContext(Dispatchers.IO) {
+        readableDatabase.query(
+            TABLE_PENDING_ACTIONS,
+            arrayOf(
+                COLUMN_ACTION_ID,
+                COLUMN_ACTION_TYPE,
+                COLUMN_TARGET_ID,
+                COLUMN_PAYLOAD_JSON,
+                COLUMN_CREATED_AT
+            ),
+            "$COLUMN_USER_SCOPE = ?",
+            arrayOf(userScope),
+            null,
+            null,
+            "$COLUMN_CREATED_AT ASC"
+        ).use { cursor ->
+            buildList {
+                while (cursor.moveToNext()) {
+                    add(
+                        PendingVolunteerAction(
+                            actionId = cursor.getLong(0),
+                            actionType = cursor.getString(1),
+                            targetId = cursor.getString(2),
+                            payloadJson = cursor.getString(3),
+                            createdAtEpochMillis = cursor.getLong(4)
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    suspend fun deletePendingAction(actionId: Long) =
+        withContext(Dispatchers.IO) {
+            writableDatabase.delete(
+                TABLE_PENDING_ACTIONS,
+                "$COLUMN_ACTION_ID = ?",
+                arrayOf(actionId.toString())
+            )
+        }
+
+    private var pendingActionUserScope: String = ""
+
+    fun setPendingActionUserScope(userScope: String) {
+        pendingActionUserScope = userScope
+    }
+
+    private fun targetUserScope(): String {
+        check(pendingActionUserScope.isNotBlank()) {
+            "A user scope is required before queueing an offline action."
+        }
+        return pendingActionUserScope
+    }
+
     private fun createSkillPathCacheTable(database: SQLiteDatabase) {
         database.execSQL(
             """
@@ -184,15 +271,36 @@ class VolunteerLocalDatabase private constructor(
         )
     }
 
+    private fun createPendingActionTable(database: SQLiteDatabase) {
+        database.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS $TABLE_PENDING_ACTIONS (
+                action_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_scope TEXT NOT NULL,
+                action_type TEXT NOT NULL,
+                target_id TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                created_at INTEGER NOT NULL
+            )
+            """.trimIndent()
+        )
+    }
+
     companion object {
         private const val DATABASE_NAME = "volunteerlink_local.db"
-        private const val DATABASE_VERSION = 2
+        private const val DATABASE_VERSION = 3
         private const val TABLE_DASHBOARD_CACHE = "volunteer_dashboard_cache"
         private const val TABLE_SKILL_PATH_CACHE = "volunteer_skill_path_cache"
+        private const val TABLE_PENDING_ACTIONS = "volunteer_pending_actions"
         private const val COLUMN_USER_SCOPE = "user_scope"
         private const val COLUMN_DASHBOARD_JSON = "dashboard_json"
         private const val COLUMN_SKILL_PATH_JSON = "skill_paths_json"
         private const val COLUMN_LAST_SYNCED_AT = "last_synced_at"
+        private const val COLUMN_ACTION_ID = "action_id"
+        private const val COLUMN_ACTION_TYPE = "action_type"
+        private const val COLUMN_TARGET_ID = "target_id"
+        private const val COLUMN_PAYLOAD_JSON = "payload_json"
+        private const val COLUMN_CREATED_AT = "created_at"
 
         @Volatile
         private var instance: VolunteerLocalDatabase? = null

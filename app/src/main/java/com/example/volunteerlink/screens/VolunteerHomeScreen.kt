@@ -1,6 +1,10 @@
 
 package com.example.volunteerlink.screens
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
@@ -18,6 +22,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -55,6 +60,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.volunteerlink.R
@@ -103,16 +109,65 @@ fun VolunteerHomeScreen(
         VolunteerSkillPathViewModel = viewModel()
 ) {
     val context = LocalContext.current
+    val matchLocationPermissionLauncher =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.RequestMultiplePermissions()
+        ) { permissions ->
+            if (
+                permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+                permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+            ) {
+                DeviceLocationHelper.getApproximateCurrentLocation(context) {
+                        location ->
+                    location?.let {
+                        VolunteerOpportunitySessionStore
+                            .updateDistancesFromDevice(
+                                latitude = it.latitude,
+                                longitude = it.longitude
+                            )
+                    }
+                }
+            }
+        }
 
-    // If permission was previously granted from Map, refresh distances for
-    // Near Me and recommendation scoring without prompting again on Home.
+    // Ask once when matches first need a Physical travel distance. Android
+    // remembers the decision; subsequent visits only reuse granted access.
     LaunchedEffect(Unit) {
-        DeviceLocationHelper.getApproximateCurrentLocation(context) { location ->
-            location?.let {
-                VolunteerOpportunitySessionStore.updateDistancesFromDevice(
-                    latitude = it.latitude,
-                    longitude = it.longitude
+        val fineGranted = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        val coarseGranted = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        val permissionPreferences = context.getSharedPreferences(
+            "volunteer_location_preferences",
+            android.content.Context.MODE_PRIVATE
+        )
+        val alreadyPrompted =
+            permissionPreferences.getBoolean("match_location_prompted", false)
+
+        if (!fineGranted && !coarseGranted && !alreadyPrompted) {
+            permissionPreferences.edit()
+                .putBoolean("match_location_prompted", true)
+                .apply()
+            matchLocationPermissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
                 )
+            )
+        } else {
+            DeviceLocationHelper.getApproximateCurrentLocation(context) {
+                    location ->
+                location?.let {
+                    VolunteerOpportunitySessionStore
+                        .updateDistancesFromDevice(
+                            latitude = it.latitude,
+                            longitude = it.longitude
+                        )
+                }
             }
         }
     }
@@ -1404,21 +1459,24 @@ private fun VolunteerHomeCompactCard(
                         shape = RoundedCornerShape(6.dp),
                         color = VolunteerLinkPrimaryGreen
                     ) {
-                        Text(
-                            text =
-                                if (recommendation != null) {
-                                    "View Role Details"
-                                } else {
-                                    "View Opportunity Details"
-                                },
-                            modifier = Modifier.padding(
-                                horizontal = 10.dp,
-                                vertical = 6.dp
-                            ),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color.White
-                        )
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                text =
+                                    if (recommendation != null) {
+                                        "View Role Details"
+                                    } else {
+                                        "View Event Details"
+                                    },
+                                modifier = Modifier.padding(
+                                    horizontal = 10.dp,
+                                    vertical = 7.dp
+                                ),
+                                maxLines = 1,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color.White
+                            )
+                        }
                     }
                 }
             }
@@ -1966,5 +2024,3 @@ private fun formatVolunteerImpactMinutes(minutes: Int): String {
         else -> "${hours}h ${remainder}m"
     }
 }
-
-

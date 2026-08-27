@@ -98,6 +98,29 @@ object VolunteerOpportunitySessionStore {
             it.applicationEventId == eventId &&
                 it.applicationRoleId == roleId
         }
+
+    fun snapshot(): VolunteerOpportunityDashboardData =
+        VolunteerOpportunityDashboardData(
+            events = volunteerOpportunityEvents.toList(),
+            applications = volunteerApplications.toList()
+        )
+
+    fun addOfflinePendingApplication(
+        application: VolunteerOpportunityApplication
+    ) {
+        volunteerApplications.removeAll {
+            it.applicationEventId == application.applicationEventId &&
+                it.applicationRoleId == application.applicationRoleId
+        }
+        volunteerApplications.add(0, application)
+    }
+
+    fun replaceApplication(
+        application: VolunteerOpportunityApplication
+    ) {
+        val index = volunteerApplications.indexOfFirst {
+            it.applicationId == application.applicationId
+        }
+        if (index >= 0) volunteerApplications[index] = application
+    }
 }
-
-
