@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -19,7 +20,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.volunteerlink.data.post.PostTimingState
 import com.example.volunteerlink.organisation.manage.model.PostManagementPerson
+import com.example.volunteerlink.organisation.manage.model.PostManagementPost
 import com.example.volunteerlink.organisation.manage.model.PostManagementRole
 import com.example.volunteerlink.organisation.viewmodel.OrganisationPostManagementViewModel
 import com.example.volunteerlink.ui.theme.VolunteerLinkBackground
@@ -56,19 +59,35 @@ fun OrganisationPostManagementScreen(
         )
         post != null -> OrganisationPostManagementContent(
             post = post,
+            isStartingAttendance = uiState.isStartingAttendance,
+            isUpdatingAttendance = uiState.isUpdatingAttendance,
+            attendanceActionMessage = uiState.attendanceActionMessage,
             onBack = onBack,
             onEdit = onEdit,
-            onToggleShortlist = viewModel::toggleApplicantShortlist
+            onToggleShortlist = viewModel::toggleApplicantShortlist,
+            onStartAttendance = viewModel::startPhysicalAttendance,
+            onMarkPresent = viewModel::markVolunteerPresent,
+            onMarkAbsent = viewModel::markVolunteerAbsent,
+            onStartAttendancePolling = viewModel::startAttendancePolling,
+            onStopAttendancePolling = viewModel::stopAttendancePolling
         )
     }
 }
 
 @Composable
 private fun OrganisationPostManagementContent(
-    post: com.example.volunteerlink.organisation.manage.model.PostManagementPost,
+    post: PostManagementPost,
+    isStartingAttendance: Boolean,
+    isUpdatingAttendance: Boolean,
+    attendanceActionMessage: String?,
     onBack: () -> Unit,
     onEdit: () -> Unit,
-    onToggleShortlist: (PostManagementPerson) -> Unit
+    onToggleShortlist: (PostManagementPerson) -> Unit,
+    onStartAttendance: () -> Unit,
+    onMarkPresent: (PostManagementPerson, String) -> Unit,
+    onMarkAbsent: (PostManagementPerson, String) -> Unit,
+    onStartAttendancePolling: () -> Unit,
+    onStopAttendancePolling: () -> Unit
 ) {
     var selectedTabName by rememberSaveable {
         mutableStateOf(PostManagementTab.OVERVIEW.name)
@@ -79,6 +98,9 @@ private fun OrganisationPostManagementContent(
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var selectedRoleId by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedPerson by remember { mutableStateOf<PostManagementPerson?>(null) }
+    var selectedAttendanceDate by rememberSaveable { mutableStateOf<String?>(null) }
+    var absentConfirmationPerson by remember { mutableStateOf<PostManagementPerson?>(null) }
+    var absentConfirmationDate by remember { mutableStateOf<String?>(null) }
 
     val selectedTab = runCatching {
         PostManagementTab.valueOf(selectedTabName)
@@ -88,8 +110,65 @@ private fun OrganisationPostManagementContent(
         PostManagementPeopleTab.valueOf(selectedPeopleTabName)
     }.getOrDefault(PostManagementPeopleTab.APPLICANTS)
 
+    val physicalAttendance = post.physicalAttendance
+
+    val shouldPollAttendance =
+        selectedTab == PostManagementTab.PEOPLE &&
+            selectedPeopleTab == PostManagementPeopleTab.VOLUNTEERS &&
+            physicalAttendance != null
+
+    DisposableEffect(shouldPollAttendance) {
+        if (shouldPollAttendance) {
+            onStartAttendancePolling()
+        } else {
+            onStopAttendancePolling()
+        }
+
+        onDispose {
+            if (shouldPollAttendance) {
+                onStopAttendancePolling()
+            }
+        }
+    }
+
+    // When AppClock moves to a new event day, follow that new day automatically.
+    // Without this, a saved Sep 3/Sep 4 selection can remain on screen while
+    // the top attendance card is already using Sep 4/Sep 5, which makes the
+    // PIN and counters look like they belong to the wrong date.
+    LaunchedEffect(physicalAttendance?.todayDate) {
+        selectedAttendanceDate = physicalAttendance?.defaultSelectedDate
+    }
+
+    // Also recover safely if the set of selectable dates changes and the
+    // currently selected date is no longer valid.
+    LaunchedEffect(physicalAttendance?.availableDates) {
+        val dates = physicalAttendance?.availableDates.orEmpty()
+        if (selectedAttendanceDate !in dates) {
+            selectedAttendanceDate = physicalAttendance?.defaultSelectedDate
+        }
+    }
+
+    val openApplicationRoleIds = post.roles
+        .filter { it.isApplicationOpen }
+        .map { it.roleTemplateId }
+        .toSet()
+    val showApplicantsTab = openApplicationRoleIds.isNotEmpty()
+    val openApplicants = post.applicants.filter { applicant ->
+        applicant.roleTemplateId in openApplicationRoleIds
+    }
+
+    LaunchedEffect(showApplicantsTab) {
+        if (
+            !showApplicantsTab &&
+            selectedPeopleTabName != PostManagementPeopleTab.VOLUNTEERS.name
+        ) {
+            selectedPeopleTabName = PostManagementPeopleTab.VOLUNTEERS.name
+            selectedRoleId = null
+        }
+    }
+
     val peopleForTab = when (selectedPeopleTab) {
-        PostManagementPeopleTab.APPLICANTS -> post.applicants
+        PostManagementPeopleTab.APPLICANTS -> openApplicants
         PostManagementPeopleTab.VOLUNTEERS -> post.volunteers
     }
 
@@ -139,6 +218,11 @@ private fun OrganisationPostManagementContent(
             }
         }
 
+    val showEdit = when (post.databaseStatus.uppercase(Locale.US)) {
+        "COMPLETED", "CANCELLED" -> false
+        else -> post.timingState != PostTimingState.PAST
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -147,7 +231,8 @@ private fun OrganisationPostManagementContent(
     ) {
         PostManagementTopBar(
             onBack = onBack,
-            onEdit = onEdit
+            onEdit = onEdit,
+            showEdit = showEdit
         )
 
         LazyColumn(
@@ -167,7 +252,7 @@ private fun OrganisationPostManagementContent(
             item(key = "post_tabs") {
                 PostManagementMainTabs(
                     selected = selectedTab,
-                    pendingApplicantCount = post.applicants.size,
+                    pendingApplicantCount = openApplicants.size,
                     onSelected = { selectedTabName = it.name }
                 )
             }
@@ -180,10 +265,67 @@ private fun OrganisationPostManagementContent(
                 }
 
                 PostManagementTab.PEOPLE -> {
+                    if (
+                        selectedPeopleTab == PostManagementPeopleTab.VOLUNTEERS &&
+                        post.physicalTimingState == PostTimingState.ONGOING
+                    ) {
+                        physicalAttendance?.let { attendance ->
+                            val attendanceDate = selectedAttendanceDate
+                                ?: attendance.defaultSelectedDate
+                                ?: attendance.todayDate
+                            val selectedSession = post.attendanceDays.firstOrNull { day ->
+                                day.eventDate == attendanceDate
+                            }
+                            val selectedEligibleCount = attendance.volunteerSummaries
+                                .filter { summary ->
+                                    summary.statusFor(attendanceDate)?.expected == true
+                                }
+                                .map { it.userId }
+                                .distinct()
+                                .size
+                            val selectedPresentCount = attendance.volunteerSummaries
+                                .filter { summary ->
+                                    summary.statusFor(attendanceDate)?.present == true
+                                }
+                                .map { it.userId }
+                                .distinct()
+                                .size
+
+                            item(key = "physical_attendance_${attendanceDate}") {
+                                PostManagementTodayAttendanceCard(
+                                    attendance = attendance,
+                                    selectedDate = attendanceDate,
+                                    selectedSession = selectedSession,
+                                    selectedEligibleVolunteerCount = selectedEligibleCount,
+                                    selectedPresentCount = selectedPresentCount,
+                                    isStartingAttendance = isStartingAttendance,
+                                    actionMessage = null,
+                                    onStartAttendance = onStartAttendance
+                                )
+                            }
+                        }
+                    }
+
+                    if (
+                        selectedPeopleTab == PostManagementPeopleTab.VOLUNTEERS &&
+                        physicalAttendance != null &&
+                        physicalAttendance.availableDates.isNotEmpty()
+                    ) {
+                        item(key = "physical_attendance_day_selector") {
+                            PostManagementAttendanceDaySelector(
+                                dates = physicalAttendance.availableDates,
+                                selectedDate = selectedAttendanceDate,
+                                actionMessage = attendanceActionMessage,
+                                onSelected = { selectedAttendanceDate = it }
+                            )
+                        }
+                    }
+
                     item(key = "people_controls") {
                         PostManagementPeopleControls(
                             selectedTab = selectedPeopleTab,
-                            applicantCount = post.applicants.size,
+                            showApplicantsTab = showApplicantsTab,
+                            applicantCount = openApplicants.size,
                             volunteerCount = post.volunteers.size,
                             query = searchQuery,
                             selectedRoleId = selectedRoleId,
@@ -212,7 +354,7 @@ private fun OrganisationPostManagementContent(
                                 PostManagementPeopleRoleHeader(
                                     role = role,
                                     selectedTab = selectedPeopleTab,
-                                    applicantCount = post.applicants.count {
+                                    applicantCount = openApplicants.count {
                                         it.roleTemplateId == role.roleTemplateId
                                     },
                                     volunteerCount = post.volunteers.count {
@@ -229,10 +371,34 @@ private fun OrganisationPostManagementContent(
                                 }
                             ) { index ->
                                 val person = peopleInRole[index]
+                                val showPhysicalAttendance =
+                                    selectedPeopleTab == PostManagementPeopleTab.VOLUNTEERS &&
+                                        person.roleMode.equals("PHYSICAL", ignoreCase = true) &&
+                                        selectedAttendanceDate != null &&
+                                        physicalAttendance != null
+
                                 PostManagementPersonCard(
                                     person = person,
                                     isApplicant = selectedPeopleTab == PostManagementPeopleTab.APPLICANTS,
                                     isApplicationOpen = role.isApplicationOpen,
+                                    attendanceSummary = if (showPhysicalAttendance) {
+                                        physicalAttendance?.summaryFor(person)
+                                    } else {
+                                        null
+                                    },
+                                    attendanceSelectedDate = if (showPhysicalAttendance) {
+                                        selectedAttendanceDate
+                                    } else {
+                                        null
+                                    },
+                                    attendanceTodayDate = physicalAttendance?.todayDate,
+                                    canCorrectAttendance = physicalAttendance?.canCorrectAttendance == true,
+                                    isUpdatingAttendance = isUpdatingAttendance,
+                                    onMarkPresent = onMarkPresent,
+                                    onRequestMarkAbsent = { selected, date ->
+                                        absentConfirmationPerson = selected
+                                        absentConfirmationDate = date
+                                    },
                                     onViewProfile = { selectedPerson = it },
                                     onToggleShortlist = onToggleShortlist
                                 )
@@ -251,4 +417,21 @@ private fun OrganisationPostManagementContent(
         )
     }
 
+    val absentPerson = absentConfirmationPerson
+    val absentDate = absentConfirmationDate
+    if (absentPerson != null && absentDate != null) {
+        PostManagementMarkAbsentDialog(
+            person = absentPerson,
+            eventDate = absentDate,
+            onDismiss = {
+                absentConfirmationPerson = null
+                absentConfirmationDate = null
+            },
+            onConfirm = {
+                absentConfirmationPerson = null
+                absentConfirmationDate = null
+                onMarkAbsent(absentPerson, absentDate)
+            }
+        )
+    }
 }

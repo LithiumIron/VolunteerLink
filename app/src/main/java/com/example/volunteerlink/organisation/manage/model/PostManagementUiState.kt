@@ -8,7 +8,10 @@ import com.example.volunteerlink.data.post.RoleApplicationWindowState
 data class OrganisationPostManagementUiState(
     val isLoading: Boolean = true,
     val post: PostManagementPost? = null,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val isStartingAttendance: Boolean = false,
+    val isUpdatingAttendance: Boolean = false,
+    val attendanceActionMessage: String? = null
 )
 
 /**
@@ -27,6 +30,9 @@ data class PostManagementPost(
     val schedules: List<PostManagementScheduleItem> = emptyList(),
     val roles: List<PostManagementRole> = emptyList(),
     val people: List<PostManagementPerson> = emptyList(),
+    val attendanceDays: List<PostManagementAttendanceDay> = emptyList(),
+    val attendanceRecords: List<PostManagementAttendanceRecord> = emptyList(),
+    val physicalAttendance: PostManagementPhysicalAttendance? = null,
     val timingState: PostTimingState? = null,
     val physicalTimingState: PostTimingState? = null,
     val remoteTimingState: PostTimingState? = null
@@ -72,6 +78,7 @@ data class PostManagementScheduleItem(
     val endTime: String? = null,
     val location: String? = null,
     val notes: String? = null,
+    val roleTemplateIds: List<String> = emptyList()
 )
 
 data class PostManagementRole(
@@ -108,4 +115,76 @@ data class PostManagementPerson(
     val appliedAt: String? = null,
     val decisionNote: String? = null,
     val isShortlisted: Boolean = false
+)
+
+/** One attendance session opened by the organisation for one Physical event day. */
+data class PostManagementAttendanceDay(
+    val eventDate: String,
+    val pinCode: String,
+    val expectedMinutes: Int,
+    val generatedAt: String? = null,
+    val isActive: Boolean
+)
+
+/** One normalized volunteer check-in for one Physical role and event day. */
+data class PostManagementAttendanceRecord(
+    val eventDate: String,
+    val roleTemplateId: String,
+    val userId: String,
+    val attendanceStatus: String,
+    val checkedInAt: String? = null,
+    val verifiedMinutes: Int
+)
+
+/** Small attendance-only payload used by the active People-screen poll. */
+data class PostManagementAttendanceSnapshot(
+    val attendanceDays: List<PostManagementAttendanceDay> = emptyList(),
+    val attendanceRecords: List<PostManagementAttendanceRecord> = emptyList()
+)
+
+/** Time-dependent Physical attendance state prepared for the Manage UI. */
+data class PostManagementPhysicalAttendance(
+    val todayDate: String,
+    val todaySession: PostManagementAttendanceDay? = null,
+    val eligiblePhysicalVolunteerCount: Int = 0,
+    val checkedInTodayCount: Int = 0,
+    val canStartAttendance: Boolean = false,
+    val canCorrectAttendance: Boolean = false,
+    val isLiveWindowOpen: Boolean = false,
+    val attendanceWindowLabel: String = "",
+    val startBlockedReason: String? = null,
+    val availableDates: List<String> = emptyList(),
+    val defaultSelectedDate: String? = null,
+    val volunteerSummaries: List<PostManagementVolunteerAttendanceSummary> = emptyList()
+) {
+    fun summaryFor(person: PostManagementPerson): PostManagementVolunteerAttendanceSummary? {
+        return volunteerSummaries.firstOrNull {
+            it.userId == person.userId &&
+                it.roleTemplateId == person.roleTemplateId
+        }
+    }
+}
+
+data class PostManagementVolunteerAttendanceSummary(
+    val userId: String,
+    val roleTemplateId: String,
+    val attendedDays: Int,
+    val expectedDays: Int,
+    val verifiedMinutes: Int,
+    val expectedToday: Boolean,
+    val checkedInToday: Boolean,
+    val dateStatuses: List<PostManagementVolunteerAttendanceDateStatus> = emptyList()
+) {
+    fun statusFor(eventDate: String): PostManagementVolunteerAttendanceDateStatus? {
+        return dateStatuses.firstOrNull { it.eventDate == eventDate }
+    }
+}
+
+data class PostManagementVolunteerAttendanceDateStatus(
+    val eventDate: String,
+    val expected: Boolean,
+    val present: Boolean,
+    val markedAbsent: Boolean = false,
+    val checkedInAt: String? = null,
+    val verifiedMinutes: Int = 0
 )

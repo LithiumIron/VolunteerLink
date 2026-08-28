@@ -1,6 +1,9 @@
 package com.example.volunteerlink.organisation.repository
 
 import com.example.volunteerlink.data.supabase
+import com.example.volunteerlink.organisation.manage.model.PostManagementAttendanceDay
+import com.example.volunteerlink.organisation.manage.model.PostManagementAttendanceRecord
+import com.example.volunteerlink.organisation.manage.model.PostManagementAttendanceSnapshot
 import com.example.volunteerlink.organisation.manage.model.PostManagementPerson
 import com.example.volunteerlink.organisation.manage.model.PostManagementPhysicalDetails
 import com.example.volunteerlink.organisation.manage.model.PostManagementPost
@@ -8,14 +11,17 @@ import com.example.volunteerlink.organisation.manage.model.PostManagementRemoteD
 import com.example.volunteerlink.organisation.manage.model.PostManagementRole
 import com.example.volunteerlink.organisation.manage.model.PostManagementScheduleItem
 import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 
 /** Supabase reader for the Organisation Post Management detail screen. */
 class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementRepository {
@@ -71,6 +77,21 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
                 filter { eq("post_id", postId) }
             }
             .decodeList<JsonObject>()
+
+        val scheduleRoleRows = supabase
+            .from("schedule_item_roles")
+            .select(
+                columns = Columns.raw("schedule_item_id,role_template_id")
+            ) {
+                filter { eq("post_id", postId) }
+            }
+            .decodeList<JsonObject>()
+
+        val scheduleRoleIdsBySchedule = scheduleRoleRows
+            .groupBy { it.requiredText("schedule_item_id") }
+            .mapValues { (_, rows) ->
+                rows.map { it.requiredText("role_template_id") }.distinct()
+            }
 
         val roleRows = supabase
             .from("post_roles")
@@ -132,6 +153,28 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
                 columns = Columns.raw(
                     "role_template_id,user_id,application_status,completion_status," +
                             "joined_at,created_at,decision_note,is_shortlisted"
+                )
+            ) {
+                filter { eq("post_id", postId) }
+            }
+            .decodeList<JsonObject>()
+
+        val attendanceDayRows = supabase
+            .from("attendance_days")
+            .select(
+                columns = Columns.raw(
+                    "event_date,pin_code,expected_minutes,generated_at,is_active"
+                )
+            ) {
+                filter { eq("post_id", postId) }
+            }
+            .decodeList<JsonObject>()
+
+        val attendanceRecordRows = supabase
+            .from("attendance_records")
+            .select(
+                columns = Columns.raw(
+                    "event_date,role_template_id,user_id,attendance_status,checked_in_at,verified_minutes"
                 )
             ) {
                 filter { eq("post_id", postId) }
@@ -235,14 +278,93 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
                     startTime = it.optionalText("start_time"),
                     endTime = it.optionalText("end_time"),
                     location = it.optionalText("location"),
-                    notes = it.optionalText("notes")
+                    notes = it.optionalText("notes"),
+                    roleTemplateIds = scheduleRoleIdsBySchedule[
+                        it.requiredText("schedule_item_id")
+                    ].orEmpty()
                 )
             }.sortedWith(
                 compareBy<PostManagementScheduleItem> { it.scheduleDate }
                     .thenBy { it.startTime.orEmpty() }
             ),
             roles = roles,
-            people = people
+            people = people,
+            attendanceDays = attendanceDayRows.map { row ->
+                PostManagementAttendanceDay(
+                    eventDate = row.requiredText("event_date"),
+                    pinCode = row.requiredText("pin_code"),
+                    expectedMinutes = row.requiredInt("expected_minutes"),
+                    generatedAt = row.optionalText("generated_at"),
+                    isActive = row.optionalBoolean("is_active") ?: false
+                )
+            }.sortedBy { it.eventDate },
+            attendanceRecords = attendanceRecordRows.map { row ->
+                PostManagementAttendanceRecord(
+                    eventDate = row.requiredText("event_date"),
+                    roleTemplateId = row.requiredText("role_template_id"),
+                    userId = row.requiredText("user_id"),
+                    attendanceStatus = row.optionalText("attendance_status") ?: "PRESENT",
+                    checkedInAt = row.optionalText("checked_in_at"),
+                    verifiedMinutes = row.requiredInt("verified_minutes")
+                )
+            }.sortedWith(
+                compareBy<PostManagementAttendanceRecord> { it.eventDate }
+                    .thenBy { it.roleTemplateId }
+                    .thenBy { it.userId }
+            )
+        )
+    }
+
+
+    override suspend fun loadPhysicalAttendance(
+        postId: String
+    ): PostManagementAttendanceSnapshot {
+        val attendanceDayRows = supabase
+            .from("attendance_days")
+            .select(
+                columns = Columns.raw(
+                    "event_date,pin_code,expected_minutes,generated_at,is_active"
+                )
+            ) {
+                filter { eq("post_id", postId) }
+            }
+            .decodeList<JsonObject>()
+
+        val attendanceRecordRows = supabase
+            .from("attendance_records")
+            .select(
+                columns = Columns.raw(
+                    "event_date,role_template_id,user_id,attendance_status,checked_in_at,verified_minutes"
+                )
+            ) {
+                filter { eq("post_id", postId) }
+            }
+            .decodeList<JsonObject>()
+
+        return PostManagementAttendanceSnapshot(
+            attendanceDays = attendanceDayRows.map { row ->
+                PostManagementAttendanceDay(
+                    eventDate = row.requiredText("event_date"),
+                    pinCode = row.requiredText("pin_code"),
+                    expectedMinutes = row.requiredInt("expected_minutes"),
+                    generatedAt = row.optionalText("generated_at"),
+                    isActive = row.optionalBoolean("is_active") ?: false
+                )
+            }.sortedBy { it.eventDate },
+            attendanceRecords = attendanceRecordRows.map { row ->
+                PostManagementAttendanceRecord(
+                    eventDate = row.requiredText("event_date"),
+                    roleTemplateId = row.requiredText("role_template_id"),
+                    userId = row.requiredText("user_id"),
+                    attendanceStatus = row.optionalText("attendance_status") ?: "PRESENT",
+                    checkedInAt = row.optionalText("checked_in_at"),
+                    verifiedMinutes = row.requiredInt("verified_minutes")
+                )
+            }.sortedWith(
+                compareBy<PostManagementAttendanceRecord> { it.eventDate }
+                    .thenBy { it.roleTemplateId }
+                    .thenBy { it.userId }
+            )
         )
     }
 
@@ -267,6 +389,49 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
                     eq("application_status", "PENDING")
                 }
             }
+    }
+
+    override suspend fun startPhysicalAttendance(postId: String) {
+        supabase.postgrest.rpc(
+            function = "start_physical_attendance",
+            parameters = buildJsonObject {
+                put("p_post_id", postId)
+            }
+        )
+    }
+
+    override suspend fun markVolunteerPresent(
+        postId: String,
+        eventDate: String,
+        roleTemplateId: String,
+        userId: String
+    ) {
+        supabase.postgrest.rpc(
+            function = "organisation_mark_physical_present",
+            parameters = buildJsonObject {
+                put("p_post_id", postId)
+                put("p_event_date", eventDate)
+                put("p_role_template_id", roleTemplateId)
+                put("p_user_id", userId)
+            }
+        )
+    }
+
+    override suspend fun markVolunteerAbsent(
+        postId: String,
+        eventDate: String,
+        roleTemplateId: String,
+        userId: String
+    ) {
+        supabase.postgrest.rpc(
+            function = "organisation_mark_physical_absent",
+            parameters = buildJsonObject {
+                put("p_post_id", postId)
+                put("p_event_date", eventDate)
+                put("p_role_template_id", roleTemplateId)
+                put("p_user_id", userId)
+            }
+        )
     }
 
     private fun JsonObject.requiredText(key: String): String {

@@ -42,9 +42,12 @@ import androidx.compose.ui.unit.sp
 import com.example.volunteerlink.R
 import com.example.volunteerlink.data.post.PostTimingState
 import com.example.volunteerlink.organisation.manage.model.PostManagementPerson
+import com.example.volunteerlink.organisation.manage.model.PostManagementAttendanceDay
+import com.example.volunteerlink.organisation.manage.model.PostManagementPhysicalAttendance
 import com.example.volunteerlink.organisation.manage.model.PostManagementPost
 import com.example.volunteerlink.organisation.manage.model.PostManagementRole
 import com.example.volunteerlink.organisation.manage.model.PostManagementScheduleItem
+import com.example.volunteerlink.organisation.manage.model.PostManagementVolunteerAttendanceSummary
 import com.example.volunteerlink.ui.theme.VolunteerLinkBackground
 import com.example.volunteerlink.ui.theme.VolunteerLinkBorderColour
 import com.example.volunteerlink.ui.theme.VolunteerLinkCardCornerRadius
@@ -75,7 +78,8 @@ private val PostManagementPillShape = RoundedCornerShape(50)
 @Composable
 internal fun PostManagementTopBar(
     onBack: () -> Unit,
-    onEdit: () -> Unit
+    onEdit: () -> Unit,
+    showEdit: Boolean
 ) {
     Row(
         modifier = Modifier
@@ -109,20 +113,22 @@ internal fun PostManagementTopBar(
             color = VolunteerLinkSurface
         )
 
-        TextButton(onClick = onEdit) {
-            Icon(
-                painter = painterResource(R.drawable.edit),
-                contentDescription = null,
-                modifier = Modifier.size(17.dp),
-                tint = VolunteerLinkSurface
-            )
-            Text(
-                text = "Edit",
-                modifier = Modifier.padding(start = 5.dp),
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                color = VolunteerLinkSurface
-            )
+        if (showEdit) {
+            TextButton(onClick = onEdit) {
+                Icon(
+                    painter = painterResource(R.drawable.edit),
+                    contentDescription = null,
+                    modifier = Modifier.size(17.dp),
+                    tint = VolunteerLinkSurface
+                )
+                Text(
+                    text = "Edit",
+                    modifier = Modifier.padding(start = 5.dp),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = VolunteerLinkSurface
+                )
+            }
         }
     }
 }
@@ -586,7 +592,7 @@ private fun PostManagementRoleRow(
             horizontalArrangement = Arrangement.spacedBy(7.dp)
         ) {
             PostManagementNeutralPill(role.applicationMethod.toApplicationMethodLabel())
-            PostManagementApplicationWindowPill(role = role)
+
             if (pendingCount > 0) {
                 Surface(
                     shape = PostManagementPillShape,
@@ -699,8 +705,405 @@ private fun PostManagementScheduleRow(schedule: PostManagementScheduleItem) {
 }
 
 @Composable
+internal fun PostManagementTodayAttendanceCard(
+    attendance: PostManagementPhysicalAttendance,
+    selectedDate: String,
+    selectedSession: PostManagementAttendanceDay?,
+    selectedEligibleVolunteerCount: Int,
+    selectedPresentCount: Int,
+    isStartingAttendance: Boolean,
+    actionMessage: String?,
+    onStartAttendance: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val isToday = selectedDate == attendance.todayDate
+
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = PostManagementCardShape,
+        color = VolunteerLinkSurface,
+        border = BorderStroke(1.dp, VolunteerLinkBorderColour),
+        shadowElevation = 1.dp
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    modifier = Modifier.size(38.dp),
+                    shape = CircleShape,
+                    color = VolunteerLinkSoftGreenSurface
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            painter = painterResource(R.drawable.ongoing_posts),
+                            contentDescription = null,
+                            modifier = Modifier.size(21.dp),
+                            tint = VolunteerLinkPrimaryGreen
+                        )
+                    }
+                }
+
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = 10.dp)
+                ) {
+                    Text(
+                        text = if (isToday) "Today's Attendance" else "Attendance",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = VolunteerLinkTextPrimary
+                    )
+                    Text(
+                        text = selectedDate.toPostManagementShortDate(),
+                        modifier = Modifier.padding(top = 2.dp),
+                        fontSize = 10.sp,
+                        color = VolunteerLinkTextSecondary
+                    )
+                    if (attendance.attendanceWindowLabel.isNotBlank()) {
+                        Text(
+                            text = "Volunteer PIN window · ${attendance.attendanceWindowLabel}",
+                            modifier = Modifier.padding(top = 2.dp),
+                            fontSize = 9.sp,
+                            color = VolunteerLinkTextSecondary
+                        )
+                    }
+                }
+            }
+
+            val session = selectedSession
+            if (session == null) {
+                Text(
+                    text = when {
+                        !isToday -> "Attendance was not started for this date."
+                        attendance.canStartAttendance -> "Attendance has not started for today."
+                        !attendance.startBlockedReason.isNullOrBlank() -> attendance.startBlockedReason
+                        attendance.eligiblePhysicalVolunteerCount <= 0 ->
+                            "No Physical volunteers are scheduled for today."
+                        else -> "Attendance has not started for today."
+                    },
+                    modifier = Modifier.padding(top = 12.dp),
+                    fontSize = 11.sp,
+                    lineHeight = 16.sp,
+                    color = VolunteerLinkTextSecondary
+                )
+
+                if (isToday && attendance.canStartAttendance) {
+                    Button(
+                        onClick = onStartAttendance,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 12.dp),
+                        enabled = !isStartingAttendance
+                    ) {
+                        Text(
+                            text = if (isStartingAttendance) {
+                                "Starting Attendance..."
+                            } else {
+                                "Start Attendance"
+                            },
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            } else {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 12.dp),
+                    shape = PostManagementSmallShape,
+                    color = VolunteerLinkSoftGreenSurface
+                ) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "ATTENDANCE PIN",
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = VolunteerLinkTextSecondary
+                        )
+                        Text(
+                            text = session.pinCode.toSixDigitPinDisplay(),
+                            modifier = Modifier.padding(top = 3.dp),
+                            fontSize = 25.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = VolunteerLinkPrimaryGreen
+                        )
+                        Text(
+                            text = if (isToday) {
+                                "Share this 6-digit PIN with today's Physical volunteers."
+                            } else {
+                                "PIN used for this Physical event day."
+                            },
+                            modifier = Modifier.padding(top = 4.dp),
+                            fontSize = 9.sp,
+                            textAlign = TextAlign.Center,
+                            color = VolunteerLinkTextSecondary
+                        )
+                    }
+                }
+
+                if (isToday && !attendance.isLiveWindowOpen) {
+                    Text(
+                        text = "Volunteer PIN check-in is closed. Organisation corrections are still available below.",
+                        modifier = Modifier.padding(top = 9.dp),
+                        fontSize = 9.sp,
+                        lineHeight = 13.sp,
+                        color = VolunteerLinkTextSecondary
+                    )
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 11.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (isToday) "Checked in today" else "Present on this day",
+                        modifier = Modifier.weight(1f),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = VolunteerLinkTextSecondary
+                    )
+                    Text(
+                        text = "$selectedPresentCount / $selectedEligibleVolunteerCount",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = VolunteerLinkPrimaryGreen
+                    )
+                }
+            }
+
+            if (!actionMessage.isNullOrBlank()) {
+                Text(
+                    text = actionMessage,
+                    modifier = Modifier.padding(top = 9.dp),
+                    fontSize = 9.sp,
+                    lineHeight = 13.sp,
+                    color = VolunteerLinkError
+                )
+            }
+        }
+    }
+}
+
+@Composable
+internal fun PostManagementAttendanceDaySelector(
+    dates: List<String>,
+    selectedDate: String?,
+    actionMessage: String?,
+    onSelected: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    if (dates.isEmpty()) return
+
+    Column(modifier = modifier.fillMaxWidth()) {
+        Text(
+            text = "Attendance Day",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            color = VolunteerLinkTextPrimary
+        )
+
+        LazyRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 7.dp),
+            horizontalArrangement = Arrangement.spacedBy(7.dp)
+        ) {
+            items(
+                count = dates.size,
+                key = { index -> dates[index] }
+            ) { index ->
+                val date = dates[index]
+                PostManagementRoleFilterChip(
+                    text = date.toPostManagementShortDate(),
+                    selected = selectedDate == date,
+                    onClick = { onSelected(date) }
+                )
+            }
+        }
+
+        if (!actionMessage.isNullOrBlank()) {
+            Text(
+                text = actionMessage,
+                modifier = Modifier.padding(top = 7.dp),
+                fontSize = 9.sp,
+                lineHeight = 13.sp,
+                color = VolunteerLinkError
+            )
+        }
+    }
+}
+
+@Composable
+private fun PostManagementVolunteerAttendanceBlock(
+    summary: PostManagementVolunteerAttendanceSummary,
+    selectedDate: String,
+    todayDate: String,
+    canCorrectAttendance: Boolean,
+    isUpdatingAttendance: Boolean,
+    onMarkPresent: () -> Unit,
+    onRequestMarkAbsent: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val selectedStatus = summary.statusFor(selectedDate)
+
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = PostManagementSmallShape,
+        color = VolunteerLinkBackground,
+        border = BorderStroke(1.dp, VolunteerLinkBorderColour)
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 11.dp, vertical = 9.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Attendance",
+                    modifier = Modifier.weight(1f),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = VolunteerLinkTextPrimary
+                )
+                Text(
+                    text = "${summary.attendedDays} / ${summary.expectedDays} days",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = VolunteerLinkPrimaryGreen
+                )
+            }
+
+            Text(
+                text = "${summary.verifiedMinutes.toVerifiedTimeLabel()} verified",
+                modifier = Modifier.padding(top = 3.dp),
+                fontSize = 9.sp,
+                color = VolunteerLinkTextSecondary
+            )
+
+            val statusText = when {
+                selectedStatus == null || !selectedStatus.expected -> {
+                    "${selectedDate.toPostManagementShortDate()} · Not scheduled"
+                }
+                selectedStatus.present -> {
+                    "${selectedDate.toPostManagementShortDate()} · Present"
+                }
+                selectedStatus.markedAbsent -> {
+                    "${selectedDate.toPostManagementShortDate()} · Absent"
+                }
+                selectedDate == todayDate -> {
+                    "${selectedDate.toPostManagementShortDate()} · Not checked in yet"
+                }
+                else -> {
+                    "${selectedDate.toPostManagementShortDate()} · Absent"
+                }
+            }
+
+            Text(
+                text = statusText,
+                modifier = Modifier.padding(top = 5.dp),
+                fontSize = 9.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = if (selectedStatus?.present == true) {
+                    VolunteerLinkPrimaryGreen
+                } else {
+                    VolunteerLinkTextSecondary
+                }
+            )
+
+            if (
+                canCorrectAttendance &&
+                selectedStatus != null &&
+                selectedStatus.expected
+            ) {
+                if (selectedStatus.present) {
+                    OutlinedButton(
+                        onClick = onRequestMarkAbsent,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
+                        enabled = !isUpdatingAttendance
+                    ) {
+                        Text(
+                            text = if (isUpdatingAttendance) "Updating..." else "Mark Absent",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                } else {
+                    Button(
+                        onClick = onMarkPresent,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
+                        enabled = !isUpdatingAttendance
+                    ) {
+                        Text(
+                            text = if (isUpdatingAttendance) "Updating..." else "Mark Present",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun PostManagementMarkAbsentDialog(
+    person: PostManagementPerson,
+    eventDate: String,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Mark ${person.fullName} as absent?",
+                fontWeight = FontWeight.Bold,
+                color = VolunteerLinkTextPrimary
+            )
+        },
+        text = {
+            Text(
+                text = "This will mark the volunteer absent for " +
+                        "${eventDate.toPostManagementShortDate()}, set verified time for that day to 0, " +
+                        "and prevent another PIN check-in for this date. You can use Mark Present to change the decision.",
+                fontSize = 11.sp,
+                lineHeight = 16.sp,
+                color = VolunteerLinkTextSecondary
+            )
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(
+                    text = "Mark Absent",
+                    color = VolunteerLinkError,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    )
+}
+
+@Composable
 internal fun PostManagementPeopleControls(
     selectedTab: PostManagementPeopleTab,
+    showApplicantsTab: Boolean,
     applicantCount: Int,
     volunteerCount: Int,
     query: String,
@@ -712,30 +1115,39 @@ internal fun PostManagementPeopleControls(
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(11.dp),
-            color = VolunteerLinkSoftGreenSurface
-        ) {
-            Row(
-                modifier = Modifier.padding(4.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+        if (showApplicantsTab) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(11.dp),
+                color = VolunteerLinkSoftGreenSurface
             ) {
-                PostManagementPeopleTabItem(
-                    text = "Applicants $applicantCount",
-                    iconRes = R.drawable.applications,
-                    selected = selectedTab == PostManagementPeopleTab.APPLICANTS,
-                    modifier = Modifier.weight(1f),
-                    onClick = { onTabSelected(PostManagementPeopleTab.APPLICANTS) }
-                )
-                PostManagementPeopleTabItem(
-                    text = "Volunteers $volunteerCount",
-                    iconRes = R.drawable.profile,
-                    selected = selectedTab == PostManagementPeopleTab.VOLUNTEERS,
-                    modifier = Modifier.weight(1f),
-                    onClick = { onTabSelected(PostManagementPeopleTab.VOLUNTEERS) }
-                )
+                Row(
+                    modifier = Modifier.padding(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    PostManagementPeopleTabItem(
+                        text = "Applicants $applicantCount",
+                        iconRes = R.drawable.applications,
+                        selected = selectedTab == PostManagementPeopleTab.APPLICANTS,
+                        modifier = Modifier.weight(1f),
+                        onClick = { onTabSelected(PostManagementPeopleTab.APPLICANTS) }
+                    )
+                    PostManagementPeopleTabItem(
+                        text = "Volunteers $volunteerCount",
+                        iconRes = R.drawable.profile,
+                        selected = selectedTab == PostManagementPeopleTab.VOLUNTEERS,
+                        modifier = Modifier.weight(1f),
+                        onClick = { onTabSelected(PostManagementPeopleTab.VOLUNTEERS) }
+                    )
+                }
             }
+        } else {
+            Text(
+                text = "Volunteers $volunteerCount",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = VolunteerLinkTextPrimary
+            )
         }
 
         OutlinedTextField(
@@ -892,7 +1304,9 @@ internal fun PostManagementPeopleRoleHeader(
                 overflow = TextOverflow.Ellipsis
             )
 
-            PostManagementApplicationWindowPill(role = role)
+            if (selectedTab == PostManagementPeopleTab.APPLICANTS) {
+                PostManagementApplicationWindowPill(role = role)
+            }
         }
 
         Text(
@@ -964,6 +1378,13 @@ internal fun PostManagementPersonCard(
     person: PostManagementPerson,
     isApplicant: Boolean,
     isApplicationOpen: Boolean,
+    attendanceSummary: PostManagementVolunteerAttendanceSummary? = null,
+    attendanceSelectedDate: String? = null,
+    attendanceTodayDate: String? = null,
+    canCorrectAttendance: Boolean = false,
+    isUpdatingAttendance: Boolean = false,
+    onMarkPresent: (PostManagementPerson, String) -> Unit = { _, _ -> },
+    onRequestMarkAbsent: (PostManagementPerson, String) -> Unit = { _, _ -> },
     onViewProfile: (PostManagementPerson) -> Unit,
     onToggleShortlist: (PostManagementPerson) -> Unit,
     modifier: Modifier = Modifier
@@ -1069,6 +1490,27 @@ internal fun PostManagementPersonCard(
                         )
                     }
                 }
+            }
+
+            if (
+                attendanceSummary != null &&
+                !attendanceSelectedDate.isNullOrBlank() &&
+                !attendanceTodayDate.isNullOrBlank()
+            ) {
+                PostManagementVolunteerAttendanceBlock(
+                    summary = attendanceSummary,
+                    selectedDate = attendanceSelectedDate,
+                    todayDate = attendanceTodayDate,
+                    canCorrectAttendance = canCorrectAttendance,
+                    isUpdatingAttendance = isUpdatingAttendance,
+                    onMarkPresent = {
+                        onMarkPresent(person, attendanceSelectedDate)
+                    },
+                    onRequestMarkAbsent = {
+                        onRequestMarkAbsent(person, attendanceSelectedDate)
+                    },
+                    modifier = Modifier.padding(top = 12.dp)
+                )
             }
 
             Row(
@@ -1547,6 +1989,26 @@ private fun postManagementDateRange(start: String?, end: String?): String {
     if (start.isNullOrBlank()) return end.toPostManagementShortDate()
     if (end.isNullOrBlank() || start == end) return start.toPostManagementShortDate()
     return "${start.toPostManagementShortDate()} – ${end.toPostManagementShortDate()}"
+}
+
+private fun String.toSixDigitPinDisplay(): String {
+    val digits = filter(Char::isDigit).take(6)
+    return if (digits.length == 6) {
+        "${digits.take(3)} ${digits.takeLast(3)}"
+    } else {
+        this
+    }
+}
+
+private fun Int.toVerifiedTimeLabel(): String {
+    val safeMinutes = coerceAtLeast(0)
+    val hours = safeMinutes / 60
+    val minutes = safeMinutes % 60
+    return when {
+        hours > 0 && minutes > 0 -> "${hours}h ${minutes}m"
+        hours > 0 -> "${hours}h"
+        else -> "${minutes}m"
+    }
 }
 
 private fun String?.toPostManagementShortDate(): String {
