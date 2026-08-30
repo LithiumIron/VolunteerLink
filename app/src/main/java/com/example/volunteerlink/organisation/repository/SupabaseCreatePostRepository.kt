@@ -269,11 +269,16 @@ class SupabaseCreatePostRepository : CreatePostRepository {
     override suspend fun loadExistingPostForEdit(postId: String): ExistingPostEditData {
         val postRow = supabase.from("volunteer_posts")
             .select(columns = Columns.raw(
-                "post_id,title,description,mode,status,category,thumbnail_path,updated_at"
-            )) { filter { eq("post_id", postId) } }
+                "post_id,organisation_id,title,description,mode,status,category,thumbnail_path,updated_at"
+            )) {
+                filter {
+                    eq("post_id", postId)
+                    eq("organisation_id", TEST_ORGANISATION_ID)
+                }
+            }
             .decodeList<JsonObject>()
             .firstOrNull()
-            ?: error("Volunteer post $postId was not found.")
+            ?: error("Volunteer post $postId does not belong to this organisation.")
 
         val physicalRow = supabase.from("physical_details")
             .select { filter { eq("post_id", postId) } }

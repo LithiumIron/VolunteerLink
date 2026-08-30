@@ -26,19 +26,28 @@ import kotlinx.serialization.json.put
 /** Supabase reader for the Organisation Post Management detail screen. */
 class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementRepository {
 
+    companion object {
+        // Temporary organisation identity until the organisation auth flow is integrated.
+        // Every organisation-management root lookup must stay scoped to this owner.
+        private const val TEST_ORGANISATION_ID = "ORG0001"
+    }
+
     override suspend fun loadPost(postId: String): PostManagementPost {
         val postRow = supabase
             .from("volunteer_posts")
             .select(
                 columns = Columns.raw(
-                    "post_id,title,description,mode,status,category"
+                    "post_id,organisation_id,title,description,mode,status,category"
                 )
             ) {
-                filter { eq("post_id", postId) }
+                filter {
+                    eq("post_id", postId)
+                    eq("organisation_id", TEST_ORGANISATION_ID)
+                }
             }
             .decodeList<JsonObject>()
             .firstOrNull()
-            ?: error("Volunteer post $postId was not found.")
+            ?: error("Volunteer post $postId does not belong to this organisation.")
 
         val physicalRow = supabase
             .from("physical_details")
@@ -319,6 +328,8 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
     override suspend fun loadPhysicalAttendance(
         postId: String
     ): PostManagementAttendanceSnapshot {
+        requireOwnedPost(postId)
+
         val attendanceDayRows = supabase
             .from("attendance_days")
             .select(
@@ -375,6 +386,8 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
         userId: String,
         isShortlisted: Boolean
     ) {
+        requireOwnedPost(postId)
+
         supabase
             .from("role_participations")
             .update(
@@ -392,6 +405,8 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
     }
 
     override suspend fun startPhysicalAttendance(postId: String) {
+        requireOwnedPost(postId)
+
         supabase.postgrest.rpc(
             function = "start_physical_attendance",
             parameters = buildJsonObject {
@@ -406,6 +421,8 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
         roleTemplateId: String,
         userId: String
     ) {
+        requireOwnedPost(postId)
+
         supabase.postgrest.rpc(
             function = "organisation_mark_physical_present",
             parameters = buildJsonObject {
@@ -423,6 +440,8 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
         roleTemplateId: String,
         userId: String
     ) {
+        requireOwnedPost(postId)
+
         supabase.postgrest.rpc(
             function = "organisation_mark_physical_absent",
             parameters = buildJsonObject {
@@ -432,6 +451,23 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
                 put("p_user_id", userId)
             }
         )
+    }
+
+    private suspend fun requireOwnedPost(postId: String) {
+        val ownsPost = supabase
+            .from("volunteer_posts")
+            .select(columns = Columns.raw("post_id")) {
+                filter {
+                    eq("post_id", postId)
+                    eq("organisation_id", TEST_ORGANISATION_ID)
+                }
+            }
+            .decodeList<JsonObject>()
+            .isNotEmpty()
+
+        require(ownsPost) {
+            "Volunteer post $postId does not belong to this organisation."
+        }
     }
 
     private fun JsonObject.requiredText(key: String): String {
