@@ -1,13 +1,24 @@
 package com.example.volunteerlink.organisation.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -16,7 +27,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -26,6 +40,10 @@ import com.example.volunteerlink.organisation.manage.model.PostManagementPost
 import com.example.volunteerlink.organisation.manage.model.PostManagementRole
 import com.example.volunteerlink.organisation.viewmodel.OrganisationPostManagementViewModel
 import com.example.volunteerlink.ui.theme.VolunteerLinkBackground
+import com.example.volunteerlink.ui.theme.VolunteerLinkPrimaryGreen
+import com.example.volunteerlink.ui.theme.VolunteerLinkSurface
+import com.example.volunteerlink.ui.theme.VolunteerLinkTextPrimary
+import com.example.volunteerlink.ui.theme.VolunteerLinkTextSecondary
 import com.example.volunteerlink.ui.theme.VolunteerLinkScreenHorizontalPadding
 import java.util.Locale
 
@@ -41,6 +59,7 @@ fun OrganisationPostManagementScreen(
     postId: String,
     onBack: () -> Unit,
     onEdit: () -> Unit,
+    onExitProtectionChanged: (Boolean, (() -> Unit)?) -> Unit = { _, _ -> },
     viewModel: OrganisationPostManagementViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -50,6 +69,25 @@ fun OrganisationPostManagementScreen(
     }
 
     val post = uiState.post
+    val reviewSession = uiState.physicalReviewSession
+    var confirmLeaveReview by rememberSaveable { mutableStateOf(false) }
+
+    fun discardAndLeave() {
+        viewModel.discardPhysicalReviewSession()
+        onBack()
+    }
+
+    BackHandler(enabled = reviewSession.hasUnfinishedReview) {
+        confirmLeaveReview = true
+    }
+
+    DisposableEffect(reviewSession.hasUnfinishedReview) {
+        onExitProtectionChanged(
+            reviewSession.hasUnfinishedReview,
+            if (reviewSession.hasUnfinishedReview) viewModel::discardPhysicalReviewSession else null
+        )
+        onDispose { onExitProtectionChanged(false, null) }
+    }
 
     when {
         uiState.isLoading -> ManageLoadingState()
@@ -62,14 +100,127 @@ fun OrganisationPostManagementScreen(
             isStartingAttendance = uiState.isStartingAttendance,
             isUpdatingAttendance = uiState.isUpdatingAttendance,
             attendanceActionMessage = uiState.attendanceActionMessage,
-            onBack = onBack,
+            isUpdatingReview = uiState.isUpdatingReview,
+            reviewActionMessage = uiState.reviewActionMessage,
+            physicalReviewSession = reviewSession,
+            onBack = {
+                if (reviewSession.hasUnfinishedReview) confirmLeaveReview = true else onBack()
+            },
             onEdit = onEdit,
             onToggleShortlist = viewModel::toggleApplicantShortlist,
             onStartAttendance = viewModel::startPhysicalAttendance,
             onMarkPresent = viewModel::markVolunteerPresent,
             onMarkAbsent = viewModel::markVolunteerAbsent,
+            onCompleteAllReady = viewModel::completeAllReadyPhysical,
+            onReportReviewIssue = viewModel::reportPhysicalReviewIssue,
+            onFinalizeVolunteer = viewModel::finalizePhysicalVolunteer,
+            onChangeDecision = viewModel::changePhysicalReviewDecision,
+            onSaveFeedback = viewModel::savePhysicalFeedback,
+            onStageChange = viewModel::setPhysicalReviewStage,
+            onReviewDraftDirtyChanged = viewModel::setPhysicalReviewDraftDirty,
+            onFinalizeReview = viewModel::finalizePhysicalReviewPost,
             onStartAttendancePolling = viewModel::startAttendancePolling,
             onStopAttendancePolling = viewModel::stopAttendancePolling
+        )
+    }
+
+    if (uiState.isUpdatingReview) {
+        AlertDialog(
+            onDismissRequest = {},
+            title = {
+                Text(
+                    text = "Finalizing event...",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = VolunteerLinkTextPrimary
+                )
+            },
+            text = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(26.dp),
+                        color = VolunteerLinkPrimaryGreen,
+                        strokeWidth = 3.dp
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = "Saving completion decisions, verified hours and feedback. Please wait.",
+                        fontSize = 14.sp,
+                        lineHeight = 20.sp,
+                        color = VolunteerLinkTextSecondary
+                    )
+                }
+            },
+            confirmButton = {},
+            containerColor = VolunteerLinkSurface
+        )
+    }
+
+    if (uiState.reviewFinalizeSucceeded) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissPhysicalReviewFinalizeSuccess,
+            title = {
+                Text(
+                    text = "Event review completed",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = VolunteerLinkTextPrimary
+                )
+            },
+            text = {
+                Text(
+                    text = "The review has been finalized successfully. This post has moved from Needs Review to Completed. Saved attendance, completion decisions and feedback are now read-only.",
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    color = VolunteerLinkTextSecondary
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = viewModel::dismissPhysicalReviewFinalizeSuccess,
+                    colors = ButtonDefaults.buttonColors(containerColor = VolunteerLinkPrimaryGreen)
+                ) {
+                    Text("Done", fontWeight = FontWeight.Bold)
+                }
+            },
+            containerColor = VolunteerLinkSurface
+        )
+    }
+
+    if (confirmLeaveReview) {
+        AlertDialog(
+            onDismissRequest = { confirmLeaveReview = false },
+            title = {
+                Text(
+                    text = "Leave event review?",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = VolunteerLinkTextPrimary
+                )
+            },
+            text = {
+                Text(
+                    text = "Your completion or feedback changes have not been finalized. Leaving now will discard those temporary review changes. Saved attendance updates will stay.",
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    color = VolunteerLinkTextSecondary
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        confirmLeaveReview = false
+                        discardAndLeave()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = VolunteerLinkPrimaryGreen)
+                ) { Text("Discard Changes & Leave", fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmLeaveReview = false }) {
+                    Text("Keep Reviewing")
+                }
+            },
+            containerColor = VolunteerLinkSurface
         )
     }
 }
@@ -80,12 +231,23 @@ private fun OrganisationPostManagementContent(
     isStartingAttendance: Boolean,
     isUpdatingAttendance: Boolean,
     attendanceActionMessage: String?,
+    isUpdatingReview: Boolean,
+    reviewActionMessage: String?,
+    physicalReviewSession: com.example.volunteerlink.organisation.manage.model.PostManagementPhysicalReviewSession,
     onBack: () -> Unit,
     onEdit: () -> Unit,
     onToggleShortlist: (PostManagementPerson) -> Unit,
     onStartAttendance: () -> Unit,
     onMarkPresent: (PostManagementPerson, String) -> Unit,
     onMarkAbsent: (PostManagementPerson, String) -> Unit,
+    onCompleteAllReady: () -> Unit,
+    onReportReviewIssue: (PostManagementPerson, String) -> Unit,
+    onFinalizeVolunteer: (PostManagementPerson, Boolean, String?) -> Unit,
+    onChangeDecision: (PostManagementPerson) -> Unit,
+    onSaveFeedback: (List<String>, String, String?) -> Unit,
+    onStageChange: (com.example.volunteerlink.organisation.manage.model.PostManagementPhysicalReviewStage) -> Unit,
+    onReviewDraftDirtyChanged: (Boolean) -> Unit,
+    onFinalizeReview: () -> Unit,
     onStartAttendancePolling: () -> Unit,
     onStopAttendancePolling: () -> Unit
 ) {
@@ -111,6 +273,22 @@ private fun OrganisationPostManagementContent(
     }.getOrDefault(PostManagementPeopleTab.APPLICANTS)
 
     val physicalAttendance = post.physicalAttendance
+    val physicalReview = post.physicalReview
+    val showPhysicalReview =
+        post.mode.equals("PHYSICAL", ignoreCase = true) &&
+            physicalReview != null &&
+            (
+                post.physicalTimingState == PostTimingState.PAST ||
+                    post.databaseStatus.equals("COMPLETED", ignoreCase = true)
+            )
+
+    LaunchedEffect(showPhysicalReview) {
+        if (showPhysicalReview && selectedTabName == PostManagementTab.PEOPLE.name) {
+            selectedTabName = PostManagementTab.REVIEW.name
+        } else if (!showPhysicalReview && selectedTabName == PostManagementTab.REVIEW.name) {
+            selectedTabName = PostManagementTab.OVERVIEW.name
+        }
+    }
 
     val shouldPollAttendance =
         selectedTab == PostManagementTab.PEOPLE &&
@@ -253,6 +431,7 @@ private fun OrganisationPostManagementContent(
                 PostManagementMainTabs(
                     selected = selectedTab,
                     pendingApplicantCount = openApplicants.size,
+                    showReviewTab = showPhysicalReview,
                     onSelected = { selectedTabName = it.name }
                 )
             }
@@ -403,6 +582,43 @@ private fun OrganisationPostManagementContent(
                                     onToggleShortlist = onToggleShortlist
                                 )
                             }
+                        }
+                    }
+                }
+
+                PostManagementTab.REVIEW -> {
+                    val review = physicalReview
+                    if (showPhysicalReview && review != null) {
+                        item(key = "physical_completion_review") {
+                            PostManagementPhysicalReviewContent(
+                                review = review,
+                                session = physicalReviewSession,
+                                isUpdatingReview = isUpdatingReview,
+                                isUpdatingAttendance = isUpdatingAttendance,
+                                reviewActionMessage = reviewActionMessage,
+                                attendanceActionMessage = attendanceActionMessage,
+                                onCompleteAllReady = onCompleteAllReady,
+                                onReportIssue = onReportReviewIssue,
+                                onSelectVolunteerDecision = onFinalizeVolunteer,
+                                onChangeDecision = onChangeDecision,
+                                onSaveFeedback = onSaveFeedback,
+                                onStageChange = onStageChange,
+                                onReviewDraftDirtyChanged = onReviewDraftDirtyChanged,
+                                onFinalizeReview = onFinalizeReview,
+                                onMarkPresent = onMarkPresent,
+                                onRequestMarkAbsent = { selected, date ->
+                                    absentConfirmationPerson = selected
+                                    absentConfirmationDate = date
+                                },
+                                onViewProfile = { selectedPerson = it }
+                            )
+                        }
+                    } else {
+                        item(key = "physical_review_unavailable") {
+                            PostManagementPeopleEmptyState(
+                                selectedTab = PostManagementPeopleTab.VOLUNTEERS,
+                                hasFilters = false
+                            )
                         }
                     }
                 }

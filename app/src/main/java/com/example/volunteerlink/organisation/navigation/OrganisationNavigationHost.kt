@@ -9,11 +9,21 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.view.WindowCompat
 import androidx.navigation.compose.NavHost
@@ -21,6 +31,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.volunteerlink.navigation.AppBottomNavigationBar
+import com.example.volunteerlink.ui.theme.VolunteerLinkPrimaryGreen
+import com.example.volunteerlink.ui.theme.VolunteerLinkSurface
+import com.example.volunteerlink.ui.theme.VolunteerLinkTextPrimary
+import com.example.volunteerlink.ui.theme.VolunteerLinkTextSecondary
 import com.example.volunteerlink.organisation.screens.OrganisationChatsScreen
 import com.example.volunteerlink.organisation.screens.OrganisationCreateScreen
 import com.example.volunteerlink.organisation.screens.OrganisationHomeScreen
@@ -43,6 +57,19 @@ fun OrganisationNavigationHost() {
 
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
+    var reviewExitProtected by remember { mutableStateOf(false) }
+    var discardReviewSession by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var pendingBottomRoute by remember { mutableStateOf<String?>(null) }
+
+    fun navigateBottom(route: String) {
+        navController.navigate(route) {
+            popUpTo(OrganisationNavigationRoutes.HOME) {
+                saveState = true
+            }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
 
     // Keep the Manage bottom-navigation item selected while a Manage sub-page
     // is open. The sub-pages are part of the same module, not new bottom tabs.
@@ -103,15 +130,13 @@ fun OrganisationNavigationHost() {
                 currentRoute = bottomBarRoute,
                 onItemClick = { item ->
                     if (item.route != currentRoute) {
-                        navController.navigate(item.route) {
-                            popUpTo(
-                                OrganisationNavigationRoutes.HOME
-                            ) {
-                                saveState = true
-                            }
-
-                            launchSingleTop = true
-                            restoreState = true
+                        if (
+                            currentRoute == OrganisationNavigationRoutes.MANAGE_POST_DETAIL &&
+                            reviewExitProtected
+                        ) {
+                            pendingBottomRoute = item.route
+                        } else {
+                            navigateBottom(item.route)
                         }
                     }
                 }
@@ -172,6 +197,10 @@ fun OrganisationNavigationHost() {
                         navController.navigate(
                             OrganisationNavigationRoutes.managePostEdit(postId)
                         )
+                    },
+                    onExitProtectionChanged = { protected, discard ->
+                        reviewExitProtected = protected
+                        discardReviewSession = discard
                     }
                 )
             }
@@ -220,6 +249,45 @@ fun OrganisationNavigationHost() {
                 OrganisationProfileScreen()
             }
         }
+    }
+
+    val requestedRoute = pendingBottomRoute
+    if (requestedRoute != null) {
+        AlertDialog(
+            onDismissRequest = { pendingBottomRoute = null },
+            title = {
+                Text(
+                    text = "Leave event review?",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = VolunteerLinkTextPrimary
+                )
+            },
+            text = {
+                Text(
+                    text = "This review is not finalized yet. Saved attendance corrections will remain, but temporary completion and feedback choices will be discarded if you leave.",
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    color = VolunteerLinkTextSecondary
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        discardReviewSession?.invoke()
+                        reviewExitProtected = false
+                        discardReviewSession = null
+                        pendingBottomRoute = null
+                        navigateBottom(requestedRoute)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = VolunteerLinkPrimaryGreen)
+                ) { Text("Discard & Leave", fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingBottomRoute = null }) { Text("Stay") }
+            },
+            containerColor = VolunteerLinkSurface
+        )
     }
 }
 

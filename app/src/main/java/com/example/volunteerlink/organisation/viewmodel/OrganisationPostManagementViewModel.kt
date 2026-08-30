@@ -11,7 +11,15 @@ import com.example.volunteerlink.data.post.RoleApplicationWindowEvaluator
 import com.example.volunteerlink.data.post.RoleApplicationWindowInput
 import com.example.volunteerlink.data.time.AppClock
 import com.example.volunteerlink.organisation.manage.model.OrganisationPostManagementUiState
+import com.example.volunteerlink.organisation.manage.model.PostManagementFeedbackGroup
 import com.example.volunteerlink.organisation.manage.model.PostManagementPerson
+import com.example.volunteerlink.organisation.manage.model.PostManagementPendingDecisionSource
+import com.example.volunteerlink.organisation.manage.model.PostManagementPendingDecisionType
+import com.example.volunteerlink.organisation.manage.model.PostManagementPendingReviewDecision
+import com.example.volunteerlink.organisation.manage.model.PostManagementPhysicalReviewSession
+import com.example.volunteerlink.organisation.manage.model.PostManagementPhysicalReviewStage
+import com.example.volunteerlink.organisation.manage.model.PostManagementPhysicalReview
+import com.example.volunteerlink.organisation.manage.model.PostManagementPhysicalReviewEntry
 import com.example.volunteerlink.organisation.manage.model.PostManagementPhysicalAttendance
 import com.example.volunteerlink.organisation.manage.model.PostManagementPost
 import com.example.volunteerlink.organisation.manage.model.PostManagementVolunteerAttendanceDateStatus
@@ -55,6 +63,8 @@ class OrganisationPostManagementViewModel : ViewModel() {
         if (loadedPostId == postId && cachedPost != null) return
         stopAttendancePolling()
         loadedPostId = postId
+        cachedPost = null
+        _uiState.value = OrganisationPostManagementUiState()
         refresh()
     }
 
@@ -245,6 +255,177 @@ class OrganisationPostManagementViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Physical review classification is now derived entirely from attendance and the
+     * local review session. Entering Review must not mutate role_participations.
+     */
+    fun preparePhysicalReview() = Unit
+
+    /** Selects every currently full-attendance Ready volunteer for completion locally. */
+    fun completeAllReadyPhysical() {
+        val review = _uiState.value.post?.physicalReview ?: return
+        if (review.ready.isEmpty()) return
+
+        val session = _uiState.value.physicalReviewSession
+        val existingKeys = session.decisions
+            .map { it.roleTemplateId to it.userId }
+            .toSet()
+        val selected: List<PostManagementPendingReviewDecision> = review.ready
+            .filter { entry -> (entry.person.roleTemplateId to entry.person.userId) !in existingKeys }
+            .map { entry ->
+                PostManagementPendingReviewDecision(
+                    roleTemplateId = entry.person.roleTemplateId,
+                    userId = entry.person.userId,
+                    decision = PostManagementPendingDecisionType.COMPLETED,
+                    reason = null,
+                    source = PostManagementPendingDecisionSource.FULL_ATTENDANCE
+                )
+            }
+        if (selected.isEmpty()) return
+        updateReviewSession(
+            session.copy(
+                decisions = session.decisions + selected,
+                touched = false
+            )
+        )
+    }
+
+    /**
+     * A reported work issue is already the organisation's Not Completed decision.
+     * It is temporary until Finalize Event and can still be changed before then.
+     */
+    fun reportPhysicalReviewIssue(
+        person: PostManagementPerson,
+        reason: String
+    ) {
+        val cleanReason = reason.trim()
+        if (cleanReason.isBlank()) return
+        setPendingDecision(
+            person = person,
+            decision = PostManagementPendingDecisionType.NOT_COMPLETED,
+            reason = cleanReason,
+            source = PostManagementPendingDecisionSource.WORK_ISSUE
+        )
+    }
+
+    /** Stores a temporary individual decision. Nothing is written to Supabase yet. */
+    fun finalizePhysicalVolunteer(
+        person: PostManagementPerson,
+        completed: Boolean,
+        note: String?
+    ) {
+        val cleanNote = note?.trim()?.takeIf { it.isNotEmpty() }
+        if (!completed && cleanNote == null) return
+        setPendingDecision(
+            person = person,
+            decision = if (completed) {
+                PostManagementPendingDecisionType.COMPLETED
+            } else {
+                PostManagementPendingDecisionType.NOT_COMPLETED
+            },
+            reason = cleanNote,
+            source = PostManagementPendingDecisionSource.PARTIAL_ATTENDANCE
+        )
+    }
+
+    /** Removes a temporary choice and returns the volunteer to their natural review bucket. */
+    fun changePhysicalReviewDecision(person: PostManagementPerson) {
+        val session = _uiState.value.physicalReviewSession
+        val updated = session.decisions.filterNot {
+            it.roleTemplateId == person.roleTemplateId && it.userId == person.userId
+        }
+        updateReviewSession(
+            session.copy(
+                decisions = updated,
+                feedbackByUserId = session.feedbackByUserId - person.userId,
+                touched = false
+            )
+        )
+    }
+
+    /** Local feedback only. The database receives it together with final decisions. */
+    fun savePhysicalFeedback(
+        userIds: List<String>,
+        feedback: String,
+        previousFeedback: String?
+    ) {
+        val text = feedback.trim()
+        if (userIds.isEmpty() || text.isBlank()) return
+        val session = _uiState.value.physicalReviewSession
+        var map = session.feedbackByUserId
+        if (!previousFeedback.isNullOrBlank()) {
+            map = map.filterValues { it != previousFeedback }.toMutableMap()
+        }
+        val mutable = map.toMutableMap()
+        userIds.distinct().forEach { mutable[it] = text }
+        updateReviewSession(
+            session.copy(
+                feedbackByUserId = mutable.toMap(),
+                touched = false
+            )
+        )
+    }
+
+    /**
+     * Tracks only uncommitted review-form text (for example a Not Completed reason
+     * or a feedback message that has not been applied yet). Attendance is persisted
+     * immediately and must never mark the review as discardable.
+     */
+    fun setPhysicalReviewDraftDirty(hasDraft: Boolean) {
+        val session = _uiState.value.physicalReviewSession
+        if (session.touched != hasDraft) {
+            updateReviewSession(session.copy(touched = hasDraft))
+        }
+    }
+
+    fun setPhysicalReviewStage(stage: PostManagementPhysicalReviewStage) {
+        val session = _uiState.value.physicalReviewSession
+        updateReviewSession(session.copy(stage = stage))
+    }
+
+    fun discardPhysicalReviewSession() {
+        updateReviewSession(PostManagementPhysicalReviewSession())
+    }
+
+    /** Dismisses the one-time success confirmation shown after a committed review. */
+    fun dismissPhysicalReviewFinalizeSuccess() {
+        _uiState.value = _uiState.value.copy(reviewFinalizeSucceeded = false)
+    }
+
+    private fun setPendingDecision(
+        person: PostManagementPerson,
+        decision: PostManagementPendingDecisionType,
+        reason: String?,
+        source: PostManagementPendingDecisionSource
+    ) {
+        val session = _uiState.value.physicalReviewSession
+        val withoutCurrent = session.decisions.filterNot {
+            it.roleTemplateId == person.roleTemplateId && it.userId == person.userId
+        }
+        val pending = PostManagementPendingReviewDecision(
+            roleTemplateId = person.roleTemplateId,
+            userId = person.userId,
+            decision = decision,
+            reason = reason,
+            source = source
+        )
+        updateReviewSession(
+            session.copy(
+                decisions = withoutCurrent + pending,
+                feedbackByUserId = if (decision == PostManagementPendingDecisionType.NOT_COMPLETED) {
+                    session.feedbackByUserId - person.userId
+                } else {
+                    session.feedbackByUserId
+                },
+                touched = false
+            )
+        )
+    }
+
+    private fun updateReviewSession(session: PostManagementPhysicalReviewSession) {
+        _uiState.value = _uiState.value.copy(physicalReviewSession = session)
+    }
+
     fun refresh() {
         val postId = loadedPostId ?: return
 
@@ -252,7 +433,8 @@ class OrganisationPostManagementViewModel : ViewModel() {
             _uiState.value = _uiState.value.copy(
                 isLoading = true,
                 errorMessage = null,
-                attendanceActionMessage = null
+                attendanceActionMessage = null,
+                reviewActionMessage = null
             )
 
             try {
@@ -297,6 +479,9 @@ class OrganisationPostManagementViewModel : ViewModel() {
     }
 
     private suspend fun reloadAfterAttendanceAction(postId: String) {
+        // Attendance corrections are already final database writes. Review grouping is
+        // derived locally from attendance, so correcting attendance must not mutate
+        // role_participations to NEEDS_REVIEW or any other completion status.
         val refreshedPost = repository.loadPost(postId)
         cachedPost = refreshedPost
         applyTiming(
@@ -305,6 +490,152 @@ class OrganisationPostManagementViewModel : ViewModel() {
             isUpdatingAttendance = false,
             attendanceActionMessage = null
         )
+    }
+
+    private suspend fun reloadAfterReviewAction(postId: String) {
+        val refreshedPost = repository.loadPost(postId)
+        cachedPost = refreshedPost
+        applyTiming(
+            post = refreshedPost,
+            isStartingAttendance = false,
+            isUpdatingAttendance = false,
+            attendanceActionMessage = null,
+            isUpdatingReview = false,
+            reviewActionMessage = null
+        )
+    }
+
+
+    /**
+     * Final commit. All temporary decisions and feedback are sent in one RPC so
+     * the database either finalizes the whole event or changes nothing.
+     */
+    fun finalizePhysicalReviewPost() {
+        val currentPost = cachedPost ?: return
+        val review = _uiState.value.post?.physicalReview ?: return
+        val session = _uiState.value.physicalReviewSession
+        if (!review.canEdit || _uiState.value.isUpdatingReview) return
+
+        val unresolved = (review.ready + review.needsReview).distinctBy {
+            it.person.roleTemplateId to it.person.userId
+        }
+        val allDecided = unresolved.all { entry ->
+            session.decisionFor(entry.person.roleTemplateId, entry.person.userId) != null
+        }
+        if (!allDecided) {
+            _uiState.value = _uiState.value.copy(
+                reviewActionMessage = "Every volunteer needs a completion decision before finalizing.",
+                reviewFinalizeSucceeded = false
+            )
+            return
+        }
+
+        val invalidNotCompletedDecision = session.decisions.firstOrNull { decision ->
+            decision.decision == PostManagementPendingDecisionType.NOT_COMPLETED &&
+                decision.reason.isNullOrBlank()
+        }
+        if (invalidNotCompletedDecision != null) {
+            val volunteerName = unresolved.firstOrNull { entry ->
+                entry.person.roleTemplateId == invalidNotCompletedDecision.roleTemplateId &&
+                    entry.person.userId == invalidNotCompletedDecision.userId
+            }?.person?.fullName
+
+            _uiState.value = _uiState.value.copy(
+                physicalReviewSession = session.copy(
+                    stage = PostManagementPhysicalReviewStage.COMPLETION
+                ),
+                reviewActionMessage = if (volunteerName == null) {
+                    "A Not Completed volunteer needs a reason before finalizing."
+                } else {
+                    "$volunteerName needs a reason for Not Completed before finalizing."
+                },
+                reviewFinalizeSucceeded = false
+            )
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                isUpdatingReview = true,
+                reviewActionMessage = null,
+                reviewFinalizeSucceeded = false
+            )
+
+            try {
+                // One database transaction: either every decision/feedback item and the
+                // post status are committed, or PostgreSQL rolls the whole call back.
+                repository.finalizePhysicalReviewBatch(
+                    postId = currentPost.postId,
+                    decisions = session.decisions,
+                    feedbackByUserId = session.feedbackByUserId
+                )
+            } catch (exception: Exception) {
+                Log.e(TAG, "Could not finalize Physical review.", exception)
+                applyTiming(
+                    post = currentPost,
+                    isUpdatingReview = false,
+                    reviewActionMessage = friendlyReviewError(exception)
+                )
+                return@launch
+            }
+
+            // The RPC returned successfully, so the database commit is complete. Move the
+            // current screen to Completed immediately instead of leaving a stale Needs Review
+            // state while the follow-up read is happening.
+            val decisionByKey = session.decisions.associateBy {
+                it.roleTemplateId to it.userId
+            }
+            val locallyCompletedPost = currentPost.copy(
+                databaseStatus = "COMPLETED",
+                people = currentPost.people.map { person ->
+                    val decision = decisionByKey[person.roleTemplateId to person.userId]
+                    if (decision == null) {
+                        person
+                    } else {
+                        person.copy(
+                            completionStatus = decision.decision.name
+                        )
+                    }
+                }
+            )
+
+            cachedPost = locallyCompletedPost
+            applyTiming(
+                post = locallyCompletedPost,
+                isStartingAttendance = false,
+                isUpdatingAttendance = false,
+                attendanceActionMessage = null,
+                isUpdatingReview = false,
+                reviewActionMessage = "Event review finalized successfully."
+            )
+            _uiState.value = _uiState.value.copy(reviewFinalizeSucceeded = true)
+
+            // Refresh once from Supabase so certificates, evaluations, feedback and the
+            // database COMPLETED status shown by the screen are the authoritative values.
+            // A refresh failure must not turn a successful commit into a false failure.
+            try {
+                val refreshedPost = repository.loadPost(currentPost.postId)
+                cachedPost = refreshedPost
+                _uiState.value = _uiState.value.copy(
+                    physicalReviewSession = PostManagementPhysicalReviewSession()
+                )
+                applyTiming(
+                    post = refreshedPost,
+                    isStartingAttendance = false,
+                    isUpdatingAttendance = false,
+                    attendanceActionMessage = null,
+                    isUpdatingReview = false,
+                    reviewActionMessage = "Event review finalized successfully."
+                )
+                _uiState.value = _uiState.value.copy(reviewFinalizeSucceeded = true)
+            } catch (reloadException: Exception) {
+                Log.w(
+                    TAG,
+                    "Physical review was committed but the completed post could not be reloaded yet.",
+                    reloadException
+                )
+            }
+        }
     }
 
     private fun observeAppClock() {
@@ -320,7 +651,9 @@ class OrganisationPostManagementViewModel : ViewModel() {
         post: PostManagementPost,
         isStartingAttendance: Boolean = _uiState.value.isStartingAttendance,
         isUpdatingAttendance: Boolean = _uiState.value.isUpdatingAttendance,
-        attendanceActionMessage: String? = _uiState.value.attendanceActionMessage
+        attendanceActionMessage: String? = _uiState.value.attendanceActionMessage,
+        isUpdatingReview: Boolean = _uiState.value.isUpdatingReview,
+        reviewActionMessage: String? = _uiState.value.reviewActionMessage
     ) {
         val nowMillis = AppClock.nowMillis()
         val mode = PostMode.fromDatabaseValue(post.mode)
@@ -389,13 +722,24 @@ class OrganisationPostManagementViewModel : ViewModel() {
             post = timedPost,
             nowMillis = nowMillis
         )
+        val physicalReview = buildPhysicalReview(
+            post = timedPost,
+            attendance = physicalAttendance
+        )
 
         _uiState.value = OrganisationPostManagementUiState(
             isLoading = false,
-            post = timedPost.copy(physicalAttendance = physicalAttendance),
+            post = timedPost.copy(
+                physicalAttendance = physicalAttendance,
+                physicalReview = physicalReview
+            ),
             isStartingAttendance = isStartingAttendance,
             isUpdatingAttendance = isUpdatingAttendance,
-            attendanceActionMessage = attendanceActionMessage
+            attendanceActionMessage = attendanceActionMessage,
+            isUpdatingReview = isUpdatingReview,
+            reviewActionMessage = reviewActionMessage,
+            reviewFinalizeSucceeded = _uiState.value.reviewFinalizeSucceeded,
+            physicalReviewSession = _uiState.value.physicalReviewSession
         )
     }
 
@@ -456,11 +800,19 @@ class OrganisationPostManagementViewModel : ViewModel() {
                 val isMarkedAbsent = record?.attendanceStatus
                     ?.equals("ABSENT", ignoreCase = true) == true
 
+                // A missing row is only "pending" while that attendance date can still happen.
+                // Once the expected date has passed, VolunteerLink treats no check-in as
+                // Absent · 0h without manufacturing an ABSENT database row.
+                val isInferredAbsent = record == null &&
+                    eventDate in expectedDates &&
+                    (post.physicalTimingState == PostTimingState.PAST || eventDate < today)
+
                 PostManagementVolunteerAttendanceDateStatus(
                     eventDate = eventDate,
                     expected = eventDate in expectedDates,
                     present = isPresent,
                     markedAbsent = isMarkedAbsent,
+                    inferredAbsent = isInferredAbsent,
                     checkedInAt = if (isPresent) record?.checkedInAt else null,
                     verifiedMinutes = if (isPresent) record?.verifiedMinutes ?: 0 else 0
                 )
@@ -531,6 +883,124 @@ class OrganisationPostManagementViewModel : ViewModel() {
             defaultSelectedDate = defaultSelectedDate,
             volunteerSummaries = summaries
         )
+    }
+
+    private fun buildPhysicalReview(
+        post: PostManagementPost,
+        attendance: PostManagementPhysicalAttendance?
+    ): PostManagementPhysicalReview? {
+        if (!post.mode.equals("PHYSICAL", ignoreCase = true)) return null
+        if (post.physical == null || attendance == null) return null
+        if (post.databaseStatus.uppercase(Locale.US) !in setOf("PUBLISHED", "CLOSED", "COMPLETED")) {
+            return null
+        }
+        if (
+            post.physicalTimingState != PostTimingState.PAST &&
+            !post.databaseStatus.equals("COMPLETED", ignoreCase = true)
+        ) return null
+
+        val evaluationByParticipation = post.evaluations.associateBy { evaluation ->
+            evaluation.roleTemplateId to evaluation.userId
+        }
+
+        val entries = post.volunteers
+            .filter { it.roleMode.equals("PHYSICAL", ignoreCase = true) }
+            .mapNotNull { person ->
+                val summary = attendance.summaryFor(person) ?: return@mapNotNull null
+                val expectedStatuses = summary.dateStatuses.filter { it.expected }
+                val absentDays = expectedStatuses.count {
+                    it.markedAbsent || it.inferredAbsent
+                }
+                val missingCheckInDays = expectedStatuses.count { it.inferredAbsent }
+                val rawIssue = person.decisionNote.orEmpty()
+                val hasPerformanceIssue = rawIssue.startsWith(
+                    PERFORMANCE_ISSUE_PREFIX,
+                    ignoreCase = true
+                )
+                val evaluation = evaluationByParticipation[
+                    person.roleTemplateId to person.userId
+                ]
+
+                PostManagementPhysicalReviewEntry(
+                    person = person,
+                    attendanceSummary = summary,
+                    absentDays = absentDays,
+                    missingCheckInDays = missingCheckInDays,
+                    hasPerformanceIssue = hasPerformanceIssue,
+                    performanceIssueText = rawIssue
+                        .takeIf { hasPerformanceIssue }
+                        ?.substringAfter(":", "")
+                        ?.trim()
+                        ?.takeIf { it.isNotEmpty() },
+                    feedback = evaluation?.feedback,
+                    completionReason = evaluation?.completionReason,
+                    verifiedMinutes = evaluation?.verifiedMinutes
+                )
+            }
+
+        val completed = entries.filter {
+            it.person.completionStatus.equals("COMPLETED", ignoreCase = true)
+        }
+        val notCompleted = entries.filter {
+            it.person.completionStatus.equals("NOT_COMPLETED", ignoreCase = true)
+        }
+        val unresolved = entries.filterNot { it.isFinalized }
+
+        // Attendance is evidence, not an automatic completion decision.
+        // Full attendance only makes a volunteer Ready for the organisation's
+        // one-tap batch confirmation. Any exception stays in Needs Review.
+        val needsReview = unresolved.filter { entry ->
+            entry.absentDays > 0 ||
+                entry.hasPerformanceIssue ||
+                entry.person.completionStatus.equals("NEEDS_REVIEW", ignoreCase = true)
+        }
+        val needsReviewKeys = needsReview.map {
+            it.person.roleTemplateId to it.person.userId
+        }.toSet()
+        val ready = unresolved.filter { entry ->
+            (entry.person.roleTemplateId to entry.person.userId) !in needsReviewKeys
+        }
+
+        val feedbackGroups = completed
+            .filter { !it.feedback.isNullOrBlank() }
+            .groupBy { it.feedback!!.trim() }
+            .map { (feedbackText, groupEntries) ->
+                PostManagementFeedbackGroup(
+                    feedback = feedbackText,
+                    userIds = groupEntries.map { it.person.userId }.distinct(),
+                    recipientNames = groupEntries.map { it.person.fullName }.distinct()
+                )
+            }
+            .sortedByDescending { it.recipientCount }
+
+        return PostManagementPhysicalReview(
+            ready = ready.sortedBy { it.person.fullName },
+            needsReview = needsReview.sortedWith(
+                compareByDescending<PostManagementPhysicalReviewEntry> { it.missingCheckInDays }
+                    .thenByDescending { it.absentDays }
+                    .thenBy { it.person.fullName }
+            ),
+            completed = completed.sortedBy { it.person.fullName },
+            notCompleted = notCompleted.sortedBy { it.person.fullName },
+            feedbackGroups = feedbackGroups,
+            completedWithoutFeedback = completed
+                .filterNot { it.hasFeedback }
+                .sortedBy { it.person.fullName },
+            canEdit = !post.databaseStatus.equals("CANCELLED", ignoreCase = true) &&
+                !post.databaseStatus.equals("COMPLETED", ignoreCase = true)
+        )
+    }
+
+    /** Keeps PostgREST request metadata out of user-facing review errors. */
+    private fun friendlyReviewError(exception: Exception): String {
+        val raw = exception.message?.trim().orEmpty()
+        if (raw.isBlank()) return "Unable to finalize this event review."
+
+        return raw
+            .substringBefore("\nCode:")
+            .substringBefore("\r\nCode:")
+            .trim()
+            .ifBlank { "Unable to finalize this event review." }
     }
 
     private fun evaluateLiveWindow(
@@ -649,5 +1119,6 @@ class OrganisationPostManagementViewModel : ViewModel() {
         private const val TAG = "OrgPostManagementVM"
         private const val DATE_PATTERN = "yyyy-MM-dd"
         private const val ATTENDANCE_POLL_INTERVAL_MS = 2_000L
+        private const val PERFORMANCE_ISSUE_PREFIX = "Performance issue:"
     }
 }

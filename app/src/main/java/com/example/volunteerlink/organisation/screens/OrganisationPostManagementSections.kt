@@ -63,7 +63,8 @@ import java.util.Locale
 
 internal enum class PostManagementTab {
     OVERVIEW,
-    PEOPLE
+    PEOPLE,
+    REVIEW
 }
 
 internal enum class PostManagementPeopleTab {
@@ -264,6 +265,7 @@ internal fun PostManagementSummaryCard(
 internal fun PostManagementMainTabs(
     selected: PostManagementTab,
     pendingApplicantCount: Int,
+    showReviewTab: Boolean,
     onSelected: (PostManagementTab) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -284,13 +286,23 @@ internal fun PostManagementMainTabs(
                 modifier = Modifier.weight(1f),
                 onClick = { onSelected(PostManagementTab.OVERVIEW) }
             )
-            PostManagementMainTabItem(
-                label = "People",
-                selected = selected == PostManagementTab.PEOPLE,
-                hasNotification = pendingApplicantCount > 0,
-                modifier = Modifier.weight(1f),
-                onClick = { onSelected(PostManagementTab.PEOPLE) }
-            )
+            if (showReviewTab) {
+                PostManagementMainTabItem(
+                    label = "Review",
+                    selected = selected == PostManagementTab.REVIEW,
+                    hasNotification = false,
+                    modifier = Modifier.weight(1f),
+                    onClick = { onSelected(PostManagementTab.REVIEW) }
+                )
+            } else {
+                PostManagementMainTabItem(
+                    label = "People",
+                    selected = selected == PostManagementTab.PEOPLE,
+                    hasNotification = pendingApplicantCount > 0,
+                    modifier = Modifier.weight(1f),
+                    onClick = { onSelected(PostManagementTab.PEOPLE) }
+                )
+            }
         }
     }
 }

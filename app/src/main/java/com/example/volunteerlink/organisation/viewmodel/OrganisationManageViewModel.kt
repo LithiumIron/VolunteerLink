@@ -46,6 +46,7 @@ class OrganisationManageViewModel : ViewModel() {
     val uiState = _uiState.asStateFlow()
 
     private var cachedSnapshot: OrganisationHomeSnapshot? = null
+    private var refreshInProgress = false
 
     init {
         refresh()
@@ -53,9 +54,13 @@ class OrganisationManageViewModel : ViewModel() {
     }
 
     fun refresh() {
+        if (refreshInProgress) return
+        refreshInProgress = true
+
         viewModelScope.launch {
+            val isInitialLoad = cachedSnapshot == null
             _uiState.value = _uiState.value.copy(
-                isLoading = true,
+                isLoading = isInitialLoad,
                 errorMessage = null
             )
 
@@ -67,9 +72,14 @@ class OrganisationManageViewModel : ViewModel() {
                 Log.e(TAG, "Could not load Manage data.", exception)
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    errorMessage = exception.message
-                        ?: "Unable to load organisation posts."
+                    errorMessage = if (cachedSnapshot == null) {
+                        exception.message ?: "Unable to load organisation posts."
+                    } else {
+                        null
+                    }
                 )
+            } finally {
+                refreshInProgress = false
             }
         }
     }

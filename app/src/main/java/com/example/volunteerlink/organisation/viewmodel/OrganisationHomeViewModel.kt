@@ -42,6 +42,7 @@ class OrganisationHomeViewModel : ViewModel() {
     val uiState = _uiState.asStateFlow()
 
     private var cachedSnapshot: OrganisationHomeSnapshot? = null
+    private var refreshInProgress = false
 
     init {
         refresh()
@@ -50,9 +51,13 @@ class OrganisationHomeViewModel : ViewModel() {
 
     /** Reloads organisation/post data from Supabase. */
     fun refresh() {
+        if (refreshInProgress) return
+        refreshInProgress = true
+
         viewModelScope.launch {
+            val isInitialLoad = cachedSnapshot == null
             _uiState.value = _uiState.value.copy(
-                isLoading = true,
+                isLoading = isInitialLoad,
                 errorMessage = null
             )
 
@@ -66,9 +71,14 @@ class OrganisationHomeViewModel : ViewModel() {
                 Log.e(TAG, "Could not load Organisation Home data.", exception)
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    errorMessage = exception.message
-                        ?: "Unable to load organisation home data."
+                    errorMessage = if (cachedSnapshot == null) {
+                        exception.message ?: "Unable to load organisation home data."
+                    } else {
+                        null
+                    }
                 )
+            } finally {
+                refreshInProgress = false
             }
         }
     }

@@ -4,9 +4,11 @@ import com.example.volunteerlink.data.supabase
 import com.example.volunteerlink.organisation.manage.model.PostManagementAttendanceDay
 import com.example.volunteerlink.organisation.manage.model.PostManagementAttendanceRecord
 import com.example.volunteerlink.organisation.manage.model.PostManagementAttendanceSnapshot
+import com.example.volunteerlink.organisation.manage.model.PostManagementEvaluation
 import com.example.volunteerlink.organisation.manage.model.PostManagementPerson
 import com.example.volunteerlink.organisation.manage.model.PostManagementPhysicalDetails
 import com.example.volunteerlink.organisation.manage.model.PostManagementPost
+import com.example.volunteerlink.organisation.manage.model.PostManagementPendingReviewDecision
 import com.example.volunteerlink.organisation.manage.model.PostManagementRemoteDetails
 import com.example.volunteerlink.organisation.manage.model.PostManagementRole
 import com.example.volunteerlink.organisation.manage.model.PostManagementScheduleItem
@@ -17,7 +19,9 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.add
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -161,7 +165,7 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
             .select(
                 columns = Columns.raw(
                     "role_template_id,user_id,application_status,completion_status," +
-                            "joined_at,created_at,decision_note,is_shortlisted"
+                            "joined_at,completed_at,created_at,decision_note,is_shortlisted"
                 )
             ) {
                 filter { eq("post_id", postId) }
@@ -184,6 +188,17 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
             .select(
                 columns = Columns.raw(
                     "event_date,role_template_id,user_id,attendance_status,checked_in_at,verified_minutes"
+                )
+            ) {
+                filter { eq("post_id", postId) }
+            }
+            .decodeList<JsonObject>()
+
+        val evaluationRows = supabase
+            .from("volunteer_evaluations")
+            .select(
+                columns = Columns.raw(
+                    "role_template_id,user_id,organisation_id,feedback,completion_reason,created_at,verified_minutes"
                 )
             ) {
                 filter { eq("post_id", postId) }
@@ -226,7 +241,7 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
                 // Keep the participation visible even if a profile-select RLS
                 // policy has not been added yet. The readable name replaces
                 // the ID automatically as soon as user_profiles is readable.
-                fullName = profile?.optionalText("full_name") ?: userId,
+                fullName = profile?.optionalText("full_name")?.takeIf { it.isNotBlank() } ?: "Volunteer",
                 city = profile?.optionalText("city"),
                 bio = profile?.optionalText("bio"),
                 avatarPath = profile?.optionalText("avatar_path"),
@@ -237,6 +252,7 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
                 applicationStatus = participationRow.requiredText("application_status"),
                 completionStatus = participationRow.requiredText("completion_status"),
                 joinedAt = participationRow.optionalText("joined_at"),
+                completedAt = participationRow.optionalText("completed_at"),
                 appliedAt = participationRow.optionalText("created_at"),
                 decisionNote = participationRow.optionalText("decision_note"),
                 isShortlisted = participationRow.optionalBoolean("is_shortlisted") ?: false
@@ -320,7 +336,18 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
                 compareBy<PostManagementAttendanceRecord> { it.eventDate }
                     .thenBy { it.roleTemplateId }
                     .thenBy { it.userId }
-            )
+            ),
+            evaluations = evaluationRows.map { row ->
+                PostManagementEvaluation(
+                    roleTemplateId = row.requiredText("role_template_id"),
+                    userId = row.requiredText("user_id"),
+                    organisationId = row.requiredText("organisation_id"),
+                    feedback = row.optionalText("feedback"),
+                    completionReason = row.optionalText("completion_reason"),
+                    createdAt = row.optionalText("created_at"),
+                    verifiedMinutes = row.optionalInt("verified_minutes")
+                )
+            }.sortedBy { it.userId }
         )
     }
 
@@ -453,6 +480,128 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
         )
     }
 
+    override suspend fun preparePhysicalReview(postId: String) {
+        requireOwnedPost(postId)
+        supabase.postgrest.rpc(
+            function = "organisation_prepare_physical_review",
+            parameters = buildJsonObject { put("p_post_id", postId) }
+        )
+    }
+
+    override suspend fun reportPhysicalReviewIssue(
+        postId: String,
+        roleTemplateId: String,
+        userId: String,
+        reason: String
+    ) {
+        requireOwnedPost(postId)
+        supabase.postgrest.rpc(
+            function = "organisation_report_physical_review_issue",
+            parameters = buildJsonObject {
+                put("p_post_id", postId)
+                put("p_role_template_id", roleTemplateId)
+                put("p_user_id", userId)
+                put("p_reason", reason)
+            }
+        )
+    }
+
+    override suspend fun completeAllReadyPhysical(postId: String) {
+        requireOwnedPost(postId)
+        supabase.postgrest.rpc(
+            function = "organisation_complete_all_ready_physical",
+            parameters = buildJsonObject { put("p_post_id", postId) }
+        )
+    }
+
+    override suspend fun finalizePhysicalVolunteer(
+        postId: String,
+        roleTemplateId: String,
+        userId: String,
+        decision: String,
+        note: String?
+    ) {
+        requireOwnedPost(postId)
+        supabase.postgrest.rpc(
+            function = "organisation_finalize_physical_volunteer",
+            parameters = buildJsonObject {
+                put("p_post_id", postId)
+                put("p_role_template_id", roleTemplateId)
+                put("p_user_id", userId)
+                put("p_decision", decision)
+                if (note == null) put("p_note", JsonNull) else put("p_note", note)
+            }
+        )
+    }
+
+    override suspend fun savePhysicalFeedback(
+        postId: String,
+        userIds: List<String>,
+        feedback: String,
+        replaceExisting: Boolean
+    ) {
+        requireOwnedPost(postId)
+        supabase.postgrest.rpc(
+            function = "organisation_save_physical_feedback",
+            parameters = buildJsonObject {
+                put("p_post_id", postId)
+                put("p_user_ids", buildJsonArray { userIds.forEach { add(it) } })
+                put("p_feedback", feedback)
+                put("p_replace_existing", replaceExisting)
+            }
+        )
+    }
+
+    override suspend fun finalizePhysicalReviewPost(postId: String) {
+        requireOwnedPost(postId)
+        supabase.postgrest.rpc(
+            function = "organisation_finalize_physical_review_post",
+            parameters = buildJsonObject { put("p_post_id", postId) }
+        )
+    }
+
+    override suspend fun finalizePhysicalReviewBatch(
+        postId: String,
+        decisions: List<PostManagementPendingReviewDecision>,
+        feedbackByUserId: Map<String, String>
+    ) {
+        requireOwnedPost(postId)
+
+        supabase.postgrest.rpc(
+            function = "organisation_finalize_physical_review_batch",
+            parameters = buildJsonObject {
+                put("p_post_id", postId)
+                put("p_decisions", buildJsonArray {
+                    decisions.forEach { decision ->
+                        add(buildJsonObject {
+                            put("role_template_id", decision.roleTemplateId)
+                            put("user_id", decision.userId)
+                            put("decision", decision.decision.name)
+                            val reason = decision.reason
+                            if (reason == null) {
+                                put("note", JsonNull)
+                                put("reason", JsonNull)
+                            } else {
+                                // Current SQL uses `note`. Keep `reason` as the same transport
+                                // value too so an older deployed batch RPC cannot silently lose it.
+                                put("note", reason)
+                                put("reason", reason)
+                            }
+                        })
+                    }
+                })
+                put("p_feedback", buildJsonArray {
+                    feedbackByUserId.forEach { (userId, feedback) ->
+                        add(buildJsonObject {
+                            put("user_id", userId)
+                            put("feedback", feedback)
+                        })
+                    }
+                })
+            }
+        )
+    }
+
     private suspend fun requireOwnedPost(postId: String) {
         val ownsPost = supabase
             .from("volunteer_posts")
@@ -485,6 +634,12 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
         val element: JsonElement = this[key] ?: return null
         if (element is JsonNull) return null
         return runCatching { element.jsonPrimitive.booleanOrNull }.getOrNull()
+    }
+
+    private fun JsonObject.optionalInt(key: String): Int? {
+        val element: JsonElement = this[key] ?: return null
+        if (element is JsonNull) return null
+        return runCatching { element.jsonPrimitive.intOrNull }.getOrNull()
     }
 
     private fun JsonObject.requiredInt(key: String): Int {
