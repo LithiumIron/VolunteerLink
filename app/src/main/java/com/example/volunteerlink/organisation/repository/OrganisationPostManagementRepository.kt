@@ -14,6 +14,23 @@ interface OrganisationPostManagementRepository {
      */
     suspend fun loadPhysicalAttendance(postId: String): PostManagementAttendanceSnapshot
 
+    /** Downloads one Remote submission file after confirming this organisation owns the post. */
+    suspend fun downloadRemoteSubmission(
+        postId: String,
+        filePath: String
+    ): ByteArray
+
+    /**
+     * Reviews one Remote submission while the project is ongoing.
+     * This only changes the work-submission status; volunteer completion is decided later.
+     */
+    suspend fun reviewRemoteSubmission(
+        postId: String,
+        submissionId: String,
+        action: String,
+        feedback: String? = null
+    )
+
     /** Shortlists or unshortlists one pending application for comparison. */
     suspend fun setApplicantShortlisted(
         postId: String,

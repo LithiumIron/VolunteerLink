@@ -24,9 +24,13 @@ data class OrganisationHomePost(
     val physicalLocationName: String? = null,
     val remoteStartDate: String? = null,
     val remoteEndDate: String? = null,
+    val remoteNewEndDate: String? = null,
     val schedules: List<OrganisationHomeSchedule> = emptyList(),
     val roles: List<OrganisationHomeRole> = emptyList()
-)
+) {
+    val effectiveRemoteEndDate: String?
+        get() = remoteNewEndDate?.takeIf { it.isNotBlank() } ?: remoteEndDate
+}
 
 data class OrganisationHomeSchedule(
     val scheduleItemId: String,

@@ -10,11 +10,13 @@ import com.example.volunteerlink.organisation.manage.model.PostManagementPhysica
 import com.example.volunteerlink.organisation.manage.model.PostManagementPost
 import com.example.volunteerlink.organisation.manage.model.PostManagementPendingReviewDecision
 import com.example.volunteerlink.organisation.manage.model.PostManagementRemoteDetails
+import com.example.volunteerlink.organisation.manage.model.PostManagementRemoteSubmission
 import com.example.volunteerlink.organisation.manage.model.PostManagementRole
 import com.example.volunteerlink.organisation.manage.model.PostManagementScheduleItem
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
+import io.github.jan.supabase.storage.storage
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -26,6 +28,10 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 
 /** Supabase reader for the Organisation Post Management detail screen. */
 class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementRepository {
@@ -34,6 +40,7 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
         // Temporary organisation identity until the organisation auth flow is integrated.
         // Every organisation-management root lookup must stay scoped to this owner.
         private const val TEST_ORGANISATION_ID = "ORG0001"
+        private const val REMOTE_SUBMISSION_BUCKET = "remote-submissions"
     }
 
     override suspend fun loadPost(postId: String): PostManagementPost {
@@ -70,7 +77,7 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
             .from("remote_details")
             .select(
                 columns = Columns.raw(
-                    "start_date,end_date,volunteer_capacity,submission_mode," +
+                    "start_date,end_date,new_end_date,volunteer_capacity,submission_mode," +
                             "shared_deliverable,responsible_role_template_id"
                 )
             ) {
@@ -194,6 +201,18 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
             }
             .decodeList<JsonObject>()
 
+        val remoteSubmissionRows = supabase
+            .from("remote_submissions")
+            .select(
+                columns = Columns.raw(
+                    "submission_id,role_template_id,user_id,submission_type,file_path," +
+                            "submission_url,status,feedback,submitted_at,reviewed_at,updated_at"
+                )
+            ) {
+                filter { eq("post_id", postId) }
+            }
+            .decodeList<JsonObject>()
+
         val evaluationRows = supabase
             .from("volunteer_evaluations")
             .select(
@@ -286,6 +305,7 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
                 PostManagementRemoteDetails(
                     startDate = it.requiredText("start_date"),
                     endDate = it.requiredText("end_date"),
+                    newEndDate = it.optionalText("new_end_date"),
                     volunteerCapacity = it.requiredInt("volunteer_capacity"),
                     submissionMode = it.requiredText("submission_mode"),
                     sharedDeliverable = it.optionalText("shared_deliverable"),
@@ -337,6 +357,21 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
                     .thenBy { it.roleTemplateId }
                     .thenBy { it.userId }
             ),
+            remoteSubmissions = remoteSubmissionRows.map { row ->
+                PostManagementRemoteSubmission(
+                    submissionId = row.requiredText("submission_id"),
+                    roleTemplateId = row.optionalText("role_template_id"),
+                    userId = row.optionalText("user_id"),
+                    submissionType = row.requiredText("submission_type"),
+                    filePath = row.optionalText("file_path"),
+                    submissionUrl = row.optionalText("submission_url"),
+                    status = row.requiredText("status"),
+                    feedback = row.optionalText("feedback"),
+                    submittedAt = row.optionalText("submitted_at"),
+                    reviewedAt = row.optionalText("reviewed_at"),
+                    updatedAt = row.optionalText("updated_at")
+                )
+            }.sortedBy { it.submissionId },
             evaluations = evaluationRows.map { row ->
                 PostManagementEvaluation(
                     roleTemplateId = row.requiredText("role_template_id"),
@@ -349,6 +384,94 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
                 )
             }.sortedBy { it.userId }
         )
+    }
+
+
+    override suspend fun downloadRemoteSubmission(
+        postId: String,
+        filePath: String
+    ): ByteArray {
+        requireOwnedPost(postId)
+
+        val normalizedPath = filePath.trim().removePrefix("/")
+        require(normalizedPath.isNotBlank()) {
+            "This submission does not contain a file path."
+        }
+        require(normalizedPath.startsWith("$postId/")) {
+            "This submission file does not belong to $postId."
+        }
+
+        return supabase.storage
+            .from(REMOTE_SUBMISSION_BUCKET)
+            .downloadAuthenticated(normalizedPath)
+    }
+
+    override suspend fun reviewRemoteSubmission(
+        postId: String,
+        submissionId: String,
+        action: String,
+        feedback: String?
+    ) {
+        requireOwnedPost(postId)
+
+        val normalizedAction = action.trim().uppercase(Locale.US)
+        require(normalizedAction == "ACCEPT" || normalizedAction == "REQUEST_REVISION") {
+            "Unsupported Remote submission review action."
+        }
+
+        val revisionFeedback = feedback?.trim().orEmpty()
+        if (normalizedAction == "REQUEST_REVISION") {
+            require(revisionFeedback.isNotBlank()) {
+                "Revision feedback is required."
+            }
+        }
+
+        val currentSubmission = supabase
+            .from("remote_submissions")
+            .select(columns = Columns.raw("submission_id,status")) {
+                filter {
+                    eq("submission_id", submissionId)
+                    eq("post_id", postId)
+                }
+            }
+            .decodeList<JsonObject>()
+            .firstOrNull()
+            ?: error("Remote submission $submissionId was not found.")
+
+        require(
+            currentSubmission.requiredText("status")
+                .equals("PENDING_REVIEW", ignoreCase = true)
+        ) {
+            "Only a Pending Review submission can be reviewed."
+        }
+
+        val auditTimestamp = currentAuditTimestamp()
+        val newStatus = if (normalizedAction == "ACCEPT") {
+            "ACCEPTED"
+        } else {
+            "REVISION_REQUESTED"
+        }
+
+        supabase
+            .from("remote_submissions")
+            .update(
+                {
+                    set("status", newStatus)
+                    if (normalizedAction == "ACCEPT") {
+                        set("feedback", JsonNull)
+                    } else {
+                        set("feedback", revisionFeedback)
+                    }
+                    set("reviewed_at", auditTimestamp)
+                    set("updated_at", auditTimestamp)
+                }
+            ) {
+                filter {
+                    eq("submission_id", submissionId)
+                    eq("post_id", postId)
+                    eq("status", "PENDING_REVIEW")
+                }
+            }
     }
 
 
@@ -617,6 +740,15 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
         require(ownsPost) {
             "Volunteer post $postId does not belong to this organisation."
         }
+    }
+
+    private fun currentAuditTimestamp(): String {
+        return SimpleDateFormat(
+            "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+            Locale.US
+        ).apply {
+            timeZone = TimeZone.getTimeZone("UTC")
+        }.format(Date())
     }
 
     private fun JsonObject.requiredText(key: String): String {

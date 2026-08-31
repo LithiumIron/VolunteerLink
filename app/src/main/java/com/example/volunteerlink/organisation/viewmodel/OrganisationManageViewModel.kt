@@ -312,7 +312,7 @@ class OrganisationManageViewModel : ViewModel() {
             physicalStartDate = physicalStartDate,
             physicalEndDate = physicalEndDate,
             remoteStartDate = remoteStartDate,
-            remoteEndDate = remoteEndDate
+            remoteEndDate = effectiveRemoteEndDate
         )
     }
 
@@ -330,7 +330,7 @@ class OrganisationManageViewModel : ViewModel() {
             databaseStatus = status,
             timingState = timingState,
             startDate = timingInput?.let(PostTimingEvaluator::earliestStartDate),
-            endDate = latestDate(physicalEndDate, remoteEndDate),
+            endDate = latestDate(physicalEndDate, effectiveRemoteEndDate),
             locationName = if (mode.equals("PHYSICAL", true)) {
                 physicalLocationName
             } else {
@@ -346,11 +346,11 @@ class OrganisationManageViewModel : ViewModel() {
                 nowMillis
             ),
             remoteStartDate = remoteStartDate,
-            remoteEndDate = remoteEndDate,
+            remoteEndDate = effectiveRemoteEndDate,
             remoteTimingState = evaluateSinglePeriod(
                 PostMode.REMOTE,
                 remoteStartDate,
-                remoteEndDate,
+                effectiveRemoteEndDate,
                 nowMillis
             ),
             attentionItems = attentionItems.sortedBySeverity()

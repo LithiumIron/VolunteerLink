@@ -37,6 +37,7 @@ data class PostManagementPost(
     val people: List<PostManagementPerson> = emptyList(),
     val attendanceDays: List<PostManagementAttendanceDay> = emptyList(),
     val attendanceRecords: List<PostManagementAttendanceRecord> = emptyList(),
+    val remoteSubmissions: List<PostManagementRemoteSubmission> = emptyList(),
     val evaluations: List<PostManagementEvaluation> = emptyList(),
     val physicalAttendance: PostManagementPhysicalAttendance? = null,
     val physicalReview: PostManagementPhysicalReview? = null,
@@ -70,10 +71,29 @@ data class PostManagementPhysicalDetails(
 data class PostManagementRemoteDetails(
     val startDate: String,
     val endDate: String,
+    val newEndDate: String? = null,
     val volunteerCapacity: Int,
     val submissionMode: String,
     val sharedDeliverable: String? = null,
     val responsibleRoleTemplateId: String? = null
+) {
+    val effectiveEndDate: String
+        get() = newEndDate?.takeIf { it.isNotBlank() } ?: endDate
+}
+
+/** One Remote deliverable submission. Shared submissions belong to the post; individual submissions belong to one volunteer. */
+data class PostManagementRemoteSubmission(
+    val submissionId: String,
+    val roleTemplateId: String? = null,
+    val userId: String? = null,
+    val submissionType: String,
+    val filePath: String? = null,
+    val submissionUrl: String? = null,
+    val status: String,
+    val feedback: String? = null,
+    val submittedAt: String? = null,
+    val reviewedAt: String? = null,
+    val updatedAt: String? = null
 )
 
 data class PostManagementScheduleItem(

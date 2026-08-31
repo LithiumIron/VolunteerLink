@@ -1,6 +1,15 @@
 package com.example.volunteerlink.organisation.screens
 
+import android.app.Activity
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.webkit.MimeTypeMap
+import androidx.core.content.FileProvider
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -25,10 +34,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
@@ -38,6 +49,7 @@ import com.example.volunteerlink.data.post.PostTimingState
 import com.example.volunteerlink.organisation.manage.model.PostManagementPerson
 import com.example.volunteerlink.organisation.manage.model.PostManagementPost
 import com.example.volunteerlink.organisation.manage.model.PostManagementRole
+import com.example.volunteerlink.organisation.manage.model.PostManagementRemoteSubmission
 import com.example.volunteerlink.organisation.viewmodel.OrganisationPostManagementViewModel
 import com.example.volunteerlink.ui.theme.VolunteerLinkBackground
 import com.example.volunteerlink.ui.theme.VolunteerLinkPrimaryGreen
@@ -45,6 +57,8 @@ import com.example.volunteerlink.ui.theme.VolunteerLinkSurface
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextPrimary
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextSecondary
 import com.example.volunteerlink.ui.theme.VolunteerLinkScreenHorizontalPadding
+import kotlinx.coroutines.launch
+import java.io.File
 import java.util.Locale
 
 /**
@@ -119,6 +133,8 @@ fun OrganisationPostManagementScreen(
             onStageChange = viewModel::setPhysicalReviewStage,
             onReviewDraftDirtyChanged = viewModel::setPhysicalReviewDraftDirty,
             onFinalizeReview = viewModel::finalizePhysicalReviewPost,
+            onDownloadRemoteSubmission = viewModel::downloadRemoteSubmission,
+            onReviewRemoteSubmission = viewModel::reviewRemoteSubmission,
             onStartAttendancePolling = viewModel::startAttendancePolling,
             onStopAttendancePolling = viewModel::stopAttendancePolling
         )
@@ -248,6 +264,8 @@ private fun OrganisationPostManagementContent(
     onStageChange: (com.example.volunteerlink.organisation.manage.model.PostManagementPhysicalReviewStage) -> Unit,
     onReviewDraftDirtyChanged: (Boolean) -> Unit,
     onFinalizeReview: () -> Unit,
+    onDownloadRemoteSubmission: suspend (PostManagementRemoteSubmission) -> ByteArray,
+    onReviewRemoteSubmission: suspend (PostManagementRemoteSubmission, String, String?) -> Unit,
     onStartAttendancePolling: () -> Unit,
     onStopAttendancePolling: () -> Unit
 ) {
@@ -263,6 +281,60 @@ private fun OrganisationPostManagementContent(
     var selectedAttendanceDate by rememberSaveable { mutableStateOf<String?>(null) }
     var absentConfirmationPerson by remember { mutableStateOf<PostManagementPerson?>(null) }
     var absentConfirmationDate by remember { mutableStateOf<String?>(null) }
+    var selectedRemoteSubmission by remember { mutableStateOf<PostManagementRemoteSubmission?>(null) }
+    var selectedRemoteSubmissionPerson by remember { mutableStateOf<PostManagementPerson?>(null) }
+    var isOpeningRemoteSubmission by remember { mutableStateOf(false) }
+    var isDownloadingRemoteSubmission by remember { mutableStateOf(false) }
+    var pendingRemoteDownloadSubmission by remember {
+        mutableStateOf<PostManagementRemoteSubmission?>(null)
+    }
+    var remoteSubmissionFileError by remember { mutableStateOf<String?>(null) }
+    var remoteSubmissionDownloadMessage by remember { mutableStateOf<String?>(null) }
+    var revisionSubmission by remember { mutableStateOf<PostManagementRemoteSubmission?>(null) }
+    var revisionFeedback by remember { mutableStateOf("") }
+    var acceptSubmission by remember { mutableStateOf<PostManagementRemoteSubmission?>(null) }
+    var isReviewingRemoteSubmission by remember { mutableStateOf(false) }
+    var remoteSubmissionReviewError by remember { mutableStateOf<String?>(null) }
+
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
+    val remoteSubmissionDownloadLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val submission = pendingRemoteDownloadSubmission
+        val destination = result.data?.data
+
+        if (
+            result.resultCode == Activity.RESULT_OK &&
+            destination != null &&
+            submission != null
+        ) {
+            isDownloadingRemoteSubmission = true
+            remoteSubmissionFileError = null
+            remoteSubmissionDownloadMessage = null
+
+            coroutineScope.launch {
+                try {
+                    val bytes = onDownloadRemoteSubmission(submission)
+                    saveRemoteSubmissionFile(
+                        context = context,
+                        destination = destination,
+                        bytes = bytes
+                    )
+                    remoteSubmissionDownloadMessage = "File downloaded successfully."
+                } catch (exception: Exception) {
+                    remoteSubmissionFileError = exception.message
+                        ?: "Unable to download this submission."
+                } finally {
+                    isDownloadingRemoteSubmission = false
+                    pendingRemoteDownloadSubmission = null
+                }
+            }
+        } else {
+            pendingRemoteDownloadSubmission = null
+        }
+    }
 
     val selectedTab = runCatching {
         PostManagementTab.valueOf(selectedTabName)
@@ -500,6 +572,52 @@ private fun OrganisationPostManagementContent(
                         }
                     }
 
+                    if (
+                        selectedPeopleTab == PostManagementPeopleTab.VOLUNTEERS &&
+                        post.remoteTimingState == PostTimingState.ONGOING &&
+                        post.remote?.submissionMode.equals("SHARED_TEAM", ignoreCase = true)
+                    ) {
+                        val remote = post.remote
+                        if (remote != null) {
+                            val sharedSubmission = post.remoteSubmissions
+                                .filter { submission ->
+                                    submission.submissionType.equals("SHARED", ignoreCase = true)
+                                }
+                                .maxWithOrNull(
+                                    compareBy<PostManagementRemoteSubmission> {
+                                        it.submittedAt.orEmpty()
+                                    }.thenBy { it.submissionId }
+                                )
+                            val sharedSubmissionIsResubmission = sharedSubmission?.let { submission ->
+                                post.isRemoteResubmission(submission)
+                            } == true
+                            val responsibleRoleName = post.roles.firstOrNull { role ->
+                                role.roleTemplateId == remote.responsibleRoleTemplateId
+                            }?.roleName
+                            val submittedByName = sharedSubmission?.userId?.let { submittedByUserId ->
+                                post.volunteers.firstOrNull { volunteer ->
+                                    volunteer.userId == submittedByUserId
+                                }?.fullName
+                            }
+
+                            item(key = "remote_shared_submission") {
+                                PostManagementRemoteTeamSubmissionCard(
+                                    deliverable = remote.sharedDeliverable,
+                                    responsibleRoleName = responsibleRoleName,
+                                    dueDate = remote.effectiveEndDate,
+                                    submission = sharedSubmission,
+                                    submittedByName = submittedByName,
+                                    isResubmission = sharedSubmissionIsResubmission,
+                                    onViewSubmission = { submission ->
+                                        selectedRemoteSubmission = submission
+                                        selectedRemoteSubmissionPerson = null
+                                        remoteSubmissionFileError = null
+                                    }
+                                )
+                            }
+                        }
+                    }
+
                     item(key = "people_controls") {
                         PostManagementPeopleControls(
                             selectedTab = selectedPeopleTab,
@@ -538,6 +656,19 @@ private fun OrganisationPostManagementContent(
                                     },
                                     volunteerCount = post.volunteers.count {
                                         it.roleTemplateId == role.roleTemplateId
+                                    },
+                                    remoteSubmissionLabel = when {
+                                        selectedPeopleTab != PostManagementPeopleTab.VOLUNTEERS -> null
+                                        post.remoteTimingState != PostTimingState.ONGOING -> null
+                                        !role.roleMode.equals("REMOTE", ignoreCase = true) -> null
+                                        post.remote?.submissionMode.equals("SHARED_TEAM", ignoreCase = true) &&
+                                            role.roleTemplateId == post.remote?.responsibleRoleTemplateId -> {
+                                            "Submitting role"
+                                        }
+                                        post.remote?.submissionMode.equals("INDIVIDUAL", ignoreCase = true) -> {
+                                            "Submits own work"
+                                        }
+                                        else -> null
                                     }
                                 )
                             }
@@ -556,6 +687,31 @@ private fun OrganisationPostManagementContent(
                                         selectedAttendanceDate != null &&
                                         physicalAttendance != null
 
+                                val showRemoteIndividualSubmission =
+                                    selectedPeopleTab == PostManagementPeopleTab.VOLUNTEERS &&
+                                        person.roleMode.equals("REMOTE", ignoreCase = true) &&
+                                        post.remoteTimingState == PostTimingState.ONGOING &&
+                                        post.remote?.submissionMode.equals("INDIVIDUAL", ignoreCase = true)
+
+                                val individualSubmission = if (showRemoteIndividualSubmission) {
+                                    post.remoteSubmissions
+                                        .filter { submission ->
+                                            submission.submissionType.equals("INDIVIDUAL", ignoreCase = true) &&
+                                                submission.roleTemplateId == person.roleTemplateId &&
+                                                submission.userId == person.userId
+                                        }
+                                        .maxWithOrNull(
+                                            compareBy<PostManagementRemoteSubmission> {
+                                                it.submittedAt.orEmpty()
+                                            }.thenBy { it.submissionId }
+                                        )
+                                } else {
+                                    null
+                                }
+                                val individualSubmissionIsResubmission = individualSubmission?.let { submission ->
+                                    post.isRemoteResubmission(submission)
+                                } == true
+
                                 PostManagementPersonCard(
                                     person = person,
                                     isApplicant = selectedPeopleTab == PostManagementPeopleTab.APPLICANTS,
@@ -571,12 +727,29 @@ private fun OrganisationPostManagementContent(
                                         null
                                     },
                                     attendanceTodayDate = physicalAttendance?.todayDate,
+                                    remoteSubmissionRequirement = if (showRemoteIndividualSubmission) {
+                                        role.individualSubmissionRequirement
+                                    } else {
+                                        null
+                                    },
+                                    remoteSubmissionDueDate = if (showRemoteIndividualSubmission) {
+                                        post.remote?.effectiveEndDate
+                                    } else {
+                                        null
+                                    },
+                                    remoteSubmission = individualSubmission,
+                                    remoteSubmissionIsResubmission = individualSubmissionIsResubmission,
                                     canCorrectAttendance = physicalAttendance?.canCorrectAttendance == true,
                                     isUpdatingAttendance = isUpdatingAttendance,
                                     onMarkPresent = onMarkPresent,
                                     onRequestMarkAbsent = { selected, date ->
                                         absentConfirmationPerson = selected
                                         absentConfirmationDate = date
+                                    },
+                                    onViewRemoteSubmission = { selected, submission ->
+                                        selectedRemoteSubmission = submission
+                                        selectedRemoteSubmissionPerson = selected
+                                        remoteSubmissionFileError = null
                                     },
                                     onViewProfile = { selectedPerson = it },
                                     onToggleShortlist = onToggleShortlist
@@ -633,6 +806,210 @@ private fun OrganisationPostManagementContent(
         )
     }
 
+    selectedRemoteSubmission?.let { submission ->
+        val isShared = submission.submissionType.equals("SHARED", ignoreCase = true)
+        val submittedByName = submission.userId?.let { submittedByUserId ->
+            post.volunteers.firstOrNull { volunteer ->
+                volunteer.userId == submittedByUserId
+            }?.fullName
+        }
+        val roleName = if (isShared) {
+            post.roles.firstOrNull { role ->
+                role.roleTemplateId == post.remote?.responsibleRoleTemplateId
+            }?.roleName
+        } else {
+            selectedRemoteSubmissionPerson?.roleName
+        }
+        val isResubmission = post.isRemoteResubmission(submission)
+        val canReview =
+            post.remoteTimingState == PostTimingState.ONGOING &&
+                submission.status.equals("PENDING_REVIEW", ignoreCase = true)
+        val isRemoteSubmissionBusy =
+            isOpeningRemoteSubmission ||
+                isDownloadingRemoteSubmission ||
+                isReviewingRemoteSubmission
+
+        PostManagementRemoteSubmissionDialog(
+            submission = submission,
+            personName = selectedRemoteSubmissionPerson?.fullName,
+            roleName = roleName,
+            submittedByName = submittedByName,
+            dueDate = post.remote?.effectiveEndDate.orEmpty(),
+            isResubmission = isResubmission,
+            canReview = canReview,
+            isOpeningFile = isOpeningRemoteSubmission,
+            isDownloadingFile = isDownloadingRemoteSubmission,
+            isReviewing = isReviewingRemoteSubmission,
+            fileActionError = remoteSubmissionFileError,
+            downloadMessage = remoteSubmissionDownloadMessage,
+            onOpenFile = {
+                if (!isRemoteSubmissionBusy) {
+                    val submissionUrl = submission.submissionUrl
+                        ?.takeIf { it.isNotBlank() }
+                    val filePath = submission.filePath
+                        ?.takeIf { it.isNotBlank() }
+
+                    if (filePath == null && submissionUrl == null) {
+                        remoteSubmissionFileError =
+                            "This submission does not contain a file or link."
+                    } else {
+                        isOpeningRemoteSubmission = true
+                        remoteSubmissionFileError = null
+                        remoteSubmissionDownloadMessage = null
+
+                        coroutineScope.launch {
+                            try {
+                                if (filePath != null) {
+                                    val bytes = onDownloadRemoteSubmission(submission)
+                                    openRemoteSubmissionFile(
+                                        context = context,
+                                        filePath = filePath,
+                                        bytes = bytes
+                                    )
+                                } else if (submissionUrl != null) {
+                                    openRemoteSubmissionUrl(
+                                        context = context,
+                                        url = submissionUrl
+                                    )
+                                }
+                            } catch (exception: Exception) {
+                                remoteSubmissionFileError = exception.message
+                                    ?: "Unable to open this submission."
+                            } finally {
+                                isOpeningRemoteSubmission = false
+                            }
+                        }
+                    }
+                }
+            },
+            onDownloadFile = {
+                if (!isRemoteSubmissionBusy) {
+                    val filePath = submission.filePath
+                        ?.takeIf { it.isNotBlank() }
+
+                    if (filePath == null) {
+                        remoteSubmissionFileError =
+                            "This submission does not contain a downloadable file."
+                    } else {
+                        remoteSubmissionFileError = null
+                        remoteSubmissionDownloadMessage = null
+                        pendingRemoteDownloadSubmission = submission
+                        remoteSubmissionDownloadLauncher.launch(
+                            createRemoteSubmissionDownloadIntent(filePath)
+                        )
+                    }
+                }
+            },
+            onRequestRevision = {
+                if (!isRemoteSubmissionBusy && canReview) {
+                    remoteSubmissionReviewError = null
+                    revisionFeedback = ""
+                    revisionSubmission = submission
+                }
+            },
+            onAccept = {
+                if (!isRemoteSubmissionBusy && canReview) {
+                    remoteSubmissionReviewError = null
+                    acceptSubmission = submission
+                }
+            },
+            onDismiss = {
+                if (!isRemoteSubmissionBusy) {
+                    selectedRemoteSubmission = null
+                    selectedRemoteSubmissionPerson = null
+                    remoteSubmissionFileError = null
+                    remoteSubmissionDownloadMessage = null
+                    remoteSubmissionReviewError = null
+                }
+            }
+        )
+    }
+
+    revisionSubmission?.let { submission ->
+        PostManagementRequestRevisionDialog(
+            isShared = submission.submissionType.equals("SHARED", ignoreCase = true),
+            dueDate = post.remote?.effectiveEndDate.orEmpty(),
+            feedback = revisionFeedback,
+            isSaving = isReviewingRemoteSubmission,
+            errorMessage = remoteSubmissionReviewError,
+            onFeedbackChange = {
+                revisionFeedback = it
+                remoteSubmissionReviewError = null
+            },
+            onDismiss = {
+                if (!isReviewingRemoteSubmission) {
+                    revisionSubmission = null
+                    remoteSubmissionReviewError = null
+                }
+            },
+            onConfirm = {
+                if (revisionFeedback.isBlank()) {
+                    remoteSubmissionReviewError = "Please explain what needs to be revised."
+                } else if (!isReviewingRemoteSubmission) {
+                    isReviewingRemoteSubmission = true
+                    remoteSubmissionReviewError = null
+
+                    coroutineScope.launch {
+                        try {
+                            onReviewRemoteSubmission(
+                                submission,
+                                "REQUEST_REVISION",
+                                revisionFeedback.trim()
+                            )
+                            revisionSubmission = null
+                            selectedRemoteSubmission = null
+                            selectedRemoteSubmissionPerson = null
+                            revisionFeedback = ""
+                        } catch (exception: Exception) {
+                            remoteSubmissionReviewError = exception.message
+                                ?: "Unable to request revision."
+                        } finally {
+                            isReviewingRemoteSubmission = false
+                        }
+                    }
+                }
+            }
+        )
+    }
+
+    acceptSubmission?.let { submission ->
+        PostManagementAcceptSubmissionDialog(
+            isShared = submission.submissionType.equals("SHARED", ignoreCase = true),
+            isSaving = isReviewingRemoteSubmission,
+            errorMessage = remoteSubmissionReviewError,
+            onDismiss = {
+                if (!isReviewingRemoteSubmission) {
+                    acceptSubmission = null
+                    remoteSubmissionReviewError = null
+                }
+            },
+            onConfirm = {
+                if (!isReviewingRemoteSubmission) {
+                    isReviewingRemoteSubmission = true
+                    remoteSubmissionReviewError = null
+
+                    coroutineScope.launch {
+                        try {
+                            onReviewRemoteSubmission(
+                                submission,
+                                "ACCEPT",
+                                null
+                            )
+                            acceptSubmission = null
+                            selectedRemoteSubmission = null
+                            selectedRemoteSubmissionPerson = null
+                        } catch (exception: Exception) {
+                            remoteSubmissionReviewError = exception.message
+                                ?: "Unable to accept this submission."
+                        } finally {
+                            isReviewingRemoteSubmission = false
+                        }
+                    }
+                }
+            }
+        )
+    }
+
     val absentPerson = absentConfirmationPerson
     val absentDate = absentConfirmationDate
     if (absentPerson != null && absentDate != null) {
@@ -649,5 +1026,103 @@ private fun OrganisationPostManagementContent(
                 onMarkAbsent(absentPerson, absentDate)
             }
         )
+    }
+}
+
+private fun createRemoteSubmissionDownloadIntent(filePath: String): Intent {
+    val fileName = filePath.substringAfterLast('/')
+        .takeIf { it.isNotBlank() }
+        ?: "remote-submission"
+
+    return Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+        addCategory(Intent.CATEGORY_OPENABLE)
+        type = remoteSubmissionMimeType(fileName)
+        putExtra(Intent.EXTRA_TITLE, fileName)
+    }
+}
+
+private fun saveRemoteSubmissionFile(
+    context: Context,
+    destination: Uri,
+    bytes: ByteArray
+) {
+    val outputStream = context.contentResolver.openOutputStream(destination)
+        ?: error("Unable to open the selected download location.")
+
+    outputStream.use { stream ->
+        stream.write(bytes)
+        stream.flush()
+    }
+}
+
+private fun remoteSubmissionMimeType(fileName: String): String {
+    val extension = fileName.substringAfterLast('.', "")
+    return MimeTypeMap.getSingleton()
+        .getMimeTypeFromExtension(extension.lowercase(Locale.US))
+        ?: "application/octet-stream"
+}
+
+private fun openRemoteSubmissionFile(
+    context: Context,
+    filePath: String,
+    bytes: ByteArray
+) {
+    val originalName = filePath.substringAfterLast('/')
+        .takeIf { it.isNotBlank() }
+        ?: "remote-submission"
+    val safeName = originalName.replace(Regex("[^A-Za-z0-9._-]"), "_")
+    val cacheDirectory = File(context.cacheDir, "remote_submissions").apply {
+        mkdirs()
+    }
+    val file = File(cacheDirectory, safeName).apply {
+        writeBytes(bytes)
+    }
+    val uri = FileProvider.getUriForFile(
+        context,
+        "${context.packageName}.fileprovider",
+        file
+    )
+    val mimeType = remoteSubmissionMimeType(safeName)
+    val intent = Intent(Intent.ACTION_VIEW).apply {
+        setDataAndType(uri, mimeType)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+
+    try {
+        context.startActivity(Intent.createChooser(intent, "Open submission"))
+    } catch (_: ActivityNotFoundException) {
+        throw IllegalStateException("No app is available to open this file type.")
+    }
+}
+
+private fun openRemoteSubmissionUrl(
+    context: Context,
+    url: String
+) {
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+
+    try {
+        context.startActivity(intent)
+    } catch (_: ActivityNotFoundException) {
+        throw IllegalStateException("No app is available to open this submission link.")
+    }
+}
+
+private fun PostManagementPost.isRemoteResubmission(
+    submission: PostManagementRemoteSubmission
+): Boolean {
+    if (!submission.status.equals("PENDING_REVIEW", ignoreCase = true)) return false
+
+    return remoteSubmissions.any { previous ->
+        previous.submissionId != submission.submissionId &&
+            previous.status.equals("REVISION_REQUESTED", ignoreCase = true) &&
+            previous.submissionType.equals(submission.submissionType, ignoreCase = true) &&
+            when {
+                submission.submissionType.equals("SHARED", ignoreCase = true) -> true
+                submission.submissionType.equals("INDIVIDUAL", ignoreCase = true) ->
+                    previous.roleTemplateId == submission.roleTemplateId &&
+                        previous.userId == submission.userId
+                else -> false
+            }
     }
 }

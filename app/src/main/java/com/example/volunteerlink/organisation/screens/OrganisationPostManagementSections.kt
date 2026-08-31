@@ -4,11 +4,14 @@ import androidx.annotation.DrawableRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -39,6 +42,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.example.volunteerlink.R
 import com.example.volunteerlink.data.post.PostTimingState
 import com.example.volunteerlink.organisation.manage.model.PostManagementPerson
@@ -46,6 +50,7 @@ import com.example.volunteerlink.organisation.manage.model.PostManagementAttenda
 import com.example.volunteerlink.organisation.manage.model.PostManagementPhysicalAttendance
 import com.example.volunteerlink.organisation.manage.model.PostManagementPost
 import com.example.volunteerlink.organisation.manage.model.PostManagementRole
+import com.example.volunteerlink.organisation.manage.model.PostManagementRemoteSubmission
 import com.example.volunteerlink.organisation.manage.model.PostManagementScheduleItem
 import com.example.volunteerlink.organisation.manage.model.PostManagementVolunteerAttendanceSummary
 import com.example.volunteerlink.ui.theme.VolunteerLinkBackground
@@ -421,7 +426,7 @@ private fun PostManagementDetailsCard(post: PostManagementPost) {
                 label = "Date",
                 value = postManagementDateRange(
                     post.remote.startDate,
-                    post.remote.endDate
+                    post.remote.effectiveEndDate
                 ),
                 modifier = Modifier.padding(top = 7.dp)
             )
@@ -461,6 +466,31 @@ private fun PostManagementInfoLine(
             fontSize = 10.sp,
             lineHeight = 15.sp,
             color = VolunteerLinkTextPrimary
+        )
+    }
+}
+
+@Composable
+private fun PostManagementCompactInfoBlock(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier) {
+        Text(
+            text = label,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = VolunteerLinkTextSecondary
+        )
+        Text(
+            text = value,
+            modifier = Modifier.padding(top = 3.dp),
+            fontSize = 10.sp,
+            lineHeight = 15.sp,
+            color = VolunteerLinkTextPrimary,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }
@@ -906,6 +936,1167 @@ internal fun PostManagementTodayAttendanceCard(
 }
 
 @Composable
+internal fun PostManagementRemoteTeamSubmissionCard(
+    deliverable: String?,
+    responsibleRoleName: String?,
+    dueDate: String,
+    submission: PostManagementRemoteSubmission?,
+    submittedByName: String?,
+    isResubmission: Boolean = false,
+    onViewSubmission: (PostManagementRemoteSubmission) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = PostManagementCardShape,
+        color = VolunteerLinkSurface,
+        border = BorderStroke(1.dp, VolunteerLinkBorderColour),
+        shadowElevation = 1.dp
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    modifier = Modifier.size(38.dp),
+                    shape = CircleShape,
+                    color = VolunteerLinkSoftGreenSurface
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            painter = painterResource(R.drawable.remote_project),
+                            contentDescription = null,
+                            modifier = Modifier.size(21.dp),
+                            tint = VolunteerLinkPrimaryGreen
+                        )
+                    }
+                }
+
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = 10.dp)
+                ) {
+                    Text(
+                        text = "Team Submission",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = VolunteerLinkTextPrimary
+                    )
+                    Text(
+                        text = "Shared team deliverable",
+                        modifier = Modifier.padding(top = 2.dp),
+                        fontSize = 10.sp,
+                        color = VolunteerLinkTextSecondary
+                    )
+                }
+
+                PostManagementSubmissionStatusPill(
+                    status = submission?.status ?: "NOT_SUBMITTED"
+                )
+            }
+
+            if (isResubmission) {
+                PostManagementResubmissionNotice(
+                    isShared = true,
+                    modifier = Modifier.padding(top = 11.dp)
+                )
+            }
+
+            if (!deliverable.isNullOrBlank()) {
+                Text(
+                    text = deliverable,
+                    modifier = Modifier.padding(top = 12.dp),
+                    fontSize = 10.sp,
+                    lineHeight = 15.sp,
+                    color = VolunteerLinkTextPrimary
+                )
+            }
+
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 11.dp),
+                color = VolunteerLinkBorderColour
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                if (!responsibleRoleName.isNullOrBlank()) {
+                    PostManagementCompactInfoBlock(
+                        label = "Submitting role",
+                        value = responsibleRoleName,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                PostManagementCompactInfoBlock(
+                    label = "Due",
+                    value = dueDate.toPostManagementShortDate(),
+                    modifier = if (!responsibleRoleName.isNullOrBlank()) {
+                        Modifier.weight(1f)
+                    } else {
+                        Modifier.fillMaxWidth()
+                    }
+                )
+            }
+
+            Text(
+                text = if (!responsibleRoleName.isNullOrBlank()) {
+                    "Only volunteers in the $responsibleRoleName role can submit or replace the team deliverable."
+                } else {
+                    "Only volunteers from the assigned responsible role can submit or replace the team deliverable."
+                },
+                modifier = Modifier.padding(top = 10.dp),
+                fontSize = 10.sp,
+                lineHeight = 15.sp,
+                color = VolunteerLinkTextSecondary
+            )
+
+            if (submission == null) {
+                Text(
+                    text = "No team submission has been received yet.",
+                    modifier = Modifier.padding(top = 8.dp),
+                    fontSize = 10.sp,
+                    lineHeight = 15.sp,
+                    color = VolunteerLinkTextSecondary
+                )
+            } else {
+                val fileName = submission.filePath
+                    ?.substringAfterLast('/')
+                    ?.takeIf { it.isNotBlank() }
+
+                if (!fileName.isNullOrBlank()) {
+                    PostManagementInfoLine(
+                        label = "File",
+                        value = fileName,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                } else if (!submission.submissionUrl.isNullOrBlank()) {
+                    PostManagementInfoLine(
+                        label = "Submission",
+                        value = "Link submitted",
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+
+                if (!submittedByName.isNullOrBlank()) {
+                    PostManagementInfoLine(
+                        label = "Submitted by",
+                        value = submittedByName,
+                        modifier = Modifier.padding(top = 5.dp)
+                    )
+                }
+
+                if (!submission.submittedAt.isNullOrBlank()) {
+                    PostManagementInfoLine(
+                        label = "Submitted",
+                        value = submission.submittedAt.toPostManagementDateTime(),
+                        modifier = Modifier.padding(top = 5.dp)
+                    )
+                }
+
+                if (
+                    submission.status.equals("REVISION_REQUESTED", ignoreCase = true) &&
+                    !submission.feedback.isNullOrBlank()
+                ) {
+                    Text(
+                        text = submission.feedback,
+                        modifier = Modifier.padding(top = 10.dp),
+                        fontSize = 10.sp,
+                        lineHeight = 15.sp,
+                        color = VolunteerLinkTextSecondary
+                    )
+                }
+
+                OutlinedButton(
+                    onClick = { onViewSubmission(submission) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 10.dp)
+                ) {
+                    Text(
+                        text = "View Submission",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PostManagementRemoteSubmissionBlock(
+    requirement: String?,
+    dueDate: String,
+    submission: PostManagementRemoteSubmission?,
+    isResubmission: Boolean = false,
+    onViewSubmission: (PostManagementRemoteSubmission) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = PostManagementSmallShape,
+        color = VolunteerLinkBackground,
+        border = BorderStroke(1.dp, VolunteerLinkBorderColour)
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 11.dp, vertical = 10.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Individual Deliverable",
+                    modifier = Modifier.weight(1f),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = VolunteerLinkTextPrimary
+                )
+
+                PostManagementSubmissionStatusPill(
+                    status = submission?.status ?: "NOT_SUBMITTED"
+                )
+            }
+
+            if (isResubmission) {
+                PostManagementResubmissionNotice(
+                    isShared = false,
+                    modifier = Modifier.padding(top = 9.dp)
+                )
+            }
+
+            if (!requirement.isNullOrBlank()) {
+                Text(
+                    text = requirement,
+                    modifier = Modifier.padding(top = 8.dp),
+                    fontSize = 10.sp,
+                    lineHeight = 15.sp,
+                    color = VolunteerLinkTextSecondary
+                )
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Due",
+                    modifier = Modifier.weight(1f),
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = VolunteerLinkTextSecondary
+                )
+                Text(
+                    text = dueDate.toPostManagementShortDate(),
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = VolunteerLinkTextPrimary
+                )
+            }
+
+            if (submission != null) {
+                val fileName = submission.filePath
+                    ?.substringAfterLast('/')
+                    ?.takeIf { it.isNotBlank() }
+
+                if (!fileName.isNullOrBlank()) {
+                    Text(
+                        text = fileName,
+                        modifier = Modifier.padding(top = 8.dp),
+                        fontSize = 9.sp,
+                        color = VolunteerLinkTextPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                } else if (!submission.submissionUrl.isNullOrBlank()) {
+                    Text(
+                        text = "Submission link provided",
+                        modifier = Modifier.padding(top = 8.dp),
+                        fontSize = 9.sp,
+                        color = VolunteerLinkTextPrimary
+                    )
+                }
+
+                if (!submission.submittedAt.isNullOrBlank()) {
+                    Text(
+                        text = "Submitted ${submission.submittedAt.toPostManagementDateTime()}",
+                        modifier = Modifier.padding(top = 3.dp),
+                        fontSize = 9.sp,
+                        color = VolunteerLinkTextSecondary
+                    )
+                }
+
+                if (
+                    submission.status.equals("REVISION_REQUESTED", ignoreCase = true) &&
+                    !submission.feedback.isNullOrBlank()
+                ) {
+                    Text(
+                        text = submission.feedback,
+                        modifier = Modifier.padding(top = 8.dp),
+                        fontSize = 9.sp,
+                        lineHeight = 13.sp,
+                        color = VolunteerLinkTextSecondary
+                    )
+                }
+
+                OutlinedButton(
+                    onClick = { onViewSubmission(submission) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 9.dp)
+                ) {
+                    Text(
+                        text = "View Submission",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun PostManagementRemoteSubmissionDialog(
+    submission: PostManagementRemoteSubmission,
+    personName: String?,
+    roleName: String?,
+    submittedByName: String?,
+    dueDate: String,
+    isResubmission: Boolean = false,
+    canReview: Boolean,
+    isOpeningFile: Boolean,
+    isDownloadingFile: Boolean,
+    isReviewing: Boolean,
+    fileActionError: String?,
+    downloadMessage: String?,
+    onOpenFile: () -> Unit,
+    onDownloadFile: () -> Unit,
+    onRequestRevision: () -> Unit,
+    onAccept: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val isShared = submission.submissionType.equals("SHARED", ignoreCase = true)
+    val fileName = submission.filePath
+        ?.substringAfterLast('/')
+        ?.takeIf { it.isNotBlank() }
+    val hasFile = !submission.filePath.isNullOrBlank()
+    val hasLink = !submission.submissionUrl.isNullOrBlank()
+    val isBusy = isOpeningFile || isDownloadingFile || isReviewing
+    val submittedValue = submission.submittedAt
+        ?.takeIf { it.isNotBlank() }
+        ?.toPostManagementDateTime()
+        ?: "Not recorded"
+    val dueValue = dueDate.takeIf { it.isNotBlank() }
+        ?.toPostManagementShortDate()
+        ?: "Not recorded"
+    val scrollState = rememberScrollState()
+
+    Dialog(
+        onDismissRequest = {
+            if (!isBusy) onDismiss()
+        }
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.92f),
+            shape = RoundedCornerShape(24.dp),
+            color = VolunteerLinkSurface,
+            border = BorderStroke(1.dp, VolunteerLinkBorderColour),
+            shadowElevation = 7.dp
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Surface(
+                        modifier = Modifier.size(46.dp),
+                        shape = CircleShape,
+                        color = VolunteerLinkSoftGreenSurface
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                painter = painterResource(R.drawable.remote_project),
+                                contentDescription = null,
+                                modifier = Modifier.size(24.dp),
+                                tint = VolunteerLinkPrimaryGreen
+                            )
+                        }
+                    }
+
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(start = 12.dp)
+                    ) {
+                        Text(
+                            text = if (isShared) {
+                                "Review Team Submission"
+                            } else {
+                                "Review Submission"
+                            },
+                            fontSize = 20.sp,
+                            lineHeight = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = VolunteerLinkTextPrimary
+                        )
+
+                        Text(
+                            text = if (isShared) {
+                                "Review the uploaded team deliverable before choosing the final submission decision."
+                            } else {
+                                "Review the uploaded work before choosing the final submission decision."
+                            },
+                            modifier = Modifier.padding(top = 4.dp),
+                            fontSize = 10.sp,
+                            lineHeight = 15.sp,
+                            color = VolunteerLinkTextSecondary
+                        )
+                    }
+
+                    TextButton(
+                        onClick = onDismiss,
+                        enabled = !isBusy
+                    ) {
+                        Text(
+                            text = "Close",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(top = 12.dp)
+                        .verticalScroll(scrollState)
+                ) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        color = VolunteerLinkBackground,
+                        border = BorderStroke(1.dp, VolunteerLinkBorderColour)
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Text(
+                                text = if (isShared) "Submission overview" else "Volunteer overview",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = VolunteerLinkTextSecondary
+                            )
+
+                            Text(
+                                text = if (isShared) {
+                                    "Shared Team Deliverable"
+                                } else {
+                                    personName ?: "Individual Deliverable"
+                                },
+                                modifier = Modifier.padding(top = 6.dp),
+                                fontSize = 15.sp,
+                                lineHeight = 20.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = VolunteerLinkTextPrimary
+                            )
+
+                            if (!roleName.isNullOrBlank()) {
+                                Text(
+                                    text = roleName,
+                                    modifier = Modifier.padding(top = 3.dp),
+                                    fontSize = 11.sp,
+                                    color = VolunteerLinkTextSecondary
+                                )
+                            }
+
+                            if (isShared && !submittedByName.isNullOrBlank()) {
+                                Text(
+                                    text = "Submitted by $submittedByName",
+                                    modifier = Modifier.padding(top = 8.dp),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = VolunteerLinkPrimaryGreen
+                                )
+                            }
+                        }
+                    }
+
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 12.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        color = VolunteerLinkInformation.copy(alpha = 0.08f),
+                        border = BorderStroke(1.dp, VolunteerLinkInformation.copy(alpha = 0.20f))
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Submission status",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = VolunteerLinkTextSecondary
+                                )
+                                Text(
+                                    text = "Current review state for this uploaded submission.",
+                                    modifier = Modifier.padding(top = 3.dp),
+                                    fontSize = 9.sp,
+                                    lineHeight = 13.sp,
+                                    color = VolunteerLinkTextSecondary
+                                )
+                            }
+
+                            PostManagementSubmissionStatusPill(status = submission.status)
+                        }
+                    }
+
+                    if (isResubmission) {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 12.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            color = VolunteerLinkPrimaryGreen.copy(alpha = 0.08f),
+                            border = BorderStroke(1.dp, VolunteerLinkPrimaryGreen.copy(alpha = 0.20f))
+                        ) {
+                            Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    PostManagementResubmittedPill()
+                                    Text(
+                                        text = "Revised submission received",
+                                        modifier = Modifier.padding(start = 8.dp),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = VolunteerLinkPrimaryGreen
+                                    )
+                                }
+                                Text(
+                                    text = if (isShared) {
+                                        "A new team version was submitted after a revision request. Review this latest version."
+                                    } else {
+                                        "A new version was submitted after a revision request. Review this latest version."
+                                    },
+                                    modifier = Modifier.padding(top = 6.dp),
+                                    fontSize = 9.sp,
+                                    lineHeight = 13.sp,
+                                    color = VolunteerLinkTextSecondary
+                                )
+                            }
+                        }
+                    }
+
+                    if (hasFile || hasLink) {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 12.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            color = VolunteerLinkSurface,
+                            border = BorderStroke(1.2.dp, VolunteerLinkBorderColour),
+                            shadowElevation = 1.dp
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Text(
+                                    text = "Submitted file",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = VolunteerLinkTextSecondary
+                                )
+
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Surface(
+                                        modifier = Modifier.size(38.dp),
+                                        shape = CircleShape,
+                                        color = VolunteerLinkSoftGreenSurface
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                painter = painterResource(R.drawable.remote_project),
+                                                contentDescription = null,
+                                                modifier = Modifier.size(20.dp),
+                                                tint = VolunteerLinkPrimaryGreen
+                                            )
+                                        }
+                                    }
+
+                                    Column(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .padding(start = 10.dp)
+                                    ) {
+                                        Text(
+                                            text = fileName ?: "Submission link",
+                                            fontSize = 13.sp,
+                                            lineHeight = 18.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = VolunteerLinkTextPrimary,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = if (fileName != null) {
+                                                remoteSubmissionFileLabel(fileName)
+                                            } else {
+                                                "Online submission"
+                                            },
+                                            modifier = Modifier.padding(top = 2.dp),
+                                            fontSize = 10.sp,
+                                            color = VolunteerLinkTextSecondary
+                                        )
+                                    }
+                                }
+
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 13.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Button(
+                                        onClick = onOpenFile,
+                                        modifier = Modifier.weight(1f),
+                                        enabled = !isBusy,
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = VolunteerLinkPrimaryGreen
+                                        )
+                                    ) {
+                                        Text(
+                                            text = when {
+                                                isOpeningFile -> "Opening..."
+                                                hasFile -> "Open File"
+                                                else -> "Open Link"
+                                            },
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+
+                                    if (hasFile) {
+                                        OutlinedButton(
+                                            onClick = onDownloadFile,
+                                            modifier = Modifier.weight(1f),
+                                            enabled = !isBusy,
+                                            border = BorderStroke(1.dp, VolunteerLinkPrimaryGreen),
+                                            colors = ButtonDefaults.outlinedButtonColors(
+                                                contentColor = VolunteerLinkPrimaryGreen
+                                            )
+                                        ) {
+                                            Text(
+                                                text = if (isDownloadingFile) {
+                                                    "Downloading..."
+                                                } else {
+                                                    "Download"
+                                                },
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (!fileActionError.isNullOrBlank()) {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 12.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            color = VolunteerLinkError.copy(alpha = 0.08f),
+                            border = BorderStroke(1.dp, VolunteerLinkError.copy(alpha = 0.20f))
+                        ) {
+                            Text(
+                                text = fileActionError,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                fontSize = 10.sp,
+                                lineHeight = 15.sp,
+                                color = VolunteerLinkError
+                            )
+                        }
+                    }
+
+                    if (!downloadMessage.isNullOrBlank()) {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 12.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            color = VolunteerLinkPrimaryGreen.copy(alpha = 0.09f),
+                            border = BorderStroke(1.dp, VolunteerLinkPrimaryGreen.copy(alpha = 0.22f))
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "✓",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = VolunteerLinkPrimaryGreen
+                                )
+                                Text(
+                                    text = downloadMessage,
+                                    modifier = Modifier.padding(start = 8.dp),
+                                    fontSize = 10.sp,
+                                    lineHeight = 15.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = VolunteerLinkPrimaryGreen
+                                )
+                            }
+                        }
+                    }
+
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 12.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        color = VolunteerLinkBackground,
+                        border = BorderStroke(1.dp, VolunteerLinkBorderColour)
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Text(
+                                text = "Submission details",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = VolunteerLinkTextSecondary
+                            )
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 10.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                PostManagementCompactInfoBlock(
+                                    label = "Submitted",
+                                    value = submittedValue,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                PostManagementCompactInfoBlock(
+                                    label = "Due",
+                                    value = dueValue,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+
+                            if (isShared && !submittedByName.isNullOrBlank()) {
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(vertical = 10.dp),
+                                    color = VolunteerLinkBorderColour
+                                )
+                                PostManagementCompactInfoBlock(
+                                    label = "Submitted by",
+                                    value = submittedByName,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
+                    }
+
+                    if (
+                        submission.status.equals("REVISION_REQUESTED", ignoreCase = true) &&
+                        !submission.feedback.isNullOrBlank()
+                    ) {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 12.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            color = VolunteerLinkWarning.copy(alpha = 0.08f),
+                            border = BorderStroke(1.dp, VolunteerLinkWarning.copy(alpha = 0.20f))
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Text(
+                                    text = "Revision feedback",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = VolunteerLinkWarning
+                                )
+                                Text(
+                                    text = submission.feedback,
+                                    modifier = Modifier.padding(top = 6.dp),
+                                    fontSize = 10.sp,
+                                    lineHeight = 15.sp,
+                                    color = VolunteerLinkTextPrimary
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
+
+                if (canReview) {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 12.dp),
+                        shape = RoundedCornerShape(18.dp),
+                        color = VolunteerLinkSoftGreenSurface.copy(alpha = 0.45f),
+                        border = BorderStroke(1.dp, VolunteerLinkBorderColour)
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Text(
+                                text = "Review decision",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = VolunteerLinkTextPrimary
+                            )
+                            Text(
+                                text = "Accept confirms this submitted work only. Final volunteer completion is decided later.",
+                                modifier = Modifier.padding(top = 4.dp),
+                                fontSize = 9.sp,
+                                lineHeight = 14.sp,
+                                color = VolunteerLinkTextSecondary
+                            )
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = onRequestRevision,
+                                    modifier = Modifier.weight(1f),
+                                    enabled = !isBusy,
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        contentColor = VolunteerLinkWarning
+                                    ),
+                                    border = BorderStroke(
+                                        1.dp,
+                                        VolunteerLinkWarning.copy(alpha = 0.55f)
+                                    )
+                                ) {
+                                    Text(
+                                        text = "Request Revision",
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+
+                                Button(
+                                    onClick = onAccept,
+                                    modifier = Modifier.weight(1f),
+                                    enabled = !isBusy,
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = VolunteerLinkPrimaryGreen
+                                    )
+                                ) {
+                                    Text(
+                                        text = if (isReviewing) "Saving..." else "Accept",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun PostManagementRequestRevisionDialog(
+    isShared: Boolean,
+    dueDate: String,
+    feedback: String,
+    isSaving: Boolean,
+    errorMessage: String?,
+    onFeedbackChange: (String) -> Unit,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = {
+            if (!isSaving) onDismiss()
+        },
+        title = {
+            Text(
+                text = "Request Revision",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = VolunteerLinkTextPrimary
+            )
+        },
+        text = {
+            Column {
+                Text(
+                    text = if (isShared) {
+                        "Explain what the team should change before resubmitting."
+                    } else {
+                        "Explain what the volunteer should change before resubmitting."
+                    },
+                    fontSize = 11.sp,
+                    lineHeight = 16.sp,
+                    color = VolunteerLinkTextSecondary
+                )
+
+                OutlinedTextField(
+                    value = feedback,
+                    onValueChange = onFeedbackChange,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 12.dp),
+                    label = { Text("Revision feedback") },
+                    placeholder = { Text("What needs to be changed?") },
+                    minLines = 3,
+                    maxLines = 5,
+                    enabled = !isSaving,
+                    isError = !errorMessage.isNullOrBlank()
+                )
+
+                if (dueDate.isNotBlank()) {
+                    PostManagementInfoLine(
+                        label = "Due",
+                        value = dueDate.toPostManagementShortDate(),
+                        modifier = Modifier.padding(top = 10.dp)
+                    )
+                }
+
+                Text(
+                    text = "The existing project deadline stays the same while the project is ongoing.",
+                    modifier = Modifier.padding(top = 7.dp),
+                    fontSize = 9.sp,
+                    lineHeight = 13.sp,
+                    color = VolunteerLinkTextSecondary
+                )
+
+                if (!errorMessage.isNullOrBlank()) {
+                    Text(
+                        text = errorMessage,
+                        modifier = Modifier.padding(top = 8.dp),
+                        fontSize = 10.sp,
+                        color = VolunteerLinkError
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                enabled = !isSaving,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = VolunteerLinkWarning
+                )
+            ) {
+                Text(
+                    text = if (isSaving) "Saving..." else "Request Revision",
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !isSaving
+            ) {
+                Text("Cancel")
+            }
+        },
+        containerColor = VolunteerLinkSurface
+    )
+}
+
+@Composable
+internal fun PostManagementAcceptSubmissionDialog(
+    isShared: Boolean,
+    isSaving: Boolean,
+    errorMessage: String?,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = {
+            if (!isSaving) onDismiss()
+        },
+        title = {
+            Text(
+                text = "Accept Submission?",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = VolunteerLinkTextPrimary
+            )
+        },
+        text = {
+            Column {
+                Text(
+                    text = if (isShared) {
+                        "This accepts the shared team deliverable. It does not automatically complete every volunteer."
+                    } else {
+                        "This accepts the volunteer's submitted work. Final volunteer completion is still decided later."
+                    },
+                    fontSize = 11.sp,
+                    lineHeight = 16.sp,
+                    color = VolunteerLinkTextSecondary
+                )
+
+                if (!errorMessage.isNullOrBlank()) {
+                    Text(
+                        text = errorMessage,
+                        modifier = Modifier.padding(top = 9.dp),
+                        fontSize = 10.sp,
+                        color = VolunteerLinkError
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                enabled = !isSaving,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = VolunteerLinkPrimaryGreen
+                )
+            ) {
+                Text(
+                    text = if (isSaving) "Saving..." else "Accept",
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !isSaving
+            ) {
+                Text("Cancel")
+            }
+        },
+        containerColor = VolunteerLinkSurface
+    )
+}
+
+private fun remoteSubmissionFileLabel(fileName: String): String {
+    val extension = fileName.substringAfterLast('.', "")
+        .trim()
+        .uppercase(Locale.US)
+
+    return if (extension.isBlank()) {
+        "Uploaded file"
+    } else {
+        "$extension submission"
+    }
+}
+
+@Composable
+private fun PostManagementSubmissionStatusPill(
+    status: String,
+    modifier: Modifier = Modifier
+) {
+    val normalized = status.uppercase(Locale.US)
+    val label = when (normalized) {
+        "NOT_SUBMITTED" -> "Not Submitted"
+        "PENDING_REVIEW" -> "Pending Review"
+        "REVISION_REQUESTED" -> "Revision Requested"
+        "ACCEPTED" -> "Accepted"
+        "NOT_ACCEPTED" -> "Not Accepted"
+        else -> status.toReadableDatabaseLabel()
+    }
+    val foreground = when (normalized) {
+        "ACCEPTED" -> VolunteerLinkPrimaryGreen
+        "PENDING_REVIEW" -> VolunteerLinkInformation
+        "REVISION_REQUESTED" -> VolunteerLinkWarning
+        "NOT_ACCEPTED" -> VolunteerLinkError
+        else -> VolunteerLinkTextSecondary
+    }
+
+    Surface(
+        modifier = modifier,
+        shape = PostManagementPillShape,
+        color = foreground.copy(alpha = 0.09f),
+        border = BorderStroke(1.dp, foreground.copy(alpha = 0.18f))
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            fontSize = 8.sp,
+            fontWeight = FontWeight.Bold,
+            color = foreground
+        )
+    }
+}
+
+@Composable
+private fun PostManagementResubmissionNotice(
+    isShared: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = VolunteerLinkPrimaryGreen.copy(alpha = 0.10f),
+        border = BorderStroke(1.2.dp, VolunteerLinkPrimaryGreen.copy(alpha = 0.34f))
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 11.dp, vertical = 9.dp)
+        ) {
+            Text(
+                text = "Revised submission received",
+                fontSize = 10.sp,
+                lineHeight = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = VolunteerLinkPrimaryGreen
+            )
+            Text(
+                text = if (isShared) {
+                    "Latest team version is ready for review."
+                } else {
+                    "Latest version is ready for review."
+                },
+                modifier = Modifier.padding(top = 2.dp),
+                fontSize = 9.sp,
+                lineHeight = 13.sp,
+                fontWeight = FontWeight.Medium,
+                color = VolunteerLinkTextPrimary
+            )
+        }
+    }
+}
+
+@Composable
+private fun PostManagementResubmittedPill(
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = PostManagementPillShape,
+        color = VolunteerLinkPrimaryGreen.copy(alpha = 0.09f),
+        border = BorderStroke(1.dp, VolunteerLinkPrimaryGreen.copy(alpha = 0.18f))
+    ) {
+        Text(
+            text = "Resubmitted",
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            fontSize = 8.sp,
+            fontWeight = FontWeight.Bold,
+            color = VolunteerLinkPrimaryGreen
+        )
+    }
+}
+
+@Composable
 internal fun PostManagementAttendanceDaySelector(
     dates: List<String>,
     selectedDate: String?,
@@ -1293,6 +2484,7 @@ internal fun PostManagementPeopleRoleHeader(
     selectedTab: PostManagementPeopleTab,
     applicantCount: Int,
     volunteerCount: Int,
+    remoteSubmissionLabel: String? = null,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -1315,6 +2507,10 @@ internal fun PostManagementPeopleRoleHeader(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
+
+            if (!remoteSubmissionLabel.isNullOrBlank()) {
+                PostManagementRemoteRolePill(text = remoteSubmissionLabel)
+            }
 
             if (selectedTab == PostManagementPeopleTab.APPLICANTS) {
                 PostManagementApplicationWindowPill(role = role)
@@ -1357,6 +2553,28 @@ internal fun PostManagementPeopleRoleHeader(
 }
 
 @Composable
+private fun PostManagementRemoteRolePill(
+    text: String,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = PostManagementPillShape,
+        color = VolunteerLinkPrimaryGreen.copy(alpha = 0.10f),
+        border = BorderStroke(1.dp, VolunteerLinkPrimaryGreen.copy(alpha = 0.22f))
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+            fontSize = 8.sp,
+            fontWeight = FontWeight.Bold,
+            color = VolunteerLinkPrimaryGreen,
+            maxLines = 1
+        )
+    }
+}
+
+@Composable
 private fun PostManagementApplicationWindowPill(
     role: PostManagementRole,
     modifier: Modifier = Modifier
@@ -1393,10 +2611,15 @@ internal fun PostManagementPersonCard(
     attendanceSummary: PostManagementVolunteerAttendanceSummary? = null,
     attendanceSelectedDate: String? = null,
     attendanceTodayDate: String? = null,
+    remoteSubmissionRequirement: String? = null,
+    remoteSubmissionDueDate: String? = null,
+    remoteSubmission: PostManagementRemoteSubmission? = null,
+    remoteSubmissionIsResubmission: Boolean = false,
     canCorrectAttendance: Boolean = false,
     isUpdatingAttendance: Boolean = false,
     onMarkPresent: (PostManagementPerson, String) -> Unit = { _, _ -> },
     onRequestMarkAbsent: (PostManagementPerson, String) -> Unit = { _, _ -> },
+    onViewRemoteSubmission: (PostManagementPerson, PostManagementRemoteSubmission) -> Unit = { _, _ -> },
     onViewProfile: (PostManagementPerson) -> Unit,
     onToggleShortlist: (PostManagementPerson) -> Unit,
     modifier: Modifier = Modifier
@@ -1520,6 +2743,19 @@ internal fun PostManagementPersonCard(
                     },
                     onRequestMarkAbsent = {
                         onRequestMarkAbsent(person, attendanceSelectedDate)
+                    },
+                    modifier = Modifier.padding(top = 12.dp)
+                )
+            }
+
+            if (!remoteSubmissionDueDate.isNullOrBlank()) {
+                PostManagementRemoteSubmissionBlock(
+                    requirement = remoteSubmissionRequirement,
+                    dueDate = remoteSubmissionDueDate,
+                    submission = remoteSubmission,
+                    isResubmission = remoteSubmissionIsResubmission,
+                    onViewSubmission = { submission ->
+                        onViewRemoteSubmission(person, submission)
                     },
                     modifier = Modifier.padding(top = 12.dp)
                 )
@@ -2045,6 +3281,18 @@ private fun String?.toPostManagementShortDate(): String {
     }
     val day = parts[2].toIntOrNull() ?: return value
     return "$day $month ${parts[0]}"
+}
+
+private fun String?.toPostManagementDateTime(): String {
+    val value = this?.takeIf { it.isNotBlank() } ?: return "Date not set"
+    val datePart = value.substringBefore("T")
+    val timePart = value.substringAfter("T", "").take(5)
+    val dateLabel = datePart.toPostManagementShortDate()
+    return if (timePart.length == 5 && timePart.contains(":")) {
+        "$dateLabel · ${timePart.toPostManagementTime()}"
+    } else {
+        dateLabel
+    }
 }
 
 private fun String.toPostManagementTime(): String {

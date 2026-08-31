@@ -64,7 +64,8 @@ class SupabaseOrganisationHomeRepository : OrganisationHomeRepository {
                     ),
                     remote_details (
                         start_date,
-                        end_date
+                        end_date,
+                        new_end_date
                     ),
                     schedule_items (
                         schedule_item_id,
@@ -112,6 +113,7 @@ class SupabaseOrganisationHomeRepository : OrganisationHomeRepository {
                 physicalLocationName = physical?.optionalText("location_name"),
                 remoteStartDate = remote?.optionalText("start_date"),
                 remoteEndDate = remote?.optionalText("end_date"),
+                remoteNewEndDate = remote?.optionalText("new_end_date"),
                 schedules = schedules,
                 roles = emptyList()
             )

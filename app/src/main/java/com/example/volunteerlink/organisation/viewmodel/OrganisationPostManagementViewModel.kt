@@ -22,6 +22,7 @@ import com.example.volunteerlink.organisation.manage.model.PostManagementPhysica
 import com.example.volunteerlink.organisation.manage.model.PostManagementPhysicalReviewEntry
 import com.example.volunteerlink.organisation.manage.model.PostManagementPhysicalAttendance
 import com.example.volunteerlink.organisation.manage.model.PostManagementPost
+import com.example.volunteerlink.organisation.manage.model.PostManagementRemoteSubmission
 import com.example.volunteerlink.organisation.manage.model.PostManagementVolunteerAttendanceDateStatus
 import com.example.volunteerlink.organisation.manage.model.PostManagementVolunteerAttendanceSummary
 import com.example.volunteerlink.organisation.repository.OrganisationPostManagementRepository
@@ -98,6 +99,46 @@ class OrganisationPostManagementViewModel : ViewModel() {
     fun stopAttendancePolling() {
         attendancePollingJob?.cancel()
         attendancePollingJob = null
+    }
+
+    /** Downloads a Remote submission through the management repository. */
+    suspend fun downloadRemoteSubmission(
+        submission: PostManagementRemoteSubmission
+    ): ByteArray {
+        val currentPost = cachedPost
+            ?: error("Open a Volunteer Post before viewing its submission.")
+        val filePath = submission.filePath
+            ?.takeIf { it.isNotBlank() }
+            ?: error("This submission does not contain an uploaded file.")
+
+        return repository.downloadRemoteSubmission(
+            postId = currentPost.postId,
+            filePath = filePath
+        )
+    }
+
+    /**
+     * Accepts a Remote submission or requests revision, then reloads the post so
+     * the organisation immediately sees the new submission state.
+     */
+    suspend fun reviewRemoteSubmission(
+        submission: PostManagementRemoteSubmission,
+        action: String,
+        feedback: String? = null
+    ) {
+        val currentPost = cachedPost
+            ?: error("Open a Volunteer Post before reviewing its submission.")
+
+        repository.reviewRemoteSubmission(
+            postId = currentPost.postId,
+            submissionId = submission.submissionId,
+            action = action,
+            feedback = feedback
+        )
+
+        val refreshedPost = repository.loadPost(currentPost.postId)
+        cachedPost = refreshedPost
+        applyTiming(refreshedPost)
     }
 
     fun toggleApplicantShortlist(person: PostManagementPerson) {
@@ -665,7 +706,7 @@ class OrganisationPostManagementViewModel : ViewModel() {
                     physicalStartDate = post.physical?.startDate,
                     physicalEndDate = post.physical?.endDate,
                     remoteStartDate = post.remote?.startDate,
-                    remoteEndDate = post.remote?.endDate
+                    remoteEndDate = post.remote?.effectiveEndDate
                 ),
                 nowMillis
             )
@@ -687,7 +728,7 @@ class OrganisationPostManagementViewModel : ViewModel() {
                 PostTimingInput(
                     mode = PostMode.REMOTE,
                     remoteStartDate = remote.startDate,
-                    remoteEndDate = remote.endDate
+                    remoteEndDate = remote.effectiveEndDate
                 ),
                 nowMillis
             )

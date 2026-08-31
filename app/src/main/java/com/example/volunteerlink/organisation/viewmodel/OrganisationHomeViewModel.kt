@@ -356,7 +356,7 @@ class OrganisationHomeViewModel : ViewModel() {
             physicalStartDate = physicalStartDate,
             physicalEndDate = physicalEndDate,
             remoteStartDate = remoteStartDate,
-            remoteEndDate = remoteEndDate
+            remoteEndDate = effectiveRemoteEndDate
         )
     }
 
@@ -374,7 +374,7 @@ class OrganisationHomeViewModel : ViewModel() {
         val remoteState = evaluateSinglePeriodState(
             mode = PostMode.REMOTE,
             startDate = remoteStartDate,
-            endDate = remoteEndDate,
+            endDate = effectiveRemoteEndDate,
             nowMillis = nowMillis
         )
 
@@ -385,7 +385,7 @@ class OrganisationHomeViewModel : ViewModel() {
             databaseStatus = status,
             timingState = timingState,
             startDate = input?.let(PostTimingEvaluator::earliestStartDate),
-            endDate = latestDate(physicalEndDate, remoteEndDate),
+            endDate = latestDate(physicalEndDate, effectiveRemoteEndDate),
             locationName = if (mode.equals("PHYSICAL", ignoreCase = true)) {
                 physicalLocationName
             } else {
@@ -396,7 +396,7 @@ class OrganisationHomeViewModel : ViewModel() {
             physicalLocationName = physicalLocationName,
             physicalTimingState = physicalState,
             remoteStartDate = remoteStartDate,
-            remoteEndDate = remoteEndDate,
+            remoteEndDate = effectiveRemoteEndDate,
             remoteTimingState = remoteState
         )
     }
