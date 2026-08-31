@@ -79,6 +79,57 @@ class VolunteerOpportunityViewModel(
         loadDashboard(isRefresh = true)
     }
 
+    fun setOpportunitySaved(eventId: Int, shouldSave: Boolean) {
+        val event = VolunteerOpportunitySessionStore.findEventById(eventId)
+        if (event == null) {
+            mutableUiState.update {
+                it.copy(applicationActionError = "Opportunity could not be found.")
+            }
+            return
+        }
+
+        viewModelScope.launch {
+            VolunteerOpportunitySessionStore.setEventSaved(eventId, shouldSave)
+            VolunteerDashboardDataSource.cacheCurrentSession()
+            mutableUiState.update {
+                it.copy(
+                    applicationActionError = null,
+                    dataVersion = it.dataVersion + 1
+                )
+            }
+
+            try {
+                VolunteerOpportunityRepository.setOpportunitySaved(
+                    event.eventDatabaseId,
+                    shouldSave
+                )
+            } catch (exception: Exception) {
+                if (exception.isConnectivityFailure()) {
+                    VolunteerDashboardDataSource.enqueuePendingAction(
+                        actionType = "SET_SAVED",
+                        targetId = event.eventDatabaseId,
+                        payloadJson = buildJsonObject {
+                            put("should_save", shouldSave)
+                        }.toString()
+                    )
+                } else {
+                    VolunteerOpportunitySessionStore.setEventSaved(
+                        eventId,
+                        !shouldSave
+                    )
+                    VolunteerDashboardDataSource.cacheCurrentSession()
+                    mutableUiState.update {
+                        it.copy(
+                            applicationActionError =
+                                "Saved opportunities could not be updated.",
+                            dataVersion = it.dataVersion + 1
+                        )
+                    }
+                }
+            }
+        }
+    }
+
     fun submitApplication(
         eventId: Int,
         roleId: Int,

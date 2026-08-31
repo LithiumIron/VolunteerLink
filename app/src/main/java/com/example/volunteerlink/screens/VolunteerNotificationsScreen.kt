@@ -24,6 +24,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material3.Button
@@ -158,6 +159,18 @@ fun VolunteerNotificationsScreen(
                     )
                 }
             }
+            if (uiState.notifications.isNotEmpty()) {
+                TextButton(
+                    onClick = notificationViewModel::dismissAll,
+                    enabled = !uiState.isClearing
+                ) {
+                    Text(
+                        if (uiState.isClearing) "Clearing..." else "Clear all",
+                        color = Color.White,
+                        fontSize = 11.sp
+                    )
+                }
+            }
         }
 
         LazyRow(
@@ -211,6 +224,7 @@ fun VolunteerNotificationsScreen(
                 items(visibleNotifications, key = { it.notificationId }) { notification ->
                     NotificationCard(
                         notification = notification,
+                        onDismiss = { notificationViewModel.dismiss(notification) },
                         onClick = {
                             when (notification.category()) {
                                 VolunteerNotificationCategory.APPLICATION ->
@@ -232,6 +246,7 @@ fun VolunteerNotificationsScreen(
 @Composable
 private fun NotificationCard(
     notification: VolunteerNotification,
+    onDismiss: () -> Unit,
     onClick: () -> Unit
 ) {
     val category = notification.category()
@@ -305,6 +320,17 @@ private fun NotificationCard(
                                 .padding(start = 8.dp)
                                 .size(8.dp)
                                 .background(VolunteerLinkPrimaryGreen, CircleShape)
+                        )
+                    }
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            Icons.Filled.Close,
+                            contentDescription = "Clear notification",
+                            tint = VolunteerLinkTextSecondary,
+                            modifier = Modifier.size(16.dp)
                         )
                     }
                 }
@@ -411,5 +437,4 @@ private fun VolunteerNotification.category(): VolunteerNotificationCategory {
 
 private fun formatNotificationTime(timestamp: String): String =
     timestamp.take(16).replace('T', ' ')
-
 

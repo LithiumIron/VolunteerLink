@@ -76,6 +76,18 @@ object VolunteerOpportunitySessionStore {
             it.eventId == eventId
         }
 
+    fun setEventSaved(eventId: Int, isSaved: Boolean) {
+        val index = volunteerOpportunityEvents.indexOfFirst {
+            it.eventId == eventId
+        }
+        if (index >= 0) {
+            volunteerOpportunityEvents[index] =
+                volunteerOpportunityEvents[index].copy(
+                    eventIsSaved = isSaved
+                )
+        }
+    }
+
     fun findRoleById(
         eventId: Int,
         roleId: Int

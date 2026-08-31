@@ -86,6 +86,7 @@ data class VolunteerOpportunityEvent(
     val eventLatitude: Double? = null,
     val eventLongitude: Double? = null,
     val eventThumbnailPath: String? = null,
+    val eventIsSaved: Boolean = false,
     val eventDatabaseId: String = "",
     val eventStatus: String = "PUBLISHED"
 )

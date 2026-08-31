@@ -145,8 +145,14 @@ object VolunteerOpportunityRepository {
         val rpcApplications =
             loadApplicationsFromRpcSafely()
 
+        val savedPostIds = loadSavedOpportunityIdsSafely()
+
         return VolunteerOpportunityDashboardData(
-            events = allMappedEvents.filter { event ->
+            events = allMappedEvents.map { event ->
+                event.copy(
+                    eventIsSaved = event.eventDatabaseId in savedPostIds
+                )
+            }.filter { event ->
                 event.eventStatus == "PUBLISHED"
             },
             applications =
@@ -253,6 +259,22 @@ object VolunteerOpportunityRepository {
         )
     }
 
+    suspend fun setOpportunitySaved(
+        postId: String,
+        shouldSave: Boolean
+    ) {
+        require(postId.isNotBlank()) {
+            "This opportunity is missing its Supabase ID."
+        }
+        supabase.postgrest.rpc(
+            function = "set_my_saved_opportunity",
+            parameters = buildJsonObject {
+                put("target_post_id", postId)
+                put("should_save", shouldSave)
+            }
+        )
+    }
+
     suspend fun replayPendingAction(
         actionType: String,
         targetId: String,
@@ -298,9 +320,24 @@ object VolunteerOpportunityRepository {
                     .map { it.jsonPrimitive.content }
                 updatePendingApplication(targetId, answers)
             }
+            "SET_SAVED" -> {
+                val shouldSave = Json.parseToJsonElement(payloadJson)
+                    .jsonObject["should_save"]?.jsonPrimitive?.content
+                    ?.toBooleanStrictOrNull() ?: false
+                setOpportunitySaved(targetId, shouldSave)
+            }
             else -> error("Unsupported pending action: $actionType")
         }
     }
+
+    private suspend fun loadSavedOpportunityIdsSafely(): Set<String> =
+        runCatching {
+            supabase.postgrest
+                .rpc("get_my_saved_opportunity_ids")
+                .decodeList<SavedOpportunityIdRow>()
+                .map { it.postId }
+                .toSet()
+        }.getOrDefault(emptySet())
 
     private suspend fun loadMetricsSafely():
         Map<String, OpportunityMetricRow> {
@@ -1329,4 +1366,9 @@ private data class ApplicationScreeningAnswerRow(
     @SerialName("question_no") val questionNo: Int,
     @SerialName("question_text") val questionText: String,
     @SerialName("answer_text") val answerText: String
+)
+
+@Serializable
+private data class SavedOpportunityIdRow(
+    @SerialName("post_id") val postId: String
 )

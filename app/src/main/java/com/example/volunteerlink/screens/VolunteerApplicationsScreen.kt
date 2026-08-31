@@ -84,9 +84,9 @@ fun VolunteerMyApplicationsScreen(
     ) -> Unit
 ) {
     var selectedStatusFilter by
-        rememberSaveable {
-            mutableStateOf("All")
-        }
+    rememberSaveable {
+        mutableStateOf("All")
+    }
 
     val statusFilters =
         listOf(
@@ -113,15 +113,15 @@ fun VolunteerMyApplicationsScreen(
 
                     "Rejected" ->
                         volunteerApplication.applicationStatus ==
-                            VolunteerApplicationStatus.REJECTED
+                                VolunteerApplicationStatus.REJECTED
 
                     "Completed" ->
                         volunteerApplication.applicationStatus ==
-                            VolunteerApplicationStatus.COMPLETED
+                                VolunteerApplicationStatus.COMPLETED
 
                     "Not Completed" ->
                         volunteerApplication.applicationStatus ==
-                            VolunteerApplicationStatus.NOT_COMPLETED
+                                VolunteerApplicationStatus.NOT_COMPLETED
 
                     else -> true
                 }
@@ -290,16 +290,16 @@ fun VolunteerApplicationDetailsScreen(
         applicationId: Int
     ) -> Unit,
     volunteerOpportunityViewModel:
-        VolunteerOpportunityViewModel
+    VolunteerOpportunityViewModel
 ) {
     val opportunityUiState by
-        volunteerOpportunityViewModel.uiState
-            .collectAsStateWithLifecycle()
+    volunteerOpportunityViewModel.uiState
+        .collectAsStateWithLifecycle()
 
     var shouldShowCancelDialog by
-        rememberSaveable {
-            mutableStateOf(false)
-        }
+    rememberSaveable {
+        mutableStateOf(false)
+    }
     var shouldShowEditDialog by rememberSaveable { mutableStateOf(false) }
     var shouldShowDeleteDialog by rememberSaveable { mutableStateOf(false) }
     var shouldShowReapplyDialog by rememberSaveable { mutableStateOf(false) }
@@ -378,9 +378,9 @@ fun VolunteerApplicationDetailsScreen(
             ) {
                 val applicationIsRemote =
                     volunteerOpportunityRole?.roleMode == "REMOTE" ||
-                        volunteerApplication.applicationRoleMode == "REMOTE" ||
-                        volunteerOpportunityEvent
-                            ?.eventOpportunityType == "Remote"
+                            volunteerApplication.applicationRoleMode == "REMOTE" ||
+                            volunteerOpportunityEvent
+                                ?.eventOpportunityType == "Remote"
 
                 VolunteerApplicationInformationCard(
                     volunteerApplication =
@@ -638,8 +638,8 @@ fun VolunteerApplicationDetailsScreen(
                     },
                     enabled =
                         !opportunityUiState.isApplicationActionRunning &&
-                            selectedCancellationReason.isNotBlank() &&
-                            (selectedCancellationReason != "Other" || cancellationDetails.isNotBlank())
+                                selectedCancellationReason.isNotBlank() &&
+                                (selectedCancellationReason != "Other" || cancellationDetails.isNotBlank())
                 ) {
                     Text(
                         text =
@@ -685,36 +685,18 @@ fun VolunteerApplicationDetailsScreen(
                         Text("This role has no additional screening questions.")
                     }
                     questions.forEachIndexed { index, question ->
-                        Column(
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Text(
-                                text = question,
-                                modifier = Modifier.fillMaxWidth(),
-                                fontSize = 13.sp,
-                                lineHeight = 18.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = VolunteerLinkTextPrimary
-                            )
-
-                            OutlinedTextField(
-                                value = formAnswers.getOrElse(index) { "" },
-                                onValueChange = { answer ->
-                                    formAnswers = formAnswers.toMutableList().also {
-                                        while (it.size <= index) {
-                                            it.add("")
-                                        }
-                                        it[index] = answer
-                                    }
-                                },
-                                label = {
-                                    Text("Your answer")
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                minLines = 2,
-                                maxLines = 5
-                            )
-                        }
+                        OutlinedTextField(
+                            value = formAnswers.getOrElse(index) { "" },
+                            onValueChange = { answer ->
+                                formAnswers = formAnswers.toMutableList().also {
+                                    while (it.size <= index) it.add("")
+                                    it[index] = answer
+                                }
+                            },
+                            label = { Text(question) },
+                            modifier = Modifier.fillMaxWidth(),
+                            minLines = 2
+                        )
                     }
                     opportunityUiState.applicationActionError?.let {
                         Text(it, color = VolunteerLinkError, fontSize = 12.sp)
@@ -724,7 +706,7 @@ fun VolunteerApplicationDetailsScreen(
             confirmButton = {
                 TextButton(
                     enabled = !opportunityUiState.isApplicationActionRunning &&
-                        formAnswers.all { it.isNotBlank() },
+                            formAnswers.all { it.isNotBlank() },
                     onClick = {
                         if (isReapply) {
                             volunteerOpportunityViewModel.reapplyForRole(
@@ -837,7 +819,7 @@ private fun VolunteerApplicationsTopBar(
 @Composable
 private fun VolunteerApplicationListCard(
     volunteerApplication:
-        VolunteerOpportunityApplication,
+    VolunteerOpportunityApplication,
     onSelected: () -> Unit
 ) {
     Card(
@@ -947,7 +929,7 @@ private fun VolunteerApplicationListCard(
 @Composable
 private fun VolunteerApplicationStatusCard(
     volunteerApplication:
-        VolunteerOpportunityApplication
+    VolunteerOpportunityApplication
 ) {
     val statusColour =
         volunteerApplicationStatusColour(
@@ -1031,7 +1013,7 @@ private fun VolunteerApplicationStatusCard(
 @Composable
 private fun VolunteerApplicationTimelineCard(
     volunteerApplication:
-        VolunteerOpportunityApplication
+    VolunteerOpportunityApplication
 ) {
     val steps =
         volunteerApplicationTimelineSteps(
@@ -1296,9 +1278,8 @@ private fun volunteerApplicationTimelineSteps(
                 ),
                 VolunteerApplicationTimelineStep(
                     title = "Role not completed",
-                    supportingText = application.applicationCompletionReason
-                        ?.takeIf(String::isNotBlank)
-                        ?: "Attendance or completion requirements were not met.",
+                    supportingText =
+                        "The organisation could not verify this role as completed.",
                     state = "ERROR"
                 )
             )
@@ -1319,7 +1300,7 @@ private fun volunteerApplicationTimelineSteps(
 @Composable
 private fun VolunteerApplicationInformationCard(
     volunteerApplication:
-        VolunteerOpportunityApplication,
+    VolunteerOpportunityApplication,
     applicationIsRemote: Boolean,
     eventDate: String?,
     eventEndDate: String?,
@@ -1412,6 +1393,13 @@ private fun VolunteerApplicationInformationCard(
 
             volunteerApplication
                 .applicationRejectionReason
+                ?.takeIf {
+                    volunteerApplication.applicationStatus in setOf(
+                        VolunteerApplicationStatus.REJECTED,
+                        VolunteerApplicationStatus.CANCELLED
+                    )
+                }
+                ?.takeIf(String::isNotBlank)
                 ?.let { rejectionReason ->
                     VolunteerApplicationInformationRow(
                         label = "Reason",

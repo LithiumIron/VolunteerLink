@@ -353,6 +353,8 @@ fun VolunteerOpportunityNavigationHost() {
                     VolunteerOpportunityDetailsScreen(
                         volunteerEventId =
                             volunteerEventId,
+                        opportunityViewModel =
+                            volunteerOpportunityViewModel,
 
                         onBackSelected = {
                             volunteerNavigationController
@@ -922,5 +924,4 @@ private fun VolunteerTemporaryModuleScreen(
         )
     }
 }
-
 
