@@ -3,11 +3,6 @@
 
 begin;
 
--- Real clock only. Preserve test_datetime so teammates can re-enable it later.
-update v1_erd_test.app_test_clock
-set use_test_time = false
-where clock_name = 'APP';
-
 -- Repair only three previously confirmed impossible acceptance timestamps.
 -- No post content, schedule, attendance, evaluation or completion is changed.
 update v1_erd_test.role_participations
@@ -90,7 +85,7 @@ on conflict (post_id, role_template_id) do update set
 insert into v1_erd_test.post_role_skills (
     post_id, role_template_id, skill_id, required_experience
 )
-select 'HISTORY_POST_004', 'ROLE007', template.skill_id, false
+select 'HISTORY_POST_004', 'ROLE007', template.skill_id, null::integer
 from v1_erd_test.role_template_skills template
 where template.role_template_id = 'ROLE007'
 on conflict (post_id, role_template_id, skill_id) do update set
