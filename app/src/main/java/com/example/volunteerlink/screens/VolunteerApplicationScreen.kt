@@ -994,6 +994,9 @@ private fun VolunteerExistingApplicationScreen(
             VolunteerApplicationStatus.COMPLETED ->
                 "Completed"
 
+            VolunteerApplicationStatus.NOT_COMPLETED ->
+                "Not Completed"
+
             VolunteerApplicationStatus.CANCELLED ->
                 "Cancelled"
         }
@@ -1013,6 +1016,9 @@ private fun VolunteerExistingApplicationScreen(
 
             VolunteerApplicationStatus.COMPLETED ->
                 VolunteerLinkInformation
+
+            VolunteerApplicationStatus.NOT_COMPLETED ->
+                VolunteerLinkError
 
             VolunteerApplicationStatus.CANCELLED ->
                 VolunteerLinkTextSecondary
@@ -1305,5 +1311,4 @@ private fun VolunteerApplicationNotFoundScreen(
         }
     }
 }
-
 

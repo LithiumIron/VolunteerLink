@@ -13,6 +13,7 @@ import com.example.volunteerlink.data.VolunteerOpportunityRepository
 import com.example.volunteerlink.model.VolunteerApplicationStatus
 import com.example.volunteerlink.model.VolunteerOpportunityApplication
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import java.text.DateFormat
@@ -78,6 +79,57 @@ class VolunteerOpportunityViewModel(
         loadDashboard(isRefresh = true)
     }
 
+    fun setOpportunitySaved(eventId: Int, shouldSave: Boolean) {
+        val event = VolunteerOpportunitySessionStore.findEventById(eventId)
+        if (event == null) {
+            mutableUiState.update {
+                it.copy(applicationActionError = "Opportunity could not be found.")
+            }
+            return
+        }
+
+        viewModelScope.launch {
+            VolunteerOpportunitySessionStore.setEventSaved(eventId, shouldSave)
+            VolunteerDashboardDataSource.cacheCurrentSession()
+            mutableUiState.update {
+                it.copy(
+                    applicationActionError = null,
+                    dataVersion = it.dataVersion + 1
+                )
+            }
+
+            try {
+                VolunteerOpportunityRepository.setOpportunitySaved(
+                    event.eventDatabaseId,
+                    shouldSave
+                )
+            } catch (exception: Exception) {
+                if (exception.isConnectivityFailure()) {
+                    VolunteerDashboardDataSource.enqueuePendingAction(
+                        actionType = "SET_SAVED",
+                        targetId = event.eventDatabaseId,
+                        payloadJson = buildJsonObject {
+                            put("should_save", shouldSave)
+                        }.toString()
+                    )
+                } else {
+                    VolunteerOpportunitySessionStore.setEventSaved(
+                        eventId,
+                        !shouldSave
+                    )
+                    VolunteerDashboardDataSource.cacheCurrentSession()
+                    mutableUiState.update {
+                        it.copy(
+                            applicationActionError =
+                                "Saved opportunities could not be updated.",
+                            dataVersion = it.dataVersion + 1
+                        )
+                    }
+                }
+            }
+        }
+    }
+
     fun submitApplication(
         eventId: Int,
         roleId: Int,
@@ -109,16 +161,51 @@ class VolunteerOpportunityViewModel(
             }
 
             try {
-                VolunteerOpportunityRepository.submitApplication(
-                    roleDatabaseId = role.roleDatabaseId,
-                    questions = role.roleExtraApplicationQuestions,
-                    answers = answers
-                )
+                val priorApplication = VolunteerOpportunitySessionStore
+                    .volunteerApplications.firstOrNull {
+                        it.applicationEventId == eventId &&
+                            it.applicationRoleId == roleId &&
+                            it.applicationStatus in setOf(
+                                VolunteerApplicationStatus.CANCELLED,
+                                VolunteerApplicationStatus.REJECTED
+                            )
+                    }
+                if (priorApplication != null) {
+                    VolunteerOpportunityRepository.reapplyForRole(
+                        roleDatabaseId = role.roleDatabaseId,
+                        answers = answers
+                    )
+                } else {
+                    VolunteerOpportunityRepository.submitApplication(
+                        roleDatabaseId = role.roleDatabaseId,
+                        questions = role.roleExtraApplicationQuestions,
+                        answers = answers
+                    )
+                }
                 refreshAfterAction()
                 onSuccess()
             } catch (exception: Exception) {
                 exception.printStackTrace()
                 if (exception.isConnectivityFailure()) {
+                    val isReapply = VolunteerOpportunitySessionStore
+                        .volunteerApplications.any {
+                            it.applicationEventId == eventId &&
+                                it.applicationRoleId == roleId &&
+                                it.applicationStatus in setOf(
+                                    VolunteerApplicationStatus.CANCELLED,
+                                    VolunteerApplicationStatus.REJECTED
+                                )
+                        }
+                    if (isReapply) {
+                        mutableUiState.update {
+                            it.copy(
+                                isApplicationActionRunning = false,
+                                applicationActionError =
+                                    "Internet connection is required to apply again."
+                            )
+                        }
+                        return@launch
+                    }
                     val event =
                         VolunteerOpportunitySessionStore
                             .findEventById(eventId)
@@ -205,6 +292,8 @@ class VolunteerOpportunityViewModel(
 
     fun cancelApplication(
         applicationId: Int,
+        reason: String,
+        details: String,
         onSuccess: () -> Unit = {}
     ) {
         val application =
@@ -231,7 +320,9 @@ class VolunteerOpportunityViewModel(
 
             try {
                 VolunteerOpportunityRepository.cancelApplication(
-                    application.applicationDatabaseId
+                    application.applicationDatabaseId,
+                    reason,
+                    details
                 )
                 refreshAfterAction()
                 onSuccess()
@@ -239,16 +330,21 @@ class VolunteerOpportunityViewModel(
                 exception.printStackTrace()
                 if (exception.isConnectivityFailure()) {
                     VolunteerDashboardDataSource.enqueuePendingAction(
-                        actionType = "CANCEL",
+                        actionType = "CANCEL_V2",
                         targetId = application.applicationDatabaseId,
-                        payloadJson = "{}"
+                        payloadJson = buildJsonObject {
+                            put("reason", reason)
+                            put("details", details)
+                        }.toString()
                     )
                     VolunteerOpportunitySessionStore.replaceApplication(
                         application.copy(
                             applicationStatus =
                                 VolunteerApplicationStatus.CANCELLED,
                             applicationStatusMessage =
-                                "Cancellation is waiting to sync."
+                                "Cancellation is waiting to sync.",
+                            applicationRejectionReason =
+                                "Cancelled by volunteer: $reason. " + details
                         )
                     )
                     VolunteerDashboardDataSource.cacheCurrentSession()
@@ -274,6 +370,138 @@ class VolunteerOpportunityViewModel(
                     )
                 }
             }
+        }
+    }
+
+    fun updatePendingApplication(
+        applicationId: Int,
+        answers: List<String>,
+        onSuccess: () -> Unit = {}
+    ) = runApplicationAction(applicationId) { application ->
+        try {
+            VolunteerOpportunityRepository.updatePendingApplication(
+                application.applicationDatabaseId,
+                answers
+            )
+            refreshAfterAction()
+            onSuccess()
+        } catch (exception: Exception) {
+            if (exception.isConnectivityFailure()) {
+                VolunteerDashboardDataSource.enqueuePendingAction(
+                    "UPDATE_APPLICATION",
+                    application.applicationDatabaseId,
+                    buildJsonObject {
+                        putJsonArray("answers") {
+                            answers.forEach { answer -> add(JsonPrimitive(answer)) }
+                        }
+                    }.toString()
+                )
+                VolunteerOpportunitySessionStore.replaceApplication(
+                    application.copy(
+                        applicationScreeningAnswers = answers,
+                        applicationStatusMessage =
+                            "Your edits are waiting to sync."
+                    )
+                )
+                VolunteerDashboardDataSource.cacheCurrentSession()
+                finishLocalAction()
+                onSuccess()
+            } else failApplicationAction(exception, "Application changes could not be saved.")
+        }
+    }
+
+    fun deleteApplication(
+        applicationId: Int,
+        onSuccess: () -> Unit = {}
+    ) = runApplicationAction(applicationId) { application ->
+        try {
+            VolunteerOpportunityRepository.deleteApplication(
+                application.applicationDatabaseId
+            )
+            refreshAfterAction()
+            onSuccess()
+        } catch (exception: Exception) {
+            failApplicationAction(
+                exception,
+                if (exception.isConnectivityFailure())
+                    "Internet connection is required to delete an application record."
+                else "Application record could not be deleted."
+            )
+        }
+    }
+
+    fun reapplyForRole(
+        applicationId: Int,
+        answers: List<String>,
+        onSuccess: () -> Unit = {}
+    ) = runApplicationAction(applicationId) { application ->
+        val event = VolunteerOpportunitySessionStore.findEventById(
+            application.applicationEventId
+        )
+        val role = application.applicationRoleId?.let {
+            VolunteerOpportunitySessionStore.findRoleById(
+                application.applicationEventId,
+                it
+            )
+        }
+        if (event == null || role == null) {
+            failApplicationAction(IllegalStateException(), "Role details could not be found.")
+            return@runApplicationAction
+        }
+        try {
+            VolunteerOpportunityRepository.reapplyForRole(
+                role.roleDatabaseId,
+                answers
+            )
+            refreshAfterAction()
+            onSuccess()
+        } catch (exception: Exception) {
+            failApplicationAction(
+                exception,
+                if (exception.isConnectivityFailure())
+                    "Internet connection is required to apply again."
+                else "This application could not be submitted again."
+            )
+        }
+    }
+
+    private fun runApplicationAction(
+        applicationId: Int,
+        block: suspend (VolunteerOpportunityApplication) -> Unit
+    ) {
+        val application = VolunteerOpportunitySessionStore.findApplicationById(applicationId)
+        if (application == null) {
+            mutableUiState.update {
+                it.copy(applicationActionError = "The selected application could not be found.")
+            }
+            return
+        }
+        viewModelScope.launch {
+            mutableUiState.update {
+                it.copy(isApplicationActionRunning = true, applicationActionError = null)
+            }
+            block(application)
+        }
+    }
+
+    private fun finishLocalAction() {
+        mutableUiState.update {
+            it.copy(
+                isApplicationActionRunning = false,
+                applicationActionError = null,
+                isShowingCachedData = true,
+                dataVersion = it.dataVersion + 1
+            )
+        }
+    }
+
+    private fun failApplicationAction(exception: Exception, fallback: String) {
+        exception.printStackTrace()
+        mutableUiState.update {
+            it.copy(
+                isApplicationActionRunning = false,
+                applicationActionError = exception.toVolunteerMessage(fallback)
+            )
         }
     }
 

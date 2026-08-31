@@ -18,6 +18,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -144,8 +145,14 @@ object VolunteerOpportunityRepository {
         val rpcApplications =
             loadApplicationsFromRpcSafely()
 
+        val savedPostIds = loadSavedOpportunityIdsSafely()
+
         return VolunteerOpportunityDashboardData(
-            events = allMappedEvents.filter { event ->
+            events = allMappedEvents.map { event ->
+                event.copy(
+                    eventIsSaved = event.eventDatabaseId in savedPostIds
+                )
+            }.filter { event ->
                 event.eventStatus == "PUBLISHED"
             },
             applications =
@@ -190,19 +197,80 @@ object VolunteerOpportunityRepository {
     }
 
     suspend fun cancelApplication(
-        applicationDatabaseId: String
+        applicationDatabaseId: String,
+        reason: String,
+        details: String
     ) {
         require(applicationDatabaseId.isNotBlank()) {
             "This application is missing its Supabase ID."
         }
 
         supabase.postgrest.rpc(
-            function = "cancel_my_application",
+            function = "volunteer_cancel_application_v2",
             parameters = buildJsonObject {
                 put(
                     "target_participation_id",
                     applicationDatabaseId
                 )
+                put("cancellation_reason", reason)
+                put("cancellation_details", details)
+            }
+        )
+    }
+
+    suspend fun updatePendingApplication(
+        applicationDatabaseId: String,
+        answers: List<String>
+    ) {
+        supabase.postgrest.rpc(
+            function = "volunteer_update_pending_application_answers",
+            parameters = buildJsonObject {
+                put("target_participation_id", applicationDatabaseId)
+                putJsonArray("provided_screening_answers") {
+                    answers.forEach { answer -> add(JsonPrimitive(answer)) }
+                }
+            }
+        )
+    }
+
+    suspend fun deleteApplication(applicationDatabaseId: String) {
+        supabase.postgrest.rpc(
+            function = "volunteer_delete_application",
+            parameters = buildJsonObject {
+                put("target_participation_id", applicationDatabaseId)
+            }
+        )
+    }
+
+    suspend fun reapplyForRole(
+        roleDatabaseId: String,
+        answers: List<String>
+    ) {
+        supabase.postgrest.rpc(
+            function = "volunteer_reapply_for_role",
+            parameters = buildJsonObject {
+                put("target_post_role_id", roleDatabaseId)
+                putJsonArray("provided_screening_answers") {
+                    answers.forEach { answer ->
+                        addJsonObject { put("answer", answer) }
+                    }
+                }
+            }
+        )
+    }
+
+    suspend fun setOpportunitySaved(
+        postId: String,
+        shouldSave: Boolean
+    ) {
+        require(postId.isNotBlank()) {
+            "This opportunity is missing its Supabase ID."
+        }
+        supabase.postgrest.rpc(
+            function = "set_my_saved_opportunity",
+            parameters = buildJsonObject {
+                put("target_post_id", postId)
+                put("should_save", shouldSave)
             }
         )
     }
@@ -229,10 +297,47 @@ object VolunteerOpportunityRepository {
                 )
             }
 
-            "CANCEL" -> cancelApplication(targetId)
+            "CANCEL_V2" -> {
+                val payload = Json.parseToJsonElement(payloadJson).jsonObject
+                cancelApplication(
+                    applicationDatabaseId = targetId,
+                    reason = payload["reason"]?.jsonPrimitive?.content.orEmpty(),
+                    details = payload["details"]?.jsonPrimitive?.content.orEmpty()
+                )
+            }
+            "CANCEL" -> {
+                // Backward compatibility for actions queued by V15.1.3.
+                supabase.postgrest.rpc(
+                    function = "cancel_my_application",
+                    parameters = buildJsonObject {
+                        put("target_participation_id", targetId)
+                    }
+                )
+            }
+            "UPDATE_APPLICATION" -> {
+                val answers = Json.parseToJsonElement(payloadJson)
+                    .jsonObject["answers"]?.jsonArray.orEmpty()
+                    .map { it.jsonPrimitive.content }
+                updatePendingApplication(targetId, answers)
+            }
+            "SET_SAVED" -> {
+                val shouldSave = Json.parseToJsonElement(payloadJson)
+                    .jsonObject["should_save"]?.jsonPrimitive?.content
+                    ?.toBooleanStrictOrNull() ?: false
+                setOpportunitySaved(targetId, shouldSave)
+            }
             else -> error("Unsupported pending action: $actionType")
         }
     }
+
+    private suspend fun loadSavedOpportunityIdsSafely(): Set<String> =
+        runCatching {
+            supabase.postgrest
+                .rpc("get_my_saved_opportunity_ids")
+                .decodeList<SavedOpportunityIdRow>()
+                .map { it.postId }
+                .toSet()
+        }.getOrDefault(emptySet())
 
     private suspend fun loadMetricsSafely():
         Map<String, OpportunityMetricRow> {
@@ -277,9 +382,15 @@ object VolunteerOpportunityRepository {
     private suspend fun loadApplicationsFromRpcSafely():
         List<MyVolunteerApplicationRow>? {
         return try {
-            supabase.postgrest
-                .rpc("get_my_volunteer_applications")
-                .decodeList<MyVolunteerApplicationRow>()
+            runCatching {
+                supabase.postgrest
+                    .rpc("get_my_volunteer_applications_v2")
+                    .decodeList<MyVolunteerApplicationRow>()
+            }.getOrElse {
+                supabase.postgrest
+                    .rpc("get_my_volunteer_applications")
+                    .decodeList<MyVolunteerApplicationRow>()
+            }
         } catch (_: Exception) {
             null
         }
@@ -632,6 +743,10 @@ object VolunteerOpportunityRepository {
                             "COMPLETED" ->
                             VolunteerApplicationStatus.COMPLETED
 
+                        participation.completionStatus ==
+                            "NOT_COMPLETED" ->
+                            VolunteerApplicationStatus.NOT_COMPLETED
+
                         participation.applicationStatus ==
                             "ACCEPTED" ->
                             VolunteerApplicationStatus.ACCEPTED
@@ -758,11 +873,17 @@ object VolunteerOpportunityRepository {
                         row.verifiedMinutes?.let { minutes ->
                             (minutes + 59) / 60
                         },
-                    applicationVerifiedMinutes = row.verifiedMinutes,
+                    applicationVerifiedMinutes = row.verifiedMinutes
+                        ?: if (status == VolunteerApplicationStatus.NOT_COMPLETED) 0 else null,
                     applicationCertificateId = certificateId,
                     applicationCompletedDate =
                         row.completedAt?.let(::formatSubmittedDate),
                     applicationOrganisationFeedback = row.feedback,
+                    applicationCompletionReason = row.completionReason,
+                    applicationScreeningQuestions =
+                        row.screeningAnswers.map { it.questionText },
+                    applicationScreeningAnswers =
+                        row.screeningAnswers.map { it.answerText },
                     applicationVolunteerName = row.volunteerName,
                     applicationEventDate =
                         row.eventDate?.let(::formatDatabaseDate),
@@ -790,6 +911,8 @@ private fun applicationStatus(
     return when {
         completionStatus == "COMPLETED" ->
             VolunteerApplicationStatus.COMPLETED
+        completionStatus == "NOT_COMPLETED" ->
+            VolunteerApplicationStatus.NOT_COMPLETED
         applicationStatus == "ACCEPTED" ->
             VolunteerApplicationStatus.ACCEPTED
         applicationStatus == "DECLINED" ->
@@ -897,6 +1020,9 @@ private fun statusMessage(
 
         VolunteerApplicationStatus.COMPLETED ->
             "This volunteer role has been completed."
+
+        VolunteerApplicationStatus.NOT_COMPLETED ->
+            "The organisation did not verify this role as completed."
 
         VolunteerApplicationStatus.CANCELLED ->
             "You cancelled this application."
@@ -1217,6 +1343,10 @@ private data class MyVolunteerApplicationRow(
     @SerialName("completed_at")
     val completedAt: String? = null,
     val feedback: String? = null,
+    @SerialName("completion_reason")
+    val completionReason: String? = null,
+    @SerialName("screening_answers")
+    val screeningAnswers: List<ApplicationScreeningAnswerRow> = emptyList(),
     @SerialName("primary_skill_path")
     val primarySkillPath: String? = null,
     @SerialName("practised_skill_names")
@@ -1229,4 +1359,16 @@ private data class MyVolunteerApplicationRow(
     val eventLocation: String? = null,
     @SerialName("created_at")
     val createdAt: String
+)
+
+@Serializable
+private data class ApplicationScreeningAnswerRow(
+    @SerialName("question_no") val questionNo: Int,
+    @SerialName("question_text") val questionText: String,
+    @SerialName("answer_text") val answerText: String
+)
+
+@Serializable
+private data class SavedOpportunityIdRow(
+    @SerialName("post_id") val postId: String
 )

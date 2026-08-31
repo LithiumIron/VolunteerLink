@@ -86,6 +86,7 @@ data class VolunteerOpportunityEvent(
     val eventLatitude: Double? = null,
     val eventLongitude: Double? = null,
     val eventThumbnailPath: String? = null,
+    val eventIsSaved: Boolean = false,
     val eventDatabaseId: String = "",
     val eventStatus: String = "PUBLISHED"
 )
@@ -96,6 +97,7 @@ enum class VolunteerApplicationStatus {
     ACCEPTED,
     REJECTED,
     COMPLETED,
+    NOT_COMPLETED,
     CANCELLED
 }
 
@@ -116,6 +118,9 @@ data class VolunteerOpportunityApplication(
     val applicationCertificateId: String? = null,
     val applicationCompletedDate: String? = null,
     val applicationOrganisationFeedback: String? = null,
+    val applicationCompletionReason: String? = null,
+    val applicationScreeningQuestions: List<String> = emptyList(),
+    val applicationScreeningAnswers: List<String> = emptyList(),
     val applicationVolunteerName: String = "VolunteerLink Volunteer",
     val applicationEventDate: String? = null,
     val applicationEventTime: String? = null,

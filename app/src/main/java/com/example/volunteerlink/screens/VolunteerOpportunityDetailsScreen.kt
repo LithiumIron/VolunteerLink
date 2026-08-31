@@ -26,6 +26,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -71,6 +73,7 @@ import com.example.volunteerlink.ui.theme.VolunteerLinkWarning
 @Composable
 fun VolunteerOpportunityDetailsScreen(
     volunteerEventId: Int,
+    opportunityViewModel: VolunteerOpportunityViewModel,
     onBackSelected: () -> Unit,
     onLocationSelected: (Int) -> Unit,
     onVolunteerRoleSelected: (
@@ -99,6 +102,13 @@ fun VolunteerOpportunityDetailsScreen(
     ) {
         VolunteerOpportunityDetailsTopBar(
             onBackSelected = onBackSelected,
+            isSaved = volunteerOpportunityEvent.eventIsSaved,
+            onSavedSelected = {
+                opportunityViewModel.setOpportunitySaved(
+                    volunteerEventId,
+                    !volunteerOpportunityEvent.eventIsSaved
+                )
+            },
             onShareSelected = {
                 shareVolunteerOpportunity(
                     context = context,
@@ -177,6 +187,8 @@ fun VolunteerOpportunityDetailsScreen(
 @Composable
 private fun VolunteerOpportunityDetailsTopBar(
     onBackSelected: () -> Unit,
+    isSaved: Boolean,
+    onSavedSelected: () -> Unit,
     onShareSelected: () -> Unit
 ) {
     Row(
@@ -209,6 +221,20 @@ private fun VolunteerOpportunityDetailsTopBar(
             fontWeight = FontWeight.Bold,
             color = Color.White
         )
+
+        IconButton(onClick = onSavedSelected) {
+            Icon(
+                imageVector = if (isSaved) {
+                    Icons.Filled.Bookmark
+                } else {
+                    Icons.Filled.BookmarkBorder
+                },
+                contentDescription =
+                    if (isSaved) "Remove from saved opportunities"
+                    else "Save opportunity",
+                tint = Color.White
+            )
+        }
 
         TextButton(
             onClick = onShareSelected
@@ -751,6 +777,8 @@ private fun VolunteerOpportunityRoleCard(
                                         "Not selected"
                                     VolunteerApplicationStatus.COMPLETED ->
                                         "Completed"
+                                    VolunteerApplicationStatus.NOT_COMPLETED ->
+                                        "Not completed"
                                     VolunteerApplicationStatus.CANCELLED ->
                                         "Cancelled"
                                 }
@@ -1302,4 +1330,3 @@ private fun startVolunteerIntent(
         ).show()
     }
 }
-

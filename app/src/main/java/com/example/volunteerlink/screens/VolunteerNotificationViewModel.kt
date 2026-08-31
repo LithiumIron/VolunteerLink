@@ -13,6 +13,7 @@ import kotlinx.coroutines.launch
 data class VolunteerNotificationUiState(
     val isLoading: Boolean = true,
     val isMarkingRead: Boolean = false,
+    val isClearing: Boolean = false,
     val notifications: List<VolunteerNotification> = emptyList(),
     val errorMessage: String? = null
 ) {
@@ -94,6 +95,57 @@ class VolunteerNotificationViewModel : ViewModel() {
                         isMarkingRead = false,
                         errorMessage =
                             "Notifications could not be marked as read."
+                    )
+                }
+            }
+        }
+    }
+
+    fun dismiss(notification: VolunteerNotification) {
+        viewModelScope.launch {
+            mutableUiState.update { it.copy(isClearing = true, errorMessage = null) }
+            runCatching {
+                VolunteerNotificationRepository.dismiss(notification.stableKey)
+            }.onSuccess {
+                mutableUiState.update {
+                    it.copy(
+                        isClearing = false,
+                        notifications = it.notifications.filterNot { current ->
+                            current.stableKey == notification.stableKey
+                        }
+                    )
+                }
+            }.onFailure { exception ->
+                exception.printStackTrace()
+                mutableUiState.update {
+                    it.copy(
+                        isClearing = false,
+                        errorMessage = "Notification could not be cleared."
+                    )
+                }
+            }
+        }
+    }
+
+    fun dismissAll() {
+        val current = mutableUiState.value.notifications
+        if (current.isEmpty()) return
+        viewModelScope.launch {
+            mutableUiState.update { it.copy(isClearing = true, errorMessage = null) }
+            runCatching {
+                VolunteerNotificationRepository.dismissAll(
+                    current.map { it.stableKey }
+                )
+            }.onSuccess {
+                mutableUiState.update {
+                    it.copy(isClearing = false, notifications = emptyList())
+                }
+            }.onFailure { exception ->
+                exception.printStackTrace()
+                mutableUiState.update {
+                    it.copy(
+                        isClearing = false,
+                        errorMessage = "Notifications could not be cleared."
                     )
                 }
             }

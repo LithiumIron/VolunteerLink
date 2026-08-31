@@ -130,6 +130,15 @@ fun VolunteerRoleDetailsScreen(
                 eventId = volunteerEventId,
                 roleId = volunteerRoleId
             )
+    val volunteerCanReapply =
+        VolunteerOpportunitySessionStore.volunteerApplications.any {
+            it.applicationEventId == volunteerEventId &&
+                it.applicationRoleId == volunteerRoleId &&
+                it.applicationStatus in setOf(
+                    com.example.volunteerlink.model.VolunteerApplicationStatus.CANCELLED,
+                    com.example.volunteerlink.model.VolunteerApplicationStatus.REJECTED
+                )
+        }
 
     Column(
         modifier = Modifier
@@ -247,6 +256,7 @@ fun VolunteerRoleDetailsScreen(
                 eligibilityIsAvailable,
             volunteerHasApplied =
                 volunteerHasApplied,
+            volunteerCanReapply = volunteerCanReapply,
             onJoinRoleSelected = {
                 onJoinRoleSelected(
                     volunteerOpportunityEvent.eventId,
@@ -855,6 +865,7 @@ private fun VolunteerRoleJoinSection(
     eligibilityIsLoading: Boolean,
     eligibilityIsAvailable: Boolean,
     volunteerHasApplied: Boolean,
+    volunteerCanReapply: Boolean,
     onJoinRoleSelected: () -> Unit
 ) {
     Surface(
@@ -894,6 +905,8 @@ private fun VolunteerRoleJoinSection(
                     text =
                         if (volunteerHasApplied) {
                             "Already Registered"
+                        } else if (volunteerCanReapply) {
+                            "Apply Again"
                         } else if (eligibilityIsLoading) {
                             "Checking Skill Path Level..."
                         } else if (!eligibilityIsAvailable) {

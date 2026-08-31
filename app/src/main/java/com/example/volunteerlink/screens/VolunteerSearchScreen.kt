@@ -179,6 +179,7 @@ fun VolunteerSearchScreen(
                         event.eventDistanceKm != null &&
                             event.eventDistanceKm <= 10.0
                     "Long Term" -> event.eventIsLongTerm
+                    "Saved" -> event.eventIsSaved
                     else -> true
                 }
 
@@ -380,7 +381,8 @@ fun VolunteerSearchScreen(
                         "Physical",
                         "Near Me",
                         "Remote",
-                        "Long Term"
+                        "Long Term",
+                        "Saved"
                     ),
                     selectedOption = selectedModeFilter,
                     onSelected = { selectedModeFilter = it }
