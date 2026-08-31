@@ -51,8 +51,10 @@ object VolunteerNotificationRepository {
                         "APPLICATION_REJECTED"
                     com.example.volunteerlink.model.VolunteerApplicationStatus.COMPLETED ->
                         "CERTIFICATE_ISSUED"
+                    com.example.volunteerlink.model.VolunteerApplicationStatus.NOT_COMPLETED ->
+                        "APPLICATION_NOT_COMPLETED"
                     com.example.volunteerlink.model.VolunteerApplicationStatus.CANCELLED ->
-                        "SCHEDULE_CHANGED"
+                        "APPLICATION_CANCELLED"
                 }
 
                 VolunteerNotification(
@@ -90,5 +92,3 @@ object VolunteerNotificationRepository {
         }
     }
 }
-
-

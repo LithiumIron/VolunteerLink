@@ -751,6 +751,8 @@ private fun VolunteerOpportunityRoleCard(
                                         "Not selected"
                                     VolunteerApplicationStatus.COMPLETED ->
                                         "Completed"
+                                    VolunteerApplicationStatus.NOT_COMPLETED ->
+                                        "Not completed"
                                     VolunteerApplicationStatus.CANCELLED ->
                                         "Cancelled"
                                 }
@@ -1302,4 +1304,3 @@ private fun startVolunteerIntent(
         ).show()
     }
 }
-

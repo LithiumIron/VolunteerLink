@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -34,12 +36,14 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -90,7 +94,8 @@ fun VolunteerMyApplicationsScreen(
             "Pending",
             "Accepted",
             "Rejected",
-            "Completed"
+            "Completed",
+            "Not Completed"
         )
 
     val filteredApplications =
@@ -113,6 +118,10 @@ fun VolunteerMyApplicationsScreen(
                     "Completed" ->
                         volunteerApplication.applicationStatus ==
                             VolunteerApplicationStatus.COMPLETED
+
+                    "Not Completed" ->
+                        volunteerApplication.applicationStatus ==
+                            VolunteerApplicationStatus.NOT_COMPLETED
 
                     else -> true
                 }
@@ -291,6 +300,12 @@ fun VolunteerApplicationDetailsScreen(
         rememberSaveable {
             mutableStateOf(false)
         }
+    var shouldShowEditDialog by rememberSaveable { mutableStateOf(false) }
+    var shouldShowDeleteDialog by rememberSaveable { mutableStateOf(false) }
+    var shouldShowReapplyDialog by rememberSaveable { mutableStateOf(false) }
+    var selectedCancellationReason by rememberSaveable { mutableStateOf("") }
+    var cancellationDetails by rememberSaveable { mutableStateOf("") }
+    var formAnswers by remember { mutableStateOf(emptyList<String>()) }
 
     val volunteerApplication =
         VolunteerOpportunitySessionStore
@@ -488,8 +503,30 @@ fun VolunteerApplicationDetailsScreen(
                     }
 
                     if (
-                        volunteerApplication.applicationStatus ==
-                        VolunteerApplicationStatus.PENDING
+                        volunteerApplication.applicationStatus == VolunteerApplicationStatus.PENDING &&
+                        volunteerOpportunityRole?.roleExtraApplicationQuestions?.isNotEmpty() == true
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                val questions = volunteerOpportunityRole.roleExtraApplicationQuestions
+                                formAnswers = questions.mapIndexed { index, _ ->
+                                    volunteerApplication.applicationScreeningAnswers
+                                        .getOrElse(index) { "" }
+                                }
+                                shouldShowEditDialog = true
+                            },
+                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("Edit Application", fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    if (
+                        volunteerApplication.applicationStatus in setOf(
+                            VolunteerApplicationStatus.PENDING,
+                            VolunteerApplicationStatus.ACCEPTED
+                        )
                     ) {
                         TextButton(
                             onClick = {
@@ -502,6 +539,31 @@ fun VolunteerApplicationDetailsScreen(
                                 fontWeight = FontWeight.SemiBold,
                                 color = VolunteerLinkError
                             )
+                        }
+                    }
+
+                    if (volunteerApplication.applicationStatus in setOf(
+                            VolunteerApplicationStatus.CANCELLED,
+                            VolunteerApplicationStatus.REJECTED
+                        )) {
+                        Button(
+                            onClick = {
+                                val questions = volunteerOpportunityRole
+                                    ?.roleExtraApplicationQuestions.orEmpty()
+                                formAnswers = questions.map { "" }
+                                shouldShowReapplyDialog = true
+                            },
+                            modifier = Modifier.fillMaxWidth().height(50.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = VolunteerLinkPrimaryGreen
+                            )
+                        ) { Text("Apply Again", fontWeight = FontWeight.Bold) }
+
+                        TextButton(
+                            onClick = { shouldShowDeleteDialog = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Delete application record", color = VolunteerLinkError)
                         }
                     }
                 }
@@ -520,11 +582,33 @@ fun VolunteerApplicationDetailsScreen(
                 )
             },
             text = {
-                Column {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState())
+                ) {
                     Text(
                         text =
-                            "This application will be marked as cancelled."
+                            if (volunteerApplication.applicationStatus == VolunteerApplicationStatus.ACCEPTED)
+                                "The organisation has reserved this role for you. Cancelling will release your place and notify the organisation."
+                            else "Select why you need to cancel this application."
                     )
+
+                    Spacer(Modifier.height(10.dp))
+                    cancellationReasons.forEach { reason ->
+                        FilterChip(
+                            selected = selectedCancellationReason == reason,
+                            onClick = { selectedCancellationReason = reason },
+                            label = { Text(reason, fontSize = 11.sp) },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    if (selectedCancellationReason == "Other") {
+                        OutlinedTextField(
+                            value = cancellationDetails,
+                            onValueChange = { cancellationDetails = it },
+                            label = { Text("Please explain") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
 
                     opportunityUiState
                         .applicationActionError
@@ -545,14 +629,17 @@ fun VolunteerApplicationDetailsScreen(
                             .cancelApplication(
                                 applicationId =
                                     volunteerApplicationId,
+                                reason = selectedCancellationReason,
+                                details = cancellationDetails.trim(),
                                 onSuccess = {
                                     shouldShowCancelDialog = false
                                 }
                             )
                     },
                     enabled =
-                        !opportunityUiState
-                            .isApplicationActionRunning
+                        !opportunityUiState.isApplicationActionRunning &&
+                            selectedCancellationReason.isNotBlank() &&
+                            (selectedCancellationReason != "Other" || cancellationDetails.isNotBlank())
                 ) {
                     Text(
                         text =
@@ -579,7 +666,136 @@ fun VolunteerApplicationDetailsScreen(
             }
         )
     }
+
+    if (shouldShowEditDialog || shouldShowReapplyDialog) {
+        val isReapply = shouldShowReapplyDialog
+        val questions = volunteerOpportunityRole?.roleExtraApplicationQuestions.orEmpty()
+        AlertDialog(
+            onDismissRequest = {
+                shouldShowEditDialog = false
+                shouldShowReapplyDialog = false
+            },
+            title = { Text(if (isReapply) "Apply again" else "Edit application") },
+            text = {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    if (questions.isEmpty()) {
+                        Text("This role has no additional screening questions.")
+                    }
+                    questions.forEachIndexed { index, question ->
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = question,
+                                modifier = Modifier.fillMaxWidth(),
+                                fontSize = 13.sp,
+                                lineHeight = 18.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = VolunteerLinkTextPrimary
+                            )
+
+                            OutlinedTextField(
+                                value = formAnswers.getOrElse(index) { "" },
+                                onValueChange = { answer ->
+                                    formAnswers = formAnswers.toMutableList().also {
+                                        while (it.size <= index) {
+                                            it.add("")
+                                        }
+                                        it[index] = answer
+                                    }
+                                },
+                                label = {
+                                    Text("Your answer")
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                minLines = 2,
+                                maxLines = 5
+                            )
+                        }
+                    }
+                    opportunityUiState.applicationActionError?.let {
+                        Text(it, color = VolunteerLinkError, fontSize = 12.sp)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !opportunityUiState.isApplicationActionRunning &&
+                        formAnswers.all { it.isNotBlank() },
+                    onClick = {
+                        if (isReapply) {
+                            volunteerOpportunityViewModel.reapplyForRole(
+                                volunteerApplicationId,
+                                formAnswers
+                            ) { shouldShowReapplyDialog = false }
+                        } else {
+                            volunteerOpportunityViewModel.updatePendingApplication(
+                                volunteerApplicationId,
+                                formAnswers
+                            ) { shouldShowEditDialog = false }
+                        }
+                    }
+                ) {
+                    Text(if (opportunityUiState.isApplicationActionRunning) "Saving..." else "Save")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    shouldShowEditDialog = false
+                    shouldShowReapplyDialog = false
+                }) { Text("Back") }
+            }
+        )
+    }
+
+    if (shouldShowDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { shouldShowDeleteDialog = false },
+            title = { Text("Delete application record?") },
+            text = {
+                Column {
+                    Text("This permanently removes this cancelled or rejected application and its screening answers. This action cannot be undone.")
+                    opportunityUiState.applicationActionError?.let {
+                        Spacer(Modifier.height(8.dp))
+                        Text(it, color = VolunteerLinkError, fontSize = 12.sp)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !opportunityUiState.isApplicationActionRunning,
+                    onClick = {
+                        volunteerOpportunityViewModel.deleteApplication(
+                            volunteerApplicationId
+                        ) {
+                            shouldShowDeleteDialog = false
+                            onBackSelected()
+                        }
+                    }
+                ) { Text("Delete permanently", color = VolunteerLinkError) }
+            },
+            dismissButton = {
+                TextButton(onClick = { shouldShowDeleteDialog = false }) {
+                    Text("Keep record")
+                }
+            }
+        )
+    }
 }
+
+private val cancellationReasons = listOf(
+    "Schedule conflict",
+    "Personal or family emergency",
+    "Health reasons",
+    "Transportation issue",
+    "Unable to meet the role commitment",
+    "Location no longer suitable",
+    "Applied by mistake",
+    "Other"
+)
 
 @Composable
 private fun VolunteerApplicationsTopBar(
@@ -1070,6 +1286,23 @@ private fun volunteerApplicationTimelineSteps(
                 )
             )
 
+        VolunteerApplicationStatus.NOT_COMPLETED ->
+            listOf(
+                submitted,
+                VolunteerApplicationTimelineStep(
+                    title = "Organisation review completed",
+                    supportingText = "The organisation reviewed attendance and contribution evidence.",
+                    state = "COMPLETE"
+                ),
+                VolunteerApplicationTimelineStep(
+                    title = "Role not completed",
+                    supportingText = application.applicationCompletionReason
+                        ?.takeIf(String::isNotBlank)
+                        ?: "Attendance or completion requirements were not met.",
+                    state = "ERROR"
+                )
+            )
+
         VolunteerApplicationStatus.CANCELLED ->
             listOf(
                 submitted,
@@ -1183,6 +1416,15 @@ private fun VolunteerApplicationInformationCard(
                     VolunteerApplicationInformationRow(
                         label = "Reason",
                         value = rejectionReason
+                    )
+                }
+
+            volunteerApplication.applicationCompletionReason
+                ?.takeIf(String::isNotBlank)
+                ?.let { reason ->
+                    VolunteerApplicationInformationRow(
+                        label = "Completion reason",
+                        value = reason
                     )
                 }
 
@@ -1313,6 +1555,9 @@ private fun volunteerApplicationStatusText(
         VolunteerApplicationStatus.COMPLETED ->
             "Completed"
 
+        VolunteerApplicationStatus.NOT_COMPLETED ->
+            "Not Completed"
+
         VolunteerApplicationStatus.CANCELLED ->
             "Cancelled"
     }
@@ -1333,6 +1578,9 @@ private fun volunteerApplicationStatusColour(
 
         VolunteerApplicationStatus.COMPLETED ->
             VolunteerLinkInformation
+
+        VolunteerApplicationStatus.NOT_COMPLETED ->
+            VolunteerLinkError
 
         VolunteerApplicationStatus.CANCELLED ->
             VolunteerLinkTextSecondary

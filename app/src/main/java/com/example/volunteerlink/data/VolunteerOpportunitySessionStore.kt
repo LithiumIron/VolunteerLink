@@ -3,6 +3,7 @@ package com.example.volunteerlink.data
 
 import androidx.compose.runtime.mutableStateListOf
 import com.example.volunteerlink.data.location.VolunteerDistanceCalculator
+import com.example.volunteerlink.model.VolunteerApplicationStatus
 import com.example.volunteerlink.model.VolunteerOpportunityApplication
 import com.example.volunteerlink.model.VolunteerOpportunityEvent
 import com.example.volunteerlink.model.VolunteerOpportunityRole
@@ -96,7 +97,11 @@ object VolunteerOpportunitySessionStore {
     ): Boolean =
         volunteerApplications.any {
             it.applicationEventId == eventId &&
-                it.applicationRoleId == roleId
+                it.applicationRoleId == roleId &&
+                it.applicationStatus !in setOf(
+                    VolunteerApplicationStatus.CANCELLED,
+                    VolunteerApplicationStatus.REJECTED
+                )
         }
 
     fun snapshot(): VolunteerOpportunityDashboardData =

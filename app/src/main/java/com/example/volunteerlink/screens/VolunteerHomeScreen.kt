@@ -2007,6 +2007,9 @@ private fun VolunteerHomeCompactStatusBadge(
             VolunteerApplicationStatus.COMPLETED ->
                 "Completed"
 
+            VolunteerApplicationStatus.NOT_COMPLETED ->
+                "Not Completed"
+
             VolunteerApplicationStatus.CANCELLED ->
                 "Cancelled"
         }
@@ -2025,6 +2028,9 @@ private fun VolunteerHomeCompactStatusBadge(
             VolunteerApplicationStatus.COMPLETED ->
                 VolunteerLinkInformation
 
+            VolunteerApplicationStatus.NOT_COMPLETED ->
+                VolunteerLinkError
+
             VolunteerApplicationStatus.CANCELLED ->
                 VolunteerLinkTextSecondary
         }
@@ -2042,6 +2048,9 @@ private fun VolunteerHomeCompactStatusBadge(
 
             VolunteerApplicationStatus.COMPLETED ->
                 Color(0xFFE3F2FD)
+
+            VolunteerApplicationStatus.NOT_COMPLETED ->
+                Color(0xFFFFEBEE)
 
             VolunteerApplicationStatus.CANCELLED ->
                 Color(0xFFF1F1F1)

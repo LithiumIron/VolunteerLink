@@ -7,6 +7,8 @@ import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationManager
 import android.os.CancellationSignal
+import android.os.Handler
+import android.os.Looper
 import androidx.core.content.ContextCompat
 import androidx.core.location.LocationManagerCompat
 import androidx.core.util.Consumer
@@ -37,36 +39,64 @@ object DeviceLocationHelper {
         ) as LocationManager
 
         try {
-            val provider = when {
-                LocationManagerCompat.hasProvider(
+            val providers = buildList {
+                if (LocationManagerCompat.hasProvider(
                     locationManager,
                     LocationManager.NETWORK_PROVIDER
                 ) && locationManager.isProviderEnabled(
                     LocationManager.NETWORK_PROVIDER
-                ) -> LocationManager.NETWORK_PROVIDER
+                )) add(LocationManager.NETWORK_PROVIDER)
 
-                LocationManagerCompat.hasProvider(
+                if (LocationManagerCompat.hasProvider(
                     locationManager,
                     LocationManager.GPS_PROVIDER
                 ) && locationManager.isProviderEnabled(
                     LocationManager.GPS_PROVIDER
-                ) -> LocationManager.GPS_PROVIDER
-
-                else -> null
+                )) add(LocationManager.GPS_PROVIDER)
             }
 
-            if (provider == null) {
+            if (providers.isEmpty()) {
                 onResult(null)
                 return
             }
 
-            LocationManagerCompat.getCurrentLocation(
-                locationManager,
-                provider,
-                null as CancellationSignal?,
-                ContextCompat.getMainExecutor(context),
-                Consumer { location -> onResult(location) }
-            )
+            val handler = Handler(Looper.getMainLooper())
+            var completed = false
+            fun finish(location: Location?) {
+                if (!completed) {
+                    completed = true
+                    handler.removeCallbacksAndMessages(null)
+                    onResult(location)
+                }
+            }
+            fun request(index: Int) {
+                if (index >= providers.size) {
+                    val lastKnown = providers.asSequence()
+                        .mapNotNull { provider ->
+                            runCatching {
+                                locationManager.getLastKnownLocation(provider)
+                            }.getOrNull()
+                        }
+                        .maxByOrNull { it.time }
+                    finish(lastKnown)
+                    return
+                }
+                LocationManagerCompat.getCurrentLocation(
+                    locationManager,
+                    providers[index],
+                    null as CancellationSignal?,
+                    ContextCompat.getMainExecutor(context),
+                    Consumer { location ->
+                        if (location != null) finish(location)
+                        else request(index + 1)
+                    }
+                )
+            }
+            handler.postDelayed({
+                if (!completed) request(1)
+            }, 4_000L)
+            handler.postDelayed({ finish(null) }, 10_000L)
+            request(0)
         } catch (_: SecurityException) {
             onResult(null)
         } catch (_: IllegalArgumentException) {
