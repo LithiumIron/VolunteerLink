@@ -685,18 +685,36 @@ fun VolunteerApplicationDetailsScreen(
                         Text("This role has no additional screening questions.")
                     }
                     questions.forEachIndexed { index, question ->
-                        OutlinedTextField(
-                            value = formAnswers.getOrElse(index) { "" },
-                            onValueChange = { answer ->
-                                formAnswers = formAnswers.toMutableList().also {
-                                    while (it.size <= index) it.add("")
-                                    it[index] = answer
-                                }
-                            },
-                            label = { Text(question) },
+                        Column(
                             modifier = Modifier.fillMaxWidth(),
-                            minLines = 2
-                        )
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = question,
+                                modifier = Modifier.fillMaxWidth(),
+                                fontSize = 13.sp,
+                                lineHeight = 18.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = VolunteerLinkTextPrimary
+                            )
+
+                            OutlinedTextField(
+                                value = formAnswers.getOrElse(index) { "" },
+                                onValueChange = { answer ->
+                                    formAnswers = formAnswers.toMutableList().also {
+                                        while (it.size <= index) {
+                                            it.add("")
+                                        }
+                                        it[index] = answer
+                                    }
+                                },
+                                label = {
+                                    Text("Your answer")
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                minLines = 2
+                            )
+                        }
                     }
                     opportunityUiState.applicationActionError?.let {
                         Text(it, color = VolunteerLinkError, fontSize = 12.sp)
