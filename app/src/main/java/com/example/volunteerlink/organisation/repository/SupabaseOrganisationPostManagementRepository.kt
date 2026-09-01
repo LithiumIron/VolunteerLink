@@ -11,7 +11,7 @@ import com.example.volunteerlink.organisation.manage.model.PostManagementPhysica
 import com.example.volunteerlink.organisation.manage.model.PostManagementPost
 import com.example.volunteerlink.organisation.manage.model.PostManagementPendingReviewDecision
 import com.example.volunteerlink.organisation.manage.model.PostManagementRemoteDetails
-import com.example.volunteerlink.organisation.manage.model.PostManagementRemoteCompletionDecision
+import com.example.volunteerlink.organisation.manage.model.PostManagementRemoteMissingDecision
 import com.example.volunteerlink.organisation.manage.model.PostManagementRemoteSubmission
 import com.example.volunteerlink.organisation.manage.model.PostManagementRemoteSubmissionDecision
 import com.example.volunteerlink.organisation.manage.model.PostManagementRole
@@ -442,6 +442,7 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
     override suspend fun saveRemoteSubmissionReviewStage(
         postId: String,
         decisions: List<PostManagementRemoteSubmissionDecision>,
+        missingDecisions: List<PostManagementRemoteMissingDecision>,
         newEndDate: String?
     ) {
         requireOwnedPost(postId)
@@ -464,6 +465,27 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
                         })
                     }
                 })
+                put("p_missing_actions", buildJsonArray {
+                    missingDecisions.forEach { decision ->
+                        add(buildJsonObject {
+                            put("action", decision.action.name)
+                            val roleTemplateId = decision.roleTemplateId
+                                ?.takeIf { it.isNotBlank() }
+                            if (roleTemplateId == null) {
+                                put("role_template_id", JsonNull)
+                            } else {
+                                put("role_template_id", roleTemplateId)
+                            }
+
+                            val userId = decision.userId?.takeIf { it.isNotBlank() }
+                            if (userId == null) {
+                                put("user_id", JsonNull)
+                            } else {
+                                put("user_id", userId)
+                            }
+                        })
+                    }
+                })
                 if (newEndDate.isNullOrBlank()) {
                     put("p_new_end_date", JsonNull)
                 } else {
@@ -475,7 +497,6 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
 
     override suspend fun finalizeRemoteReviewBatch(
         postId: String,
-        decisions: List<PostManagementRemoteCompletionDecision>,
         feedbackByParticipation: Map<String, String>
     ) {
         requireOwnedPost(postId)
@@ -484,21 +505,6 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
             function = "organisation_finalize_remote_review_batch",
             parameters = buildJsonObject {
                 put("p_post_id", postId)
-                put("p_decisions", buildJsonArray {
-                    decisions.forEach { decision ->
-                        add(buildJsonObject {
-                            put("role_template_id", decision.roleTemplateId)
-                            put("user_id", decision.userId)
-                            put("decision", decision.decision.name)
-                            val reason = decision.reason
-                            if (reason.isNullOrBlank()) {
-                                put("reason", JsonNull)
-                            } else {
-                                put("reason", reason.trim())
-                            }
-                        })
-                    }
-                })
                 put("p_feedback", buildJsonArray {
                     feedbackByParticipation.forEach { (participationKey, feedback) ->
                         val splitAt = participationKey.indexOf("::")

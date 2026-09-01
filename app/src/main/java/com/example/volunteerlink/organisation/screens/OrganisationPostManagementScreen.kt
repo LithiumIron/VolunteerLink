@@ -53,6 +53,7 @@ import com.example.volunteerlink.organisation.manage.model.PostManagementRemoteR
 import com.example.volunteerlink.organisation.manage.model.PostManagementRemoteReviewSession
 import com.example.volunteerlink.organisation.manage.model.PostManagementRemoteReviewStage
 import com.example.volunteerlink.organisation.manage.model.PostManagementRemoteSubmission
+import com.example.volunteerlink.organisation.manage.model.PostManagementRemoteSubmissionDecisionType
 import com.example.volunteerlink.organisation.viewmodel.OrganisationPostManagementViewModel
 import com.example.volunteerlink.ui.theme.VolunteerLinkBackground
 import com.example.volunteerlink.ui.theme.VolunteerLinkPrimaryGreen
@@ -147,8 +148,6 @@ fun OrganisationPostManagementScreen(
             onSetRemoteMissingAction = viewModel::setRemoteMissingAction,
             onSetRemoteReviewNewEndDate = viewModel::setRemoteReviewNewEndDate,
             onSaveRemoteSubmissionStage = viewModel::saveRemoteSubmissionReviewStage,
-            onSetRemoteCompletionDecision = viewModel::setRemoteCompletionDecision,
-            onChangeRemoteCompletionDecision = viewModel::changeRemoteCompletionDecision,
             onSetRemoteFeedback = viewModel::setRemoteFeedback,
             onRemoteReviewStageChange = viewModel::setRemoteReviewStage,
             onFinalizeRemoteReview = viewModel::finalizeRemoteReviewPost,
@@ -186,7 +185,7 @@ fun OrganisationPostManagementScreen(
                     Text(
                         text = when {
                             isRemoteFinalize ->
-                                "Saving Remote completion decisions and final feedback. Please wait."
+                                "Saving final Remote feedback and completing the project. Please wait."
                             isRemoteOperation ->
                                 "Saving submission decisions and the project-wide deadline. Please wait."
                             else ->
@@ -336,8 +335,6 @@ private fun OrganisationPostManagementContent(
     onSetRemoteMissingAction: (String, Boolean) -> Unit,
     onSetRemoteReviewNewEndDate: (String?) -> Unit,
     onSaveRemoteSubmissionStage: () -> Unit,
-    onSetRemoteCompletionDecision: (PostManagementPerson, Boolean, String?) -> Unit,
-    onChangeRemoteCompletionDecision: (PostManagementPerson) -> Unit,
     onSetRemoteFeedback: (PostManagementPerson, String) -> Unit,
     onRemoteReviewStageChange: (PostManagementRemoteReviewStage) -> Unit,
     onFinalizeRemoteReview: () -> Unit,
@@ -584,6 +581,18 @@ private fun OrganisationPostManagementContent(
                 PostManagementSummaryCard(post)
             }
 
+            if (!remoteReviewActionMessage.isNullOrBlank() && !showRemoteReview) {
+                item(key = "remote_review_saved_message") {
+                    Text(
+                        text = remoteReviewActionMessage,
+                        fontSize = 11.sp,
+                        lineHeight = 16.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = VolunteerLinkPrimaryGreen
+                    )
+                }
+            }
+
             item(key = "post_tabs") {
                 PostManagementMainTabs(
                     selected = selectedTab,
@@ -775,6 +784,8 @@ private fun OrganisationPostManagementContent(
                                 val showRemoteIndividualSubmission =
                                     selectedPeopleTab == PostManagementPeopleTab.VOLUNTEERS &&
                                         person.roleMode.equals("REMOTE", ignoreCase = true) &&
+                                        person.completionStatus.uppercase(Locale.US) in
+                                            setOf("IN_PROGRESS", "NEEDS_REVIEW") &&
                                         post.remoteTimingState == PostTimingState.ONGOING &&
                                         post.remote?.submissionMode.equals("INDIVIDUAL", ignoreCase = true)
 
@@ -891,8 +902,6 @@ private fun OrganisationPostManagementContent(
                                 onMissingAction = onSetRemoteMissingAction,
                                 onNewEndDateChange = onSetRemoteReviewNewEndDate,
                                 onSaveSubmissionStage = onSaveRemoteSubmissionStage,
-                                onCompletionDecision = onSetRemoteCompletionDecision,
-                                onChangeCompletionDecision = onChangeRemoteCompletionDecision,
                                 onFeedbackChange = onSetRemoteFeedback,
                                 onStageChange = onRemoteReviewStageChange,
                                 onFinalize = onFinalizeRemoteReview,
@@ -1019,7 +1028,13 @@ private fun OrganisationPostManagementContent(
             onRequestRevision = {
                 if (!isRemoteSubmissionBusy && canReview) {
                     remoteSubmissionReviewError = null
-                    revisionFeedback = ""
+                    revisionFeedback = remoteReviewSession.submissionDecisions
+                        .firstOrNull { draft ->
+                            draft.submissionId == submission.submissionId &&
+                                draft.decision == PostManagementRemoteSubmissionDecisionType.REQUEST_REVISION
+                        }
+                        ?.feedback
+                        .orEmpty()
                     revisionSubmission = submission
                 }
             },
@@ -1052,10 +1067,16 @@ private fun OrganisationPostManagementContent(
     }
 
     revisionSubmission?.let { submission ->
+        val isEditingRevisionDraft = showRemoteReview &&
+            remoteReviewSession.submissionDecisions.any { draft ->
+                draft.submissionId == submission.submissionId &&
+                    draft.decision == PostManagementRemoteSubmissionDecisionType.REQUEST_REVISION
+            }
         PostManagementRequestRevisionDialog(
             isShared = submission.submissionType.equals("SHARED", ignoreCase = true),
             dueDate = post.remote?.effectiveEndDate.orEmpty(),
             feedback = revisionFeedback,
+            isEditingDraft = isEditingRevisionDraft,
             needsProjectDeadlineExtension = showRemoteReview,
             isSaving = isReviewingRemoteSubmission,
             errorMessage = remoteSubmissionReviewError,

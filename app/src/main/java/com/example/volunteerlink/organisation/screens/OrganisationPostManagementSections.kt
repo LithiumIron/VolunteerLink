@@ -1764,7 +1764,7 @@ internal fun PostManagementRemoteSubmissionDialog(
                                 color = VolunteerLinkTextPrimary
                             )
                             Text(
-                                text = "Accept confirms this submitted work only. Final volunteer completion is decided later.",
+                                text = "Accept confirms the submitted work. No separate Remote completion decision is needed; accepted work becomes Completed automatically during final Remote review.",
                                 modifier = Modifier.padding(top = 4.dp),
                                 fontSize = 9.sp,
                                 lineHeight = 14.sp,
@@ -1841,6 +1841,7 @@ internal fun PostManagementRequestRevisionDialog(
     isShared: Boolean,
     dueDate: String,
     feedback: String,
+    isEditingDraft: Boolean = false,
     needsProjectDeadlineExtension: Boolean = false,
     isSaving: Boolean,
     errorMessage: String?,
@@ -1854,7 +1855,7 @@ internal fun PostManagementRequestRevisionDialog(
         },
         title = {
             Text(
-                text = "Request Revision",
+                text = if (isEditingDraft) "Edit Revision Request" else "Request Revision",
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 color = VolunteerLinkTextPrimary
@@ -1897,7 +1898,11 @@ internal fun PostManagementRequestRevisionDialog(
 
                 Text(
                     text = if (needsProjectDeadlineExtension) {
-                        "This is a draft revision request. After reviewing all unresolved work, set one new project-wide deadline in the Submission stage."
+                        if (isEditingDraft) {
+                            "Update the draft feedback here. It will be committed together with the Submission stage and the new project deadline."
+                        } else {
+                            "This is a draft revision request. After reviewing all unresolved work, set one new project-wide deadline in the Submission stage."
+                        }
                     } else {
                         "The existing project deadline stays the same while the project is ongoing."
                     },
@@ -1926,7 +1931,11 @@ internal fun PostManagementRequestRevisionDialog(
                 )
             ) {
                 Text(
-                    text = if (isSaving) "Saving..." else "Request Revision",
+                    text = when {
+                        isSaving -> "Saving..."
+                        isEditingDraft -> "Update Request"
+                        else -> "Request Revision"
+                    },
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -1967,9 +1976,9 @@ internal fun PostManagementAcceptSubmissionDialog(
             Column {
                 Text(
                     text = if (isShared) {
-                        "This accepts the shared team deliverable. It does not automatically complete every volunteer."
+                        "This accepts the shared team deliverable. No separate Remote completion decision is needed; unresolved Remote team members become Completed automatically during final Remote review."
                     } else {
-                        "This accepts the volunteer's submitted work. Final volunteer completion is still decided later."
+                        "This accepts the volunteer's submitted work. No separate Remote completion decision is needed; accepted work becomes Completed automatically during final Remote review."
                     },
                     fontSize = 11.sp,
                     lineHeight = 16.sp,

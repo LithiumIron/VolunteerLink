@@ -22,8 +22,8 @@ import com.example.volunteerlink.organisation.manage.model.PostManagementPhysica
 import com.example.volunteerlink.organisation.manage.model.PostManagementPhysicalReviewEntry
 import com.example.volunteerlink.organisation.manage.model.PostManagementPhysicalAttendance
 import com.example.volunteerlink.organisation.manage.model.PostManagementPost
-import com.example.volunteerlink.organisation.manage.model.PostManagementRemoteCompletionDecision
 import com.example.volunteerlink.organisation.manage.model.PostManagementRemoteMissingAction
+import com.example.volunteerlink.organisation.manage.model.PostManagementRemoteMissingDecision
 import com.example.volunteerlink.organisation.manage.model.PostManagementRemoteReview
 import com.example.volunteerlink.organisation.manage.model.PostManagementRemoteReviewItem
 import com.example.volunteerlink.organisation.manage.model.PostManagementRemoteReviewSession
@@ -195,8 +195,14 @@ class OrganisationPostManagementViewModel : ViewModel() {
             missingActions = session.missingActions - item.itemKey,
             touched = false
         )
-        if (!remoteExtensionRequired(review, updated)) {
-            updated = updated.copy(newEndDate = null)
+        updated = when {
+            remoteExtensionRequired(review, updated) && updated.newEndDate.isNullOrBlank() ->
+                updated.copy(newEndDate = minimumRemoteExtensionDate(review))
+
+            !remoteExtensionRequired(review, updated) ->
+                updated.copy(newEndDate = null)
+
+            else -> updated
         }
         updateRemoteReviewSession(updated)
         _uiState.value = _uiState.value.copy(remoteReviewActionMessage = null)
@@ -213,7 +219,7 @@ class OrganisationPostManagementViewModel : ViewModel() {
         updateRemoteReviewSession(updated)
     }
 
-    /** Missing work and an expired revision request both use the same project-wide extension rule. */
+    /** Missing Remote work can either stay open under one extension or be finalized as Not Completed. */
     fun setRemoteMissingAction(
         itemKey: String,
         giveMoreTime: Boolean
@@ -232,7 +238,15 @@ class OrganisationPostManagementViewModel : ViewModel() {
             )
         }
         var updated = session.copy(missingActions = updatedActions, touched = false)
-        if (!remoteExtensionRequired(review, updated)) updated = updated.copy(newEndDate = null)
+        updated = when {
+            remoteExtensionRequired(review, updated) && updated.newEndDate.isNullOrBlank() ->
+                updated.copy(newEndDate = minimumRemoteExtensionDate(review))
+
+            !remoteExtensionRequired(review, updated) ->
+                updated.copy(newEndDate = null)
+
+            else -> updated
+        }
         updateRemoteReviewSession(updated)
         _uiState.value = _uiState.value.copy(remoteReviewActionMessage = null)
     }
@@ -262,26 +276,17 @@ class OrganisationPostManagementViewModel : ViewModel() {
             }
         }
         if (unresolvedItem != null) {
+            val unresolvedName = unresolvedItem.person?.fullName
+                ?: if (unresolvedItem.isShared) "the Shared Team deliverable" else unresolvedItem.roleName
             _uiState.value = _uiState.value.copy(
-                remoteReviewActionMessage = "Review every unresolved deliverable before continuing."
+                remoteReviewActionMessage =
+                    "Still unresolved: $unresolvedName. Choose a submission decision or a missing-work action first."
             )
             return
         }
 
         val requiresExtension = remoteExtensionRequired(review, session)
         if (requiresExtension) {
-            val continueWithout = review.items.firstOrNull { item ->
-                session.missingActionFor(item.itemKey) ==
-                    PostManagementRemoteMissingAction.CONTINUE_WITHOUT_WORK
-            }
-            if (continueWithout != null) {
-                _uiState.value = _uiState.value.copy(
-                    remoteReviewActionMessage =
-                        "A deadline extension applies to every unresolved deliverable. Change Continue Without Submission to Give More Time before extending."
-                )
-                return
-            }
-
             val newDate = session.newEndDate
             if (!isValidRemoteExtensionDate(
                     currentDeadline = review.currentDeadline,
@@ -297,10 +302,28 @@ class OrganisationPostManagementViewModel : ViewModel() {
             }
         }
 
-        // No database change is needed if all rows were already resolved and the
-        // only local choices were Continue Without Work for genuinely missing work.
-        if (session.submissionDecisions.isEmpty() && !requiresExtension) {
-            updateRemoteReviewSession(session.copy(stage = PostManagementRemoteReviewStage.COMPLETION))
+        val missingDecisions = review.items.mapNotNull { item ->
+            val action = session.missingActionFor(item.itemKey) ?: return@mapNotNull null
+            PostManagementRemoteMissingDecision(
+                // SHARED_TEAM mode is already stored in remote_details, so the
+                // RPC receives no duplicated submission-type value.
+                roleTemplateId = if (item.isShared) null else item.roleTemplateId,
+                userId = if (item.isShared) null else item.userId,
+                action = action
+            )
+        }
+
+        // If every deliverable was already resolved in the database there is
+        // nothing to write in the Submission stage.
+        if (
+            review.items.isEmpty() &&
+            session.submissionDecisions.isEmpty() &&
+            missingDecisions.isEmpty() &&
+            !requiresExtension
+        ) {
+            updateRemoteReviewSession(
+                session.copy(stage = PostManagementRemoteReviewStage.FEEDBACK)
+            )
             _uiState.value = _uiState.value.copy(remoteReviewActionMessage = null)
             return
         }
@@ -315,6 +338,7 @@ class OrganisationPostManagementViewModel : ViewModel() {
                 repository.saveRemoteSubmissionReviewStage(
                     postId = currentPost.postId,
                     decisions = session.submissionDecisions,
+                    missingDecisions = missingDecisions,
                     newEndDate = if (requiresExtension) session.newEndDate else null
                 )
 
@@ -322,8 +346,9 @@ class OrganisationPostManagementViewModel : ViewModel() {
                     PostManagementRemoteReviewSession()
                 } else {
                     session.copy(
-                        stage = PostManagementRemoteReviewStage.COMPLETION,
+                        stage = PostManagementRemoteReviewStage.FEEDBACK,
                         submissionDecisions = emptyList(),
+                        missingActions = emptyMap(),
                         newEndDate = null,
                         touched = false
                     )
@@ -337,12 +362,20 @@ class OrganisationPostManagementViewModel : ViewModel() {
                     isUpdatingReview = _uiState.value.isUpdatingReview,
                     reviewActionMessage = _uiState.value.reviewActionMessage
                 )
+                val continuedWithoutWork = missingDecisions.any {
+                    it.action == PostManagementRemoteMissingAction.CONTINUE_WITHOUT_WORK
+                }
                 _uiState.value = _uiState.value.copy(
                     isUpdatingRemoteReview = false,
-                    remoteReviewActionMessage = if (requiresExtension) {
-                        "Deadline extended. The Remote project is Active again for unresolved work."
-                    } else {
-                        null
+                    remoteReviewActionMessage = when {
+                        requiresExtension && continuedWithoutWork ->
+                            "Deadline extended for Remote work kept open. Continue Without Submission/Revision outcomes were saved as Not Completed."
+                        requiresExtension ->
+                            "Deadline extended successfully. The Remote project is Ongoing again until the new deadline."
+                        continuedWithoutWork ->
+                            "Submission outcomes saved. Accepted work is Completed automatically; missing or rejected work is Not Completed."
+                        else ->
+                            "Submission outcomes saved. Accepted work is Completed automatically."
                     }
                 )
             } catch (exception: Exception) {
@@ -355,70 +388,12 @@ class OrganisationPostManagementViewModel : ViewModel() {
         }
     }
 
-    fun setRemoteCompletionDecision(
-        person: PostManagementPerson,
-        completed: Boolean,
-        reason: String?
-    ) {
+    fun setRemoteFeedback(person: PostManagementPerson, feedback: String) {
         val review = _uiState.value.post?.remoteReview ?: return
         if (!review.canEdit) return
-        if (completed && !review.canComplete(person)) {
-            _uiState.value = _uiState.value.copy(
-                remoteReviewActionMessage = "Only a volunteer with accepted Remote work can be marked Completed."
-            )
-            return
-        }
-        val cleanReason = reason?.trim()?.takeIf { it.isNotEmpty() }
-        if (!completed && cleanReason == null) return
+        if (!person.completionStatus.equals("COMPLETED", ignoreCase = true)) return
 
         val session = _uiState.value.remoteReviewSession
-        val withoutCurrent = session.completionDecisions.filterNot {
-            it.roleTemplateId == person.roleTemplateId && it.userId == person.userId
-        }
-        val decision = PostManagementRemoteCompletionDecision(
-            roleTemplateId = person.roleTemplateId,
-            userId = person.userId,
-            decision = if (completed) {
-                PostManagementPendingDecisionType.COMPLETED
-            } else {
-                PostManagementPendingDecisionType.NOT_COMPLETED
-            },
-            reason = if (completed) null else cleanReason
-        )
-        val key = remoteReviewParticipationKey(person.roleTemplateId, person.userId)
-        updateRemoteReviewSession(
-            session.copy(
-                completionDecisions = withoutCurrent + decision,
-                feedbackByParticipation = if (completed) {
-                    session.feedbackByParticipation
-                } else {
-                    session.feedbackByParticipation - key
-                },
-                touched = false
-            )
-        )
-        _uiState.value = _uiState.value.copy(remoteReviewActionMessage = null)
-    }
-
-    fun changeRemoteCompletionDecision(person: PostManagementPerson) {
-        val session = _uiState.value.remoteReviewSession
-        val key = remoteReviewParticipationKey(person.roleTemplateId, person.userId)
-        updateRemoteReviewSession(
-            session.copy(
-                completionDecisions = session.completionDecisions.filterNot {
-                    it.roleTemplateId == person.roleTemplateId && it.userId == person.userId
-                },
-                feedbackByParticipation = session.feedbackByParticipation - key,
-                touched = false
-            )
-        )
-    }
-
-    fun setRemoteFeedback(person: PostManagementPerson, feedback: String) {
-        val session = _uiState.value.remoteReviewSession
-        val decision = session.completionDecisionFor(person.roleTemplateId, person.userId)
-            ?: return
-        if (decision.decision != PostManagementPendingDecisionType.COMPLETED) return
         val key = remoteReviewParticipationKey(person.roleTemplateId, person.userId)
         val clean = feedback.trim()
         val updated = session.feedbackByParticipation.toMutableMap().apply {
@@ -454,30 +429,14 @@ class OrganisationPostManagementViewModel : ViewModel() {
         val session = _uiState.value.remoteReviewSession
         if (!review.canEdit || _uiState.value.isUpdatingRemoteReview) return
 
-        val allDecided = review.participants.all { person ->
-            session.completionDecisionFor(person.roleTemplateId, person.userId) != null
+        val unresolved = review.participants.firstOrNull { person ->
+            person.completionStatus.uppercase(Locale.US) in setOf("IN_PROGRESS", "NEEDS_REVIEW")
         }
-        if (!allDecided) {
+        if (unresolved != null) {
             _uiState.value = _uiState.value.copy(
-                remoteReviewSession = session.copy(stage = PostManagementRemoteReviewStage.COMPLETION),
-                remoteReviewActionMessage = "Every Remote volunteer needs a completion decision before finalizing."
-            )
-            return
-        }
-
-        val invalid = session.completionDecisions.firstOrNull { decision ->
-            (decision.decision == PostManagementPendingDecisionType.NOT_COMPLETED && decision.reason.isNullOrBlank()) ||
-                (decision.decision == PostManagementPendingDecisionType.COMPLETED &&
-                    !review.canComplete(
-                        review.participants.first { person ->
-                            person.roleTemplateId == decision.roleTemplateId && person.userId == decision.userId
-                        }
-                    ))
-        }
-        if (invalid != null) {
-            _uiState.value = _uiState.value.copy(
-                remoteReviewSession = session.copy(stage = PostManagementRemoteReviewStage.COMPLETION),
-                remoteReviewActionMessage = "Check the Remote completion decisions before finalizing."
+                remoteReviewSession = session.copy(stage = PostManagementRemoteReviewStage.SUBMISSION),
+                remoteReviewActionMessage =
+                    "Some Remote work is still unresolved. Return to Submission Review first."
             )
             return
         }
@@ -491,7 +450,6 @@ class OrganisationPostManagementViewModel : ViewModel() {
             try {
                 repository.finalizeRemoteReviewBatch(
                     postId = currentPost.postId,
-                    decisions = session.completionDecisions,
                     feedbackByParticipation = session.feedbackByParticipation
                 )
             } catch (exception: Exception) {
@@ -503,16 +461,7 @@ class OrganisationPostManagementViewModel : ViewModel() {
                 return@launch
             }
 
-            val decisionByKey = session.completionDecisions.associateBy {
-                it.roleTemplateId to it.userId
-            }
-            val locallyCompletedPost = currentPost.copy(
-                databaseStatus = "COMPLETED",
-                people = currentPost.people.map { person ->
-                    val decision = decisionByKey[person.roleTemplateId to person.userId]
-                    if (decision == null) person else person.copy(completionStatus = decision.decision.name)
-                }
-            )
+            val locallyCompletedPost = currentPost.copy(databaseStatus = "COMPLETED")
             cachedPost = locallyCompletedPost
             _uiState.value = _uiState.value.copy(
                 remoteReviewSession = PostManagementRemoteReviewSession(),
@@ -552,6 +501,17 @@ class OrganisationPostManagementViewModel : ViewModel() {
         } || review.items.any { item ->
             session.missingActionFor(item.itemKey) == PostManagementRemoteMissingAction.GIVE_MORE_TIME
         }
+    }
+
+    private fun minimumRemoteExtensionDate(review: PostManagementRemoteReview): String {
+        val parser = SimpleDateFormat(DATE_PATTERN, Locale.US).apply { isLenient = false }
+        val current = runCatching { parser.parse(review.currentDeadline) }.getOrNull()
+        val today = runCatching { parser.parse(review.todayDate) }.getOrNull()
+        val base = listOfNotNull(current, today).maxByOrNull { it.time } ?: Date()
+        return Calendar.getInstance().apply {
+            time = base
+            add(Calendar.DAY_OF_YEAR, 1)
+        }.let { parser.format(it.time) }
     }
 
     private fun isValidRemoteExtensionDate(
@@ -1234,15 +1194,12 @@ class OrganisationPostManagementViewModel : ViewModel() {
         ) return null
 
         val participants = post.volunteers
-            .filter { person ->
-                person.roleMode.equals("REMOTE", ignoreCase = true) &&
-                    (
-                        post.databaseStatus.equals("COMPLETED", ignoreCase = true) ||
-                            person.completionStatus.uppercase(Locale.US) in
-                            setOf("IN_PROGRESS", "NEEDS_REVIEW")
-                    )
-            }
+            .filter { person -> person.roleMode.equals("REMOTE", ignoreCase = true) }
             .sortedWith(compareBy<PostManagementPerson> { it.roleName }.thenBy { it.fullName })
+
+        val unresolvedParticipants = participants.filter { person ->
+            person.completionStatus.uppercase(Locale.US) in setOf("IN_PROGRESS", "NEEDS_REVIEW")
+        }
 
         fun latest(rows: List<PostManagementRemoteSubmission>): PostManagementRemoteSubmission? =
             rows.maxWithOrNull(
@@ -1267,32 +1224,36 @@ class OrganisationPostManagementViewModel : ViewModel() {
         }
 
         val items = if (remote.submissionMode.equals("SHARED_TEAM", ignoreCase = true)) {
-            val shared = latest(
-                post.remoteSubmissions.filter {
-                    it.submissionType.equals("SHARED", ignoreCase = true)
-                }
-            )
-            val responsibleRole = post.roles.firstOrNull {
-                it.roleTemplateId == remote.responsibleRoleTemplateId
-            }
-            listOf(
-                PostManagementRemoteReviewItem(
-                    itemKey = "SHARED",
-                    submissionType = "SHARED",
-                    roleTemplateId = remote.responsibleRoleTemplateId,
-                    userId = null,
-                    person = null,
-                    roleName = responsibleRole?.roleName ?: "Submitting role",
-                    requirement = remote.sharedDeliverable,
-                    latestSubmission = shared,
-                    submittedByName = shared?.userId?.let { submitterId ->
-                        participants.firstOrNull { it.userId == submitterId }?.fullName
-                    },
-                    isResubmission = shared?.let(::isResubmission) == true
+            if (unresolvedParticipants.isEmpty()) {
+                emptyList()
+            } else {
+                val shared = latest(
+                    post.remoteSubmissions.filter {
+                        it.submissionType.equals("SHARED", ignoreCase = true)
+                    }
                 )
-            )
+                val responsibleRole = post.roles.firstOrNull {
+                    it.roleTemplateId == remote.responsibleRoleTemplateId
+                }
+                listOf(
+                    PostManagementRemoteReviewItem(
+                        itemKey = "SHARED",
+                        submissionType = "SHARED",
+                        roleTemplateId = remote.responsibleRoleTemplateId,
+                        userId = null,
+                        person = null,
+                        roleName = responsibleRole?.roleName ?: "Submitting role",
+                        requirement = remote.sharedDeliverable,
+                        latestSubmission = shared,
+                        submittedByName = shared?.userId?.let { submitterId ->
+                            participants.firstOrNull { it.userId == submitterId }?.fullName
+                        },
+                        isResubmission = shared?.let(::isResubmission) == true
+                    )
+                )
+            }
         } else {
-            participants.map { person ->
+            unresolvedParticipants.map { person ->
                 val role = post.roles.firstOrNull { it.roleTemplateId == person.roleTemplateId }
                 val individual = latest(
                     post.remoteSubmissions.filter { submission ->

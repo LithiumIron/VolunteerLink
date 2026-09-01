@@ -37,7 +37,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.volunteerlink.organisation.manage.model.PostManagementEvaluation
-import com.example.volunteerlink.organisation.manage.model.PostManagementPendingDecisionType
 import com.example.volunteerlink.organisation.manage.model.PostManagementPerson
 import com.example.volunteerlink.organisation.manage.model.PostManagementRemoteMissingAction
 import com.example.volunteerlink.organisation.manage.model.PostManagementRemoteReview
@@ -74,8 +73,6 @@ internal fun PostManagementRemoteReviewContent(
     onMissingAction: (String, Boolean) -> Unit,
     onNewEndDateChange: (String?) -> Unit,
     onSaveSubmissionStage: () -> Unit,
-    onCompletionDecision: (PostManagementPerson, Boolean, String?) -> Unit,
-    onChangeCompletionDecision: (PostManagementPerson) -> Unit,
     onFeedbackChange: (PostManagementPerson, String) -> Unit,
     onStageChange: (PostManagementRemoteReviewStage) -> Unit,
     onFinalize: () -> Unit,
@@ -83,8 +80,6 @@ internal fun PostManagementRemoteReviewContent(
     modifier: Modifier = Modifier
 ) {
     val stage = if (review.canEdit) session.stage else PostManagementRemoteReviewStage.FINISH
-    var notCompletedPerson by remember { mutableStateOf<PostManagementPerson?>(null) }
-    var notCompletedReason by remember { mutableStateOf("") }
     var confirmFinalize by rememberSaveable { mutableStateOf(false) }
 
     Column(
@@ -108,28 +103,14 @@ internal fun PostManagementRemoteReviewContent(
                 onContinue = onSaveSubmissionStage
             )
 
-            PostManagementRemoteReviewStage.COMPLETION -> RemoteCompletionReviewStage(
-                review = review,
-                session = session,
-                busy = isSaving,
-                onBack = { onStageChange(PostManagementRemoteReviewStage.SUBMISSION) },
-                onContinue = { onStageChange(PostManagementRemoteReviewStage.FEEDBACK) },
-                onCompleted = { person -> onCompletionDecision(person, true, null) },
-                onNotCompleted = { person ->
-                    notCompletedReason = ""
-                    notCompletedPerson = person
-                },
-                onChangeDecision = onChangeCompletionDecision,
-                onViewProfile = onViewProfile
-            )
-
             PostManagementRemoteReviewStage.FEEDBACK -> RemoteFeedbackReviewStage(
                 review = review,
                 session = session,
                 busy = isSaving,
                 onFeedbackChange = onFeedbackChange,
-                onBack = { onStageChange(PostManagementRemoteReviewStage.COMPLETION) },
-                onContinue = { onStageChange(PostManagementRemoteReviewStage.FINISH) }
+                onBack = { onStageChange(PostManagementRemoteReviewStage.SUBMISSION) },
+                onContinue = { onStageChange(PostManagementRemoteReviewStage.FINISH) },
+                onViewProfile = onViewProfile
             )
 
             PostManagementRemoteReviewStage.FINISH -> RemoteFinishReviewStage(
@@ -143,61 +124,13 @@ internal fun PostManagementRemoteReviewContent(
         }
     }
 
-    notCompletedPerson?.let { person ->
-        AlertDialog(
-            onDismissRequest = { if (!isSaving) notCompletedPerson = null },
-            title = { RemoteReviewDialogTitle("Mark Not Completed") },
-            text = {
-                Column {
-                    Text(
-                        text = "Give a clear reason for ${person.fullName}. This reason becomes part of the final Remote evaluation.",
-                        fontSize = 12.sp,
-                        lineHeight = 18.sp,
-                        color = VolunteerLinkTextSecondary
-                    )
-                    OutlinedTextField(
-                        value = notCompletedReason,
-                        onValueChange = { notCompletedReason = it },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 12.dp),
-                        label = { Text("Reason") },
-                        placeholder = { Text("Why was the participation not completed?") },
-                        minLines = 3,
-                        maxLines = 5,
-                        enabled = !isSaving
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    enabled = !isSaving && notCompletedReason.isNotBlank(),
-                    onClick = {
-                        onCompletionDecision(person, false, notCompletedReason.trim())
-                        notCompletedPerson = null
-                        notCompletedReason = ""
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = VolunteerLinkWarning)
-                ) {
-                    Text("Save Decision", fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                TextButton(enabled = !isSaving, onClick = { notCompletedPerson = null }) {
-                    Text("Cancel")
-                }
-            },
-            containerColor = VolunteerLinkSurface
-        )
-    }
-
     if (confirmFinalize) {
         AlertDialog(
             onDismissRequest = { if (!isSaving) confirmFinalize = false },
             title = { RemoteReviewDialogTitle("Finalize Remote project?") },
             text = {
                 Text(
-                    text = "This is the final save. Completion decisions and final feedback will be committed, certificates and verified skills will be issued only for Completed volunteers, and the project becomes read-only.",
+                    text = "This is the final save. Submission Review has already settled every volunteer outcome. Optional feedback will be saved, certificates and verified skills will be issued only for Completed volunteers, and the project becomes read-only.",
                     fontSize = 13.sp,
                     lineHeight = 19.sp,
                     color = VolunteerLinkTextSecondary
@@ -244,7 +177,7 @@ private fun RemoteReviewFlowHeader(
             text = if (finalized) {
                 "This Remote review is finalized and read-only."
             } else {
-                "Review one stage at a time. Submission decisions are settled before volunteer completion."
+                "Review submissions first. Accepted work becomes Completed automatically before Feedback and Finish."
             },
             modifier = Modifier.padding(top = 4.dp),
             fontSize = 14.sp,
@@ -329,14 +262,10 @@ private fun RemoteSubmissionReviewStage(
     } || review.items.any {
         session.missingActionFor(it.itemKey) == PostManagementRemoteMissingAction.GIVE_MORE_TIME
     }
-    val extensionConflict = extensionRequired && review.items.any {
-        session.missingActionFor(it.itemKey) == PostManagementRemoteMissingAction.CONTINUE_WITHOUT_WORK
-    }
-    val deadlineReady = !extensionRequired || !session.newEndDate.isNullOrBlank()
 
     RemoteReviewStageSurface(
         title = "Submission Review",
-        subtitle = "The project deadline has passed. Resolve every deliverable before deciding volunteer completion."
+        subtitle = "The project deadline has passed. Resolve every deliverable. Accepted work becomes Completed automatically."
     ) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
@@ -358,13 +287,27 @@ private fun RemoteSubmissionReviewStage(
                     color = VolunteerLinkTextPrimary
                 )
                 Text(
-                    text = "If any unresolved work needs more time, set one new project deadline below. The same date applies to every unresolved Individual or Shared deliverable.",
+                    text = if (review.submissionMode.equals("SHARED_TEAM", ignoreCase = true)) {
+                        "Shared Team has one deliverable. Accept completes the Remote team automatically; Not Accept or Continue Without Submission makes the unresolved Remote team Not Completed. Request Revision or Give More Time extends the whole team deadline."
+                    } else {
+                        "Individual decisions can be mixed. Accept completes that volunteer automatically. Not Accept or Continue Without Submission makes only that Remote participation Not Completed. Give More Time or Request Revision keeps work open under a new deadline."
+                    },
                     modifier = Modifier.padding(top = 5.dp),
                     fontSize = 10.sp,
                     lineHeight = 15.sp,
                     color = VolunteerLinkTextSecondary
                 )
             }
+        }
+
+        if (review.items.isEmpty()) {
+            Text(
+                text = "All Remote volunteer outcomes are already resolved. Continue to optional feedback.",
+                modifier = Modifier.padding(top = 14.dp),
+                fontSize = 11.sp,
+                lineHeight = 16.sp,
+                color = VolunteerLinkTextSecondary
+            )
         }
 
         Column(
@@ -388,7 +331,6 @@ private fun RemoteSubmissionReviewStage(
             RemoteDeadlineExtensionPanel(
                 review = review,
                 selectedDate = session.newEndDate,
-                conflict = extensionConflict,
                 enabled = !busy,
                 onSelected = onNewEndDateChange,
                 modifier = Modifier.padding(top = 14.dp)
@@ -397,7 +339,7 @@ private fun RemoteSubmissionReviewStage(
 
         if (!allResolved) {
             Text(
-                text = "Review every unresolved deliverable before continuing.",
+                text = "Review every unresolved deliverable before continuing. You can press the save button to see which item is still missing a decision.",
                 modifier = Modifier.padding(top = 12.dp),
                 fontSize = 10.sp,
                 lineHeight = 15.sp,
@@ -407,7 +349,10 @@ private fun RemoteSubmissionReviewStage(
 
         Button(
             onClick = onContinue,
-            enabled = !busy && allResolved && deadlineReady && !extensionConflict,
+            // Keep the action usable. The ViewModel performs the authoritative
+            // validation and explains the exact unresolved item/date instead of
+            // leaving the organisation with an unexplained disabled button.
+            enabled = !busy,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 14.dp),
@@ -556,9 +501,9 @@ private fun RemoteSubmissionReviewItemCard(
             if (draft != null) {
                 RemoteDraftDecisionNotice(
                     title = when (draft.decision) {
-                        PostManagementRemoteSubmissionDecisionType.ACCEPT -> "Draft decision · Accept"
+                        PostManagementRemoteSubmissionDecisionType.ACCEPT -> "Draft decision · Accept → Completed"
                         PostManagementRemoteSubmissionDecisionType.REQUEST_REVISION -> "Draft decision · Request Revision"
-                        PostManagementRemoteSubmissionDecisionType.NOT_ACCEPT -> "Draft decision · Not Accept"
+                        PostManagementRemoteSubmissionDecisionType.NOT_ACCEPT -> "Draft decision · Not Accept → Not Completed"
                     },
                     detail = draft.feedback,
                     modifier = Modifier.padding(top = 9.dp)
@@ -585,6 +530,7 @@ private fun RemoteSubmissionReviewItemCard(
                     RemoteMissingWorkActions(
                         selected = missingAction,
                         revisionWasRequested = true,
+                        sharedTeam = item.isShared,
                         busy = busy,
                         onSelected = onMissingAction,
                         modifier = Modifier.padding(top = 9.dp)
@@ -594,6 +540,7 @@ private fun RemoteSubmissionReviewItemCard(
                 "NOT_SUBMITTED" -> RemoteMissingWorkActions(
                     selected = missingAction,
                     revisionWasRequested = false,
+                    sharedTeam = item.isShared,
                     busy = busy,
                     onSelected = onMissingAction,
                     modifier = Modifier.padding(top = 9.dp)
@@ -607,6 +554,7 @@ private fun RemoteSubmissionReviewItemCard(
 private fun RemoteMissingWorkActions(
     selected: PostManagementRemoteMissingAction?,
     revisionWasRequested: Boolean,
+    sharedTeam: Boolean,
     busy: Boolean,
     onSelected: (Boolean) -> Unit,
     modifier: Modifier = Modifier
@@ -664,6 +612,25 @@ private fun RemoteMissingWorkActions(
                 )
             }
         }
+
+        if (selected == PostManagementRemoteMissingAction.CONTINUE_WITHOUT_WORK) {
+            Text(
+                text = when {
+                    sharedTeam && revisionWasRequested ->
+                        "Saving this will mark every unresolved Remote volunteer Not Completed because the requested shared revision was not received."
+                    sharedTeam ->
+                        "Saving this will mark every unresolved Remote volunteer Not Completed because the shared submission was not received."
+                    revisionWasRequested ->
+                        "Saving this will mark this Remote participation Not Completed because the requested revision was not received."
+                    else ->
+                        "Saving this will mark this Remote participation Not Completed because no submission was received."
+                },
+                modifier = Modifier.padding(top = 7.dp),
+                fontSize = 9.sp,
+                lineHeight = 14.sp,
+                color = VolunteerLinkWarning
+            )
+        }
     }
 }
 
@@ -671,7 +638,6 @@ private fun RemoteMissingWorkActions(
 private fun RemoteDeadlineExtensionPanel(
     review: PostManagementRemoteReview,
     selectedDate: String?,
-    conflict: Boolean,
     enabled: Boolean,
     onSelected: (String?) -> Unit,
     modifier: Modifier = Modifier
@@ -698,7 +664,11 @@ private fun RemoteDeadlineExtensionPanel(
                 color = VolunteerLinkPrimaryGreen
             )
             Text(
-                text = "Choose one new project deadline. It applies to everyone whose Remote work is still unresolved; already accepted work stays accepted.",
+                text = if (review.submissionMode.equals("SHARED_TEAM", ignoreCase = true)) {
+                    "Choose one new deadline for the shared team deliverable. The whole team receives this extension."
+                } else {
+                    "Choose one new project deadline for Individual work kept open through Give More Time or Request Revision. Volunteers finalized as Not Completed do not return to this review."
+                },
                 modifier = Modifier.padding(top = 4.dp),
                 fontSize = 10.sp,
                 lineHeight = 15.sp,
@@ -749,147 +719,6 @@ private fun RemoteDeadlineExtensionPanel(
                 )
             }
 
-            if (conflict) {
-                Text(
-                    text = "Because the extension is project-wide, unresolved work cannot also be marked Continue Without Submission. Give those volunteers more time instead.",
-                    modifier = Modifier.padding(top = 8.dp),
-                    fontSize = 9.sp,
-                    lineHeight = 14.sp,
-                    color = VolunteerLinkError
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun RemoteCompletionReviewStage(
-    review: PostManagementRemoteReview,
-    session: PostManagementRemoteReviewSession,
-    busy: Boolean,
-    onBack: () -> Unit,
-    onContinue: () -> Unit,
-    onCompleted: (PostManagementPerson) -> Unit,
-    onNotCompleted: (PostManagementPerson) -> Unit,
-    onChangeDecision: (PostManagementPerson) -> Unit,
-    onViewProfile: (PostManagementPerson) -> Unit
-) {
-    val allDecided = review.participants.all {
-        session.completionDecisionFor(it.roleTemplateId, it.userId) != null
-    }
-
-    RemoteReviewStageSurface(
-        title = "Completion",
-        subtitle = "Accepted work makes a volunteer eligible for Completed. It does not complete them automatically."
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            review.participants.forEach { person ->
-                val decision = session.completionDecisionFor(person.roleTemplateId, person.userId)
-                val eligible = review.canComplete(person)
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp),
-                    color = VolunteerLinkBackground,
-                    border = BorderStroke(1.dp, VolunteerLinkBorderColour)
-                ) {
-                    Column(modifier = Modifier.padding(13.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(person.fullName, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = VolunteerLinkTextPrimary)
-                                Text(person.roleName, modifier = Modifier.padding(top = 2.dp), fontSize = 10.sp, color = VolunteerLinkTextSecondary)
-                            }
-                            RemoteSubmissionStatusPill(
-                                if (eligible) "WORK_ACCEPTED" else "WORK_NOT_ACCEPTED"
-                            )
-                        }
-
-                        if (decision == null) {
-                            Text(
-                                text = if (eligible) {
-                                    "Accepted work allows either Completed or Not Completed."
-                                } else {
-                                    "Without accepted work, this volunteer can only be marked Not Completed."
-                                },
-                                modifier = Modifier.padding(top = 9.dp),
-                                fontSize = 10.sp,
-                                lineHeight = 15.sp,
-                                color = VolunteerLinkTextSecondary
-                            )
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(top = 9.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                if (eligible) {
-                                    Button(
-                                        onClick = { onCompleted(person) },
-                                        enabled = !busy,
-                                        modifier = Modifier.weight(1f),
-                                        colors = ButtonDefaults.buttonColors(containerColor = VolunteerLinkPrimaryGreen)
-                                    ) {
-                                        Text("Completed", fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                                OutlinedButton(
-                                    onClick = { onNotCompleted(person) },
-                                    enabled = !busy,
-                                    modifier = Modifier.weight(1f),
-                                    border = BorderStroke(1.dp, VolunteerLinkWarning)
-                                ) {
-                                    Text("Not Completed", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = VolunteerLinkWarning)
-                                }
-                            }
-                        } else {
-                            RemoteDraftDecisionNotice(
-                                title = if (decision.decision == PostManagementPendingDecisionType.COMPLETED) {
-                                    "Selected · Completed"
-                                } else {
-                                    "Selected · Not Completed"
-                                },
-                                detail = decision.reason,
-                                modifier = Modifier.padding(top = 9.dp)
-                            )
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(top = 8.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                OutlinedButton(
-                                    onClick = { onViewProfile(person) },
-                                    enabled = !busy,
-                                    modifier = Modifier.weight(1f)
-                                ) { Text("Profile", fontSize = 9.sp) }
-                                TextButton(
-                                    onClick = { onChangeDecision(person) },
-                                    enabled = !busy,
-                                    modifier = Modifier.weight(1f)
-                                ) { Text("Change Decision", fontSize = 9.sp, fontWeight = FontWeight.Bold) }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 14.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            OutlinedButton(onClick = onBack, enabled = !busy, modifier = Modifier.weight(1f)) {
-                Text("Back", fontWeight = FontWeight.Bold)
-            }
-            Button(
-                onClick = onContinue,
-                enabled = !busy && allDecided,
-                modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.buttonColors(containerColor = VolunteerLinkPrimaryGreen)
-            ) {
-                Text("Continue", fontWeight = FontWeight.Bold)
-            }
         }
     }
 }
@@ -901,20 +730,20 @@ private fun RemoteFeedbackReviewStage(
     busy: Boolean,
     onFeedbackChange: (PostManagementPerson, String) -> Unit,
     onBack: () -> Unit,
-    onContinue: () -> Unit
+    onContinue: () -> Unit,
+    onViewProfile: (PostManagementPerson) -> Unit
 ) {
     val completed = review.participants.filter { person ->
-        session.completionDecisionFor(person.roleTemplateId, person.userId)?.decision ==
-            PostManagementPendingDecisionType.COMPLETED
+        person.completionStatus.equals("COMPLETED", ignoreCase = true)
     }
 
     RemoteReviewStageSurface(
         title = "Feedback",
-        subtitle = "Final feedback is optional and only applies to volunteers marked Completed."
+        subtitle = "Final feedback is optional and only applies to volunteers whose Remote work was accepted and completed."
     ) {
         if (completed.isEmpty()) {
             Text(
-                text = "No Completed volunteers require final feedback.",
+                text = "There are no Completed volunteers to receive final feedback.",
                 fontSize = 11.sp,
                 color = VolunteerLinkTextSecondary
             )
@@ -929,8 +758,13 @@ private fun RemoteFeedbackReviewStage(
                         border = BorderStroke(1.dp, VolunteerLinkBorderColour)
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
-                            Text(person.fullName, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = VolunteerLinkTextPrimary)
-                            Text(person.roleName, modifier = Modifier.padding(top = 2.dp), fontSize = 9.sp, color = VolunteerLinkTextSecondary)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(person.fullName, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = VolunteerLinkTextPrimary)
+                                    Text(person.roleName, modifier = Modifier.padding(top = 2.dp), fontSize = 9.sp, color = VolunteerLinkTextSecondary)
+                                }
+                                RemoteSubmissionStatusPill("COMPLETED")
+                            }
                             OutlinedTextField(
                                 value = session.feedbackByParticipation[key].orEmpty(),
                                 onValueChange = { onFeedbackChange(person, it) },
@@ -943,6 +777,13 @@ private fun RemoteFeedbackReviewStage(
                                 maxLines = 4,
                                 enabled = !busy
                             )
+                            TextButton(
+                                onClick = { onViewProfile(person) },
+                                enabled = !busy,
+                                modifier = Modifier.padding(top = 2.dp)
+                            ) {
+                                Text("View Profile", fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 }
@@ -982,20 +823,35 @@ private fun RemoteFinishReviewStage(
     RemoteReviewStageSurface(
         title = if (review.canEdit) "Finish" else "Final Review",
         subtitle = if (review.canEdit) {
-            "Check every outcome before the final database save."
+            "Check the automatic submission outcomes and optional feedback before closing the project."
         } else {
             "These Remote completion outcomes are finalized and read-only."
         }
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        if (review.participants.isEmpty()) {
+            Text(
+                text = if (review.canEdit) {
+                    "All Remote volunteer outcomes were settled during Submission Review. Finalize the project to close the post."
+                } else {
+                    "No unresolved Remote volunteer remains."
+                },
+                fontSize = 11.sp,
+                lineHeight = 16.sp,
+                color = VolunteerLinkTextSecondary
+            )
+        }
+
+        Column(
+            modifier = if (review.participants.isEmpty()) Modifier.padding(top = 8.dp) else Modifier,
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
             review.participants.forEach { person ->
-                val draft = session.completionDecisionFor(person.roleTemplateId, person.userId)
                 val evaluation = evaluations.firstOrNull {
                     it.roleTemplateId == person.roleTemplateId && it.userId == person.userId
                 }
-                val finalDecision = draft?.decision?.name ?: person.completionStatus
+                val finalDecision = person.completionStatus
                 val key = remoteReviewParticipationKey(person.roleTemplateId, person.userId)
-                val reason = draft?.reason ?: evaluation?.completionReason
+                val reason = evaluation?.completionReason ?: person.decisionNote
                 val feedback = session.feedbackByParticipation[key] ?: evaluation?.feedback
 
                 Surface(

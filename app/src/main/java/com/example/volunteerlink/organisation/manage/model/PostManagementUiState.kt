@@ -175,10 +175,10 @@ data class PostManagementEvaluation(
     val userId: String,
     val organisationId: String,
     val feedback: String? = null,
-    /** Required for a finalized NOT_COMPLETED Physical participation. */
+    /** Required for a finalized NOT_COMPLETED participation. */
     val completionReason: String? = null,
     val createdAt: String? = null,
-    /** Final credited minutes. Physical NOT_COMPLETED is always 0. */
+    /** Final credited minutes. Remote evaluations keep this null. */
     val verifiedMinutes: Int? = null
 )
 
@@ -341,7 +341,6 @@ data class PostManagementPhysicalReviewSession(
 /** Remote close-out uses submitted work rather than Physical attendance. */
 enum class PostManagementRemoteReviewStage {
     SUBMISSION,
-    COMPLETION,
     FEEDBACK,
     FINISH
 }
@@ -357,6 +356,17 @@ enum class PostManagementRemoteMissingAction {
     CONTINUE_WITHOUT_WORK
 }
 
+/**
+ * One persisted action for Remote work that is still missing after the deadline.
+ * Shared Team work is represented by null role/user because remote_details already
+ * tells the database that the post uses SHARED_TEAM; submission mode is not duplicated.
+ */
+data class PostManagementRemoteMissingDecision(
+    val roleTemplateId: String? = null,
+    val userId: String? = null,
+    val action: PostManagementRemoteMissingAction
+)
+
 data class PostManagementRemoteSubmissionDecision(
     val itemKey: String,
     val submissionId: String,
@@ -364,12 +374,6 @@ data class PostManagementRemoteSubmissionDecision(
     val feedback: String? = null
 )
 
-data class PostManagementRemoteCompletionDecision(
-    val roleTemplateId: String,
-    val userId: String,
-    val decision: PostManagementPendingDecisionType,
-    val reason: String? = null
-)
 
 /** One submission stream shown in Remote > Needs Review. */
 data class PostManagementRemoteReviewItem(
@@ -412,19 +416,20 @@ data class PostManagementRemoteReview(
         }
     }
 
-    fun canComplete(person: PostManagementPerson): Boolean {
-        return itemFor(person)?.currentStatus.equals("ACCEPTED", ignoreCase = true)
-    }
 }
 
-/** Temporary Remote review choices. Submission decisions are persisted only when
- * the Submission stage is saved; completion and final feedback wait for Finalize. */
+/**
+ * Temporary Remote review choices.
+ *
+ * Submission decisions are persisted when the Submission stage is saved. At that
+ * same save, accepted work becomes COMPLETED and rejected/missing work becomes
+ * NOT_COMPLETED. Only optional final feedback remains until Finish.
+ */
 data class PostManagementRemoteReviewSession(
     val stage: PostManagementRemoteReviewStage = PostManagementRemoteReviewStage.SUBMISSION,
     val submissionDecisions: List<PostManagementRemoteSubmissionDecision> = emptyList(),
     val missingActions: Map<String, PostManagementRemoteMissingAction> = emptyMap(),
     val newEndDate: String? = null,
-    val completionDecisions: List<PostManagementRemoteCompletionDecision> = emptyList(),
     /** Key format is roleTemplateId::userId to avoid ambiguity if one user has multiple roles. */
     val feedbackByParticipation: Map<String, String> = emptyMap(),
     val touched: Boolean = false
@@ -434,22 +439,13 @@ data class PostManagementRemoteReviewSession(
             submissionDecisions.isNotEmpty() ||
             missingActions.isNotEmpty() ||
             !newEndDate.isNullOrBlank() ||
-            completionDecisions.isNotEmpty() ||
-            feedbackByParticipation.isNotEmpty() ||
-            stage != PostManagementRemoteReviewStage.SUBMISSION
+            feedbackByParticipation.isNotEmpty()
 
     fun submissionDecisionFor(itemKey: String): PostManagementRemoteSubmissionDecision? =
         submissionDecisions.firstOrNull { it.itemKey == itemKey }
 
     fun missingActionFor(itemKey: String): PostManagementRemoteMissingAction? =
         missingActions[itemKey]
-
-    fun completionDecisionFor(
-        roleTemplateId: String,
-        userId: String
-    ): PostManagementRemoteCompletionDecision? = completionDecisions.firstOrNull {
-        it.roleTemplateId == roleTemplateId && it.userId == userId
-    }
 }
 
 fun remoteReviewParticipationKey(roleTemplateId: String, userId: String): String =

@@ -3,7 +3,7 @@ package com.example.volunteerlink.organisation.repository
 import com.example.volunteerlink.organisation.manage.model.PostManagementAttendanceSnapshot
 import com.example.volunteerlink.organisation.manage.model.PostManagementPost
 import com.example.volunteerlink.organisation.manage.model.PostManagementPendingReviewDecision
-import com.example.volunteerlink.organisation.manage.model.PostManagementRemoteCompletionDecision
+import com.example.volunteerlink.organisation.manage.model.PostManagementRemoteMissingDecision
 import com.example.volunteerlink.organisation.manage.model.PostManagementRemoteSubmissionDecision
 
 /** Loads and updates the normalized data needed to manage one Volunteer Post. */
@@ -24,7 +24,7 @@ interface OrganisationPostManagementRepository {
 
     /**
      * Reviews one Remote submission while the project is ongoing.
-     * This only changes the work-submission status; volunteer completion is decided later.
+     * During Ongoing review this changes the work-submission status. The ended-project Submission stage later maps accepted/rejected work to final Remote participation outcomes automatically.
      */
     suspend fun reviewRemoteSubmission(
         postId: String,
@@ -35,18 +35,23 @@ interface OrganisationPostManagementRepository {
 
     /**
      * Saves the ended Remote Submission stage in one database transaction.
-     * A new deadline, when supplied, is project-wide for every unresolved deliverable.
+     * Missing Individual work can be finalized as Not Completed while other
+     * unresolved work receives one later project deadline.
      */
     suspend fun saveRemoteSubmissionReviewStage(
         postId: String,
         decisions: List<PostManagementRemoteSubmissionDecision>,
+        missingDecisions: List<PostManagementRemoteMissingDecision>,
         newEndDate: String?
     )
 
-    /** Atomically finalizes every accepted Remote participant and the post itself. */
+    /**
+     * Final Remote close-out. Submission Review has already settled every volunteer
+     * as COMPLETED or NOT_COMPLETED; Finish only saves optional feedback, issues
+     * Completed evidence, rebuilds progress, and closes the post.
+     */
     suspend fun finalizeRemoteReviewBatch(
         postId: String,
-        decisions: List<PostManagementRemoteCompletionDecision>,
         feedbackByParticipation: Map<String, String>
     )
 
