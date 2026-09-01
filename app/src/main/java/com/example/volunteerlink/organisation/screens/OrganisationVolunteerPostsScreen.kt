@@ -156,14 +156,14 @@ private fun OrganisationVolunteerPostsContent(
                 top = 2.dp,
                 bottom = 112.dp
             ),
-            verticalArrangement = Arrangement.spacedBy(11.dp)
+            verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
             item(key = "overview_${selectedSection.name}") {
                 ManageSectionOverview(
                     title = sectionOverview.first,
                     detail = sectionOverview.second,
                     hasAttention = sectionOverview.third,
-                    modifier = Modifier.padding(bottom = 2.dp)
+                    modifier = Modifier.padding(top = 8.dp, bottom = 10.dp)
                 )
             }
 
@@ -181,7 +181,8 @@ private fun OrganisationVolunteerPostsContent(
                             title = "Ongoing",
                             count = uiState.ongoingPosts.size,
                             subtitle = "Happening now · ending soonest first",
-                            hasAttention = uiState.ongoingPosts.any { it.attentionItems.isNotEmpty() }
+                            hasAttention = uiState.ongoingPosts.any { it.attentionItems.isNotEmpty() },
+                            modifier = Modifier.padding(top = 12.dp, bottom = 6.dp)
                         )
                     }
                     items(
@@ -203,7 +204,7 @@ private fun OrganisationVolunteerPostsContent(
                             count = uiState.upcomingPosts.size,
                             subtitle = "Starting soonest first",
                             hasAttention = uiState.upcomingPosts.any { it.attentionItems.isNotEmpty() },
-                            modifier = Modifier.padding(top = if (uiState.ongoingPosts.isNotEmpty()) 7.dp else 0.dp)
+                            modifier = Modifier.padding(top = if (uiState.ongoingPosts.isNotEmpty()) 22.dp else 12.dp, bottom = 6.dp)
                         )
                     }
                     items(

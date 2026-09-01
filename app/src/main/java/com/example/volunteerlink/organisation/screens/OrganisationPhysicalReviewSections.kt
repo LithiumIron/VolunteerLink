@@ -21,6 +21,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -41,6 +42,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.volunteerlink.R
+import com.example.volunteerlink.organisation.components.OrganisationDivider
+import com.example.volunteerlink.organisation.components.OrganisationInfoStrip
+import com.example.volunteerlink.organisation.components.OrganisationMessageButton
+import com.example.volunteerlink.organisation.components.OrganisationPrimaryButton
+import com.example.volunteerlink.organisation.components.OrganisationSectionHeader
+import com.example.volunteerlink.organisation.components.OrganisationSectionSurface
+import com.example.volunteerlink.organisation.components.OrganisationStatusPill
 import com.example.volunteerlink.organisation.manage.model.PostManagementPendingDecisionSource
 import com.example.volunteerlink.organisation.manage.model.PostManagementPendingDecisionType
 import com.example.volunteerlink.organisation.manage.model.PostManagementPendingReviewDecision
@@ -245,42 +253,57 @@ private fun ReviewFlowHeader(
 ) {
     val stages = PostManagementPhysicalReviewStage.entries
     val activeIndex = stages.indexOf(stage)
-
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
             text = if (finalized) "Event Review Complete" else "Event Review",
-            fontSize = 21.sp,
+            fontSize = 22.sp,
+            lineHeight = 28.sp,
             fontWeight = FontWeight.Bold,
             color = VolunteerLinkTextPrimary
         )
         Text(
-            text = if (finalized) {
-                "This review is finalized and read-only."
-            } else {
-                "Review one stage at a time. You can go back before finalizing."
-            },
+            text = if (finalized) "This review is finalized and read-only." else "Attendance → Completion → Feedback → Finish",
             modifier = Modifier.padding(top = 4.dp),
             fontSize = 14.sp,
-            lineHeight = 19.sp,
             color = VolunteerLinkTextSecondary
         )
-
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 14.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
             stages.forEachIndexed { index, item ->
-                ReviewStageStep(
-                    number = index + 1,
-                    label = item.name.lowercase(Locale.US).replaceFirstChar { it.titlecase(Locale.US) },
-                    completed = finalized || index < activeIndex,
-                    active = !finalized && index == activeIndex,
-                    modifier = Modifier.weight(1f)
-                )
+                val done = finalized || index < activeIndex
+                val active = !finalized && index == activeIndex
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Surface(
+                        modifier = Modifier.size(28.dp),
+                        shape = CircleShape,
+                        color = if (done) VolunteerLinkPrimaryGreen else if (active) VolunteerLinkSoftGreenSurface else VolunteerLinkSurface,
+                        border = BorderStroke(1.dp, if (done || active) VolunteerLinkPrimaryGreen else VolunteerLinkBorderColour)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                text = if (done) "✓" else (index + 1).toString(),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (done) VolunteerLinkSurface else if (active) VolunteerLinkPrimaryGreen else VolunteerLinkTextSecondary
+                            )
+                        }
+                    }
+                    Text(
+                        text = item.name.lowercase(Locale.US).replaceFirstChar { it.titlecase(Locale.US) },
+                        modifier = Modifier.padding(top = 5.dp),
+                        fontSize = 12.sp,
+                        fontWeight = if (done || active) FontWeight.SemiBold else FontWeight.Medium,
+                        color = if (done || active) VolunteerLinkPrimaryGreen else VolunteerLinkTextSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
         }
+        OrganisationDivider(modifier = Modifier.padding(top = 14.dp))
     }
 }
 
@@ -354,29 +377,9 @@ private fun ReviewStageSurface(
     subtitle: String,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = ReviewStageShape,
-        color = VolunteerLinkSurface,
-        border = BorderStroke(1.dp, VolunteerLinkBorderColour),
-        shadowElevation = 1.dp
-    ) {
-        Column(modifier = Modifier.padding(VolunteerLinkCardContentPadding)) {
-            Text(
-                text = title,
-                fontSize = 19.sp,
-                fontWeight = FontWeight.Bold,
-                color = VolunteerLinkTextPrimary
-            )
-            Text(
-                text = subtitle,
-                modifier = Modifier.padding(top = 4.dp),
-                fontSize = 14.sp,
-                lineHeight = 20.sp,
-                color = VolunteerLinkTextSecondary
-            )
-            Column(modifier = Modifier.padding(top = 14.dp), content = content)
-        }
+    OrganisationSectionSurface(contentPadding = 16.dp) {
+        OrganisationSectionHeader(title = title, subtitle = subtitle)
+        Column(modifier = Modifier.padding(top = 12.dp), content = content)
     }
 }
 
@@ -386,31 +389,12 @@ private fun ReviewSectionHeading(
     subtitle: String? = null,
     modifier: Modifier = Modifier
 ) {
-    Column(modifier = modifier.fillMaxWidth()) {
-        Text(
-            text = title,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold,
-            color = VolunteerLinkTextPrimary
-        )
-        if (!subtitle.isNullOrBlank()) {
-            Text(
-                text = subtitle,
-                modifier = Modifier.padding(top = 3.dp),
-                fontSize = 13.sp,
-                lineHeight = 18.sp,
-                color = VolunteerLinkTextSecondary
-            )
-        }
-    }
+    OrganisationSectionHeader(title = title, subtitle = subtitle, modifier = modifier)
 }
 
 @Composable
 private fun ReviewSectionDivider() {
-    HorizontalDivider(
-        modifier = Modifier.padding(vertical = 14.dp),
-        color = VolunteerLinkBorderColour
-    )
+    OrganisationDivider(modifier = Modifier.padding(vertical = 14.dp))
 }
 
 @Composable
@@ -425,37 +409,28 @@ private fun ReviewStageFooter(
     primaryColor: Color = VolunteerLinkPrimaryGreen
 ) {
     ReviewSectionDivider()
-
     if (!helperText.isNullOrBlank()) {
-        Text(
-            text = helperText,
-            modifier = Modifier.padding(bottom = 10.dp),
-            fontSize = 13.sp,
-            lineHeight = 18.sp,
-            color = VolunteerLinkTextSecondary
-        )
+        Text(helperText, modifier = Modifier.padding(bottom = 10.dp), fontSize = 13.sp, lineHeight = 18.sp, color = VolunteerLinkTextSecondary)
     }
-
     if (backLabel != null && onBack != null) {
         OutlinedButton(
             enabled = backEnabled,
             onClick = onBack,
-            modifier = Modifier.fillMaxWidth(),
-            border = BorderStroke(1.dp, VolunteerLinkPrimaryGreen),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = VolunteerLinkPrimaryGreen)
+            modifier = Modifier.fillMaxWidth().height(50.dp),
+            border = BorderStroke(1.dp, VolunteerLinkPrimaryGreen)
         ) {
-            Text(backLabel, fontWeight = FontWeight.SemiBold)
+            Text(backLabel, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = VolunteerLinkPrimaryGreen)
         }
         Spacer(modifier = Modifier.height(8.dp))
     }
-
     Button(
         enabled = primaryEnabled,
         onClick = onPrimary,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().height(52.dp),
+        shape = RoundedCornerShape(14.dp),
         colors = ButtonDefaults.buttonColors(containerColor = primaryColor)
     ) {
-        Text(primaryLabel, fontWeight = FontWeight.Bold)
+        Text(primaryLabel, fontSize = 14.sp, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -687,126 +662,84 @@ private fun CompletionDecisionCard(
     var reason by rememberSaveable(reviewKey(entry), "reason") { mutableStateOf("") }
     val verified = entry.attendanceSummary.verifiedMinutes
 
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = ReviewActionShape,
-        color = VolunteerLinkSurface,
-        border = BorderStroke(1.dp, VolunteerLinkBorderColour)
-    ) {
-        Column(modifier = Modifier.padding(13.dp)) {
-            VolunteerIdentityHeader(
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
+        VolunteerIdentityHeader(
+            entry = entry,
+            trailingLabel = "${entry.attendanceSummary.attendedDays}/${entry.attendanceSummary.expectedDays} days",
+            trailingColor = VolunteerLinkWarning,
+            onViewProfile = onViewProfile
+        )
+        Text(
+            text = "${formatMinutesForReview(verified)} verified · ${entry.absentDays} absent ${if (entry.absentDays == 1) "day" else "days"}",
+            modifier = Modifier.padding(top = 6.dp),
+            fontSize = 13.sp,
+            color = VolunteerLinkTextSecondary
+        )
+        TextButton(onClick = { expanded = !expanded }, modifier = Modifier.align(Alignment.End)) {
+            Text(if (expanded) "Hide decision" else "Review decision", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            ReviewChevron(expanded)
+        }
+
+        if (expanded) {
+            OrganisationDivider(modifier = Modifier.padding(vertical = 10.dp))
+            AttendanceTimeline(
                 entry = entry,
-                trailingLabel = "${entry.attendanceSummary.attendedDays}/${entry.attendanceSummary.expectedDays} days",
-                trailingColor = VolunteerLinkWarning,
-                onViewProfile = onViewProfile
+                busy = busy,
+                canCorrect = true,
+                onMarkPresent = onMarkPresent,
+                onRequestMarkAbsent = onRequestMarkAbsent
             )
             Text(
-                text = "${formatMinutesForReview(verified)} verified · ${entry.absentDays} absent ${if (entry.absentDays == 1) "day" else "days"}",
-                modifier = Modifier.padding(top = 7.dp),
+                text = if (verified > 0) "Completed gives ${formatMinutesForReview(verified)} verified time. Not Completed gives no completion credit." else "No verified attendance was recorded, so this volunteer cannot be Completed.",
+                modifier = Modifier.padding(top = 10.dp),
                 fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
+                lineHeight = 18.sp,
                 color = VolunteerLinkTextSecondary
             )
-
-            TextButton(
-                onClick = { expanded = !expanded },
-                modifier = Modifier.align(Alignment.End)
-            ) {
-                Text(if (expanded) "Hide Decision" else "Review Decision")
-                ReviewChevron(expanded)
+            if (!choosingNotCompleted && verified > 0) {
+                OrganisationPrimaryButton(
+                    text = "Complete with ${formatMinutesForReview(verified)}",
+                    onClick = { onSelectDecision(entry.person, true, null) },
+                    enabled = !busy,
+                    modifier = Modifier.padding(top = 10.dp)
+                )
             }
-
-            if (expanded) {
-                HorizontalDivider(
-                    modifier = Modifier.padding(vertical = 10.dp),
-                    color = VolunteerLinkBorderColour
+            if (!choosingNotCompleted) {
+                OutlinedButton(
+                    enabled = !busy,
+                    onClick = { choosingNotCompleted = true },
+                    modifier = Modifier.padding(top = 8.dp).fillMaxWidth().height(50.dp),
+                    border = BorderStroke(1.dp, VolunteerLinkError)
+                ) {
+                    Text("Not Completed", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = VolunteerLinkError)
+                }
+            } else {
+                OutlinedTextField(
+                    value = reason,
+                    onValueChange = { reason = it; onDraftDirtyChanged(it.isNotBlank()) },
+                    modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                    label = { Text("Reason for Not Completed") },
+                    minLines = 2,
+                    maxLines = 4
                 )
-                AttendanceTimeline(
-                    entry = entry,
-                    busy = busy,
-                    canCorrect = true,
-                    onMarkPresent = onMarkPresent,
-                    onRequestMarkAbsent = onRequestMarkAbsent
-                )
-
-                Text(
-                    text = if (verified > 0) {
-                        "Complete gives ${formatMinutesForReview(verified)} verified hours. Not Completed gives 0 completion credit."
-                    } else {
-                        "No verified attendance hours were recorded, so this volunteer cannot be Completed."
+                Button(
+                    enabled = !busy && reason.isNotBlank(),
+                    onClick = {
+                        onSelectDecision(entry.person, false, reason.trim())
+                        onDraftDirtyChanged(false)
+                        choosingNotCompleted = false
+                        reason = ""
                     },
-                    modifier = Modifier.padding(top = 10.dp),
-                    fontSize = 13.sp,
-                    lineHeight = 18.sp,
-                    color = VolunteerLinkTextSecondary
-                )
-
-                if (!choosingNotCompleted && verified > 0) {
-                    Button(
-                        enabled = !busy,
-                        onClick = { onSelectDecision(entry.person, true, null) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 11.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = VolunteerLinkPrimaryGreen)
-                    ) {
-                        Text("Complete with ${formatMinutesForReview(verified)}", fontWeight = FontWeight.Bold)
-                    }
+                    modifier = Modifier.padding(top = 8.dp).fillMaxWidth().height(52.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = VolunteerLinkError)
+                ) {
+                    Text("Confirm Not Completed", fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 }
-
-                if (!choosingNotCompleted) {
-                    OutlinedButton(
-                        enabled = !busy,
-                        onClick = { choosingNotCompleted = true },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp),
-                        border = BorderStroke(1.dp, VolunteerLinkError),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = VolunteerLinkError)
-                    ) {
-                        Text("Not Completed", fontWeight = FontWeight.SemiBold)
-                    }
-                } else {
-                    OutlinedTextField(
-                        value = reason,
-                        onValueChange = {
-                            reason = it
-                            onDraftDirtyChanged(it.isNotBlank())
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 11.dp),
-                        label = { Text("Reason for Not Completed") },
-                        minLines = 2,
-                        maxLines = 4
-                    )
-                    Button(
-                        enabled = !busy && reason.isNotBlank(),
-                        onClick = {
-                            onSelectDecision(entry.person, false, reason.trim())
-                            onDraftDirtyChanged(false)
-                            choosingNotCompleted = false
-                            reason = ""
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = VolunteerLinkError)
-                    ) {
-                        Text("Confirm Not Completed", fontWeight = FontWeight.Bold)
-                    }
-                    TextButton(
-                        enabled = !busy,
-                        onClick = {
-                            choosingNotCompleted = false
-                            reason = ""
-                            onDraftDirtyChanged(false)
-                        },
-                        modifier = Modifier.align(Alignment.End)
-                    ) {
-                        Text("Cancel")
-                    }
-                }
+                TextButton(
+                    enabled = !busy,
+                    onClick = { choosingNotCompleted = false; reason = ""; onDraftDirtyChanged(false) },
+                    modifier = Modifier.align(Alignment.End)
+                ) { Text("Cancel") }
             }
         }
     }
@@ -1235,7 +1168,7 @@ private fun FeedbackReviewStage(
                         selectedRoleIds = emptySet()
                         selectedUserIds = emptySet()
                     },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
                     border = BorderStroke(1.dp, VolunteerLinkPrimaryGreen),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = VolunteerLinkPrimaryGreen)
                 ) {
@@ -1427,28 +1360,22 @@ private fun FeedbackComposer(
         maxLines = 6
     )
 
-    Row(
+    OutlinedButton(
+        enabled = !busy,
+        onClick = onCancel,
         modifier = Modifier
+            .padding(top = 10.dp)
             .fillMaxWidth()
-            .padding(top = 9.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+            .height(50.dp)
     ) {
-        OutlinedButton(
-            enabled = !busy,
-            onClick = onCancel,
-            modifier = Modifier.weight(1f)
-        ) {
-            Text("Cancel")
-        }
-        Button(
-            enabled = !busy && recipients.isNotEmpty() && feedbackText.isNotBlank(),
-            onClick = onApply,
-            modifier = Modifier.weight(1f),
-            colors = ButtonDefaults.buttonColors(containerColor = VolunteerLinkPrimaryGreen)
-        ) {
-            Text(if (editingText == null) "Apply" else "Save Changes")
-        }
+        Text("Cancel", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
     }
+    OrganisationPrimaryButton(
+        text = if (editingText == null) "Apply Feedback" else "Save Feedback Changes",
+        enabled = !busy && recipients.isNotEmpty() && feedbackText.isNotBlank(),
+        onClick = onApply,
+        modifier = Modifier.padding(top = 8.dp)
+    )
 }
 
 @Composable
@@ -1459,41 +1386,38 @@ private fun TemporaryFeedbackGroupRow(
     onEdit: () -> Unit
 ) {
     val recipients = completed.filter { it.person.userId in userIds }
-
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.Top
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "${recipients.size} recipient${if (recipients.size == 1) "" else "s"}",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = VolunteerLinkPrimaryGreen
-                )
-                Text(
-                    text = roleSummary(recipients),
-                    modifier = Modifier.padding(top = 2.dp),
-                    fontSize = 12.sp,
-                    color = VolunteerLinkTextSecondary,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            TextButton(onClick = onEdit) {
-                Text("Edit")
-            }
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = feedback,
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
+                color = VolunteerLinkTextPrimary,
+                maxLines = 4,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = recipients.joinToString(" · ") { it.person.fullName },
+                modifier = Modifier.padding(top = 5.dp),
+                fontSize = 12.sp,
+                lineHeight = 17.sp,
+                color = VolunteerLinkTextSecondary,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = roleSummary(recipients),
+                modifier = Modifier.padding(top = 2.dp),
+                fontSize = 12.sp,
+                color = VolunteerLinkTextSecondary,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
         }
-        Text(
-            text = feedback,
-            modifier = Modifier.padding(top = 4.dp),
-            fontSize = 13.sp,
-            lineHeight = 18.sp,
-            color = VolunteerLinkTextPrimary,
-            maxLines = 3,
-            overflow = TextOverflow.Ellipsis
-        )
+        TextButton(onClick = onEdit) { Text("Edit", fontWeight = FontWeight.SemiBold) }
     }
 }
 
@@ -1775,6 +1699,17 @@ private fun AttendanceBrowser(
                                     if (entry.absentDays > 0) VolunteerLinkWarning else VolunteerLinkSuccess,
                                     Modifier.padding(start = 8.dp)
                                 )
+                                IconButton(
+                                    onClick = { onViewProfile(entry.person) },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        painter = painterResource(R.drawable.profile),
+                                        contentDescription = "View ${entry.person.fullName} profile",
+                                        modifier = Modifier.size(18.dp),
+                                        tint = VolunteerLinkPrimaryGreen
+                                    )
+                                }
                                 ReviewChevron(expandedKey == key)
                             }
 
@@ -1788,12 +1723,6 @@ private fun AttendanceBrowser(
                                         onMarkPresent = onMarkPresent,
                                         onRequestMarkAbsent = onRequestMarkAbsent
                                     )
-                                    TextButton(
-                                        onClick = { onViewProfile(entry.person) },
-                                        modifier = Modifier.align(Alignment.End)
-                                    ) {
-                                        Text("View Profile")
-                                    }
                                 }
                             }
                         }
@@ -1964,10 +1893,14 @@ private fun VolunteerIdentityHeader(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
+            ReviewStatusPill(
+                text = trailingLabel,
+                color = trailingColor,
+                modifier = Modifier.padding(top = 7.dp)
+            )
         }
-        ReviewStatusPill(
-            text = trailingLabel,
-            color = trailingColor,
+        OrganisationMessageButton(
+            personName = entry.person.fullName,
             modifier = Modifier.padding(start = 8.dp)
         )
     }

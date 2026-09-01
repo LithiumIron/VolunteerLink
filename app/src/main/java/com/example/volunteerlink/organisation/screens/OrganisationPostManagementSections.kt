@@ -35,6 +35,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -44,6 +45,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.volunteerlink.R
+import com.example.volunteerlink.organisation.components.OrganisationDivider
+import com.example.volunteerlink.organisation.components.OrganisationInfoStrip
+import com.example.volunteerlink.organisation.components.OrganisationListRow
+import com.example.volunteerlink.organisation.components.OrganisationMessageButton
+import com.example.volunteerlink.organisation.components.OrganisationMetric
+import com.example.volunteerlink.organisation.components.OrganisationSectionHeader
+import com.example.volunteerlink.organisation.components.OrganisationSectionSurface
+import com.example.volunteerlink.organisation.components.OrganisationStatusPill
 import com.example.volunteerlink.data.post.PostTimingState
 import com.example.volunteerlink.organisation.manage.model.PostManagementPerson
 import com.example.volunteerlink.organisation.manage.model.PostManagementAttendanceDay
@@ -61,6 +70,7 @@ import com.example.volunteerlink.ui.theme.VolunteerLinkInformation
 import com.example.volunteerlink.ui.theme.VolunteerLinkPrimaryGreen
 import com.example.volunteerlink.ui.theme.VolunteerLinkSoftGreenSurface
 import com.example.volunteerlink.ui.theme.VolunteerLinkSurface
+import com.example.volunteerlink.ui.theme.VolunteerLinkSuccess
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextPrimary
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextSecondary
 import com.example.volunteerlink.ui.theme.VolunteerLinkWarning
@@ -144,124 +154,105 @@ internal fun PostManagementSummaryCard(
     post: PostManagementPost,
     modifier: Modifier = Modifier
 ) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = PostManagementCardShape,
-        color = VolunteerLinkSurface,
-        border = BorderStroke(1.dp, VolunteerLinkBorderColour),
-        shadowElevation = 1.dp
+    OrganisationSectionSurface(
+        modifier = modifier.padding(vertical = 2.dp),
+        contentPadding = 16.dp
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top
+        ) {
+            Surface(
+                modifier = Modifier.size(46.dp),
+                shape = RoundedCornerShape(13.dp),
+                color = VolunteerLinkSoftGreenSurface
             ) {
-                Surface(
-                    modifier = Modifier.size(44.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    color = VolunteerLinkSoftGreenSurface
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            painter = painterResource(post.mode.postManagementModeDrawable()),
-                            contentDescription = null,
-                            modifier = Modifier.size(23.dp),
-                            tint = VolunteerLinkPrimaryGreen
-                        )
-                    }
-                }
-
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(start = 12.dp)
-                ) {
-                    Text(
-                        text = post.title,
-                        fontSize = 18.sp,
-                        lineHeight = 23.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = VolunteerLinkTextPrimary,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        painter = painterResource(post.mode.postManagementModeDrawable()),
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                        tint = VolunteerLinkPrimaryGreen
                     )
-                    Row(
-                        modifier = Modifier.padding(top = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(7.dp)
-                    ) {
-                        PostManagementLifecycleBadge(post)
-                        PostManagementNeutralPill(post.mode.toPostManagementModeLabel())
-                    }
                 }
             }
 
-            if (!post.category.isNullOrBlank()) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 12.dp)
+            ) {
                 Text(
-                    text = post.category.toReadableDatabaseLabel(),
-                    modifier = Modifier.padding(top = 13.dp),
-                    fontSize = 10.sp,
+                    text = post.title,
+                    fontSize = 21.sp,
+                    lineHeight = 27.sp,
                     fontWeight = FontWeight.Bold,
-                    color = VolunteerLinkPrimaryGreen
+                    color = VolunteerLinkTextPrimary,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis
                 )
+                Row(
+                    modifier = Modifier.padding(top = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(7.dp)
+                ) {
+                    PostManagementLifecycleBadge(post)
+                    OrganisationStatusPill(
+                        text = post.mode.toPostManagementModeLabel().uppercase(Locale.US),
+                        color = VolunteerLinkPrimaryGreen
+                    )
+                }
             }
+        }
 
+        if (!post.category.isNullOrBlank()) {
             Text(
-                text = post.description,
-                modifier = Modifier.padding(top = 5.dp),
+                text = post.category.toReadableDatabaseLabel(),
+                modifier = Modifier.padding(top = 14.dp),
                 fontSize = 12.sp,
-                lineHeight = 18.sp,
-                color = VolunteerLinkTextSecondary,
-                maxLines = 4,
-                overflow = TextOverflow.Ellipsis
+                fontWeight = FontWeight.Bold,
+                color = VolunteerLinkPrimaryGreen
             )
+        }
 
-            if (post.mode.equals("HYBRID", ignoreCase = true)) {
-                Spacer(modifier = Modifier.height(14.dp))
-                HorizontalDivider(color = VolunteerLinkBorderColour)
-                PostManagementPhaseLine(
-                    label = "Remote",
-                    iconRes = R.drawable.remote_project,
-                    startDate = post.remote?.startDate,
-                    endDate = post.remote?.effectiveEndDate,
-                    location = null,
-                    timing = post.remoteTimingState,
-                    modifier = Modifier.padding(top = 12.dp)
-                )
-                PostManagementPhaseLine(
-                    label = "Physical",
-                    iconRes = R.drawable.physical_event,
-                    startDate = post.physical?.startDate,
-                    endDate = post.physical?.endDate,
-                    location = post.physical?.locationName,
-                    timing = post.physicalTimingState,
-                    modifier = Modifier.padding(top = 10.dp)
-                )
-            } else if (post.mode.equals("PHYSICAL", ignoreCase = true)) {
-                Spacer(modifier = Modifier.height(14.dp))
-                HorizontalDivider(color = VolunteerLinkBorderColour)
-                PostManagementPhaseLine(
-                    label = "Physical",
-                    iconRes = R.drawable.physical_event,
-                    startDate = post.physical?.startDate,
-                    endDate = post.physical?.endDate,
-                    location = post.physical?.locationName,
-                    timing = post.physicalTimingState,
-                    modifier = Modifier.padding(top = 12.dp)
-                )
-            } else if (post.mode.equals("REMOTE", ignoreCase = true)) {
-                Spacer(modifier = Modifier.height(14.dp))
-                HorizontalDivider(color = VolunteerLinkBorderColour)
-                PostManagementPhaseLine(
-                    label = "Remote",
-                    iconRes = R.drawable.remote_project,
-                    startDate = post.remote?.startDate,
-                    endDate = post.remote?.effectiveEndDate,
-                    location = null,
-                    timing = post.remoteTimingState,
-                    modifier = Modifier.padding(top = 12.dp)
-                )
-            }
+        Text(
+            text = post.description,
+            modifier = Modifier.padding(top = 5.dp),
+            fontSize = 14.sp,
+            lineHeight = 20.sp,
+            color = VolunteerLinkTextSecondary,
+            maxLines = 4,
+            overflow = TextOverflow.Ellipsis
+        )
+
+        val phaseLines = when {
+            post.mode.equals("HYBRID", true) -> listOf(
+                Triple("Remote", post.remote?.startDate to post.remote?.effectiveEndDate, null),
+                Triple("Physical", post.physical?.startDate to post.physical?.endDate, post.physical?.locationName)
+            )
+            post.mode.equals("PHYSICAL", true) -> listOf(
+                Triple("Physical", post.physical?.startDate to post.physical?.endDate, post.physical?.locationName)
+            )
+            else -> listOf(
+                Triple("Remote", post.remote?.startDate to post.remote?.effectiveEndDate, null)
+            )
+        }
+
+        OrganisationDivider(modifier = Modifier.padding(top = 16.dp))
+        phaseLines.forEachIndexed { index, phase ->
+            val dateText = postManagementDateRange(phase.second.first, phase.second.second)
+            Text(
+                text = buildString {
+                    append(phase.first)
+                    append(" · ")
+                    append(dateText)
+                    phase.third?.takeIf { it.isNotBlank() }?.let { append(" · $it") }
+                },
+                modifier = Modifier.padding(top = if (index == 0) 12.dp else 7.dp),
+                fontSize = 13.sp,
+                lineHeight = 18.sp,
+                color = VolunteerLinkTextSecondary
+            )
         }
     }
 }
@@ -274,38 +265,31 @@ internal fun PostManagementMainTabs(
     onSelected: (PostManagementTab) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val tabs = buildList {
+        add(PostManagementTab.OVERVIEW to "Overview")
+        if (showReviewTab) add(PostManagementTab.REVIEW to "Review")
+        else add(PostManagementTab.PEOPLE to "People")
+    }
+
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        color = VolunteerLinkSurface,
+        shape = RoundedCornerShape(14.dp),
+        color = VolunteerLinkSoftGreenSurface.copy(alpha = 0.55f),
         border = BorderStroke(1.dp, VolunteerLinkBorderColour)
     ) {
         Row(
-            modifier = Modifier.padding(4.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(5.dp),
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
         ) {
-            PostManagementMainTabItem(
-                label = "Overview",
-                selected = selected == PostManagementTab.OVERVIEW,
-                hasNotification = false,
-                modifier = Modifier.weight(1f),
-                onClick = { onSelected(PostManagementTab.OVERVIEW) }
-            )
-            if (showReviewTab) {
+            tabs.forEach { (tab, label) ->
                 PostManagementMainTabItem(
-                    label = "Review",
-                    selected = selected == PostManagementTab.REVIEW,
-                    hasNotification = false,
+                    label = label,
+                    selected = selected == tab,
+                    hasNotification = tab == PostManagementTab.PEOPLE && pendingApplicantCount > 0,
                     modifier = Modifier.weight(1f),
-                    onClick = { onSelected(PostManagementTab.REVIEW) }
-                )
-            } else {
-                PostManagementMainTabItem(
-                    label = "People",
-                    selected = selected == PostManagementTab.PEOPLE,
-                    hasNotification = pendingApplicantCount > 0,
-                    modifier = Modifier.weight(1f),
-                    onClick = { onSelected(PostManagementTab.PEOPLE) }
+                    onClick = { onSelected(tab) }
                 )
             }
         }
@@ -322,8 +306,10 @@ private fun PostManagementMainTabItem(
 ) {
     Surface(
         modifier = modifier.clickable(onClick = onClick),
-        shape = RoundedCornerShape(9.dp),
-        color = if (selected) VolunteerLinkPrimaryGreen else VolunteerLinkSurface
+        shape = RoundedCornerShape(10.dp),
+        color = if (selected) VolunteerLinkPrimaryGreen else Color.Transparent,
+        border = null,
+        shadowElevation = 0.dp
     ) {
         Row(
             modifier = Modifier.padding(vertical = 10.dp, horizontal = 8.dp),
@@ -332,7 +318,7 @@ private fun PostManagementMainTabItem(
         ) {
             Text(
                 text = label,
-                fontSize = 12.sp,
+                fontSize = 14.sp,
                 fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
                 color = if (selected) VolunteerLinkSurface else VolunteerLinkTextSecondary
             )
@@ -340,7 +326,7 @@ private fun PostManagementMainTabItem(
                 Surface(
                     modifier = Modifier
                         .padding(start = 6.dp)
-                        .size(8.dp),
+                        .size(7.dp),
                     shape = CircleShape,
                     color = VolunteerLinkError
                 ) {}
@@ -356,91 +342,85 @@ internal fun PostManagementOverview(
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        PostManagementDetailsCard(post)
-        PostManagementParticipationCard(post)
-        PostManagementRoleSection(post)
-        PostManagementScheduleSection(post)
+        OrganisationSectionSurface { PostManagementDetailsCard(post) }
+        OrganisationSectionSurface { PostManagementParticipationCard(post) }
+        OrganisationSectionSurface { PostManagementRoleSection(post) }
+        OrganisationSectionSurface { PostManagementScheduleSection(post) }
     }
 }
 
 @Composable
 private fun PostManagementDetailsCard(post: PostManagementPost) {
-    PostManagementSectionCard(title = "Opportunity Details") {
-        if (post.physical != null) {
-            Text(
-                text = "Physical",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                color = VolunteerLinkPrimaryGreen
-            )
-            PostManagementInfoLine(
-                label = "Date",
-                value = postManagementDateRange(
-                    post.physical.startDate,
-                    post.physical.endDate
-                ),
-                modifier = Modifier.padding(top = 7.dp)
-            )
-            PostManagementInfoLine(
-                label = "Time",
-                value = "${post.physical.startTime.toPostManagementTime()} – ${post.physical.endTime.toPostManagementTime()}",
-                modifier = Modifier.padding(top = 5.dp)
-            )
-            PostManagementInfoLine(
-                label = "Location",
-                value = buildString {
-                    append(post.physical.locationName)
-                    if (!post.physical.locationAddress.isNullOrBlank()) {
-                        append("\n")
-                        append(post.physical.locationAddress)
-                    }
-                },
-                modifier = Modifier.padding(top = 5.dp)
-            )
-            if (!post.physical.meetingPoint.isNullOrBlank()) {
-                PostManagementInfoLine(
-                    label = "Meeting point",
-                    value = post.physical.meetingPoint,
-                    modifier = Modifier.padding(top = 5.dp)
+    Column(modifier = Modifier.fillMaxWidth()) {
+        OrganisationSectionHeader(
+            title = "Opportunity details",
+            subtitle = "Key information volunteers see for this post"
+        )
+        Column(modifier = Modifier.padding(top = 8.dp)) {
+            if (post.physical != null) {
+                Text(
+                    text = "Physical",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = VolunteerLinkPrimaryGreen
                 )
+                PostManagementInfoLine(
+                    label = "Date",
+                    value = postManagementDateRange(post.physical.startDate, post.physical.endDate),
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+                PostManagementInfoLine(
+                    label = "Time",
+                    value = "${post.physical.startTime.toPostManagementTime()} – ${post.physical.endTime.toPostManagementTime()}",
+                    modifier = Modifier.padding(top = 7.dp)
+                )
+                PostManagementInfoLine(
+                    label = "Location",
+                    value = buildString {
+                        append(post.physical.locationName)
+                        if (!post.physical.locationAddress.isNullOrBlank()) append(" · ${post.physical.locationAddress}")
+                    },
+                    modifier = Modifier.padding(top = 7.dp)
+                )
+                if (!post.physical.meetingPoint.isNullOrBlank()) {
+                    PostManagementInfoLine(
+                        label = "Meeting point",
+                        value = post.physical.meetingPoint,
+                        modifier = Modifier.padding(top = 7.dp)
+                    )
+                }
             }
-        }
 
-        if (post.physical != null && post.remote != null) {
-            HorizontalDivider(
-                modifier = Modifier.padding(vertical = 12.dp),
-                color = VolunteerLinkBorderColour
-            )
-        }
+            if (post.physical != null && post.remote != null) {
+                OrganisationDivider(modifier = Modifier.padding(vertical = 14.dp))
+            }
 
-        if (post.remote != null) {
-            Text(
-                text = "Remote",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                color = VolunteerLinkPrimaryGreen
-            )
-            PostManagementInfoLine(
-                label = "Date",
-                value = postManagementDateRange(
-                    post.remote.startDate,
-                    post.remote.effectiveEndDate
-                ),
-                modifier = Modifier.padding(top = 7.dp)
-            )
-            PostManagementInfoLine(
-                label = "Submission",
-                value = post.remote.submissionMode.toReadableDatabaseLabel(),
-                modifier = Modifier.padding(top = 5.dp)
-            )
-            if (!post.remote.sharedDeliverable.isNullOrBlank()) {
-                PostManagementInfoLine(
-                    label = "Deliverable",
-                    value = post.remote.sharedDeliverable,
-                    modifier = Modifier.padding(top = 5.dp)
+            if (post.remote != null) {
+                Text(
+                    text = "Remote",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = VolunteerLinkPrimaryGreen
                 )
+                PostManagementInfoLine(
+                    label = "Date",
+                    value = postManagementDateRange(post.remote.startDate, post.remote.effectiveEndDate),
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+                PostManagementInfoLine(
+                    label = "Submission",
+                    value = post.remote.submissionMode.toReadableDatabaseLabel(),
+                    modifier = Modifier.padding(top = 7.dp)
+                )
+                if (!post.remote.sharedDeliverable.isNullOrBlank()) {
+                    PostManagementInfoLine(
+                        label = "Deliverable",
+                        value = post.remote.sharedDeliverable,
+                        modifier = Modifier.padding(top = 7.dp)
+                    )
+                }
             }
         }
     }
@@ -455,16 +435,17 @@ private fun PostManagementInfoLine(
     Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
         Text(
             text = label,
-            modifier = Modifier.width(86.dp),
-            fontSize = 10.sp,
-            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.width(104.dp),
+            fontSize = 13.sp,
+            lineHeight = 18.sp,
+            fontWeight = FontWeight.Medium,
             color = VolunteerLinkTextSecondary
         )
         Text(
             text = value,
             modifier = Modifier.weight(1f),
-            fontSize = 10.sp,
-            lineHeight = 15.sp,
+            fontSize = 13.sp,
+            lineHeight = 19.sp,
             color = VolunteerLinkTextPrimary
         )
     }
@@ -479,15 +460,15 @@ private fun PostManagementCompactInfoBlock(
     Column(modifier = modifier) {
         Text(
             text = label,
-            fontSize = 9.sp,
+            fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
             color = VolunteerLinkTextSecondary
         )
         Text(
             text = value,
             modifier = Modifier.padding(top = 3.dp),
-            fontSize = 10.sp,
-            lineHeight = 15.sp,
+            fontSize = 14.sp,
+            lineHeight = 19.sp,
             color = VolunteerLinkTextPrimary,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
@@ -501,26 +482,25 @@ private fun PostManagementParticipationCard(post: PostManagementPost) {
     val pending = post.applicants.size
     val totalRoleCapacity = post.roles.sumOf { it.capacity }
 
-    PostManagementSectionCard(title = "Participation") {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        OrganisationSectionHeader(title = "Participation")
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(9.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 12.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            PostManagementStat(
-                value = accepted.toString(),
-                label = "Joined",
-                modifier = Modifier.weight(1f)
-            )
-            PostManagementStat(
-                value = pending.toString(),
-                label = "Applicants",
-                modifier = Modifier.weight(1f),
-                highlight = pending > 0
-            )
-            PostManagementStat(
-                value = totalRoleCapacity.toString(),
-                label = "Role spaces",
-                modifier = Modifier.weight(1f)
+            OrganisationMetric(accepted.toString(), "Joined", Modifier.weight(1f))
+            OrganisationMetric(pending.toString(), "Applicants", Modifier.weight(1f))
+            OrganisationMetric(totalRoleCapacity.toString(), "Role spaces", Modifier.weight(1f))
+        }
+        if (pending > 0) {
+            Text(
+                text = "$pending application${if (pending == 1) "" else "s"} waiting",
+                modifier = Modifier.padding(top = 10.dp),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = VolunteerLinkWarning
             )
         }
     }
@@ -560,7 +540,7 @@ private fun PostManagementStat(
             Text(
                 text = label,
                 modifier = Modifier.padding(top = 2.dp),
-                fontSize = 9.sp,
+                fontSize = 12.sp,
                 color = VolunteerLinkTextSecondary,
                 maxLines = 1
             )
@@ -570,29 +550,23 @@ private fun PostManagementStat(
 
 @Composable
 private fun PostManagementRoleSection(post: PostManagementPost) {
-    PostManagementSectionCard(
-        title = "Roles",
-        subtitle = if (post.roles.isEmpty()) null else "${post.roles.size} role${if (post.roles.size == 1) "" else "s"}"
-    ) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        OrganisationSectionHeader(
+            title = "Roles",
+            subtitle = if (post.roles.isEmpty()) null else "${post.roles.size} role${if (post.roles.size == 1) "" else "s"}"
+        )
         if (post.roles.isEmpty()) {
             PostManagementEmptyCopy("No roles have been added to this post.")
         } else {
-            post.roles.forEachIndexed { index, role ->
-                if (index > 0) {
-                    HorizontalDivider(
-                        modifier = Modifier.padding(vertical = 11.dp),
-                        color = VolunteerLinkBorderColour
+            Column(modifier = Modifier.padding(top = 6.dp)) {
+                post.roles.forEachIndexed { index, role ->
+                    PostManagementRoleRow(
+                        role = role,
+                        acceptedCount = post.volunteers.count { it.roleTemplateId == role.roleTemplateId },
+                        pendingCount = post.applicants.count { it.roleTemplateId == role.roleTemplateId }
                     )
+                    if (index != post.roles.lastIndex) OrganisationDivider()
                 }
-                PostManagementRoleRow(
-                    role = role,
-                    acceptedCount = post.volunteers.count {
-                        it.roleTemplateId == role.roleTemplateId
-                    },
-                    pendingCount = post.applicants.count {
-                        it.roleTemplateId == role.roleTemplateId
-                    }
-                )
             }
         }
     }
@@ -604,73 +578,62 @@ private fun PostManagementRoleRow(
     acceptedCount: Int,
     pendingCount: Int
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.Top) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = role.roleName,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = VolunteerLinkTextPrimary
-                )
-                Text(
-                    text = "${role.defaultLevel.toReadableDatabaseLabel()} · ${role.roleMode.toReadableDatabaseLabel()}",
-                    modifier = Modifier.padding(top = 2.dp),
-                    fontSize = 10.sp,
-                    color = VolunteerLinkTextSecondary
-                )
-            }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 13.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = "$acceptedCount / ${role.capacity}",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                color = VolunteerLinkPrimaryGreen
+                text = role.roleName,
+                fontSize = 15.sp,
+                lineHeight = 20.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = VolunteerLinkTextPrimary
             )
-        }
-
-        Row(
-            modifier = Modifier.padding(top = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(7.dp)
-        ) {
-            PostManagementNeutralPill(role.applicationMethod.toApplicationMethodLabel())
-
+            Text(
+                text = "${role.defaultLevel.toReadableDatabaseLabel()} · ${role.roleMode.toReadableDatabaseLabel()} · ${role.applicationMethod.toApplicationMethodLabel()}",
+                modifier = Modifier.padding(top = 4.dp),
+                fontSize = 12.sp,
+                lineHeight = 17.sp,
+                color = VolunteerLinkTextSecondary
+            )
             if (pendingCount > 0) {
-                Surface(
-                    shape = PostManagementPillShape,
-                    color = VolunteerLinkWarning.copy(alpha = 0.09f),
-                    border = BorderStroke(1.dp, VolunteerLinkWarning.copy(alpha = 0.20f))
-                ) {
-                    Text(
-                        text = "$pendingCount pending",
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = VolunteerLinkWarning
-                    )
-                }
+                Text(
+                    text = "$pendingCount pending application${if (pendingCount == 1) "" else "s"}",
+                    modifier = Modifier.padding(top = 4.dp),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = VolunteerLinkWarning
+                )
             }
         }
+        Text(
+            text = "$acceptedCount / ${role.capacity}",
+            modifier = Modifier.padding(start = 10.dp),
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            color = VolunteerLinkPrimaryGreen
+        )
     }
 }
 
 @Composable
 private fun PostManagementScheduleSection(post: PostManagementPost) {
-    PostManagementSectionCard(
-        title = "Schedule",
-        subtitle = if (post.schedules.isEmpty()) null else "${post.schedules.size} item${if (post.schedules.size == 1) "" else "s"}"
-    ) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        OrganisationSectionHeader(
+            title = "Schedule",
+            subtitle = if (post.schedules.isEmpty()) null else "${post.schedules.size} item${if (post.schedules.size == 1) "" else "s"}"
+        )
         if (post.schedules.isEmpty()) {
             PostManagementEmptyCopy("No additional schedule items have been added.")
         } else {
-            post.schedules.forEachIndexed { index, schedule ->
-                if (index > 0) {
-                    HorizontalDivider(
-                        modifier = Modifier.padding(vertical = 10.dp),
-                        color = VolunteerLinkBorderColour
-                    )
+            Column(modifier = Modifier.padding(top = 6.dp)) {
+                post.schedules.forEachIndexed { index, schedule ->
+                    PostManagementScheduleRow(schedule)
+                    if (index != post.schedules.lastIndex) OrganisationDivider(modifier = Modifier.padding(start = 48.dp))
                 }
-                PostManagementScheduleRow(schedule)
             }
         }
     }
@@ -679,12 +642,14 @@ private fun PostManagementScheduleSection(post: PostManagementPost) {
 @Composable
 private fun PostManagementScheduleRow(schedule: PostManagementScheduleItem) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 12.dp),
         verticalAlignment = Alignment.Top
     ) {
         Surface(
-            modifier = Modifier.size(36.dp),
-            shape = PostManagementSmallShape,
+            modifier = Modifier.size(38.dp),
+            shape = RoundedCornerShape(11.dp),
             color = VolunteerLinkSoftGreenSurface
         ) {
             Box(contentAlignment = Alignment.Center) {
@@ -696,7 +661,6 @@ private fun PostManagementScheduleRow(schedule: PostManagementScheduleItem) {
                 )
             }
         }
-
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -706,37 +670,32 @@ private fun PostManagementScheduleRow(schedule: PostManagementScheduleItem) {
                 Text(
                     text = schedule.title,
                     modifier = Modifier.weight(1f),
-                    fontSize = 12.sp,
-                    lineHeight = 16.sp,
-                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    lineHeight = 19.sp,
+                    fontWeight = FontWeight.SemiBold,
                     color = VolunteerLinkTextPrimary
                 )
-                PostManagementNeutralPill(schedule.scheduleType.toReadableDatabaseLabel())
+                OrganisationStatusPill(
+                    text = schedule.scheduleType.toReadableDatabaseLabel().uppercase(Locale.US),
+                    color = VolunteerLinkPrimaryGreen,
+                    modifier = Modifier.padding(start = 8.dp)
+                )
             }
             Text(
                 text = buildString {
                     append(schedule.scheduleDate.toPostManagementShortDate())
-                    if (!schedule.startTime.isNullOrBlank()) {
-                        append(" · ")
-                        append(schedule.startTime.toPostManagementTime())
-                    }
-                    if (!schedule.endTime.isNullOrBlank()) {
-                        append("–")
-                        append(schedule.endTime.toPostManagementTime())
-                    }
+                    if (!schedule.startTime.isNullOrBlank()) append(" · ${schedule.startTime.toPostManagementTime()}")
+                    if (!schedule.endTime.isNullOrBlank()) append("–${schedule.endTime.toPostManagementTime()}")
                 },
                 modifier = Modifier.padding(top = 4.dp),
-                fontSize = 10.sp,
+                fontSize = 12.sp,
                 color = VolunteerLinkTextSecondary
             )
-
-            val place = schedule.location?.takeIf { it.isNotBlank() }
-
-            if (!place.isNullOrBlank()) {
+            schedule.location?.takeIf { it.isNotBlank() }?.let {
                 Text(
-                    text = place,
+                    text = it,
                     modifier = Modifier.padding(top = 2.dp),
-                    fontSize = 10.sp,
+                    fontSize = 12.sp,
                     color = VolunteerLinkTextSecondary,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
@@ -759,178 +718,131 @@ internal fun PostManagementTodayAttendanceCard(
     modifier: Modifier = Modifier
 ) {
     val isToday = selectedDate == attendance.todayDate
+    val session = selectedSession
 
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = PostManagementCardShape,
-        color = VolunteerLinkSurface,
-        border = BorderStroke(1.dp, VolunteerLinkBorderColour),
-        shadowElevation = 1.dp
+    OrganisationSectionSurface(
+        modifier = modifier,
+        contentPadding = 16.dp
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Surface(
-                    modifier = Modifier.size(38.dp),
-                    shape = CircleShape,
-                    color = VolunteerLinkSoftGreenSurface
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            painter = painterResource(R.drawable.ongoing_posts),
-                            contentDescription = null,
-                            modifier = Modifier.size(21.dp),
-                            tint = VolunteerLinkPrimaryGreen
-                        )
-                    }
-                }
-
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(start = 10.dp)
-                ) {
-                    Text(
-                        text = if (isToday) "Today's Attendance" else "Attendance",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = VolunteerLinkTextPrimary
-                    )
-                    Text(
-                        text = selectedDate.toPostManagementShortDate(),
-                        modifier = Modifier.padding(top = 2.dp),
-                        fontSize = 10.sp,
-                        color = VolunteerLinkTextSecondary
-                    )
-                    if (attendance.attendanceWindowLabel.isNotBlank()) {
-                        Text(
-                            text = "Volunteer PIN window · ${attendance.attendanceWindowLabel}",
-                            modifier = Modifier.padding(top = 2.dp),
-                            fontSize = 9.sp,
-                            color = VolunteerLinkTextSecondary
-                        )
-                    }
+        OrganisationSectionHeader(
+            title = if (isToday) "Today's attendance" else "Attendance",
+            subtitle = buildString {
+                append(selectedDate.toPostManagementShortDate())
+                if (attendance.attendanceWindowLabel.isNotBlank()) {
+                    append(" · PIN window ${attendance.attendanceWindowLabel}")
                 }
             }
+        )
 
-            val session = selectedSession
-            if (session == null) {
-                Text(
-                    text = when {
-                        !isToday -> "Attendance was not started for this date."
-                        attendance.canStartAttendance -> "Attendance has not started for today."
-                        !attendance.startBlockedReason.isNullOrBlank() -> attendance.startBlockedReason
-                        attendance.eligiblePhysicalVolunteerCount <= 0 ->
-                            "No Physical volunteers are scheduled for today."
-                        else -> "Attendance has not started for today."
-                    },
-                    modifier = Modifier.padding(top = 12.dp),
-                    fontSize = 11.sp,
-                    lineHeight = 16.sp,
-                    color = VolunteerLinkTextSecondary
-                )
+        if (session == null) {
+            val message = when {
+                !isToday -> "Attendance was not started for this date."
+                attendance.canStartAttendance -> "Attendance has not started for today."
+                !attendance.startBlockedReason.isNullOrBlank() -> attendance.startBlockedReason
+                attendance.eligiblePhysicalVolunteerCount <= 0 ->
+                    "No Physical volunteers are scheduled for today."
+                else -> "Attendance has not started for today."
+            }
 
-                if (isToday && attendance.canStartAttendance) {
-                    Button(
-                        onClick = onStartAttendance,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 12.dp),
-                        enabled = !isStartingAttendance
-                    ) {
-                        Text(
-                            text = if (isStartingAttendance) {
-                                "Starting Attendance..."
-                            } else {
-                                "Start Attendance"
-                            },
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            } else {
-                Surface(
+            Text(
+                text = message,
+                modifier = Modifier.padding(top = 10.dp),
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
+                color = VolunteerLinkTextSecondary
+            )
+
+            if (isToday && attendance.canStartAttendance) {
+                Button(
+                    onClick = onStartAttendance,
                     modifier = Modifier
+                        .padding(top = 12.dp)
                         .fillMaxWidth()
-                        .padding(top = 12.dp),
-                    shape = PostManagementSmallShape,
-                    color = VolunteerLinkSoftGreenSurface
+                        .height(52.dp),
+                    enabled = !isStartingAttendance,
+                    colors = ButtonDefaults.buttonColors(containerColor = VolunteerLinkPrimaryGreen)
                 ) {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
+                    Text(
+                        text = if (isStartingAttendance) "Starting Attendance..." else "Start Attendance",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        } else {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp),
+                shape = RoundedCornerShape(14.dp),
+                color = VolunteerLinkSoftGreenSurface
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "ATTENDANCE PIN",
-                            fontSize = 9.sp,
+                            text = "Attendance PIN",
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             color = VolunteerLinkTextSecondary
                         )
                         Text(
                             text = session.pinCode.toSixDigitPinDisplay(),
                             modifier = Modifier.padding(top = 3.dp),
-                            fontSize = 25.sp,
+                            fontSize = 28.sp,
                             fontWeight = FontWeight.Bold,
                             color = VolunteerLinkPrimaryGreen
                         )
+                    }
+                    Column(horizontalAlignment = Alignment.End) {
                         Text(
-                            text = if (isToday) {
-                                "Share this 6-digit PIN with today's Physical volunteers."
-                            } else {
-                                "PIN used for this Physical event day."
-                            },
-                            modifier = Modifier.padding(top = 4.dp),
-                            fontSize = 9.sp,
-                            textAlign = TextAlign.Center,
+                            text = "$selectedPresentCount / $selectedEligibleVolunteerCount",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = VolunteerLinkTextPrimary
+                        )
+                        Text(
+                            text = if (isToday) "checked in" else "present",
+                            modifier = Modifier.padding(top = 2.dp),
+                            fontSize = 12.sp,
                             color = VolunteerLinkTextSecondary
                         )
                     }
                 }
-
-                if (isToday && !attendance.isLiveWindowOpen) {
-                    Text(
-                        text = "Volunteer PIN check-in is closed. Organisation corrections are still available below.",
-                        modifier = Modifier.padding(top = 9.dp),
-                        fontSize = 9.sp,
-                        lineHeight = 13.sp,
-                        color = VolunteerLinkTextSecondary
-                    )
-                }
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 11.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = if (isToday) "Checked in today" else "Present on this day",
-                        modifier = Modifier.weight(1f),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = VolunteerLinkTextSecondary
-                    )
-                    Text(
-                        text = "$selectedPresentCount / $selectedEligibleVolunteerCount",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = VolunteerLinkPrimaryGreen
-                    )
-                }
             }
 
-            if (!actionMessage.isNullOrBlank()) {
+            Text(
+                text = if (isToday) {
+                    "Share the 6-digit PIN with today's Physical volunteers."
+                } else {
+                    "This was the PIN used for this Physical event day."
+                },
+                modifier = Modifier.padding(top = 8.dp),
+                fontSize = 13.sp,
+                lineHeight = 18.sp,
+                color = VolunteerLinkTextSecondary
+            )
+
+            if (isToday && !attendance.isLiveWindowOpen) {
                 Text(
-                    text = actionMessage,
-                    modifier = Modifier.padding(top = 9.dp),
-                    fontSize = 9.sp,
-                    lineHeight = 13.sp,
-                    color = VolunteerLinkError
+                    text = "Volunteer PIN check-in is closed. Organisation corrections are still available below.",
+                    modifier = Modifier.padding(top = 7.dp),
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp,
+                    color = VolunteerLinkWarning
                 )
             }
+        }
+
+        if (!actionMessage.isNullOrBlank()) {
+            OrganisationInfoStrip(
+                title = "Attendance update",
+                message = actionMessage,
+                modifier = Modifier.padding(top = 10.dp),
+                accent = VolunteerLinkError
+            )
         }
     }
 }
@@ -946,183 +858,88 @@ internal fun PostManagementRemoteTeamSubmissionCard(
     onViewSubmission: (PostManagementRemoteSubmission) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = PostManagementCardShape,
-        color = VolunteerLinkSurface,
-        border = BorderStroke(1.dp, VolunteerLinkBorderColour),
-        shadowElevation = 1.dp
-    ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Surface(
-                    modifier = Modifier.size(38.dp),
-                    shape = CircleShape,
-                    color = VolunteerLinkSoftGreenSurface
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            painter = painterResource(R.drawable.remote_project),
-                            contentDescription = null,
-                            modifier = Modifier.size(21.dp),
-                            tint = VolunteerLinkPrimaryGreen
-                        )
-                    }
-                }
-
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(start = 10.dp)
-                ) {
-                    Text(
-                        text = "Team Submission",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = VolunteerLinkTextPrimary
-                    )
-                    Text(
-                        text = "Shared team deliverable",
-                        modifier = Modifier.padding(top = 2.dp),
-                        fontSize = 10.sp,
-                        color = VolunteerLinkTextSecondary
-                    )
-                }
-
-                PostManagementSubmissionStatusPill(
-                    status = submission?.status ?: "NOT_SUBMITTED"
+    OrganisationSectionSurface(modifier = modifier) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                OrganisationSectionHeader(
+                    title = "Team submission",
+                    subtitle = "Shared Remote deliverable"
                 )
             }
-
-            if (isResubmission) {
-                PostManagementResubmissionNotice(
-                    isShared = true,
-                    modifier = Modifier.padding(top = 11.dp)
-                )
-            }
-
-            if (!deliverable.isNullOrBlank()) {
-                Text(
-                    text = deliverable,
-                    modifier = Modifier.padding(top = 12.dp),
-                    fontSize = 10.sp,
-                    lineHeight = 15.sp,
-                    color = VolunteerLinkTextPrimary
-                )
-            }
-
-            HorizontalDivider(
-                modifier = Modifier.padding(vertical = 11.dp),
-                color = VolunteerLinkBorderColour
+            PostManagementSubmissionStatusPill(
+                status = submission?.status ?: "NOT_SUBMITTED",
+                modifier = Modifier.padding(start = 10.dp, top = 2.dp)
             )
+        }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                if (!responsibleRoleName.isNullOrBlank()) {
-                    PostManagementCompactInfoBlock(
-                        label = "Submitting role",
-                        value = responsibleRoleName,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-
-                PostManagementCompactInfoBlock(
-                    label = "Due",
-                    value = dueDate.toPostManagementShortDate(),
-                    modifier = if (!responsibleRoleName.isNullOrBlank()) {
-                        Modifier.weight(1f)
-                    } else {
-                        Modifier.fillMaxWidth()
-                    }
-                )
-            }
-
+        if (!deliverable.isNullOrBlank()) {
             Text(
-                text = if (!responsibleRoleName.isNullOrBlank()) {
-                    "Only volunteers in the $responsibleRoleName role can submit or replace the team deliverable."
-                } else {
-                    "Only volunteers from the assigned responsible role can submit or replace the team deliverable."
-                },
+                text = deliverable,
                 modifier = Modifier.padding(top = 10.dp),
-                fontSize = 10.sp,
-                lineHeight = 15.sp,
-                color = VolunteerLinkTextSecondary
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
+                color = VolunteerLinkTextPrimary
             )
+        }
 
-            if (submission == null) {
-                Text(
-                    text = "No team submission has been received yet.",
-                    modifier = Modifier.padding(top = 8.dp),
-                    fontSize = 10.sp,
-                    lineHeight = 15.sp,
-                    color = VolunteerLinkTextSecondary
+        OrganisationDivider(modifier = Modifier.padding(vertical = 12.dp))
+        PostManagementInfoLine(
+            label = "Due",
+            value = dueDate.toPostManagementShortDate()
+        )
+        if (!responsibleRoleName.isNullOrBlank()) {
+            PostManagementInfoLine(
+                label = "Submitting role",
+                value = responsibleRoleName,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+        }
+
+        if (submission == null) {
+            Text(
+                text = "No team submission has been received yet.",
+                modifier = Modifier.padding(top = 12.dp),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = VolunteerLinkWarning
+            )
+        } else {
+            val fileName = submission.filePath
+                ?.substringAfterLast('/')
+                ?.takeIf { it.isNotBlank() }
+                ?: if (!submission.submissionUrl.isNullOrBlank()) "Submitted link" else "Submission"
+
+            if (
+                submission.status.equals("REVISION_REQUESTED", ignoreCase = true) &&
+                !submission.feedback.isNullOrBlank()
+            ) {
+                OrganisationInfoStrip(
+                    title = "Revision requested",
+                    message = submission.feedback,
+                    modifier = Modifier.padding(top = 12.dp),
+                    accent = VolunteerLinkWarning
                 )
-            } else {
-                val fileName = submission.filePath
-                    ?.substringAfterLast('/')
-                    ?.takeIf { it.isNotBlank() }
-
-                if (!fileName.isNullOrBlank()) {
-                    PostManagementInfoLine(
-                        label = "File",
-                        value = fileName,
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
-                } else if (!submission.submissionUrl.isNullOrBlank()) {
-                    PostManagementInfoLine(
-                        label = "Submission",
-                        value = "Link submitted",
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
-                }
-
-                if (!submittedByName.isNullOrBlank()) {
-                    PostManagementInfoLine(
-                        label = "Submitted by",
-                        value = submittedByName,
-                        modifier = Modifier.padding(top = 5.dp)
-                    )
-                }
-
-                if (!submission.submittedAt.isNullOrBlank()) {
-                    PostManagementInfoLine(
-                        label = "Submitted",
-                        value = submission.submittedAt.toPostManagementDateTime(),
-                        modifier = Modifier.padding(top = 5.dp)
-                    )
-                }
-
-                if (
-                    submission.status.equals("REVISION_REQUESTED", ignoreCase = true) &&
-                    !submission.feedback.isNullOrBlank()
-                ) {
-                    Text(
-                        text = submission.feedback,
-                        modifier = Modifier.padding(top = 10.dp),
-                        fontSize = 10.sp,
-                        lineHeight = 15.sp,
-                        color = VolunteerLinkTextSecondary
-                    )
-                }
-
-                OutlinedButton(
-                    onClick = { onViewSubmission(submission) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 10.dp)
-                ) {
-                    Text(
-                        text = "View Submission",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
             }
+
+            OrganisationDivider(modifier = Modifier.padding(top = 12.dp))
+            OrganisationListRow(
+                title = fileName,
+                subtitle = buildString {
+                    if (!submittedByName.isNullOrBlank()) append("Submitted by $submittedByName")
+                    if (!submission.submittedAt.isNullOrBlank()) {
+                        if (isNotEmpty()) append(" · ")
+                        append(submission.submittedAt.toPostManagementDateTime())
+                    }
+                }.takeIf { it.isNotBlank() },
+                supportingText = if (isResubmission) "Revised submission · tap to review" else "Tap to review submission",
+                iconRes = R.drawable.remote_project,
+                statusColor = VolunteerLinkPrimaryGreen,
+                onClick = { onViewSubmission(submission) },
+                modifier = Modifier.padding(top = 2.dp)
+            )
         }
     }
 }
@@ -1136,126 +953,83 @@ private fun PostManagementRemoteSubmissionBlock(
     onViewSubmission: (PostManagementRemoteSubmission) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = PostManagementSmallShape,
-        color = VolunteerLinkBackground,
-        border = BorderStroke(1.dp, VolunteerLinkBorderColour)
-    ) {
-        Column(modifier = Modifier.padding(horizontal = 11.dp, vertical = 10.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+    Column(modifier = modifier.fillMaxWidth()) {
+        OrganisationDivider()
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Individual deliverable",
+                modifier = Modifier.weight(1f),
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                color = VolunteerLinkTextPrimary
+            )
+            PostManagementSubmissionStatusPill(
+                status = submission?.status ?: "NOT_SUBMITTED",
+                modifier = Modifier.padding(start = 10.dp)
+            )
+        }
+
+        if (!requirement.isNullOrBlank()) {
+            Text(
+                text = requirement,
+                modifier = Modifier.padding(top = 8.dp),
+                fontSize = 13.sp,
+                lineHeight = 18.sp,
+                color = VolunteerLinkTextSecondary
+            )
+        }
+
+        Text(
+            text = "Due ${dueDate.toPostManagementShortDate()}",
+            modifier = Modifier.padding(top = 7.dp),
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+            color = VolunteerLinkTextSecondary
+        )
+
+        if (submission == null) {
+            Text(
+                text = "No submission received yet.",
+                modifier = Modifier.padding(top = 8.dp),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = VolunteerLinkWarning
+            )
+        } else {
+            val fileName = submission.filePath
+                ?.substringAfterLast('/')
+                ?.takeIf { it.isNotBlank() }
+                ?: if (!submission.submissionUrl.isNullOrBlank()) "Submitted link" else "Submission"
+
+            if (
+                submission.status.equals("REVISION_REQUESTED", ignoreCase = true) &&
+                !submission.feedback.isNullOrBlank()
             ) {
-                Text(
-                    text = "Individual Deliverable",
-                    modifier = Modifier.weight(1f),
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = VolunteerLinkTextPrimary
-                )
-
-                PostManagementSubmissionStatusPill(
-                    status = submission?.status ?: "NOT_SUBMITTED"
+                OrganisationInfoStrip(
+                    title = "Revision requested",
+                    message = submission.feedback,
+                    modifier = Modifier.padding(top = 10.dp),
+                    accent = VolunteerLinkWarning
                 )
             }
 
-            if (isResubmission) {
-                PostManagementResubmissionNotice(
-                    isShared = false,
-                    modifier = Modifier.padding(top = 9.dp)
-                )
-            }
-
-            if (!requirement.isNullOrBlank()) {
-                Text(
-                    text = requirement,
-                    modifier = Modifier.padding(top = 8.dp),
-                    fontSize = 10.sp,
-                    lineHeight = 15.sp,
-                    color = VolunteerLinkTextSecondary
-                )
-            }
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Due",
-                    modifier = Modifier.weight(1f),
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = VolunteerLinkTextSecondary
-                )
-                Text(
-                    text = dueDate.toPostManagementShortDate(),
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = VolunteerLinkTextPrimary
-                )
-            }
-
-            if (submission != null) {
-                val fileName = submission.filePath
-                    ?.substringAfterLast('/')
+            OrganisationListRow(
+                title = fileName,
+                subtitle = submission.submittedAt
                     ?.takeIf { it.isNotBlank() }
-
-                if (!fileName.isNullOrBlank()) {
-                    Text(
-                        text = fileName,
-                        modifier = Modifier.padding(top = 8.dp),
-                        fontSize = 9.sp,
-                        color = VolunteerLinkTextPrimary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                } else if (!submission.submissionUrl.isNullOrBlank()) {
-                    Text(
-                        text = "Submission link provided",
-                        modifier = Modifier.padding(top = 8.dp),
-                        fontSize = 9.sp,
-                        color = VolunteerLinkTextPrimary
-                    )
-                }
-
-                if (!submission.submittedAt.isNullOrBlank()) {
-                    Text(
-                        text = "Submitted ${submission.submittedAt.toPostManagementDateTime()}",
-                        modifier = Modifier.padding(top = 3.dp),
-                        fontSize = 9.sp,
-                        color = VolunteerLinkTextSecondary
-                    )
-                }
-
-                if (
-                    submission.status.equals("REVISION_REQUESTED", ignoreCase = true) &&
-                    !submission.feedback.isNullOrBlank()
-                ) {
-                    Text(
-                        text = submission.feedback,
-                        modifier = Modifier.padding(top = 8.dp),
-                        fontSize = 9.sp,
-                        lineHeight = 13.sp,
-                        color = VolunteerLinkTextSecondary
-                    )
-                }
-
-                OutlinedButton(
-                    onClick = { onViewSubmission(submission) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 9.dp)
-                ) {
-                    Text(
-                        text = "View Submission",
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
+                    ?.let { "Submitted ${it.toPostManagementDateTime()}" },
+                supportingText = if (isResubmission) "Revised submission · tap to review" else "Tap to review submission",
+                iconRes = R.drawable.remote_project,
+                statusColor = VolunteerLinkPrimaryGreen,
+                onClick = { onViewSubmission(submission) },
+                modifier = Modifier.padding(top = 4.dp)
+            )
         }
     }
 }
@@ -1281,96 +1055,46 @@ internal fun PostManagementRemoteSubmissionDialog(
     onNotAccept: (() -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
-    val isShared = submission.submissionType.equals("SHARED", ignoreCase = true)
-    val fileName = submission.filePath
-        ?.substringAfterLast('/')
-        ?.takeIf { it.isNotBlank() }
+    val isShared = submission.submissionType.equals("SHARED", true)
+    val fileName = submission.filePath?.substringAfterLast('/')?.takeIf { it.isNotBlank() }
     val hasFile = !submission.filePath.isNullOrBlank()
     val hasLink = !submission.submissionUrl.isNullOrBlank()
     val isBusy = isOpeningFile || isDownloadingFile || isReviewing
-    val submittedValue = submission.submittedAt
-        ?.takeIf { it.isNotBlank() }
-        ?.toPostManagementDateTime()
-        ?: "Not recorded"
-    val dueValue = dueDate.takeIf { it.isNotBlank() }
-        ?.toPostManagementShortDate()
-        ?: "Not recorded"
+    val submittedValue = submission.submittedAt?.takeIf { it.isNotBlank() }?.toPostManagementDateTime() ?: "Not recorded"
+    val dueValue = dueDate.takeIf { it.isNotBlank() }?.toPostManagementShortDate() ?: "Not recorded"
     val scrollState = rememberScrollState()
 
-    Dialog(
-        onDismissRequest = {
-            if (!isBusy) onDismiss()
-        }
-    ) {
+    Dialog(onDismissRequest = { if (!isBusy) onDismiss() }) {
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
                 .fillMaxHeight(0.92f),
             shape = RoundedCornerShape(24.dp),
             color = VolunteerLinkSurface,
-            border = BorderStroke(1.dp, VolunteerLinkBorderColour),
             shadowElevation = 7.dp
         ) {
-            Column(modifier = Modifier.padding(20.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.Top
-                ) {
-                    Surface(
-                        modifier = Modifier.size(46.dp),
-                        shape = CircleShape,
-                        color = VolunteerLinkSoftGreenSurface
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                painter = painterResource(R.drawable.remote_project),
-                                contentDescription = null,
-                                modifier = Modifier.size(24.dp),
-                                tint = VolunteerLinkPrimaryGreen
-                            )
-                        }
-                    }
-
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(start = 12.dp)
-                    ) {
+            Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp)) {
+                Row(verticalAlignment = Alignment.Top) {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = if (isShared) {
-                                "Review Team Submission"
-                            } else {
-                                "Review Submission"
-                            },
-                            fontSize = 20.sp,
-                            lineHeight = 24.sp,
+                            text = if (isShared) "Review Team Submission" else "Review Submission",
+                            fontSize = 21.sp,
+                            lineHeight = 26.sp,
                             fontWeight = FontWeight.Bold,
                             color = VolunteerLinkTextPrimary
                         )
-
                         Text(
-                            text = if (isShared) {
-                                "Review the uploaded team deliverable before choosing the final submission decision."
-                            } else {
-                                "Review the uploaded work before choosing the final submission decision."
-                            },
+                            text = if (isShared) "Shared Team Deliverable" else personName ?: "Individual Deliverable",
                             modifier = Modifier.padding(top = 4.dp),
-                            fontSize = 10.sp,
-                            lineHeight = 15.sp,
-                            color = VolunteerLinkTextSecondary
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = VolunteerLinkPrimaryGreen
                         )
+                        if (!roleName.isNullOrBlank()) {
+                            Text(roleName, modifier = Modifier.padding(top = 2.dp), fontSize = 13.sp, color = VolunteerLinkTextSecondary)
+                        }
                     }
-
-                    TextButton(
-                        onClick = onDismiss,
-                        enabled = !isBusy
-                    ) {
-                        Text(
-                            text = "Close",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
+                    TextButton(onClick = onDismiss, enabled = !isBusy) { Text("Close") }
                 }
 
                 Column(
@@ -1380,459 +1104,175 @@ internal fun PostManagementRemoteSubmissionDialog(
                         .padding(top = 12.dp)
                         .verticalScroll(scrollState)
                 ) {
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        color = VolunteerLinkBackground,
-                        border = BorderStroke(1.dp, VolunteerLinkBorderColour)
-                    ) {
-                        Column(modifier = Modifier.padding(14.dp)) {
-                            Text(
-                                text = if (isShared) "Submission overview" else "Volunteer overview",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = VolunteerLinkTextSecondary
-                            )
-
-                            Text(
-                                text = if (isShared) {
-                                    "Shared Team Deliverable"
-                                } else {
-                                    personName ?: "Individual Deliverable"
-                                },
-                                modifier = Modifier.padding(top = 6.dp),
-                                fontSize = 15.sp,
-                                lineHeight = 20.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = VolunteerLinkTextPrimary
-                            )
-
-                            if (!roleName.isNullOrBlank()) {
-                                Text(
-                                    text = roleName,
-                                    modifier = Modifier.padding(top = 3.dp),
-                                    fontSize = 11.sp,
-                                    color = VolunteerLinkTextSecondary
-                                )
-                            }
-
-                            if (isShared && !submittedByName.isNullOrBlank()) {
-                                Text(
-                                    text = "Submitted by $submittedByName",
-                                    modifier = Modifier.padding(top = 8.dp),
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = VolunteerLinkPrimaryGreen
-                                )
-                            }
-                        }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "Submission",
+                            modifier = Modifier.weight(1f),
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = VolunteerLinkTextPrimary
+                        )
+                        PostManagementSubmissionStatusPill(submission.status)
                     }
-
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 12.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        color = VolunteerLinkInformation.copy(alpha = 0.08f),
-                        border = BorderStroke(1.dp, VolunteerLinkInformation.copy(alpha = 0.20f))
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Submission status",
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = VolunteerLinkTextSecondary
-                                )
-                                Text(
-                                    text = "Current review state for this uploaded submission.",
-                                    modifier = Modifier.padding(top = 3.dp),
-                                    fontSize = 9.sp,
-                                    lineHeight = 13.sp,
-                                    color = VolunteerLinkTextSecondary
-                                )
-                            }
-
-                            PostManagementSubmissionStatusPill(status = submission.status)
-                        }
-                    }
+                    OrganisationDivider(modifier = Modifier.padding(top = 9.dp))
 
                     if (isResubmission) {
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 12.dp),
-                            shape = RoundedCornerShape(16.dp),
-                            color = VolunteerLinkPrimaryGreen.copy(alpha = 0.08f),
-                            border = BorderStroke(1.dp, VolunteerLinkPrimaryGreen.copy(alpha = 0.20f))
-                        ) {
-                            Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    PostManagementResubmittedPill()
-                                    Text(
-                                        text = "Revised submission received",
-                                        modifier = Modifier.padding(start = 8.dp),
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = VolunteerLinkPrimaryGreen
-                                    )
-                                }
-                                Text(
-                                    text = if (isShared) {
-                                        "A new team version was submitted after a revision request. Review this latest version."
-                                    } else {
-                                        "A new version was submitted after a revision request. Review this latest version."
-                                    },
-                                    modifier = Modifier.padding(top = 6.dp),
-                                    fontSize = 9.sp,
-                                    lineHeight = 13.sp,
-                                    color = VolunteerLinkTextSecondary
-                                )
-                            }
-                        }
+                        Text(
+                            text = "Revised submission received",
+                            modifier = Modifier.padding(top = 11.dp),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = VolunteerLinkPrimaryGreen
+                        )
+                    }
+
+                    PostManagementInfoLine("File", fileName ?: if (hasLink) "Submission link" else "No file or link", Modifier.padding(top = 12.dp))
+                    PostManagementInfoLine("Submitted", submittedValue, Modifier.padding(top = 8.dp))
+                    PostManagementInfoLine("Due", dueValue, Modifier.padding(top = 8.dp))
+                    if (isShared && !submittedByName.isNullOrBlank()) {
+                        PostManagementInfoLine("Submitted by", submittedByName, Modifier.padding(top = 8.dp))
                     }
 
                     if (hasFile || hasLink) {
-                        Surface(
+                        OrganisationDivider(modifier = Modifier.padding(vertical = 14.dp))
+                        OrganisationSectionHeader(title = "File actions")
+                        OutlinedButton(
+                            onClick = onOpenFile,
+                            enabled = !isBusy,
                             modifier = Modifier
+                                .padding(top = 9.dp)
                                 .fillMaxWidth()
-                                .padding(top = 12.dp),
-                            shape = RoundedCornerShape(16.dp),
-                            color = VolunteerLinkSurface,
-                            border = BorderStroke(1.2.dp, VolunteerLinkBorderColour),
-                            shadowElevation = 1.dp
+                                .height(50.dp),
+                            border = BorderStroke(1.dp, VolunteerLinkPrimaryGreen)
                         ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
-                                Text(
-                                    text = "Submitted file",
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = VolunteerLinkTextSecondary
-                                )
-
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(top = 10.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Surface(
-                                        modifier = Modifier.size(38.dp),
-                                        shape = CircleShape,
-                                        color = VolunteerLinkSoftGreenSurface
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Icon(
-                                                painter = painterResource(R.drawable.remote_project),
-                                                contentDescription = null,
-                                                modifier = Modifier.size(20.dp),
-                                                tint = VolunteerLinkPrimaryGreen
-                                            )
-                                        }
-                                    }
-
-                                    Column(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .padding(start = 10.dp)
-                                    ) {
-                                        Text(
-                                            text = fileName ?: "Submission link",
-                                            fontSize = 13.sp,
-                                            lineHeight = 18.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = VolunteerLinkTextPrimary,
-                                            maxLines = 2,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                        Text(
-                                            text = if (fileName != null) {
-                                                remoteSubmissionFileLabel(fileName)
-                                            } else {
-                                                "Online submission"
-                                            },
-                                            modifier = Modifier.padding(top = 2.dp),
-                                            fontSize = 10.sp,
-                                            color = VolunteerLinkTextSecondary
-                                        )
-                                    }
-                                }
-
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(top = 13.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    Button(
-                                        onClick = onOpenFile,
-                                        modifier = Modifier.weight(1f),
-                                        enabled = !isBusy,
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = VolunteerLinkPrimaryGreen
-                                        )
-                                    ) {
-                                        Text(
-                                            text = when {
-                                                isOpeningFile -> "Opening..."
-                                                hasFile -> "Open File"
-                                                else -> "Open Link"
-                                            },
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-
-                                    if (hasFile) {
-                                        OutlinedButton(
-                                            onClick = onDownloadFile,
-                                            modifier = Modifier.weight(1f),
-                                            enabled = !isBusy,
-                                            border = BorderStroke(1.dp, VolunteerLinkPrimaryGreen),
-                                            colors = ButtonDefaults.outlinedButtonColors(
-                                                contentColor = VolunteerLinkPrimaryGreen
-                                            )
-                                        ) {
-                                            Text(
-                                                text = if (isDownloadingFile) {
-                                                    "Downloading..."
-                                                } else {
-                                                    "Download"
-                                                },
-                                                fontSize = 10.sp,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                        }
-                                    }
-                                }
+                            Text(if (isOpeningFile) "Opening..." else "Open Submission", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = VolunteerLinkPrimaryGreen)
+                        }
+                        if (hasFile) {
+                            OutlinedButton(
+                                onClick = onDownloadFile,
+                                enabled = !isBusy,
+                                modifier = Modifier
+                                    .padding(top = 8.dp)
+                                    .fillMaxWidth()
+                                    .height(50.dp)
+                            ) {
+                                Text(if (isDownloadingFile) "Downloading..." else "Download File", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                             }
                         }
                     }
 
                     if (!fileActionError.isNullOrBlank()) {
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 12.dp),
-                            shape = RoundedCornerShape(14.dp),
-                            color = VolunteerLinkError.copy(alpha = 0.08f),
-                            border = BorderStroke(1.dp, VolunteerLinkError.copy(alpha = 0.20f))
-                        ) {
-                            Text(
-                                text = fileActionError,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                                fontSize = 10.sp,
-                                lineHeight = 15.sp,
-                                color = VolunteerLinkError
-                            )
-                        }
+                        OrganisationInfoStrip(
+                            title = "Unable to open file",
+                            message = fileActionError,
+                            modifier = Modifier.padding(top = 12.dp),
+                            accent = VolunteerLinkError
+                        )
                     }
-
                     if (!downloadMessage.isNullOrBlank()) {
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 12.dp),
-                            shape = RoundedCornerShape(14.dp),
-                            color = VolunteerLinkPrimaryGreen.copy(alpha = 0.09f),
-                            border = BorderStroke(1.dp, VolunteerLinkPrimaryGreen.copy(alpha = 0.22f))
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "✓",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = VolunteerLinkPrimaryGreen
-                                )
-                                Text(
-                                    text = downloadMessage,
-                                    modifier = Modifier.padding(start = 8.dp),
-                                    fontSize = 10.sp,
-                                    lineHeight = 15.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = VolunteerLinkPrimaryGreen
-                                )
-                            }
-                        }
+                        OrganisationInfoStrip(
+                            title = "File saved",
+                            message = downloadMessage,
+                            modifier = Modifier.padding(top = 12.dp),
+                            accent = VolunteerLinkPrimaryGreen
+                        )
                     }
 
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 12.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        color = VolunteerLinkBackground,
-                        border = BorderStroke(1.dp, VolunteerLinkBorderColour)
-                    ) {
-                        Column(modifier = Modifier.padding(14.dp)) {
-                            Text(
-                                text = "Submission details",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = VolunteerLinkTextSecondary
+                    if (submission.status.equals("REVISION_REQUESTED", true) && !submission.feedback.isNullOrBlank()) {
+                        OrganisationInfoStrip(
+                            title = "Revision feedback",
+                            message = submission.feedback,
+                            modifier = Modifier.padding(top = 12.dp),
+                            accent = VolunteerLinkWarning
+                        )
+                    }
+
+                    if (canReview) {
+                        OrganisationDivider(modifier = Modifier.padding(vertical = 16.dp))
+                        OrganisationSectionHeader(
+                            title = "Decision",
+                            subtitle = "Accepted Remote work becomes Completed automatically."
+                        )
+
+                        SubmissionDecisionRow(
+                            title = "Accept work",
+                            subtitle = "Accept this submission and complete the Remote participation.",
+                            color = VolunteerLinkPrimaryGreen,
+                            enabled = !isBusy,
+                            onClick = onAccept,
+                            modifier = Modifier.padding(top = 10.dp)
+                        )
+                        SubmissionDecisionRow(
+                            title = "Request revision",
+                            subtitle = "Ask for changes and keep the work open under an extended deadline.",
+                            color = VolunteerLinkWarning,
+                            enabled = !isBusy,
+                            onClick = onRequestRevision,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                        if (onNotAccept != null) {
+                            SubmissionDecisionRow(
+                                title = "Not accept",
+                                subtitle = "Reject this work and mark the Remote participation Not Completed.",
+                                color = VolunteerLinkError,
+                                enabled = !isBusy,
+                                onClick = onNotAccept,
+                                modifier = Modifier.padding(top = 8.dp)
                             )
-
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(top = 10.dp),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                PostManagementCompactInfoBlock(
-                                    label = "Submitted",
-                                    value = submittedValue,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                PostManagementCompactInfoBlock(
-                                    label = "Due",
-                                    value = dueValue,
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-
-                            if (isShared && !submittedByName.isNullOrBlank()) {
-                                HorizontalDivider(
-                                    modifier = Modifier.padding(vertical = 10.dp),
-                                    color = VolunteerLinkBorderColour
-                                )
-                                PostManagementCompactInfoBlock(
-                                    label = "Submitted by",
-                                    value = submittedByName,
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                            }
                         }
                     }
-
-                    if (
-                        submission.status.equals("REVISION_REQUESTED", ignoreCase = true) &&
-                        !submission.feedback.isNullOrBlank()
-                    ) {
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 12.dp),
-                            shape = RoundedCornerShape(16.dp),
-                            color = VolunteerLinkWarning.copy(alpha = 0.08f),
-                            border = BorderStroke(1.dp, VolunteerLinkWarning.copy(alpha = 0.20f))
-                        ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
-                                Text(
-                                    text = "Revision feedback",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = VolunteerLinkWarning
-                                )
-                                Text(
-                                    text = submission.feedback,
-                                    modifier = Modifier.padding(top = 6.dp),
-                                    fontSize = 10.sp,
-                                    lineHeight = 15.sp,
-                                    color = VolunteerLinkTextPrimary
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(4.dp))
-                }
-
-                if (canReview) {
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 12.dp),
-                        shape = RoundedCornerShape(18.dp),
-                        color = VolunteerLinkSoftGreenSurface.copy(alpha = 0.45f),
-                        border = BorderStroke(1.dp, VolunteerLinkBorderColour)
-                    ) {
-                        Column(modifier = Modifier.padding(14.dp)) {
-                            Text(
-                                text = "Review decision",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = VolunteerLinkTextPrimary
-                            )
-                            Text(
-                                text = "Accept confirms the submitted work. No separate Remote completion decision is needed; accepted work becomes Completed automatically during final Remote review.",
-                                modifier = Modifier.padding(top = 4.dp),
-                                fontSize = 9.sp,
-                                lineHeight = 14.sp,
-                                color = VolunteerLinkTextSecondary
-                            )
-
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(top = 12.dp),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                OutlinedButton(
-                                    onClick = onRequestRevision,
-                                    modifier = Modifier.weight(1f),
-                                    enabled = !isBusy,
-                                    colors = ButtonDefaults.outlinedButtonColors(
-                                        contentColor = VolunteerLinkWarning
-                                    ),
-                                    border = BorderStroke(
-                                        1.dp,
-                                        VolunteerLinkWarning.copy(alpha = 0.55f)
-                                    )
-                                ) {
-                                    Text(
-                                        text = "Request Revision",
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-
-                                Button(
-                                    onClick = onAccept,
-                                    modifier = Modifier.weight(1f),
-                                    enabled = !isBusy,
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = VolunteerLinkPrimaryGreen
-                                    )
-                                ) {
-                                    Text(
-                                        text = if (isReviewing) "Saving..." else "Accept",
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-
-                            if (onNotAccept != null) {
-                                TextButton(
-                                    onClick = onNotAccept,
-                                    enabled = !isBusy,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(top = 5.dp)
-                                ) {
-                                    Text(
-                                        text = "Not Accept",
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = VolunteerLinkError
-                                    )
-                                }
-                            }
-                        }
-                    }
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
             }
         }
+    }
+}
+
+
+
+@Composable
+private fun SubmissionDecisionRow(
+    title: String,
+    subtitle: String,
+    color: Color,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(enabled = enabled, onClick = onClick)
+                .padding(vertical = 13.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = color
+                )
+                Text(
+                    text = subtitle,
+                    modifier = Modifier.padding(top = 3.dp),
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp,
+                    color = VolunteerLinkTextSecondary
+                )
+            }
+            Icon(
+                painter = painterResource(R.drawable.back),
+                contentDescription = null,
+                modifier = Modifier
+                    .padding(start = 10.dp)
+                    .size(17.dp)
+                    .rotate(180f),
+                tint = color
+            )
+        }
+        OrganisationDivider()
     }
 }
 
@@ -1869,8 +1309,8 @@ internal fun PostManagementRequestRevisionDialog(
                     } else {
                         "Explain what the volunteer should change before resubmitting."
                     },
-                    fontSize = 11.sp,
-                    lineHeight = 16.sp,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
                     color = VolunteerLinkTextSecondary
                 )
 
@@ -1906,9 +1346,9 @@ internal fun PostManagementRequestRevisionDialog(
                     } else {
                         "The existing project deadline stays the same while the project is ongoing."
                     },
-                    modifier = Modifier.padding(top = 7.dp),
-                    fontSize = 9.sp,
-                    lineHeight = 13.sp,
+                    modifier = Modifier.padding(top = 8.dp),
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp,
                     color = VolunteerLinkTextSecondary
                 )
 
@@ -1916,7 +1356,8 @@ internal fun PostManagementRequestRevisionDialog(
                     Text(
                         text = errorMessage,
                         modifier = Modifier.padding(top = 8.dp),
-                        fontSize = 10.sp,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp,
                         color = VolunteerLinkError
                     )
                 }
@@ -1980,8 +1421,8 @@ internal fun PostManagementAcceptSubmissionDialog(
                     } else {
                         "This accepts the volunteer's submitted work. No separate Remote completion decision is needed; accepted work becomes Completed automatically during final Remote review."
                     },
-                    fontSize = 11.sp,
-                    lineHeight = 16.sp,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
                     color = VolunteerLinkTextSecondary
                 )
 
@@ -1989,7 +1430,8 @@ internal fun PostManagementAcceptSubmissionDialog(
                     Text(
                         text = errorMessage,
                         modifier = Modifier.padding(top = 9.dp),
-                        fontSize = 10.sp,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp,
                         color = VolunteerLinkError
                     )
                 }
@@ -2044,8 +1486,8 @@ internal fun PostManagementNotAcceptSubmissionDialog(
                 } else {
                     "This marks the latest submitted work as Not Accepted. This volunteer will not be eligible for Completed from this deliverable."
                 },
-                fontSize = 11.sp,
-                lineHeight = 16.sp,
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
                 color = VolunteerLinkTextSecondary
             )
         },
@@ -2107,7 +1549,8 @@ private fun PostManagementSubmissionStatusPill(
         Text(
             text = label,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-            fontSize = 8.sp,
+            fontSize = 12.sp,
+            lineHeight = 15.sp,
             fontWeight = FontWeight.Bold,
             color = foreground
         )
@@ -2130,8 +1573,8 @@ private fun PostManagementResubmissionNotice(
         ) {
             Text(
                 text = "Revised submission received",
-                fontSize = 10.sp,
-                lineHeight = 14.sp,
+                fontSize = 13.sp,
+                lineHeight = 18.sp,
                 fontWeight = FontWeight.Bold,
                 color = VolunteerLinkPrimaryGreen
             )
@@ -2141,9 +1584,9 @@ private fun PostManagementResubmissionNotice(
                 } else {
                     "Latest version is ready for review."
                 },
-                modifier = Modifier.padding(top = 2.dp),
-                fontSize = 9.sp,
-                lineHeight = 13.sp,
+                modifier = Modifier.padding(top = 3.dp),
+                fontSize = 12.sp,
+                lineHeight = 17.sp,
                 fontWeight = FontWeight.Medium,
                 color = VolunteerLinkTextPrimary
             )
@@ -2164,7 +1607,7 @@ private fun PostManagementResubmittedPill(
         Text(
             text = "Resubmitted",
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-            fontSize = 8.sp,
+            fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
             color = VolunteerLinkPrimaryGreen
         )
@@ -2183,8 +1626,8 @@ internal fun PostManagementAttendanceDaySelector(
 
     Column(modifier = modifier.fillMaxWidth()) {
         Text(
-            text = "Attendance Day",
-            fontSize = 11.sp,
+            text = "Attendance day",
+            fontSize = 15.sp,
             fontWeight = FontWeight.Bold,
             color = VolunteerLinkTextPrimary
         )
@@ -2211,9 +1654,9 @@ internal fun PostManagementAttendanceDaySelector(
         if (!actionMessage.isNullOrBlank()) {
             Text(
                 text = actionMessage,
-                modifier = Modifier.padding(top = 7.dp),
-                fontSize = 9.sp,
-                lineHeight = 13.sp,
+                modifier = Modifier.padding(top = 8.dp),
+                fontSize = 13.sp,
+                lineHeight = 18.sp,
                 color = VolunteerLinkError
             )
         }
@@ -2233,102 +1676,102 @@ private fun PostManagementVolunteerAttendanceBlock(
 ) {
     val selectedStatus = summary.statusFor(selectedDate)
 
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = PostManagementSmallShape,
-        color = VolunteerLinkBackground,
-        border = BorderStroke(1.dp, VolunteerLinkBorderColour)
-    ) {
-        Column(modifier = Modifier.padding(horizontal = 11.dp, vertical = 9.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        OrganisationDivider()
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "Attendance",
-                    modifier = Modifier.weight(1f),
-                    fontSize = 10.sp,
+                    fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
                     color = VolunteerLinkTextPrimary
                 )
                 Text(
-                    text = "${summary.attendedDays} / ${summary.expectedDays} days",
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = VolunteerLinkPrimaryGreen
+                    text = "${summary.verifiedMinutes.toVerifiedTimeLabel()} verified",
+                    modifier = Modifier.padding(top = 3.dp),
+                    fontSize = 13.sp,
+                    color = VolunteerLinkTextSecondary
                 )
             }
-
             Text(
-                text = "${summary.verifiedMinutes.toVerifiedTimeLabel()} verified",
-                modifier = Modifier.padding(top = 3.dp),
-                fontSize = 9.sp,
-                color = VolunteerLinkTextSecondary
+                text = "${summary.attendedDays} / ${summary.expectedDays} days",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = VolunteerLinkPrimaryGreen
             )
+        }
 
-            val statusText = when {
-                selectedStatus == null || !selectedStatus.expected -> {
-                    "${selectedDate.toPostManagementShortDate()} · Not scheduled"
-                }
-                selectedStatus.present -> {
-                    "${selectedDate.toPostManagementShortDate()} · Present"
-                }
-                selectedStatus.markedAbsent -> {
-                    "${selectedDate.toPostManagementShortDate()} · Absent"
-                }
-                selectedDate == todayDate -> {
-                    "${selectedDate.toPostManagementShortDate()} · Not checked in yet"
-                }
-                else -> {
-                    "${selectedDate.toPostManagementShortDate()} · Absent"
-                }
+        val statusText = when {
+            selectedStatus == null || !selectedStatus.expected -> {
+                "${selectedDate.toPostManagementShortDate()} · Not scheduled"
             }
+            selectedStatus.present -> {
+                "${selectedDate.toPostManagementShortDate()} · Present"
+            }
+            selectedStatus.markedAbsent -> {
+                "${selectedDate.toPostManagementShortDate()} · Absent"
+            }
+            selectedDate == todayDate -> {
+                "${selectedDate.toPostManagementShortDate()} · Not checked in yet"
+            }
+            else -> {
+                "${selectedDate.toPostManagementShortDate()} · Absent"
+            }
+        }
 
-            Text(
-                text = statusText,
-                modifier = Modifier.padding(top = 5.dp),
-                fontSize = 9.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = if (selectedStatus?.present == true) {
-                    VolunteerLinkPrimaryGreen
-                } else {
-                    VolunteerLinkTextSecondary
+        Text(
+            text = statusText,
+            modifier = Modifier.padding(top = 7.dp),
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = if (selectedStatus?.present == true) {
+                VolunteerLinkPrimaryGreen
+            } else {
+                VolunteerLinkTextSecondary
+            }
+        )
+
+        if (
+            canCorrectAttendance &&
+            selectedStatus != null &&
+            selectedStatus.expected
+        ) {
+            if (selectedStatus.present) {
+                OutlinedButton(
+                    onClick = onRequestMarkAbsent,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 9.dp)
+                        .height(48.dp),
+                    enabled = !isUpdatingAttendance
+                ) {
+                    Text(
+                        text = if (isUpdatingAttendance) "Updating..." else "Mark Absent",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
-            )
-
-            if (
-                canCorrectAttendance &&
-                selectedStatus != null &&
-                selectedStatus.expected
-            ) {
-                if (selectedStatus.present) {
-                    OutlinedButton(
-                        onClick = onRequestMarkAbsent,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp),
-                        enabled = !isUpdatingAttendance
-                    ) {
-                        Text(
-                            text = if (isUpdatingAttendance) "Updating..." else "Mark Absent",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                } else {
-                    Button(
-                        onClick = onMarkPresent,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp),
-                        enabled = !isUpdatingAttendance
-                    ) {
-                        Text(
-                            text = if (isUpdatingAttendance) "Updating..." else "Mark Present",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+            } else {
+                Button(
+                    onClick = onMarkPresent,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 9.dp)
+                        .height(48.dp),
+                    enabled = !isUpdatingAttendance,
+                    colors = ButtonDefaults.buttonColors(containerColor = VolunteerLinkPrimaryGreen)
+                ) {
+                    Text(
+                        text = if (isUpdatingAttendance) "Updating..." else "Mark Present",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         }
@@ -2356,8 +1799,8 @@ internal fun PostManagementMarkAbsentDialog(
                 text = "This will mark the volunteer absent for " +
                         "${eventDate.toPostManagementShortDate()}, set verified time for that day to 0, " +
                         "and prevent another PIN check-in for this date. You can use Mark Present to change the decision.",
-                fontSize = 11.sp,
-                lineHeight = 16.sp,
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
                 color = VolunteerLinkTextSecondary
             )
         },
@@ -2392,15 +1835,21 @@ internal fun PostManagementPeopleControls(
     onRoleSelected: (String?) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(modifier = modifier.fillMaxWidth()) {
+    OrganisationSectionSurface(
+        modifier = modifier,
+        contentPadding = 14.dp
+    ) {
         if (showApplicantsTab) {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(11.dp),
-                color = VolunteerLinkSoftGreenSurface
+                shape = RoundedCornerShape(12.dp),
+                color = VolunteerLinkSoftGreenSurface.copy(alpha = 0.52f),
+                border = BorderStroke(1.dp, VolunteerLinkBorderColour)
             ) {
                 Row(
-                    modifier = Modifier.padding(4.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(4.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     PostManagementPeopleTabItem(
@@ -2420,11 +1869,9 @@ internal fun PostManagementPeopleControls(
                 }
             }
         } else {
-            Text(
-                text = "Volunteers $volunteerCount",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                color = VolunteerLinkTextPrimary
+            OrganisationSectionHeader(
+                title = "Volunteers",
+                subtitle = "$volunteerCount joined"
             )
         }
 
@@ -2440,7 +1887,7 @@ internal fun PostManagementPeopleControls(
                 Icon(
                     painter = painterResource(R.drawable.ic_volunteer_search),
                     contentDescription = null,
-                    modifier = Modifier.size(19.dp),
+                    modifier = Modifier.size(20.dp),
                     tint = VolunteerLinkTextSecondary
                 )
             }
@@ -2448,18 +1895,18 @@ internal fun PostManagementPeopleControls(
 
         if (roles.isNotEmpty()) {
             Text(
-                text = "Filter by role",
-                modifier = Modifier.padding(top = 12.dp),
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
+                text = "Role",
+                modifier = Modifier.padding(top = 14.dp),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
                 color = VolunteerLinkTextSecondary
             )
 
             LazyRow(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 7.dp),
-                horizontalArrangement = Arrangement.spacedBy(7.dp)
+                    .padding(top = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 item(key = "all_roles") {
                     PostManagementRoleFilterChip(
@@ -2494,34 +1941,29 @@ private fun PostManagementPeopleTabItem(
 ) {
     Surface(
         modifier = modifier.clickable(onClick = onClick),
-        shape = RoundedCornerShape(8.dp),
-        color = if (selected) VolunteerLinkSurface else Color.Transparent,
-        shadowElevation = if (selected) 1.dp else 0.dp
+        shape = RoundedCornerShape(9.dp),
+        color = if (selected) VolunteerLinkPrimaryGreen else Color.Transparent,
+        border = null
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 6.dp, vertical = 9.dp),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
         ) {
             Icon(
                 painter = painterResource(iconRes),
                 contentDescription = null,
-                modifier = Modifier.size(15.dp),
-                tint = if (selected) {
-                    VolunteerLinkPrimaryGreen
-                } else {
-                    VolunteerLinkTextSecondary
-                }
+                modifier = Modifier.size(17.dp),
+                tint = if (selected) VolunteerLinkSurface else VolunteerLinkTextSecondary
             )
             Text(
                 text = text,
-                modifier = Modifier.padding(start = 5.dp),
-                fontSize = 10.sp,
+                modifier = Modifier.padding(start = 6.dp),
+                fontSize = 13.sp,
                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                color = if (selected) VolunteerLinkPrimaryGreen else VolunteerLinkTextSecondary,
-                maxLines = 1
+                color = if (selected) VolunteerLinkSurface else VolunteerLinkTextSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }
@@ -2544,8 +1986,8 @@ private fun PostManagementRoleFilterChip(
     ) {
         Text(
             text = text,
-            modifier = Modifier.padding(horizontal = 11.dp, vertical = 7.dp),
-            fontSize = 10.sp,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
             color = if (selected) VolunteerLinkSurface else VolunteerLinkTextSecondary,
             maxLines = 1
@@ -2565,7 +2007,7 @@ internal fun PostManagementPeopleRoleHeader(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(top = 4.dp)
+            .padding(top = 8.dp, bottom = 2.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -2575,8 +2017,8 @@ internal fun PostManagementPeopleRoleHeader(
             Text(
                 text = role.roleName,
                 modifier = Modifier.weight(1f),
-                fontSize = 14.sp,
-                lineHeight = 18.sp,
+                fontSize = 16.sp,
+                lineHeight = 21.sp,
                 fontWeight = FontWeight.Bold,
                 color = VolunteerLinkTextPrimary,
                 maxLines = 2,
@@ -2614,16 +2056,13 @@ internal fun PostManagementPeopleRoleHeader(
                             "$volunteerCount / ${role.capacity} joined"
                 }
             },
-            modifier = Modifier.padding(top = 3.dp),
-            fontSize = 10.sp,
-            lineHeight = 14.sp,
+            modifier = Modifier.padding(top = 4.dp),
+            fontSize = 13.sp,
+            lineHeight = 18.sp,
             color = VolunteerLinkTextSecondary
         )
 
-        HorizontalDivider(
-            modifier = Modifier.padding(top = 9.dp),
-            color = VolunteerLinkBorderColour
-        )
+        OrganisationDivider(modifier = Modifier.padding(top = 10.dp))
     }
 }
 
@@ -2632,21 +2071,11 @@ private fun PostManagementRemoteRolePill(
     text: String,
     modifier: Modifier = Modifier
 ) {
-    Surface(
-        modifier = modifier,
-        shape = PostManagementPillShape,
-        color = VolunteerLinkPrimaryGreen.copy(alpha = 0.10f),
-        border = BorderStroke(1.dp, VolunteerLinkPrimaryGreen.copy(alpha = 0.22f))
-    ) {
-        Text(
-            text = text,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-            fontSize = 8.sp,
-            fontWeight = FontWeight.Bold,
-            color = VolunteerLinkPrimaryGreen,
-            maxLines = 1
-        )
-    }
+    OrganisationStatusPill(
+        text = text,
+        color = VolunteerLinkPrimaryGreen,
+        modifier = modifier
+    )
 }
 
 @Composable
@@ -2654,28 +2083,11 @@ private fun PostManagementApplicationWindowPill(
     role: PostManagementRole,
     modifier: Modifier = Modifier
 ) {
-    val isOpen = role.isApplicationOpen
-    val background = if (isOpen) {
-        VolunteerLinkPrimaryGreen.copy(alpha = 0.10f)
-    } else {
-        VolunteerLinkWarning.copy(alpha = 0.10f)
-    }
-    val foreground = if (isOpen) VolunteerLinkPrimaryGreen else VolunteerLinkWarning
-
-    Surface(
-        modifier = modifier,
-        shape = PostManagementPillShape,
-        color = background,
-        border = BorderStroke(1.dp, foreground.copy(alpha = 0.22f))
-    ) {
-        Text(
-            text = if (isOpen) "OPEN" else "CLOSED",
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-            fontSize = 8.sp,
-            fontWeight = FontWeight.Bold,
-            color = foreground
-        )
-    }
+    OrganisationStatusPill(
+        text = if (role.isApplicationOpen) "Open" else "Closed",
+        color = if (role.isApplicationOpen) VolunteerLinkPrimaryGreen else VolunteerLinkWarning,
+        modifier = modifier
+    )
 }
 
 @Composable
@@ -2700,23 +2112,26 @@ internal fun PostManagementPersonCard(
     modifier: Modifier = Modifier
 ) {
     Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = PostManagementCardShape,
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp),
+        shape = RoundedCornerShape(16.dp),
         color = VolunteerLinkSurface,
-        border = BorderStroke(1.dp, VolunteerLinkBorderColour),
-        shadowElevation = 1.dp
+        border = BorderStroke(1.dp, VolunteerLinkBorderColour)
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.Top) {
                 Surface(
-                    modifier = Modifier.size(44.dp),
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clickable { onViewProfile(person) },
                     shape = CircleShape,
                     color = VolunteerLinkSoftGreenSurface
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             painter = painterResource(R.drawable.person_placeholder),
-                            contentDescription = null,
+                            contentDescription = "View ${person.fullName} profile",
                             modifier = Modifier.size(24.dp),
                             tint = VolunteerLinkPrimaryGreen
                         )
@@ -2726,14 +2141,16 @@ internal fun PostManagementPersonCard(
                 Column(
                     modifier = Modifier
                         .weight(1f)
-                        .padding(start = 11.dp)
+                        .padding(start = 12.dp)
+                        .clickable { onViewProfile(person) }
                 ) {
                     Text(
                         text = person.fullName,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        lineHeight = 21.sp,
+                        fontWeight = FontWeight.SemiBold,
                         color = VolunteerLinkTextPrimary,
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
@@ -2745,61 +2162,54 @@ internal fun PostManagementPersonCard(
                             }
                         },
                         modifier = Modifier.padding(top = 3.dp),
-                        fontSize = 10.sp,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp,
                         color = VolunteerLinkTextSecondary
                     )
-                }
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(3.dp)
-                ) {
-                    if (isApplicant) {
-                        IconButton(
-                            onClick = { onToggleShortlist(person) },
-                            modifier = Modifier.size(32.dp),
-                            enabled = isApplicationOpen
-                        ) {
-                            Icon(
-                                painter = painterResource(
-                                    if (person.isShortlisted) {
-                                        R.drawable.shortlist_filled
-                                    } else {
-                                        R.drawable.shortlist_outline
-                                    }
-                                ),
-                                contentDescription = if (person.isShortlisted) {
-                                    "Remove from shortlist"
-                                } else {
-                                    "Add to shortlist"
-                                },
-                                modifier = Modifier.size(20.dp),
-                                tint = when {
-                                    !isApplicationOpen -> VolunteerLinkTextSecondary.copy(alpha = 0.35f)
-                                    person.isShortlisted -> VolunteerLinkWarning
-                                    else -> VolunteerLinkTextSecondary
-                                }
-                            )
-                        }
-                    }
-
-                    Surface(
-                        shape = PostManagementPillShape,
-                        color = if (isApplicant) {
-                            VolunteerLinkWarning.copy(alpha = 0.09f)
-                        } else {
-                            VolunteerLinkSoftGreenSurface
-                        }
+                    Row(
+                        modifier = Modifier.padding(top = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
+                        OrganisationStatusPill(
                             text = if (isApplicant) "Pending" else person.completionStatus.toCompletionLabel(),
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            fontSize = 8.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isApplicant) VolunteerLinkWarning else VolunteerLinkPrimaryGreen
+                            color = if (isApplicant) VolunteerLinkInformation else person.completionStatus.toCompletionColor()
+                        )
+                        Text(
+                            text = "View profile",
+                            modifier = Modifier.padding(start = 9.dp),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = VolunteerLinkPrimaryGreen
                         )
                     }
                 }
+
+                OrganisationMessageButton(
+                    personName = person.fullName,
+                    modifier = Modifier.padding(start = 6.dp)
+                )
+
+                if (isApplicant) {
+                    IconButton(
+                        onClick = { onToggleShortlist(person) },
+                        modifier = Modifier.size(38.dp),
+                        enabled = isApplicationOpen
+                    ) {
+                        Icon(
+                            painter = painterResource(
+                                if (person.isShortlisted) R.drawable.shortlist_filled else R.drawable.shortlist_outline
+                            ),
+                            contentDescription = if (person.isShortlisted) "Remove from shortlist" else "Add to shortlist",
+                            modifier = Modifier.size(20.dp),
+                            tint = when {
+                                !isApplicationOpen -> VolunteerLinkTextSecondary.copy(alpha = 0.35f)
+                                person.isShortlisted -> VolunteerLinkWarning
+                                else -> VolunteerLinkTextSecondary
+                            }
+                        )
+                    }
+                }
+
             }
 
             if (
@@ -2813,12 +2223,8 @@ internal fun PostManagementPersonCard(
                     todayDate = attendanceTodayDate,
                     canCorrectAttendance = canCorrectAttendance,
                     isUpdatingAttendance = isUpdatingAttendance,
-                    onMarkPresent = {
-                        onMarkPresent(person, attendanceSelectedDate)
-                    },
-                    onRequestMarkAbsent = {
-                        onRequestMarkAbsent(person, attendanceSelectedDate)
-                    },
+                    onMarkPresent = { onMarkPresent(person, attendanceSelectedDate) },
+                    onRequestMarkAbsent = { onRequestMarkAbsent(person, attendanceSelectedDate) },
                     modifier = Modifier.padding(top = 12.dp)
                 )
             }
@@ -2829,90 +2235,46 @@ internal fun PostManagementPersonCard(
                     dueDate = remoteSubmissionDueDate,
                     submission = remoteSubmission,
                     isResubmission = remoteSubmissionIsResubmission,
-                    onViewSubmission = { submission ->
-                        onViewRemoteSubmission(person, submission)
-                    },
+                    onViewSubmission = { submission -> onViewRemoteSubmission(person, submission) },
                     modifier = Modifier.padding(top = 12.dp)
                 )
             }
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                OutlinedButton(
-                    onClick = { onViewProfile(person) },
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(
-                        painter = painterResource(R.drawable.profile),
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
+            if (isApplicant) {
+                Button(
+                    onClick = {},
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 12.dp)
+                        .height(48.dp),
+                    enabled = false,
+                    colors = ButtonDefaults.buttonColors(
+                        disabledContainerColor = if (isApplicationOpen) {
+                            VolunteerLinkPrimaryGreen.copy(alpha = 0.18f)
+                        } else {
+                            VolunteerLinkWarning.copy(alpha = 0.12f)
+                        },
+                        disabledContentColor = if (isApplicationOpen) {
+                            VolunteerLinkPrimaryGreen.copy(alpha = 0.60f)
+                        } else {
+                            VolunteerLinkWarning.copy(alpha = 0.75f)
+                        }
                     )
+                ) {
                     Text(
-                        text = "Profile",
-                        modifier = Modifier.padding(start = 5.dp),
-                        fontSize = 10.sp,
+                        text = if (isApplicationOpen) "Review Application" else "Application Closed",
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.Bold
                     )
-                }
-
-                if (isApplicant) {
-                    Button(
-                        onClick = {},
-                        modifier = Modifier.weight(1f),
-                        enabled = false,
-                        colors = ButtonDefaults.buttonColors(
-                            disabledContainerColor = if (isApplicationOpen) {
-                                VolunteerLinkPrimaryGreen.copy(alpha = 0.18f)
-                            } else {
-                                VolunteerLinkWarning.copy(alpha = 0.12f)
-                            },
-                            disabledContentColor = if (isApplicationOpen) {
-                                VolunteerLinkPrimaryGreen.copy(alpha = 0.60f)
-                            } else {
-                                VolunteerLinkWarning.copy(alpha = 0.75f)
-                            }
-                        )
-                    ) {
-                        Text(
-                            text = if (isApplicationOpen) "Review" else "Closed",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                } else {
-                    Button(
-                        onClick = {},
-                        modifier = Modifier.weight(1f),
-                        enabled = false,
-                        colors = ButtonDefaults.buttonColors(
-                            disabledContainerColor = VolunteerLinkPrimaryGreen.copy(alpha = 0.18f),
-                            disabledContentColor = VolunteerLinkPrimaryGreen.copy(alpha = 0.60f)
-                        )
-                    ) {
-                        Icon(
-                            painter = painterResource(R.drawable.chat),
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Text(
-                            text = "Message",
-                            modifier = Modifier.padding(start = 5.dp),
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
                 }
             }
 
             if (isApplicant && !isApplicationOpen) {
                 Text(
                     text = "Application review is closed for this role.",
-                    modifier = Modifier.padding(top = 7.dp),
-                    fontSize = 9.sp,
+                    modifier = Modifier.padding(top = 8.dp),
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp,
                     color = VolunteerLinkWarning
                 )
             }
@@ -3045,14 +2407,14 @@ private fun PostManagementSectionCard(
                 Text(
                     text = title,
                     modifier = Modifier.weight(1f),
-                    fontSize = 14.sp,
+                    fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = VolunteerLinkTextPrimary
                 )
                 if (!subtitle.isNullOrBlank()) {
                     Text(
                         text = subtitle,
-                        fontSize = 10.sp,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = VolunteerLinkTextSecondary
                     )
@@ -3068,8 +2430,8 @@ private fun PostManagementSectionCard(
 private fun PostManagementEmptyCopy(text: String) {
     Text(
         text = text,
-        fontSize = 11.sp,
-        lineHeight = 16.sp,
+        fontSize = 13.sp,
+        lineHeight = 18.sp,
         color = VolunteerLinkTextSecondary
     )
 }
@@ -3131,7 +2493,7 @@ private fun PostManagementLifecycleBadge(post: PostManagementPost) {
         Text(
             text = style.label,
             modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
-            fontSize = 9.sp,
+            fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
             color = style.content
         )
@@ -3155,7 +2517,7 @@ private fun PostManagementNeutralPill(text: String) {
         Text(
             text = text,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-            fontSize = 8.sp,
+            fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
             color = VolunteerLinkPrimaryGreen,
             maxLines = 1
@@ -3200,7 +2562,7 @@ private fun PostManagementPhaseLine(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = label,
-                    fontSize = 11.sp,
+                    fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                     color = VolunteerLinkTextPrimary
                 )
@@ -3212,7 +2574,7 @@ private fun PostManagementPhaseLine(
             Text(
                 text = postManagementDateRange(startDate, endDate),
                 modifier = Modifier.padding(top = 3.dp),
-                fontSize = 11.sp,
+                fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
                 color = VolunteerLinkTextSecondary
             )
@@ -3220,8 +2582,8 @@ private fun PostManagementPhaseLine(
                 Text(
                     text = location,
                     modifier = Modifier.padding(top = 2.dp),
-                    fontSize = 10.sp,
-                    lineHeight = 14.sp,
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp,
                     color = VolunteerLinkTextSecondary,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
@@ -3261,7 +2623,7 @@ private fun PostManagementPhaseBadge(
         Text(
             text = label,
             modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
-            fontSize = 8.sp,
+            fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
             color = foreground
         )
@@ -3295,6 +2657,14 @@ private fun String.toCompletionLabel(): String = when (uppercase(Locale.US)) {
     "COMPLETED" -> "Completed"
     "NOT_COMPLETED" -> "Not Completed"
     else -> toReadableDatabaseLabel()
+}
+
+private fun String.toCompletionColor(): Color = when (uppercase(Locale.US)) {
+    "IN_PROGRESS" -> VolunteerLinkPrimaryGreen
+    "NEEDS_REVIEW" -> VolunteerLinkInformation
+    "COMPLETED" -> VolunteerLinkSuccess
+    "NOT_COMPLETED" -> VolunteerLinkError
+    else -> VolunteerLinkTextSecondary
 }
 
 private fun String.toReadableDatabaseLabel(): String {

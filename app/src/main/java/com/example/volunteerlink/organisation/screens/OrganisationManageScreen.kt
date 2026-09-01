@@ -26,6 +26,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.volunteerlink.R
+import com.example.volunteerlink.organisation.components.OrganisationSectionHeader
 import com.example.volunteerlink.organisation.manage.model.OrganisationManageUiState
 import com.example.volunteerlink.organisation.viewmodel.OrganisationManageViewModel
 import com.example.volunteerlink.ui.theme.VolunteerLinkBackground
@@ -81,12 +82,25 @@ private fun ManageLandingContent(
             .background(VolunteerLinkBackground)
             .statusBarsPadding(),
         contentPadding = PaddingValues(bottom = 112.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(0.dp)
     ) {
         item(key = "manage_header") {
             OrganisationManageHeader(
                 title = "Manage",
-                subtitle = "Choose what you want to manage"
+                subtitle = "Everything your organisation is running"
+            )
+        }
+
+        item(key = "manage_volunteering_heading") {
+            OrganisationSectionHeader(
+                title = "Volunteering",
+                subtitle = "Posts, participants and review work",
+                modifier = Modifier.padding(
+                    start = VolunteerLinkScreenHorizontalPadding,
+                    end = VolunteerLinkScreenHorizontalPadding,
+                    top = 24.dp,
+                    bottom = 2.dp
+                )
             )
         }
 
@@ -99,10 +113,19 @@ private fun ManageLandingContent(
                 attentionText = buildManageAttentionSummary(uiState),
                 hasAttention = uiState.managementAttentionPostCount > 0,
                 onClick = onVolunteerPostsClick,
+                modifier = Modifier.padding(horizontal = VolunteerLinkScreenHorizontalPadding)
+            )
+        }
+
+        item(key = "manage_partnership_heading") {
+            OrganisationSectionHeader(
+                title = "Partnerships",
+                subtitle = "Organisation collaboration and shared support",
                 modifier = Modifier.padding(
                     start = VolunteerLinkScreenHorizontalPadding,
                     end = VolunteerLinkScreenHorizontalPadding,
-                    top = 14.dp
+                    top = 24.dp,
+                    bottom = 2.dp
                 )
             )
         }
@@ -111,9 +134,22 @@ private fun ManageLandingContent(
             ManageModuleChoiceCard(
                 iconRes = R.drawable.group,
                 title = "Impact Weave",
-                description = "Manage collaborative project drafts, resource needs and partnerships.",
+                description = "Manage collaboration drafts, needs and partner organisations.",
                 onClick = onImpactWeaveClick,
                 modifier = Modifier.padding(horizontal = VolunteerLinkScreenHorizontalPadding)
+            )
+        }
+
+        item(key = "manage_visibility_heading") {
+            OrganisationSectionHeader(
+                title = "Visibility",
+                subtitle = "Promote opportunities that need more reach",
+                modifier = Modifier.padding(
+                    start = VolunteerLinkScreenHorizontalPadding,
+                    end = VolunteerLinkScreenHorizontalPadding,
+                    top = 24.dp,
+                    bottom = 2.dp
+                )
             )
         }
 

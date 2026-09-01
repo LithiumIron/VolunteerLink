@@ -25,6 +25,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.volunteerlink.data.time.AppClock
+import com.example.volunteerlink.organisation.components.OrganisationDivider
+import com.example.volunteerlink.organisation.components.OrganisationSectionSurface
 import com.example.volunteerlink.organisation.home.model.OrganisationHomeUiState
 import com.example.volunteerlink.organisation.viewmodel.OrganisationHomeViewModel
 import com.example.volunteerlink.ui.theme.VolunteerLinkBackground
@@ -173,9 +175,13 @@ private fun OrganisationHomeContent(
                                 text = "No volunteering activities are currently ongoing."
                             )
                         } else {
-                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                uiState.ongoingPosts.take(2).forEach { post ->
+                            val visibleOngoing = uiState.ongoingPosts.take(2)
+                            OrganisationSectionSurface(contentPadding = 14.dp) {
+                                visibleOngoing.forEachIndexed { index, post ->
                                     OngoingPostCard(post = post)
+                                    if (index != visibleOngoing.lastIndex) {
+                                        OrganisationDivider()
+                                    }
                                 }
                             }
                         }
@@ -203,7 +209,7 @@ private fun OrganisationHomeContent(
                             )
                         } else {
                             val visibleUpcoming = uiState.upcomingPosts.take(2)
-                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            OrganisationSectionSurface(contentPadding = 14.dp) {
                                 visibleUpcoming.forEachIndexed { index, post ->
                                     UpcomingPostRow(
                                         post = post,

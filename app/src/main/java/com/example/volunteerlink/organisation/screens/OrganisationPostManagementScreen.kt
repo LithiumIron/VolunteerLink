@@ -585,8 +585,8 @@ private fun OrganisationPostManagementContent(
                 item(key = "remote_review_saved_message") {
                     Text(
                         text = remoteReviewActionMessage,
-                        fontSize = 11.sp,
-                        lineHeight = 16.sp,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = VolunteerLinkPrimaryGreen
                     )
