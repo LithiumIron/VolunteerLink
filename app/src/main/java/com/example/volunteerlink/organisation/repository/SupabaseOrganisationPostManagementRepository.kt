@@ -1,6 +1,7 @@
 package com.example.volunteerlink.organisation.repository
 
 import com.example.volunteerlink.data.supabase
+import com.example.volunteerlink.organisation.auth.OrganisationSession
 import com.example.volunteerlink.organisation.manage.model.PostManagementAttendanceDay
 import com.example.volunteerlink.organisation.manage.model.PostManagementAttendanceRecord
 import com.example.volunteerlink.organisation.manage.model.PostManagementAttendanceSnapshot
@@ -10,7 +11,9 @@ import com.example.volunteerlink.organisation.manage.model.PostManagementPhysica
 import com.example.volunteerlink.organisation.manage.model.PostManagementPost
 import com.example.volunteerlink.organisation.manage.model.PostManagementPendingReviewDecision
 import com.example.volunteerlink.organisation.manage.model.PostManagementRemoteDetails
+import com.example.volunteerlink.organisation.manage.model.PostManagementRemoteCompletionDecision
 import com.example.volunteerlink.organisation.manage.model.PostManagementRemoteSubmission
+import com.example.volunteerlink.organisation.manage.model.PostManagementRemoteSubmissionDecision
 import com.example.volunteerlink.organisation.manage.model.PostManagementRole
 import com.example.volunteerlink.organisation.manage.model.PostManagementScheduleItem
 import io.github.jan.supabase.postgrest.from
@@ -28,22 +31,17 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
-import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
-import java.util.TimeZone
 
 /** Supabase reader for the Organisation Post Management detail screen. */
 class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementRepository {
 
     companion object {
-        // Temporary organisation identity until the organisation auth flow is integrated.
-        // Every organisation-management root lookup must stay scoped to this owner.
-        private const val TEST_ORGANISATION_ID = "ORG0001"
         private const val REMOTE_SUBMISSION_BUCKET = "remote-submissions"
     }
 
     override suspend fun loadPost(postId: String): PostManagementPost {
+        val organisationId = OrganisationSession.requireOrganisationId()
         val postRow = supabase
             .from("volunteer_posts")
             .select(
@@ -53,7 +51,7 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
             ) {
                 filter {
                     eq("post_id", postId)
-                    eq("organisation_id", TEST_ORGANISATION_ID)
+                    eq("organisation_id", organisationId)
                 }
             }
             .decodeList<JsonObject>()
@@ -426,54 +424,96 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
             }
         }
 
-        val currentSubmission = supabase
-            .from("remote_submissions")
-            .select(columns = Columns.raw("submission_id,status")) {
-                filter {
-                    eq("submission_id", submissionId)
-                    eq("post_id", postId)
+        supabase.postgrest.rpc(
+            function = "organisation_review_remote_submission_authenticated",
+            parameters = buildJsonObject {
+                put("p_post_id", postId)
+                put("p_submission_id", submissionId)
+                put("p_action", normalizedAction)
+                if (revisionFeedback.isBlank()) {
+                    put("p_feedback", JsonNull)
+                } else {
+                    put("p_feedback", revisionFeedback)
                 }
             }
-            .decodeList<JsonObject>()
-            .firstOrNull()
-            ?: error("Remote submission $submissionId was not found.")
-
-        require(
-            currentSubmission.requiredText("status")
-                .equals("PENDING_REVIEW", ignoreCase = true)
-        ) {
-            "Only a Pending Review submission can be reviewed."
-        }
-
-        val auditTimestamp = currentAuditTimestamp()
-        val newStatus = if (normalizedAction == "ACCEPT") {
-            "ACCEPTED"
-        } else {
-            "REVISION_REQUESTED"
-        }
-
-        supabase
-            .from("remote_submissions")
-            .update(
-                {
-                    set("status", newStatus)
-                    if (normalizedAction == "ACCEPT") {
-                        set("feedback", JsonNull)
-                    } else {
-                        set("feedback", revisionFeedback)
-                    }
-                    set("reviewed_at", auditTimestamp)
-                    set("updated_at", auditTimestamp)
-                }
-            ) {
-                filter {
-                    eq("submission_id", submissionId)
-                    eq("post_id", postId)
-                    eq("status", "PENDING_REVIEW")
-                }
-            }
+        )
     }
 
+    override suspend fun saveRemoteSubmissionReviewStage(
+        postId: String,
+        decisions: List<PostManagementRemoteSubmissionDecision>,
+        newEndDate: String?
+    ) {
+        requireOwnedPost(postId)
+
+        supabase.postgrest.rpc(
+            function = "organisation_save_remote_submission_review_stage",
+            parameters = buildJsonObject {
+                put("p_post_id", postId)
+                put("p_decisions", buildJsonArray {
+                    decisions.forEach { decision ->
+                        add(buildJsonObject {
+                            put("submission_id", decision.submissionId)
+                            put("decision", decision.decision.name)
+                            val feedback = decision.feedback
+                            if (feedback.isNullOrBlank()) {
+                                put("feedback", JsonNull)
+                            } else {
+                                put("feedback", feedback.trim())
+                            }
+                        })
+                    }
+                })
+                if (newEndDate.isNullOrBlank()) {
+                    put("p_new_end_date", JsonNull)
+                } else {
+                    put("p_new_end_date", newEndDate)
+                }
+            }
+        )
+    }
+
+    override suspend fun finalizeRemoteReviewBatch(
+        postId: String,
+        decisions: List<PostManagementRemoteCompletionDecision>,
+        feedbackByParticipation: Map<String, String>
+    ) {
+        requireOwnedPost(postId)
+
+        supabase.postgrest.rpc(
+            function = "organisation_finalize_remote_review_batch",
+            parameters = buildJsonObject {
+                put("p_post_id", postId)
+                put("p_decisions", buildJsonArray {
+                    decisions.forEach { decision ->
+                        add(buildJsonObject {
+                            put("role_template_id", decision.roleTemplateId)
+                            put("user_id", decision.userId)
+                            put("decision", decision.decision.name)
+                            val reason = decision.reason
+                            if (reason.isNullOrBlank()) {
+                                put("reason", JsonNull)
+                            } else {
+                                put("reason", reason.trim())
+                            }
+                        })
+                    }
+                })
+                put("p_feedback", buildJsonArray {
+                    feedbackByParticipation.forEach { (participationKey, feedback) ->
+                        val splitAt = participationKey.indexOf("::")
+                        if (splitAt > 0 && feedback.isNotBlank()) {
+                            add(buildJsonObject {
+                                put("role_template_id", participationKey.substring(0, splitAt))
+                                put("user_id", participationKey.substring(splitAt + 2))
+                                put("feedback", feedback.trim())
+                            })
+                        }
+                    }
+                })
+            }
+        )
+    }
 
     override suspend fun loadPhysicalAttendance(
         postId: String
@@ -538,27 +578,22 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
     ) {
         requireOwnedPost(postId)
 
-        supabase
-            .from("role_participations")
-            .update(
-                {
-                    set("is_shortlisted", isShortlisted)
-                }
-            ) {
-                filter {
-                    eq("post_id", postId)
-                    eq("role_template_id", roleTemplateId)
-                    eq("user_id", userId)
-                    eq("application_status", "PENDING")
-                }
+        supabase.postgrest.rpc(
+            function = "organisation_set_applicant_shortlisted",
+            parameters = buildJsonObject {
+                put("p_post_id", postId)
+                put("p_role_template_id", roleTemplateId)
+                put("p_user_id", userId)
+                put("p_is_shortlisted", isShortlisted)
             }
+        )
     }
 
     override suspend fun startPhysicalAttendance(postId: String) {
         requireOwnedPost(postId)
 
         supabase.postgrest.rpc(
-            function = "start_physical_attendance",
+            function = "organisation_start_physical_attendance",
             parameters = buildJsonObject {
                 put("p_post_id", postId)
             }
@@ -726,12 +761,13 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
     }
 
     private suspend fun requireOwnedPost(postId: String) {
+        val organisationId = OrganisationSession.requireOrganisationId()
         val ownsPost = supabase
             .from("volunteer_posts")
             .select(columns = Columns.raw("post_id")) {
                 filter {
                     eq("post_id", postId)
-                    eq("organisation_id", TEST_ORGANISATION_ID)
+                    eq("organisation_id", organisationId)
                 }
             }
             .decodeList<JsonObject>()
@@ -742,14 +778,6 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
         }
     }
 
-    private fun currentAuditTimestamp(): String {
-        return SimpleDateFormat(
-            "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
-            Locale.US
-        ).apply {
-            timeZone = TimeZone.getTimeZone("UTC")
-        }.format(Date())
-    }
 
     private fun JsonObject.requiredText(key: String): String {
         return optionalText(key)

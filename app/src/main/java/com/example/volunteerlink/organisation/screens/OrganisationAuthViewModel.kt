@@ -8,7 +8,7 @@ import com.example.volunteerlink.data.supabase
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.auth.status.SessionStatus
-import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 data class OrganisationAuthUiState(
     val isCheckingSession: Boolean = true,
@@ -86,18 +88,29 @@ class OrganisationAuthViewModel(
             }
 
             try {
+                // Send the organisation details as Supabase Auth metadata.
+                // 07_organisation_authenticated_access.sql has an auth.users
+                // trigger that atomically creates user_profiles + organisations.
+                // This also works when email confirmation is enabled, because
+                // the database profile is created when auth.users is inserted.
                 supabase.auth.signUpWith(Email) {
                     this.email = normalizedEmail
                     this.password = password
+                    data = buildJsonObject {
+                        put("volunteerlink_account_type", "ORGANISATION")
+                        put("organisation_name", normalizedOrgName)
+                        contactPhone?.trim()?.ifBlank { null }?.let { phone ->
+                            put("contact_phone", phone)
+                        }
+                    }
                 }
 
                 val authUserId = supabase.auth.currentUserOrNull()?.id
 
                 if (authUserId == null) {
-                    // "Confirm email" is enabled in Supabase Auth settings —
-                    // no session exists yet, so we can't create the profile
-                    // rows (RLS requires auth.uid() to match). The user must
-                    // confirm via email, then sign in normally.
+                    // Email confirmation is enabled. The SQL trigger has already
+                    // created the VolunteerLink organisation rows, so after the
+                    // email is confirmed the user can sign in normally.
                     mutableUiState.value = OrganisationAuthUiState(
                         isCheckingSession = false,
                         needsEmailConfirmation = true
@@ -105,11 +118,9 @@ class OrganisationAuthViewModel(
                     return@launch
                 }
 
-                createOrganisationProfile(
-                    authUserId = authUserId,
-                    organisationName = normalizedOrgName,
-                    contactPhone = contactPhone?.trim()?.ifBlank { null }
-                )
+                // When confirmation is disabled we already have a session.
+                // Verify that the SQL trigger created the matching profile.
+                confirmOrganisationProfile()
                 rememberVerifiedOrganisation()
 
                 mutableUiState.value = OrganisationAuthUiState(
@@ -279,55 +290,25 @@ class OrganisationAuthViewModel(
         ) == currentAuthUserId
     }
 
-    private suspend fun createOrganisationProfile(
-        authUserId: String,
-        organisationName: String,
-        contactPhone: String?
-    ) {
-        // 1. Base account row, marked as an ORGANISATION account type.
-        supabase.from("user_profiles").insert(
-            NewUserProfileRow(
-                authUserId = authUserId,
-                fullName = organisationName,
-                accountType = "ORGANISATION"
-            )
-        )
-
-        // 2. Read back the generated user_id (e.g. "USER003") to link the
-        // organisations row to it.
-        val profile = supabase.from("user_profiles")
-            .select {
-                filter { eq("auth_user_id", authUserId) }
-            }
-            .decodeSingle<UserProfileIdRow>()
-
-        // 3. The organisation-specific row. contact_email is intentionally
-        // left null here — it's a nullable column, and the org sets/edits it
-        // later from their Profile screen rather than at sign-up.
-        supabase.from("organisations").insert(
-            NewOrganisationRow(
-                userId = profile.userId,
-                organisationName = organisationName,
-                contactPhone = contactPhone
-            )
-        )
-    }
-
     private suspend fun confirmOrganisationProfile() {
-        val authUserId = supabase.auth.currentUserOrNull()?.id
+        supabase.auth.currentUserOrNull()
             ?: error("The Supabase session is no longer available.")
 
-        val profiles = supabase.from("user_profiles")
-            .select {
-                filter { eq("auth_user_id", authUserId) }
-            }
-            .decodeList<VolunteerAccountTypeRowForOrg>()
-
-        val profile = profiles.firstOrNull()
+        // Resolve the signed-in VolunteerLink identity through one authenticated
+        // RPC. This avoids a false "no profile" result from a direct table SELECT
+        // if RLS policy state was changed by a rollback/migration mismatch.
+        val identity = supabase.postgrest
+            .rpc("get_my_organisation_context")
+            .decodeList<OrganisationIdentityRow>()
+            .firstOrNull()
             ?: error("No VolunteerLink profile is linked to this account.")
 
-        require(profile.accountType == "ORGANISATION") {
+        require(identity.accountType.equals("ORGANISATION", ignoreCase = true)) {
             "This account belongs to a volunteer, not an organisation."
+        }
+
+        require(!identity.organisationId.isNullOrBlank()) {
+            "This organisation account is incomplete. Please contact support."
         }
     }
 
@@ -381,25 +362,10 @@ private fun authErrorMessage(exception: Exception): String {
 }
 
 @Serializable
-private data class NewUserProfileRow(
-    @SerialName("auth_user_id") val authUserId: String,
-    @SerialName("full_name") val fullName: String,
-    @SerialName("account_type") val accountType: String
-)
-
-@Serializable
-private data class UserProfileIdRow(
-    @SerialName("user_id") val userId: String
-)
-
-@Serializable
-private data class NewOrganisationRow(
+private data class OrganisationIdentityRow(
     @SerialName("user_id") val userId: String,
-    @SerialName("organisation_name") val organisationName: String,
-    @SerialName("contact_phone") val contactPhone: String?
-)
-
-@Serializable
-private data class VolunteerAccountTypeRowForOrg(
-    @SerialName("account_type") val accountType: String
+    @SerialName("account_type") val accountType: String,
+    @SerialName("organisation_id") val organisationId: String? = null,
+    @SerialName("organisation_name") val organisationName: String? = null,
+    @SerialName("verification_status") val verificationStatus: String? = null
 )

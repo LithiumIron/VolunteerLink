@@ -3,6 +3,8 @@ package com.example.volunteerlink.organisation.repository
 import com.example.volunteerlink.organisation.manage.model.PostManagementAttendanceSnapshot
 import com.example.volunteerlink.organisation.manage.model.PostManagementPost
 import com.example.volunteerlink.organisation.manage.model.PostManagementPendingReviewDecision
+import com.example.volunteerlink.organisation.manage.model.PostManagementRemoteCompletionDecision
+import com.example.volunteerlink.organisation.manage.model.PostManagementRemoteSubmissionDecision
 
 /** Loads and updates the normalized data needed to manage one Volunteer Post. */
 interface OrganisationPostManagementRepository {
@@ -29,6 +31,23 @@ interface OrganisationPostManagementRepository {
         submissionId: String,
         action: String,
         feedback: String? = null
+    )
+
+    /**
+     * Saves the ended Remote Submission stage in one database transaction.
+     * A new deadline, when supplied, is project-wide for every unresolved deliverable.
+     */
+    suspend fun saveRemoteSubmissionReviewStage(
+        postId: String,
+        decisions: List<PostManagementRemoteSubmissionDecision>,
+        newEndDate: String?
+    )
+
+    /** Atomically finalizes every accepted Remote participant and the post itself. */
+    suspend fun finalizeRemoteReviewBatch(
+        postId: String,
+        decisions: List<PostManagementRemoteCompletionDecision>,
+        feedbackByParticipation: Map<String, String>
     )
 
     /** Shortlists or unshortlists one pending application for comparison. */

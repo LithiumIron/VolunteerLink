@@ -223,7 +223,7 @@ internal fun PostManagementSummaryCard(
                     label = "Remote",
                     iconRes = R.drawable.remote_project,
                     startDate = post.remote?.startDate,
-                    endDate = post.remote?.endDate,
+                    endDate = post.remote?.effectiveEndDate,
                     location = null,
                     timing = post.remoteTimingState,
                     modifier = Modifier.padding(top = 12.dp)
@@ -256,7 +256,7 @@ internal fun PostManagementSummaryCard(
                     label = "Remote",
                     iconRes = R.drawable.remote_project,
                     startDate = post.remote?.startDate,
-                    endDate = post.remote?.endDate,
+                    endDate = post.remote?.effectiveEndDate,
                     location = null,
                     timing = post.remoteTimingState,
                     modifier = Modifier.padding(top = 12.dp)
@@ -1278,6 +1278,7 @@ internal fun PostManagementRemoteSubmissionDialog(
     onDownloadFile: () -> Unit,
     onRequestRevision: () -> Unit,
     onAccept: () -> Unit,
+    onNotAccept: (() -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
     val isShared = submission.submissionType.equals("SHARED", ignoreCase = true)
@@ -1810,6 +1811,23 @@ internal fun PostManagementRemoteSubmissionDialog(
                                     )
                                 }
                             }
+
+                            if (onNotAccept != null) {
+                                TextButton(
+                                    onClick = onNotAccept,
+                                    enabled = !isBusy,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 5.dp)
+                                ) {
+                                    Text(
+                                        text = "Not Accept",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = VolunteerLinkError
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -1823,6 +1841,7 @@ internal fun PostManagementRequestRevisionDialog(
     isShared: Boolean,
     dueDate: String,
     feedback: String,
+    needsProjectDeadlineExtension: Boolean = false,
     isSaving: Boolean,
     errorMessage: String?,
     onFeedbackChange: (String) -> Unit,
@@ -1870,14 +1889,18 @@ internal fun PostManagementRequestRevisionDialog(
 
                 if (dueDate.isNotBlank()) {
                     PostManagementInfoLine(
-                        label = "Due",
+                        label = if (needsProjectDeadlineExtension) "Previous deadline" else "Due",
                         value = dueDate.toPostManagementShortDate(),
                         modifier = Modifier.padding(top = 10.dp)
                     )
                 }
 
                 Text(
-                    text = "The existing project deadline stays the same while the project is ongoing.",
+                    text = if (needsProjectDeadlineExtension) {
+                        "This is a draft revision request. After reviewing all unresolved work, set one new project-wide deadline in the Submission stage."
+                    } else {
+                        "The existing project deadline stays the same while the project is ongoing."
+                    },
                     modifier = Modifier.padding(top = 7.dp),
                     fontSize = 9.sp,
                     lineHeight = 13.sp,
@@ -1984,6 +2007,49 @@ internal fun PostManagementAcceptSubmissionDialog(
             ) {
                 Text("Cancel")
             }
+        },
+        containerColor = VolunteerLinkSurface
+    )
+}
+
+@Composable
+internal fun PostManagementNotAcceptSubmissionDialog(
+    isShared: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Not Accept Submission?",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = VolunteerLinkTextPrimary
+            )
+        },
+        text = {
+            Text(
+                text = if (isShared) {
+                    "This marks the latest Shared Team deliverable as Not Accepted. Team members will not be eligible for Completed from this deliverable."
+                } else {
+                    "This marks the latest submitted work as Not Accepted. This volunteer will not be eligible for Completed from this deliverable."
+                },
+                fontSize = 11.sp,
+                lineHeight = 16.sp,
+                color = VolunteerLinkTextSecondary
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(containerColor = VolunteerLinkError)
+            ) {
+                Text("Not Accept", fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
         },
         containerColor = VolunteerLinkSurface
     )

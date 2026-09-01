@@ -49,6 +49,9 @@ import com.example.volunteerlink.data.post.PostTimingState
 import com.example.volunteerlink.organisation.manage.model.PostManagementPerson
 import com.example.volunteerlink.organisation.manage.model.PostManagementPost
 import com.example.volunteerlink.organisation.manage.model.PostManagementRole
+import com.example.volunteerlink.organisation.manage.model.PostManagementRemoteReviewItem
+import com.example.volunteerlink.organisation.manage.model.PostManagementRemoteReviewSession
+import com.example.volunteerlink.organisation.manage.model.PostManagementRemoteReviewStage
 import com.example.volunteerlink.organisation.manage.model.PostManagementRemoteSubmission
 import com.example.volunteerlink.organisation.viewmodel.OrganisationPostManagementViewModel
 import com.example.volunteerlink.ui.theme.VolunteerLinkBackground
@@ -84,21 +87,23 @@ fun OrganisationPostManagementScreen(
 
     val post = uiState.post
     val reviewSession = uiState.physicalReviewSession
+    val remoteReviewSession = uiState.remoteReviewSession
+    val hasUnfinishedReview = reviewSession.hasUnfinishedReview || remoteReviewSession.hasUnfinishedReview
     var confirmLeaveReview by rememberSaveable { mutableStateOf(false) }
 
     fun discardAndLeave() {
-        viewModel.discardPhysicalReviewSession()
+        viewModel.discardReviewSessions()
         onBack()
     }
 
-    BackHandler(enabled = reviewSession.hasUnfinishedReview) {
+    BackHandler(enabled = hasUnfinishedReview) {
         confirmLeaveReview = true
     }
 
-    DisposableEffect(reviewSession.hasUnfinishedReview) {
+    DisposableEffect(hasUnfinishedReview) {
         onExitProtectionChanged(
-            reviewSession.hasUnfinishedReview,
-            if (reviewSession.hasUnfinishedReview) viewModel::discardPhysicalReviewSession else null
+            hasUnfinishedReview,
+            if (hasUnfinishedReview) viewModel::discardReviewSessions else null
         )
         onDispose { onExitProtectionChanged(false, null) }
     }
@@ -117,8 +122,11 @@ fun OrganisationPostManagementScreen(
             isUpdatingReview = uiState.isUpdatingReview,
             reviewActionMessage = uiState.reviewActionMessage,
             physicalReviewSession = reviewSession,
+            isUpdatingRemoteReview = uiState.isUpdatingRemoteReview,
+            remoteReviewActionMessage = uiState.remoteReviewActionMessage,
+            remoteReviewSession = remoteReviewSession,
             onBack = {
-                if (reviewSession.hasUnfinishedReview) confirmLeaveReview = true else onBack()
+                if (hasUnfinishedReview) confirmLeaveReview = true else onBack()
             },
             onEdit = onEdit,
             onToggleShortlist = viewModel::toggleApplicantShortlist,
@@ -135,17 +143,33 @@ fun OrganisationPostManagementScreen(
             onFinalizeReview = viewModel::finalizePhysicalReviewPost,
             onDownloadRemoteSubmission = viewModel::downloadRemoteSubmission,
             onReviewRemoteSubmission = viewModel::reviewRemoteSubmission,
+            onSetRemoteSubmissionDecision = viewModel::setRemoteSubmissionDecision,
+            onSetRemoteMissingAction = viewModel::setRemoteMissingAction,
+            onSetRemoteReviewNewEndDate = viewModel::setRemoteReviewNewEndDate,
+            onSaveRemoteSubmissionStage = viewModel::saveRemoteSubmissionReviewStage,
+            onSetRemoteCompletionDecision = viewModel::setRemoteCompletionDecision,
+            onChangeRemoteCompletionDecision = viewModel::changeRemoteCompletionDecision,
+            onSetRemoteFeedback = viewModel::setRemoteFeedback,
+            onRemoteReviewStageChange = viewModel::setRemoteReviewStage,
+            onFinalizeRemoteReview = viewModel::finalizeRemoteReviewPost,
             onStartAttendancePolling = viewModel::startAttendancePolling,
             onStopAttendancePolling = viewModel::stopAttendancePolling
         )
     }
 
-    if (uiState.isUpdatingReview) {
+    if (uiState.isUpdatingReview || uiState.isUpdatingRemoteReview) {
+        val isRemoteOperation = uiState.isUpdatingRemoteReview
+        val isRemoteFinalize = isRemoteOperation &&
+            uiState.remoteReviewSession.stage == PostManagementRemoteReviewStage.FINISH
         AlertDialog(
             onDismissRequest = {},
             title = {
                 Text(
-                    text = "Finalizing event...",
+                    text = when {
+                        isRemoteFinalize -> "Finalizing Remote project..."
+                        isRemoteOperation -> "Saving Remote review..."
+                        else -> "Finalizing event..."
+                    },
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = VolunteerLinkTextPrimary
@@ -160,7 +184,14 @@ fun OrganisationPostManagementScreen(
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
-                        text = "Saving completion decisions, verified hours and feedback. Please wait.",
+                        text = when {
+                            isRemoteFinalize ->
+                                "Saving Remote completion decisions and final feedback. Please wait."
+                            isRemoteOperation ->
+                                "Saving submission decisions and the project-wide deadline. Please wait."
+                            else ->
+                                "Saving completion decisions, verified hours and feedback. Please wait."
+                        },
                         fontSize = 14.sp,
                         lineHeight = 20.sp,
                         color = VolunteerLinkTextSecondary
@@ -203,12 +234,13 @@ fun OrganisationPostManagementScreen(
         )
     }
 
-    if (confirmLeaveReview) {
+
+    if (uiState.remoteReviewFinalizeSucceeded) {
         AlertDialog(
-            onDismissRequest = { confirmLeaveReview = false },
+            onDismissRequest = viewModel::dismissRemoteReviewFinalizeSuccess,
             title = {
                 Text(
-                    text = "Leave event review?",
+                    text = "Remote review completed",
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = VolunteerLinkTextPrimary
@@ -216,7 +248,38 @@ fun OrganisationPostManagementScreen(
             },
             text = {
                 Text(
-                    text = "Your completion or feedback changes have not been finalized. Leaving now will discard those temporary review changes. Saved attendance updates will stay.",
+                    text = "The Remote project review has been finalized successfully. The post is now Completed and the saved outcomes are read-only.",
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    color = VolunteerLinkTextSecondary
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = viewModel::dismissRemoteReviewFinalizeSuccess,
+                    colors = ButtonDefaults.buttonColors(containerColor = VolunteerLinkPrimaryGreen)
+                ) {
+                    Text("Done", fontWeight = FontWeight.Bold)
+                }
+            },
+            containerColor = VolunteerLinkSurface
+        )
+    }
+
+    if (confirmLeaveReview) {
+        AlertDialog(
+            onDismissRequest = { confirmLeaveReview = false },
+            title = {
+                Text(
+                    text = "Leave review?",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = VolunteerLinkTextPrimary
+                )
+            },
+            text = {
+                Text(
+                    text = "Your temporary review choices have not been finalized. Leaving now will discard those draft choices. Database changes that were already saved, such as attendance or a committed Remote deadline extension, will stay.",
                     fontSize = 14.sp,
                     lineHeight = 20.sp,
                     color = VolunteerLinkTextSecondary
@@ -250,6 +313,9 @@ private fun OrganisationPostManagementContent(
     isUpdatingReview: Boolean,
     reviewActionMessage: String?,
     physicalReviewSession: com.example.volunteerlink.organisation.manage.model.PostManagementPhysicalReviewSession,
+    isUpdatingRemoteReview: Boolean,
+    remoteReviewActionMessage: String?,
+    remoteReviewSession: PostManagementRemoteReviewSession,
     onBack: () -> Unit,
     onEdit: () -> Unit,
     onToggleShortlist: (PostManagementPerson) -> Unit,
@@ -266,6 +332,15 @@ private fun OrganisationPostManagementContent(
     onFinalizeReview: () -> Unit,
     onDownloadRemoteSubmission: suspend (PostManagementRemoteSubmission) -> ByteArray,
     onReviewRemoteSubmission: suspend (PostManagementRemoteSubmission, String, String?) -> Unit,
+    onSetRemoteSubmissionDecision: (PostManagementRemoteSubmission, String, String?) -> Unit,
+    onSetRemoteMissingAction: (String, Boolean) -> Unit,
+    onSetRemoteReviewNewEndDate: (String?) -> Unit,
+    onSaveRemoteSubmissionStage: () -> Unit,
+    onSetRemoteCompletionDecision: (PostManagementPerson, Boolean, String?) -> Unit,
+    onChangeRemoteCompletionDecision: (PostManagementPerson) -> Unit,
+    onSetRemoteFeedback: (PostManagementPerson, String) -> Unit,
+    onRemoteReviewStageChange: (PostManagementRemoteReviewStage) -> Unit,
+    onFinalizeRemoteReview: () -> Unit,
     onStartAttendancePolling: () -> Unit,
     onStopAttendancePolling: () -> Unit
 ) {
@@ -293,6 +368,7 @@ private fun OrganisationPostManagementContent(
     var revisionSubmission by remember { mutableStateOf<PostManagementRemoteSubmission?>(null) }
     var revisionFeedback by remember { mutableStateOf("") }
     var acceptSubmission by remember { mutableStateOf<PostManagementRemoteSubmission?>(null) }
+    var notAcceptSubmission by remember { mutableStateOf<PostManagementRemoteSubmission?>(null) }
     var isReviewingRemoteSubmission by remember { mutableStateOf(false) }
     var remoteSubmissionReviewError by remember { mutableStateOf<String?>(null) }
 
@@ -346,6 +422,7 @@ private fun OrganisationPostManagementContent(
 
     val physicalAttendance = post.physicalAttendance
     val physicalReview = post.physicalReview
+    val remoteReview = post.remoteReview
     val showPhysicalReview =
         post.mode.equals("PHYSICAL", ignoreCase = true) &&
             physicalReview != null &&
@@ -353,11 +430,19 @@ private fun OrganisationPostManagementContent(
                 post.physicalTimingState == PostTimingState.PAST ||
                     post.databaseStatus.equals("COMPLETED", ignoreCase = true)
             )
+    val showRemoteReview =
+        post.mode.equals("REMOTE", ignoreCase = true) &&
+            remoteReview != null &&
+            (
+                post.remoteTimingState == PostTimingState.PAST ||
+                    post.databaseStatus.equals("COMPLETED", ignoreCase = true)
+            )
+    val showReview = showPhysicalReview || showRemoteReview
 
-    LaunchedEffect(showPhysicalReview) {
-        if (showPhysicalReview && selectedTabName == PostManagementTab.PEOPLE.name) {
+    LaunchedEffect(showReview) {
+        if (showReview && selectedTabName == PostManagementTab.PEOPLE.name) {
             selectedTabName = PostManagementTab.REVIEW.name
-        } else if (!showPhysicalReview && selectedTabName == PostManagementTab.REVIEW.name) {
+        } else if (!showReview && selectedTabName == PostManagementTab.REVIEW.name) {
             selectedTabName = PostManagementTab.OVERVIEW.name
         }
     }
@@ -503,7 +588,7 @@ private fun OrganisationPostManagementContent(
                 PostManagementMainTabs(
                     selected = selectedTab,
                     pendingApplicantCount = openApplicants.size,
-                    showReviewTab = showPhysicalReview,
+                    showReviewTab = showReview,
                     onSelected = { selectedTabName = it.name }
                 )
             }
@@ -786,8 +871,36 @@ private fun OrganisationPostManagementContent(
                                 onViewProfile = { selectedPerson = it }
                             )
                         }
+                    } else if (showRemoteReview && remoteReview != null) {
+                        item(key = "remote_completion_review") {
+                            PostManagementRemoteReviewContent(
+                                review = remoteReview,
+                                session = remoteReviewSession,
+                                evaluations = post.evaluations,
+                                isSaving = isUpdatingRemoteReview,
+                                actionMessage = remoteReviewActionMessage,
+                                onViewSubmission = { item ->
+                                    val submission = item.latestSubmission
+                                    if (submission != null) {
+                                        selectedRemoteSubmission = submission
+                                        selectedRemoteSubmissionPerson = item.person
+                                        remoteSubmissionFileError = null
+                                        remoteSubmissionReviewError = null
+                                    }
+                                },
+                                onMissingAction = onSetRemoteMissingAction,
+                                onNewEndDateChange = onSetRemoteReviewNewEndDate,
+                                onSaveSubmissionStage = onSaveRemoteSubmissionStage,
+                                onCompletionDecision = onSetRemoteCompletionDecision,
+                                onChangeCompletionDecision = onChangeRemoteCompletionDecision,
+                                onFeedbackChange = onSetRemoteFeedback,
+                                onStageChange = onRemoteReviewStageChange,
+                                onFinalize = onFinalizeRemoteReview,
+                                onViewProfile = { selectedPerson = it }
+                            )
+                        }
                     } else {
-                        item(key = "physical_review_unavailable") {
+                        item(key = "review_unavailable") {
                             PostManagementPeopleEmptyState(
                                 selectedTab = PostManagementPeopleTab.VOLUNTEERS,
                                 hasFilters = false
@@ -822,8 +935,11 @@ private fun OrganisationPostManagementContent(
         }
         val isResubmission = post.isRemoteResubmission(submission)
         val canReview =
-            post.remoteTimingState == PostTimingState.ONGOING &&
-                submission.status.equals("PENDING_REVIEW", ignoreCase = true)
+            submission.status.equals("PENDING_REVIEW", ignoreCase = true) &&
+                (
+                    post.remoteTimingState == PostTimingState.ONGOING ||
+                        (showRemoteReview && remoteReview?.canEdit == true)
+                )
         val isRemoteSubmissionBusy =
             isOpeningRemoteSubmission ||
                 isDownloadingRemoteSubmission ||
@@ -913,6 +1029,16 @@ private fun OrganisationPostManagementContent(
                     acceptSubmission = submission
                 }
             },
+            onNotAccept = if (showRemoteReview && remoteReview?.canEdit == true) {
+                {
+                    if (!isRemoteSubmissionBusy && canReview) {
+                        remoteSubmissionReviewError = null
+                        notAcceptSubmission = submission
+                    }
+                }
+            } else {
+                null
+            },
             onDismiss = {
                 if (!isRemoteSubmissionBusy) {
                     selectedRemoteSubmission = null
@@ -930,6 +1056,7 @@ private fun OrganisationPostManagementContent(
             isShared = submission.submissionType.equals("SHARED", ignoreCase = true),
             dueDate = post.remote?.effectiveEndDate.orEmpty(),
             feedback = revisionFeedback,
+            needsProjectDeadlineExtension = showRemoteReview,
             isSaving = isReviewingRemoteSubmission,
             errorMessage = remoteSubmissionReviewError,
             onFeedbackChange = {
@@ -945,6 +1072,17 @@ private fun OrganisationPostManagementContent(
             onConfirm = {
                 if (revisionFeedback.isBlank()) {
                     remoteSubmissionReviewError = "Please explain what needs to be revised."
+                } else if (showRemoteReview) {
+                    onSetRemoteSubmissionDecision(
+                        submission,
+                        "REQUEST_REVISION",
+                        revisionFeedback.trim()
+                    )
+                    revisionSubmission = null
+                    selectedRemoteSubmission = null
+                    selectedRemoteSubmissionPerson = null
+                    revisionFeedback = ""
+                    remoteSubmissionReviewError = null
                 } else if (!isReviewingRemoteSubmission) {
                     isReviewingRemoteSubmission = true
                     remoteSubmissionReviewError = null
@@ -984,7 +1122,13 @@ private fun OrganisationPostManagementContent(
                 }
             },
             onConfirm = {
-                if (!isReviewingRemoteSubmission) {
+                if (showRemoteReview) {
+                    onSetRemoteSubmissionDecision(submission, "ACCEPT", null)
+                    acceptSubmission = null
+                    selectedRemoteSubmission = null
+                    selectedRemoteSubmissionPerson = null
+                    remoteSubmissionReviewError = null
+                } else if (!isReviewingRemoteSubmission) {
                     isReviewingRemoteSubmission = true
                     remoteSubmissionReviewError = null
 
@@ -1006,6 +1150,20 @@ private fun OrganisationPostManagementContent(
                         }
                     }
                 }
+            }
+        )
+    }
+
+    notAcceptSubmission?.let { submission ->
+        PostManagementNotAcceptSubmissionDialog(
+            isShared = submission.submissionType.equals("SHARED", ignoreCase = true),
+            onDismiss = { notAcceptSubmission = null },
+            onConfirm = {
+                onSetRemoteSubmissionDecision(submission, "NOT_ACCEPT", null)
+                notAcceptSubmission = null
+                selectedRemoteSubmission = null
+                selectedRemoteSubmissionPerson = null
+                remoteSubmissionReviewError = null
             }
         )
     }

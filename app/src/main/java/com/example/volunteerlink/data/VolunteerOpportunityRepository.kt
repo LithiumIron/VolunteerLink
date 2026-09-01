@@ -11,6 +11,7 @@ import com.example.volunteerlink.model.VolunteerRoleApplicationMethod
 import com.example.volunteerlink.model.VolunteerRoleScheduleItem
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.postgrest.query.Columns
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.addJsonObject
@@ -42,7 +43,12 @@ object VolunteerOpportunityRepository {
     suspend fun loadDashboard(): VolunteerOpportunityDashboardData {
         val organisations =
             supabase.from("organisations")
-                .select()
+                .select(
+                    columns = Columns.raw(
+                        "organisation_id,organisation_name,contact_email," +
+                            "contact_phone,verification_status"
+                    )
+                )
                 .decodeList<OrganisationRow>()
 
         val posts =

@@ -2,6 +2,7 @@ package com.example.volunteerlink.organisation.repository
 
 import com.example.volunteerlink.data.supabase
 import com.example.volunteerlink.data.location.LocationSuggestion
+import com.example.volunteerlink.organisation.auth.OrganisationSession
 import com.example.volunteerlink.organisation.create.CreatePostValidator
 import com.example.volunteerlink.organisation.create.PostEditParticipationInput
 import com.example.volunteerlink.organisation.create.PostEditPolicyInput
@@ -38,15 +39,14 @@ import kotlinx.serialization.json.put
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import java.util.TimeZone
 import java.util.UUID
 
 /**
  * Supabase implementation used by the Create Post wizard.
  *
- * New-post Save Draft / Publish remain client-side multi-table operations for this
- * university project. Existing-post Edit uses one PostgreSQL RPC transaction because
- * application/activity history makes partial multi-table updates unsafe.
+ * New-post creation and existing-post editing both use ownership-checked PostgreSQL
+ * RPCs. Storage uploads remain separate because Supabase Storage is outside the
+ * database transaction, so failed uploads/DB saves are cleaned up best-effort.
  */
 class SupabaseCreatePostRepository : CreatePostRepository {
 
@@ -82,129 +82,27 @@ class SupabaseCreatePostRepository : CreatePostRepository {
         thumbnail: PublishThumbnail?,
         publishAfterSave: Boolean
     ): SavedPostResult {
-        val postType = draft.postType
-            ?: error("Choose a post type before saving.")
-        val category = draft.category
-            ?: error("Choose a category before saving.")
-        val saveTimestamp = currentUtcTimestamp()
-        val posts = supabase.from("volunteer_posts")
-        val bucket = supabase.storage.from(THUMBNAIL_BUCKET)
-
-        // The parent starts as DRAFT for both actions. Save Draft keeps this
-        // state; Publish switches it only after every child/thumbnail succeeds.
-        val parentRow = buildJsonObject {
-            put("organisation_id", TEST_ORGANISATION_ID)
-            put("title", draft.title.trim())
-            put("description", draft.description.trim())
-            put("mode", postType.databaseValue)
-            put("status", "DRAFT")
-            put("created_at", saveTimestamp)
-            put("updated_at", saveTimestamp)
-            put("category", category.databaseValue)
+        val organisation = OrganisationSession.requireContext()
+        require(organisation.isVerified) {
+            "Your organisation must be verified before creating volunteer posts."
         }
 
-        val insertedPost = posts
-            .insert(parentRow) {
-                select()
-            }
-            .decodeSingle<JsonObject>()
+        val payload = buildNewPostPayload(
+            draft = draft,
+            roleCatalogue = roleCatalogue
+        )
 
-        val postId = insertedPost.requiredText("post_id")
+        val created = supabase.postgrest.rpc(
+            function = "organisation_create_volunteer_post",
+            parameters = buildJsonObject {
+                put("p_payload", payload)
+            }
+        ).decodeSingle<JsonObject>()
+
+        val postId = created.requiredText("post_id")
         var uploadedThumbnailPath: String? = null
 
         try {
-            // post_roles now stores only role-level columns. Skills,
-            // responsibilities and screening questions live in normalized
-            // child tables in v1_erd_test.
-            val roleRows = draft.selectedRoles.map { selectedRole ->
-                buildJsonObject {
-                    put("post_id", postId)
-                    put("role_template_id", selectedRole.roleTemplateId)
-                    put("capacity", selectedRole.capacity)
-                    put(
-                        "application_method",
-                        selectedRole.applicationMethod?.databaseValue
-                            ?: error("One selected role has no application method.")
-                    )
-
-                    selectedRole.roleNotes.nullIfBlank()?.let { roleNotes ->
-                        put("role_notes", roleNotes)
-                    }
-                    selectedRole.individualSubmissionRequirement
-                        .nullIfBlank()
-                        ?.let { requirement ->
-                            put("individual_submission_requirement", requirement)
-                        }
-                }
-            }
-
-            if (roleRows.isNotEmpty()) {
-                supabase.from("post_roles").insert(roleRows)
-            }
-
-            insertPostRoleDetails(
-                postId = postId,
-                draft = draft
-            )
-
-            if (
-                postType == VolunteerPostType.PHYSICAL ||
-                postType == VolunteerPostType.HYBRID
-            ) {
-                supabase.from("physical_details").insert(
-                    buildPhysicalDetailsRow(
-                        postId = postId,
-                        draft = draft
-                    )
-                )
-            }
-
-            if (
-                postType == VolunteerPostType.REMOTE ||
-                postType == VolunteerPostType.HYBRID
-            ) {
-                supabase.from("remote_details").insert(
-                    buildRemoteDetailsRow(
-                        postId = postId,
-                        draft = draft
-                    )
-                )
-            }
-
-            // schedule_items no longer contains a JSON array of ROLE IDs.
-            // Insert each schedule item, receive its SCH... ID, then insert
-            // its role relationships into schedule_item_roles.
-            for (item in draft.scheduleItems) {
-                val scheduleData = buildSchedulePublishData(
-                    postId = postId,
-                    draft = draft,
-                    item = item,
-                    roleCatalogue = roleCatalogue
-                )
-
-                val insertedSchedule = supabase
-                    .from("schedule_items")
-                    .insert(scheduleData.row) {
-                        select()
-                    }
-                    .decodeSingle<JsonObject>()
-
-                val scheduleItemId = insertedSchedule
-                    .requiredText("schedule_item_id")
-
-                val targetRows = scheduleData.targetRoleTemplateIds.map { roleId ->
-                    buildJsonObject {
-                        put("schedule_item_id", scheduleItemId)
-                        put("post_id", postId)
-                        put("role_template_id", roleId)
-                    }
-                }
-
-                if (targetRows.isNotEmpty()) {
-                    supabase.from("schedule_item_roles").insert(targetRows)
-                }
-            }
-
             if (thumbnail != null) {
                 val safeExtension = thumbnail.fileExtension
                     .lowercase()
@@ -212,10 +110,10 @@ class SupabaseCreatePostRepository : CreatePostRepository {
                     .ifBlank { "jpg" }
 
                 val storagePath =
-                    "$TEST_STORAGE_PREFIX/$TEST_ORGANISATION_ID/$postId/" +
+                    "$STORAGE_PREFIX/${organisation.organisationId}/$postId/" +
                             "${UUID.randomUUID()}.$safeExtension"
 
-                bucket.upload(
+                supabase.storage.from(THUMBNAIL_BUCKET).upload(
                     path = storagePath,
                     data = thumbnail.bytes
                 ) {
@@ -224,56 +122,158 @@ class SupabaseCreatePostRepository : CreatePostRepository {
                 }
 
                 uploadedThumbnailPath = storagePath
-
-                posts.update(
-                    {
-                        set("thumbnail_path", storagePath)
-                    }
-                ) {
-                    filter {
-                        eq("post_id", postId)
-                    }
-                }
             }
 
-            // Publishing is deliberately the final database action.
-            // Save Draft stops before this update, so status stays DRAFT and
-            // published_at stays SQL NULL.
-            if (publishAfterSave) {
-                posts.update(
-                    {
-                        set("status", "PUBLISHED")
-                        set("published_at", saveTimestamp)
-                        set("updated_at", saveTimestamp)
-                    }
-                ) {
-                    filter {
-                        eq("post_id", postId)
+            supabase.postgrest.rpc(
+                function = "organisation_finish_created_post",
+                parameters = buildJsonObject {
+                    put("p_post_id", postId)
+                    put("p_publish", publishAfterSave)
+                    if (uploadedThumbnailPath == null) {
+                        put("p_thumbnail_path", JsonNull)
+                    } else {
+                        put("p_thumbnail_path", uploadedThumbnailPath)
                     }
                 }
-            }
+            )
 
             return SavedPostResult(
                 postId = postId,
                 thumbnailPath = uploadedThumbnailPath
             )
-        } catch (e: Exception) {
-            cleanupFailedSave(
-                postId = postId,
-                thumbnailPath = uploadedThumbnailPath
+        } catch (exception: Exception) {
+            uploadedThumbnailPath?.let { path ->
+                runCatching {
+                    supabase.storage.from(THUMBNAIL_BUCKET).delete(path)
+                }
+            }
+
+            runCatching {
+                supabase.postgrest.rpc(
+                    function = "organisation_delete_created_draft",
+                    parameters = buildJsonObject { put("p_post_id", postId) }
+                )
+            }
+            throw exception
+        }
+    }
+
+    private fun buildNewPostPayload(
+        draft: CreatePostDraft,
+        roleCatalogue: List<CreateRoleTemplate>
+    ): JsonObject {
+        val postType = draft.postType
+            ?: error("Choose a post type before saving.")
+        val category = draft.category
+            ?: error("Choose a category before saving.")
+
+        val needsPhysical = postType == VolunteerPostType.PHYSICAL ||
+                postType == VolunteerPostType.HYBRID
+        val needsRemote = postType == VolunteerPostType.REMOTE ||
+                postType == VolunteerPostType.HYBRID
+
+        return buildJsonObject {
+            put("title", draft.title.trim())
+            put("description", draft.description.trim())
+            put("mode", postType.databaseValue)
+            put("category", category.databaseValue)
+
+            put(
+                "physical",
+                if (needsPhysical) {
+                    JsonObject(
+                        buildPhysicalDetailsRow("NEW", draft)
+                            .filterKeys { it != "post_id" }
+                    )
+                } else JsonNull
             )
-            throw e
+
+            put(
+                "remote",
+                if (needsRemote) {
+                    JsonObject(
+                        buildRemoteDetailsRow("NEW", draft)
+                            .filterKeys { it != "post_id" }
+                    )
+                } else JsonNull
+            )
+
+            put("roles", buildJsonArray {
+                draft.selectedRoles.forEach { role ->
+                    add(buildJsonObject {
+                        put("role_template_id", role.roleTemplateId)
+                        put("capacity", role.capacity)
+                        put(
+                            "application_method",
+                            role.applicationMethod?.databaseValue
+                                ?: error("Choose an application method for ${role.roleTemplateId}.")
+                        )
+                        put(
+                            "role_notes",
+                            role.roleNotes.nullIfBlank()?.let(::JsonPrimitive) ?: JsonNull
+                        )
+                        put(
+                            "individual_submission_requirement",
+                            role.individualSubmissionRequirement.nullIfBlank()
+                                ?.let(::JsonPrimitive) ?: JsonNull
+                        )
+
+                        put("skills", buildJsonArray {
+                            role.practisedSkillIds.distinct().forEach { skillId ->
+                                add(buildJsonObject {
+                                    put("skill_id", skillId)
+                                    role.requiredSkillExperience[skillId]?.let { experience ->
+                                        put("required_experience", experience)
+                                    } ?: put("required_experience", JsonNull)
+                                })
+                            }
+                        })
+
+                        put("responsibilities", buildJsonArray {
+                            role.responsibilities
+                                .mapNotNull { it.nullIfBlank() }
+                                .forEach { add(JsonPrimitive(it)) }
+                        })
+
+                        put("screening_questions", buildJsonArray {
+                            role.screeningQuestions
+                                .mapNotNull { it.nullIfBlank() }
+                                .forEach { add(JsonPrimitive(it)) }
+                        })
+                    })
+                }
+            })
+
+            put("schedules", buildJsonArray {
+                draft.scheduleItems.forEach { item ->
+                    val data = buildSchedulePublishData(
+                        postId = "NEW",
+                        draft = draft,
+                        item = item,
+                        roleCatalogue = roleCatalogue
+                    )
+                    add(buildJsonObject {
+                        data.row
+                            .filterKeys { it != "post_id" }
+                            .forEach { (key, value) -> put(key, value) }
+                        put("target_role_template_ids", buildJsonArray {
+                            data.targetRoleTemplateIds.forEach { add(JsonPrimitive(it)) }
+                        })
+                    })
+                }
+            })
         }
     }
 
     override suspend fun loadExistingPostForEdit(postId: String): ExistingPostEditData {
+        val organisationId = OrganisationSession.requireOrganisationId()
         val postRow = supabase.from("volunteer_posts")
             .select(columns = Columns.raw(
                 "post_id,organisation_id,title,description,mode,status,category,thumbnail_path,updated_at"
             )) {
                 filter {
                     eq("post_id", postId)
-                    eq("organisation_id", TEST_ORGANISATION_ID)
+                    eq("organisation_id", organisationId)
                 }
             }
             .decodeList<JsonObject>()
@@ -542,6 +542,7 @@ class SupabaseCreatePostRepository : CreatePostRepository {
         thumbnail: PublishThumbnail?
     ): SavedPostResult {
         val postId = latest.postId
+        val organisation = OrganisationSession.requireContext()
         val postType = editedDraft.postType ?: error("Post Type is missing.")
         editedDraft.category ?: error("Category is missing.")
 
@@ -555,7 +556,7 @@ class SupabaseCreatePostRepository : CreatePostRepository {
                 val safeExtension = thumbnail.fileExtension.lowercase()
                     .filter { it.isLetterOrDigit() }
                     .ifBlank { "jpg" }
-                val storagePath = "$TEST_STORAGE_PREFIX/$TEST_ORGANISATION_ID/$postId/" +
+                val storagePath = "$STORAGE_PREFIX/${organisation.organisationId}/$postId/" +
                     "${UUID.randomUUID()}.$safeExtension"
 
                 supabase.storage.from(THUMBNAIL_BUCKET).upload(
@@ -583,7 +584,7 @@ class SupabaseCreatePostRepository : CreatePostRepository {
             // volunteer_posts first and verifies originalUpdatedAt before any
             // child row is touched.
             supabase.postgrest.rpc(
-                function = "update_volunteer_post_editor",
+                function = "organisation_update_volunteer_post_editor",
                 parameters = buildJsonObject {
                     put("p_payload", payload)
                 }
@@ -810,76 +811,6 @@ class SupabaseCreatePostRepository : CreatePostRepository {
             .sortedBy { it.roleTemplateId }
     }
 
-    /**
-     * Inserts the normalized Step 3 child tables for every selected role.
-     *
-     * post_role_skills:
-     * - one row = one practised skill
-     * - required_experience NULL = practised only
-     * - required_experience 1..5 = practised and required
-     */
-    private suspend fun insertPostRoleDetails(
-        postId: String,
-        draft: CreatePostDraft
-    ) {
-        val skillRows = draft.selectedRoles.flatMap { selectedRole ->
-            selectedRole.practisedSkillIds
-                .distinct()
-                .map { skillId ->
-                    buildJsonObject {
-                        put("post_id", postId)
-                        put("role_template_id", selectedRole.roleTemplateId)
-                        put("skill_id", skillId)
-
-                        selectedRole.requiredSkillExperience[skillId]
-                            ?.let { requiredExperience ->
-                                put("required_experience", requiredExperience)
-                            }
-                    }
-                }
-        }
-
-        if (skillRows.isNotEmpty()) {
-            supabase.from("post_role_skills").insert(skillRows)
-        }
-
-        val responsibilityRows = draft.selectedRoles.flatMap { selectedRole ->
-            selectedRole.responsibilities
-                .mapNotNull { responsibility -> responsibility.nullIfBlank() }
-                .mapIndexed { index, responsibility ->
-                    buildJsonObject {
-                        put("post_id", postId)
-                        put("role_template_id", selectedRole.roleTemplateId)
-                        put("responsibility_no", index + 1)
-                        put("responsibility_text", responsibility)
-                    }
-                }
-        }
-
-        if (responsibilityRows.isNotEmpty()) {
-            supabase.from("post_role_responsibilities")
-                .insert(responsibilityRows)
-        }
-
-        val screeningQuestionRows = draft.selectedRoles.flatMap { selectedRole ->
-            selectedRole.screeningQuestions
-                .mapNotNull { question -> question.nullIfBlank() }
-                .mapIndexed { index, question ->
-                    buildJsonObject {
-                        put("post_id", postId)
-                        put("role_template_id", selectedRole.roleTemplateId)
-                        put("question_no", index + 1)
-                        put("question_text", question)
-                    }
-                }
-        }
-
-        if (screeningQuestionRows.isNotEmpty()) {
-            supabase.from("post_role_screening_questions")
-                .insert(screeningQuestionRows)
-        }
-    }
-
     private fun buildPhysicalDetailsRow(
         postId: String,
         draft: CreatePostDraft
@@ -1049,66 +980,6 @@ class SupabaseCreatePostRepository : CreatePostRepository {
      * Explicit child cleanup is kept even where a test FK currently cascades,
      * so this multi-table client-side save stays understandable and debuggable.
      */
-    private suspend fun cleanupFailedSave(
-        postId: String,
-        thumbnailPath: String?
-    ) {
-        runCatching {
-            supabase.from("schedule_item_roles").delete {
-                filter { eq("post_id", postId) }
-            }
-        }
-        runCatching {
-            supabase.from("schedule_items").delete {
-                filter { eq("post_id", postId) }
-            }
-        }
-        runCatching {
-            supabase.from("remote_details").delete {
-                filter { eq("post_id", postId) }
-            }
-        }
-        runCatching {
-            supabase.from("physical_details").delete {
-                filter { eq("post_id", postId) }
-            }
-        }
-        runCatching {
-            supabase.from("post_role_screening_questions").delete {
-                filter { eq("post_id", postId) }
-            }
-        }
-        runCatching {
-            supabase.from("post_role_responsibilities").delete {
-                filter { eq("post_id", postId) }
-            }
-        }
-        runCatching {
-            supabase.from("post_role_skills").delete {
-                filter { eq("post_id", postId) }
-            }
-        }
-        runCatching {
-            supabase.from("post_roles").delete {
-                filter { eq("post_id", postId) }
-            }
-        }
-
-        if (thumbnailPath != null) {
-            runCatching {
-                supabase.storage
-                    .from(THUMBNAIL_BUCKET)
-                    .delete(thumbnailPath)
-            }
-        }
-
-        runCatching {
-            supabase.from("volunteer_posts").delete {
-                filter { eq("post_id", postId) }
-            }
-        }
-    }
-
     private fun sqlDate(dateMillis: Long): String {
         return SimpleDateFormat(
             "yyyy-MM-dd",
@@ -1124,15 +995,6 @@ class SupabaseCreatePostRepository : CreatePostRepository {
         val hour = minutesAfterMidnight / 60
         val minute = minutesAfterMidnight % 60
         return String.format(Locale.US, "%02d:%02d:00", hour, minute)
-    }
-
-    private fun currentUtcTimestamp(): String {
-        return SimpleDateFormat(
-            "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
-            Locale.US
-        ).apply {
-            timeZone = TimeZone.getTimeZone("UTC")
-        }.format(Date())
     }
 
     private fun String?.nullIfBlank(): String? {
@@ -1209,8 +1071,7 @@ class SupabaseCreatePostRepository : CreatePostRepository {
     )
 
     private companion object {
-        const val TEST_ORGANISATION_ID = "ORG0001"
         const val THUMBNAIL_BUCKET = "post-thumbnails"
-        const val TEST_STORAGE_PREFIX = "v1_erd_test"
+        const val STORAGE_PREFIX = "v1_erd_test"
     }
 }

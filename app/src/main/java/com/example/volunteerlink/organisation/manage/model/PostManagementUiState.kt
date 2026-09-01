@@ -16,7 +16,11 @@ data class OrganisationPostManagementUiState(
     val reviewActionMessage: String? = null,
     /** True only after the final batch RPC has committed successfully. */
     val reviewFinalizeSucceeded: Boolean = false,
-    val physicalReviewSession: PostManagementPhysicalReviewSession = PostManagementPhysicalReviewSession()
+    val physicalReviewSession: PostManagementPhysicalReviewSession = PostManagementPhysicalReviewSession(),
+    val isUpdatingRemoteReview: Boolean = false,
+    val remoteReviewActionMessage: String? = null,
+    val remoteReviewFinalizeSucceeded: Boolean = false,
+    val remoteReviewSession: PostManagementRemoteReviewSession = PostManagementRemoteReviewSession()
 )
 
 /**
@@ -41,6 +45,7 @@ data class PostManagementPost(
     val evaluations: List<PostManagementEvaluation> = emptyList(),
     val physicalAttendance: PostManagementPhysicalAttendance? = null,
     val physicalReview: PostManagementPhysicalReview? = null,
+    val remoteReview: PostManagementRemoteReview? = null,
     val timingState: PostTimingState? = null,
     val physicalTimingState: PostTimingState? = null,
     val remoteTimingState: PostTimingState? = null
@@ -331,3 +336,121 @@ data class PostManagementPhysicalReviewSession(
         }
     }
 }
+
+
+/** Remote close-out uses submitted work rather than Physical attendance. */
+enum class PostManagementRemoteReviewStage {
+    SUBMISSION,
+    COMPLETION,
+    FEEDBACK,
+    FINISH
+}
+
+enum class PostManagementRemoteSubmissionDecisionType {
+    ACCEPT,
+    REQUEST_REVISION,
+    NOT_ACCEPT
+}
+
+enum class PostManagementRemoteMissingAction {
+    GIVE_MORE_TIME,
+    CONTINUE_WITHOUT_WORK
+}
+
+data class PostManagementRemoteSubmissionDecision(
+    val itemKey: String,
+    val submissionId: String,
+    val decision: PostManagementRemoteSubmissionDecisionType,
+    val feedback: String? = null
+)
+
+data class PostManagementRemoteCompletionDecision(
+    val roleTemplateId: String,
+    val userId: String,
+    val decision: PostManagementPendingDecisionType,
+    val reason: String? = null
+)
+
+/** One submission stream shown in Remote > Needs Review. */
+data class PostManagementRemoteReviewItem(
+    val itemKey: String,
+    val submissionType: String,
+    val roleTemplateId: String? = null,
+    val userId: String? = null,
+    val person: PostManagementPerson? = null,
+    val roleName: String,
+    val requirement: String? = null,
+    val latestSubmission: PostManagementRemoteSubmission? = null,
+    val submittedByName: String? = null,
+    val isResubmission: Boolean = false
+) {
+    val isShared: Boolean
+        get() = submissionType.equals("SHARED", ignoreCase = true)
+
+    val currentStatus: String
+        get() = latestSubmission?.status ?: "NOT_SUBMITTED"
+}
+
+/** Derived Remote review data. No review history is duplicated here. */
+data class PostManagementRemoteReview(
+    val todayDate: String,
+    val currentDeadline: String,
+    val submissionMode: String,
+    val items: List<PostManagementRemoteReviewItem> = emptyList(),
+    val participants: List<PostManagementPerson> = emptyList(),
+    val canEdit: Boolean = true
+) {
+    fun itemFor(person: PostManagementPerson): PostManagementRemoteReviewItem? {
+        return if (submissionMode.equals("SHARED_TEAM", ignoreCase = true)) {
+            items.firstOrNull { it.isShared }
+        } else {
+            items.firstOrNull {
+                !it.isShared &&
+                    it.roleTemplateId == person.roleTemplateId &&
+                    it.userId == person.userId
+            }
+        }
+    }
+
+    fun canComplete(person: PostManagementPerson): Boolean {
+        return itemFor(person)?.currentStatus.equals("ACCEPTED", ignoreCase = true)
+    }
+}
+
+/** Temporary Remote review choices. Submission decisions are persisted only when
+ * the Submission stage is saved; completion and final feedback wait for Finalize. */
+data class PostManagementRemoteReviewSession(
+    val stage: PostManagementRemoteReviewStage = PostManagementRemoteReviewStage.SUBMISSION,
+    val submissionDecisions: List<PostManagementRemoteSubmissionDecision> = emptyList(),
+    val missingActions: Map<String, PostManagementRemoteMissingAction> = emptyMap(),
+    val newEndDate: String? = null,
+    val completionDecisions: List<PostManagementRemoteCompletionDecision> = emptyList(),
+    /** Key format is roleTemplateId::userId to avoid ambiguity if one user has multiple roles. */
+    val feedbackByParticipation: Map<String, String> = emptyMap(),
+    val touched: Boolean = false
+) {
+    val hasUnfinishedReview: Boolean
+        get() = touched ||
+            submissionDecisions.isNotEmpty() ||
+            missingActions.isNotEmpty() ||
+            !newEndDate.isNullOrBlank() ||
+            completionDecisions.isNotEmpty() ||
+            feedbackByParticipation.isNotEmpty() ||
+            stage != PostManagementRemoteReviewStage.SUBMISSION
+
+    fun submissionDecisionFor(itemKey: String): PostManagementRemoteSubmissionDecision? =
+        submissionDecisions.firstOrNull { it.itemKey == itemKey }
+
+    fun missingActionFor(itemKey: String): PostManagementRemoteMissingAction? =
+        missingActions[itemKey]
+
+    fun completionDecisionFor(
+        roleTemplateId: String,
+        userId: String
+    ): PostManagementRemoteCompletionDecision? = completionDecisions.firstOrNull {
+        it.roleTemplateId == roleTemplateId && it.userId == userId
+    }
+}
+
+fun remoteReviewParticipationKey(roleTemplateId: String, userId: String): String =
+    "$roleTemplateId::$userId"
