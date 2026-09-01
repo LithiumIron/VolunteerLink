@@ -1,6 +1,8 @@
 package com.example.volunteerlink.organisation
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import android.content.Context
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.volunteerlink.data.supabase
 import io.github.jan.supabase.auth.auth
@@ -29,7 +31,21 @@ data class OrganisationAuthUiState(
     val errorMessage: String? = null
 )
 
-class OrganisationAuthViewModel : ViewModel() {
+class OrganisationAuthViewModel(
+    application: Application
+) : AndroidViewModel(application) {
+
+    // Caches the auth.uid() of the last account that successfully passed
+    // confirmOrganisationProfile() while online. This is a UX convenience
+    // for offline continuity ONLY — it grants no data access by itself.
+    // Every real Supabase query still requires a valid session token and
+    // is gated by RLS regardless of this flag.
+    private val offlineAccountPreferences =
+        application.getSharedPreferences(
+            "organisation_offline_account",
+            Context.MODE_PRIVATE
+        )
+
     private val mutableUiState =
         MutableStateFlow(OrganisationAuthUiState())
 
@@ -94,6 +110,7 @@ class OrganisationAuthViewModel : ViewModel() {
                     organisationName = normalizedOrgName,
                     contactPhone = contactPhone?.trim()?.ifBlank { null }
                 )
+                rememberVerifiedOrganisation()
 
                 mutableUiState.value = OrganisationAuthUiState(
                     isCheckingSession = false,
@@ -134,6 +151,7 @@ class OrganisationAuthViewModel : ViewModel() {
                     this.password = password
                 }
                 confirmOrganisationProfile()
+                rememberVerifiedOrganisation()
                 mutableUiState.value = OrganisationAuthUiState(
                     isCheckingSession = false,
                     isAuthenticated = true
@@ -161,12 +179,27 @@ class OrganisationAuthViewModel : ViewModel() {
             }
             try {
                 confirmOrganisationProfile()
+                rememberVerifiedOrganisation()
                 mutableUiState.value = OrganisationAuthUiState(
                     isCheckingSession = false,
                     isAuthenticated = true
                 )
             } catch (exception: Exception) {
                 exception.printStackTrace()
+
+                // The confirm check itself failed because there's no
+                // network right now (not because the account was rejected).
+                // If this exact account was verified the last time we had
+                // a connection, let them continue rather than locking them
+                // out purely because signal dropped.
+                if (isNetworkRelated(exception) && isPreviouslyVerifiedOrganisation()) {
+                    mutableUiState.value = OrganisationAuthUiState(
+                        isCheckingSession = false,
+                        isAuthenticated = true
+                    )
+                    return@launch
+                }
+
                 runCatching { supabase.auth.signOut() }
                 mutableUiState.value = OrganisationAuthUiState(
                     isCheckingSession = false,
@@ -204,19 +237,46 @@ class OrganisationAuthViewModel : ViewModel() {
                             pendingAccountEmail = restoredEmail ?: "this account"
                         )
                     }
+
+                    is SessionStatus.RefreshFailure -> {
+                        // A session token exists but couldn't be refreshed —
+                        // almost always means no network right now. There's
+                        // no connection to show a meaningful email in a
+                        // dialog or to re-verify the profile, so fall back
+                        // directly to the cached offline flag instead.
+                        mutableUiState.value = OrganisationAuthUiState(
+                            isCheckingSession = false,
+                            isAuthenticated = isPreviouslyVerifiedOrganisation()
+                        )
+                    }
+
                     is SessionStatus.NotAuthenticated,
-                    is SessionStatus.RefreshFailure,
                     SessionStatus.Initializing -> {
                         mutableUiState.value =
                             OrganisationAuthUiState(isCheckingSession = false)
                     }
                 }
             } catch (_: Exception) {
-                runCatching { supabase.auth.signOut() }
                 mutableUiState.value =
                     OrganisationAuthUiState(isCheckingSession = false)
             }
         }
+    }
+
+    private fun rememberVerifiedOrganisation() {
+        val authUserId = supabase.auth.currentUserOrNull()?.id ?: return
+        offlineAccountPreferences.edit()
+            .putString("verified_auth_user_id", authUserId)
+            .apply()
+    }
+
+    private fun isPreviouslyVerifiedOrganisation(): Boolean {
+        val currentAuthUserId =
+            supabase.auth.currentUserOrNull()?.id ?: return false
+        return offlineAccountPreferences.getString(
+            "verified_auth_user_id",
+            null
+        ) == currentAuthUserId
     }
 
     private suspend fun createOrganisationProfile(
@@ -276,12 +336,31 @@ class OrganisationAuthViewModel : ViewModel() {
     }
 }
 
+private fun isNetworkRelated(exception: Exception): Boolean {
+    val message = exception.message.orEmpty()
+    return message.contains("network", ignoreCase = true) ||
+            message.contains("connect", ignoreCase = true) ||
+            message.contains("timeout", ignoreCase = true) ||
+            message.contains("unable to resolve host", ignoreCase = true)
+}
+
 private fun authErrorMessage(exception: Exception): String {
     val message = exception.message.orEmpty()
     return when {
         message.contains("already registered", ignoreCase = true) ||
                 message.contains("already exists", ignoreCase = true) ->
             "An account with this email already exists."
+
+        // Must come before the generic "invalid" check below — Supabase's
+        // rejected-domain error (e.g. example.com) also contains "invalid",
+        // and would otherwise get mislabelled as a wrong-password error.
+        message.contains("email_address_invalid", ignoreCase = true) ||
+                (message.contains("invalid", ignoreCase = true) &&
+                        message.contains("email", ignoreCase = true)) ->
+            "That email address isn't valid, try a different one."
+
+        message.contains("not authorized", ignoreCase = true) ->
+            "This email address can't receive messages from this project yet."
 
         message.contains("invalid", ignoreCase = true) ||
                 message.contains("credentials", ignoreCase = true) ->

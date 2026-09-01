@@ -10,8 +10,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Business
@@ -85,6 +87,7 @@ fun OrganisationSignUpScreen(
         Column(
             modifier = Modifier
                 .weight(1f)
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 28.dp),
             verticalArrangement = Arrangement.Center
         ) {
@@ -252,6 +255,10 @@ fun OrganisationSignUpScreen(
                     Text(text = "Create account", fontWeight = FontWeight.Bold)
                 }
             }
+
+            // Bottom breathing room so the button isn't flush against the
+            // screen edge (or the keyboard) once the content scrolls.
+            Spacer(Modifier.height(24.dp))
         }
     }
 }
