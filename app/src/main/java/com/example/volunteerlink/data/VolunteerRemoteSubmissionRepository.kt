@@ -86,6 +86,15 @@ object VolunteerRemoteSubmissionRepository {
 
     fun signedInId(): String? = supabase.auth.currentUserOrNull()?.id
 
+    suspend fun readyAccountId(): String {
+        supabase.auth.awaitInitialization()
+        return signedInId() ?: if (supabase.auth.currentSessionOrNull() != null) {
+            supabase.auth.retrieveUserForCurrentSession(updateSession = true).id
+        } else {
+            error("Sign in before submitting.")
+        }
+    }
+
     suspend fun load(postId: String, roleId: String): VolunteerRemoteContext =
         supabase.postgrest.rpc("volunteer_remote_context_v1", buildJsonObject {
             put("p_post_id", postId)
@@ -134,8 +143,10 @@ object VolunteerRemoteSubmissionRepository {
     }
 
     suspend fun submit(postId: String, roleId: String, selected: VolunteerRemoteSelectedFile,
+                       expectedAccountId: String,
                        onProgress: (Float) -> Unit) = withContext(Dispatchers.IO) {
-        val uid = signedInId() ?: error("Sign in before submitting.")
+        val uid = readyAccountId()
+        check(uid == expectedAccountId) { "Your account changed. Reopen this application." }
         VolunteerRemoteFileRules.checkSize(selected.file.length())
         val path = "$postId/$uid/$roleId/${selected.requestId}/${selected.storageName}"
         val bucket = supabase.storage.from(BUCKET)
@@ -161,6 +172,7 @@ object VolunteerRemoteSubmissionRepository {
             }
         }
         onProgress(1f)
+        check(readyAccountId() == uid) { "Your account changed. Reopen this application." }
         supabase.postgrest.rpc("volunteer_remote_submit_v1", buildJsonObject {
             put("p_post_id", postId)
             put("p_role_id", roleId)

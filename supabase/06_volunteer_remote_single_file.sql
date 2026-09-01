@@ -186,7 +186,16 @@ BEGIN
     CASE WHEN v_context->>'submission_mode' = 'INDIVIDUAL' THEN p_role_id ELSE NULL END,
     CASE WHEN v_context->>'submission_mode' = 'INDIVIDUAL' THEN v_user ELSE NULL END,
     CASE WHEN v_context->>'submission_mode' = 'INDIVIDUAL' THEN 'INDIVIDUAL' ELSE 'SHARED' END,
-    v_path, NULL, 'PENDING_REVIEW', NULL, clock_timestamp(), NULL, clock_timestamp()
+v_path, NULL, 'PENDING_REVIEW', NULL,
+    greatest(
+      v1_erd_test.volunteer_app_now(),
+      (SELECT max(rs.submitted_at) + interval '1 microsecond'
+       FROM v1_erd_test.remote_submissions rs
+       WHERE rs.post_id = p_post_id AND (
+         (v_context->>'submission_mode' = 'SHARED_TEAM' AND rs.submission_type = 'SHARED') OR
+         (v_context->>'submission_mode' = 'INDIVIDUAL' AND rs.submission_type = 'INDIVIDUAL'
+          AND rs.role_template_id = p_role_id AND rs.user_id = v_user)))
+    ), NULL, clock_timestamp()
   );
   RETURN jsonb_build_object('submission_id', v_id, 'already_saved', false);
 END $$;

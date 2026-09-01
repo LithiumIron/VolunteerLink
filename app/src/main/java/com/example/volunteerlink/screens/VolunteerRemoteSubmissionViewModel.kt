@@ -38,18 +38,25 @@ class VolunteerRemoteSubmissionViewModel(application: Application) : AndroidView
             state.update { it.copy(error = "Sync your applications before opening the submission.") }
             return
         }
-        val uid = Repository.signedInId()
-        if (ownerAuthId != uid || postId != parts[0] || roleId != parts[1]) {
+        if (postId != parts[0] || roleId != parts[1]) {
             state.value.selected?.file?.delete()
             state.value = VolunteerRemoteUiState()
+            ownerAuthId = null
         }
-        ownerAuthId = uid
         postId = parts[0]
         roleId = parts[1]
         state.update { it.copy(busy = true, stage = "Checking project status…", error = null, message = null) }
         viewModelScope.launch {
             try {
+                val uid = Repository.readyAccountId()
+                if (ownerAuthId != null && ownerAuthId != uid) {
+                    state.value.selected?.file?.delete()
+                    state.update { it.copy(selected = null, context = null) }
+                }
+                ownerAuthId = null
                 val loaded = Repository.load(postId, roleId)
+                check(Repository.readyAccountId() == uid) { "Your account changed. Reopen this application." }
+                ownerAuthId = uid
                 state.update { it.copy(context = loaded) }
             } catch (e: CancellationException) { throw e
             } catch (e: Exception) {
@@ -60,11 +67,21 @@ class VolunteerRemoteSubmissionViewModel(application: Application) : AndroidView
     }
 
     fun choose(uri: Uri) {
-        if (state.value.busy || !checkAccount()) return
+        if (state.value.busy) return
         state.update { it.copy(busy = true, stage = "Checking selected file…", error = null, message = null) }
         viewModelScope.launch {
             try {
+                if (!checkAccount()) return@launch
                 val file = Repository.prepare(getApplication<Application>(), uri)
+                try {
+                    if (!checkAccount()) {
+                        file.file.delete()
+                        return@launch
+                    }
+                } catch (e: Exception) {
+                    file.file.delete()
+                    throw e
+                }
                 state.value.selected?.file?.delete()
                 state.update { it.copy(selected = file) }
             } catch (e: CancellationException) { throw e
@@ -80,7 +97,7 @@ class VolunteerRemoteSubmissionViewModel(application: Application) : AndroidView
     }
 
     fun validateSelection(): Boolean {
-        if (state.value.busy || !checkAccount()) return false
+        if (state.value.busy) return false
         if (state.value.selected == null) {
             state.update { it.copy(error = "Choose a file before submitting.") }
             return false
@@ -94,7 +111,9 @@ class VolunteerRemoteSubmissionViewModel(application: Application) : AndroidView
         state.update { it.copy(busy = true, stage = "Uploading file…", progress = 0f, error = null, message = null) }
         viewModelScope.launch {
             try {
-                Repository.submit(postId, roleId, selected) { progress ->
+                if (!checkAccount()) return@launch
+                val uid = ownerAuthId ?: error("Refresh submission status before continuing.")
+                Repository.submit(postId, roleId, selected, uid) { progress ->
                     state.update { it.copy(progress = progress,
                         stage = if (progress >= 1f) "Confirming submission…" else "Uploading file…") }
                 }
@@ -104,6 +123,7 @@ class VolunteerRemoteSubmissionViewModel(application: Application) : AndroidView
                     successVersion = it.successVersion + 1) }
                 try {
                     val loaded = Repository.load(postId, roleId)
+                    check(Repository.readyAccountId() == uid) { "Your account changed. Reopen this application." }
                     state.update { it.copy(context = loaded) }
                 } catch (e: CancellationException) { throw e
                 } catch (_: Exception) {
@@ -117,10 +137,13 @@ class VolunteerRemoteSubmissionViewModel(application: Application) : AndroidView
     }
 
     fun openFile(path: String, onReady: (String) -> Unit) {
-        if (state.value.busy || !checkAccount()) return
+        if (state.value.busy) return
         state.update { it.copy(busy = true, stage = "Opening file…", error = null) }
         viewModelScope.launch {
-            try { onReady(Repository.fileUrl(path))
+            try {
+                if (!checkAccount()) return@launch
+                val url = Repository.fileUrl(path)
+                if (checkAccount()) onReady(url)
             } catch (e: CancellationException) { throw e
             } catch (_: Exception) {
                 state.update { it.copy(error = "The file could not be opened. Check your connection and try again.") }
@@ -128,8 +151,16 @@ class VolunteerRemoteSubmissionViewModel(application: Application) : AndroidView
         }
     }
 
-    private fun checkAccount(): Boolean {
-        if (ownerAuthId == null || Repository.signedInId() != ownerAuthId) {
+    private suspend fun checkAccount(): Boolean {
+        val uid = Repository.readyAccountId()
+        if (ownerAuthId == null) {
+            // Revalidate server access before binding a session that was not ready earlier.
+            val loaded = Repository.load(postId, roleId)
+            check(Repository.readyAccountId() == uid) { "Your account changed. Reopen this application." }
+            ownerAuthId = uid
+            state.update { it.copy(context = loaded) }
+        }
+        if (uid != ownerAuthId) {
             state.value.selected?.file?.delete()
             state.value = VolunteerRemoteUiState(error = "Your account changed. Reopen this application.")
             return false
@@ -146,6 +177,8 @@ class VolunteerRemoteSubmissionViewModel(application: Application) : AndroidView
 private fun remoteError(exception: Exception): String {
     val detail = exception.message.orEmpty()
     val knownMessages = listOf(
+        "Your account changed. Reopen this application.",
+        "Refresh submission status before continuing.",
         "Choose a PDF, JPG, PNG, Word, Excel or PowerPoint file.",
         "The selected file is empty.", "The selected file exceeds the 20 MB limit.",
         "The selected file could not be opened. Choose it again.",
