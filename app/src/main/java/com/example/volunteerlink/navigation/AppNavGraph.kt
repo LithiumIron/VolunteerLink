@@ -1,4 +1,4 @@
-    package com.example.volunteerlink.navigation
+package com.example.volunteerlink.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
@@ -6,14 +6,16 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.volunteerlink.organisation.navigation.OrganisationNavigationHost
+import com.example.volunteerlink.organisation.OrganisationSignInScreen
+import com.example.volunteerlink.organisation.OrganisationSignUpScreen
 import com.example.volunteerlink.screens.UserTypeSelectionScreen
 import com.example.volunteerlink.screens.VolunteerSignInScreen
 
 /**
  * Root navigation graph for the whole application.
  *
- * The existing Volunteer navigation host is left unchanged. This graph only
- * adds the temporary first-page choice and the new Organisation branch.
+ * Both the Volunteer and Organisation branches now route through a
+ * Supabase Auth screen before reaching their respective module.
  */
 @Composable
 fun AppNavGraph(
@@ -26,12 +28,10 @@ fun AppNavGraph(
         composable(AppRoutes.USER_TYPE_SELECTION) {
             UserTypeSelectionScreen(
                 onVolunteerClick = {
-                    navController.navigate(
-                        AppRoutes.VOLUNTEER_LOGIN
-                    )
+                    navController.navigate(AppRoutes.VOLUNTEER_LOGIN)
                 },
                 onOrganisationClick = {
-                    navController.navigate(AppRoutes.ORGANISATION)
+                    navController.navigate(AppRoutes.ORGANISATION_LOGIN)
                 }
             )
         }
@@ -55,6 +55,41 @@ fun AppNavGraph(
         composable(AppRoutes.VOLUNTEER) {
             // Teammate's existing Volunteer module is used as-is.
             VolunteerOpportunityNavigationHost()
+        }
+
+        composable(AppRoutes.ORGANISATION_LOGIN) {
+            OrganisationSignInScreen(
+                onBackSelected = {
+                    navController.popBackStack()
+                },
+                onSignUpSelected = {
+                    navController.navigate(AppRoutes.ORGANISATION_SIGNUP)
+                },
+                onSignedIn = {
+                    navController.navigate(AppRoutes.ORGANISATION) {
+                        popUpTo(AppRoutes.USER_TYPE_SELECTION) {
+                            inclusive = false
+                        }
+                        launchSingleTop = true
+                    }
+                }
+            )
+        }
+
+        composable(AppRoutes.ORGANISATION_SIGNUP) {
+            OrganisationSignUpScreen(
+                onBackSelected = {
+                    navController.popBackStack()
+                },
+                onSignedUp = {
+                    navController.navigate(AppRoutes.ORGANISATION) {
+                        popUpTo(AppRoutes.USER_TYPE_SELECTION) {
+                            inclusive = false
+                        }
+                        launchSingleTop = true
+                    }
+                }
+            )
         }
 
         composable(AppRoutes.ORGANISATION) {

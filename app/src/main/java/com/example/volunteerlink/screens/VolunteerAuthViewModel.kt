@@ -1,9 +1,6 @@
-
 package com.example.volunteerlink.screens
 
-import android.app.Application
-import android.content.Context
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.volunteerlink.data.supabase
 import io.github.jan.supabase.auth.auth
@@ -23,17 +20,15 @@ data class VolunteerAuthUiState(
     val isCheckingSession: Boolean = true,
     val isSigningIn: Boolean = false,
     val isAuthenticated: Boolean = false,
+    // Set only when a SAVED session was found on launch. The screen should
+    // show a "Continue as <email>?" prompt instead of signing in silently,
+    // so a different account can be used for testing without needing to
+    // manually sign out first.
+    val pendingAccountEmail: String? = null,
     val errorMessage: String? = null
 )
 
-class VolunteerAuthViewModel(
-    application: Application
-) : AndroidViewModel(application) {
-    private val offlineAccountPreferences =
-        application.getSharedPreferences(
-            "volunteer_offline_account",
-            Context.MODE_PRIVATE
-        )
+class VolunteerAuthViewModel : ViewModel() {
     private val mutableUiState =
         MutableStateFlow(VolunteerAuthUiState())
 
@@ -72,7 +67,6 @@ class VolunteerAuthViewModel(
                     this.password = password
                 }
                 confirmVolunteerProfile()
-                rememberVerifiedVolunteer()
                 mutableUiState.value =
                     VolunteerAuthUiState(
                         isCheckingSession = false,
@@ -96,6 +90,37 @@ class VolunteerAuthViewModel(
         }
     }
 
+    /** User tapped "Continue" on the restored-session prompt. */
+    fun continueWithRestoredSession() {
+        viewModelScope.launch {
+            mutableUiState.update {
+                it.copy(isSigningIn = true, errorMessage = null)
+            }
+            try {
+                confirmVolunteerProfile()
+                mutableUiState.value = VolunteerAuthUiState(
+                    isCheckingSession = false,
+                    isAuthenticated = true
+                )
+            } catch (exception: Exception) {
+                exception.printStackTrace()
+                runCatching { supabase.auth.signOut() }
+                mutableUiState.value = VolunteerAuthUiState(
+                    isCheckingSession = false,
+                    errorMessage = authErrorMessage(exception)
+                )
+            }
+        }
+    }
+
+    /** User tapped "Use a different account" on the restored-session prompt. */
+    fun useDifferentAccount() {
+        viewModelScope.launch {
+            runCatching { supabase.auth.signOut() }
+            mutableUiState.value = VolunteerAuthUiState(isCheckingSession = false)
+        }
+    }
+
     private fun checkExistingSession() {
         viewModelScope.launch {
             try {
@@ -107,36 +132,26 @@ class VolunteerAuthViewModel(
                     supabase.auth.sessionStatus
                         .first { sessionStatus ->
                             sessionStatus !=
-                                SessionStatus.Initializing
+                                    SessionStatus.Initializing
                         }
 
                 when (restoredSessionStatus) {
                     is SessionStatus.Authenticated -> {
-                        try {
-                            confirmVolunteerProfile()
-                            rememberVerifiedVolunteer()
-                        } catch (exception: Exception) {
-                            if (!isPreviouslyVerifiedVolunteer()) {
-                                throw exception
-                            }
-                        }
+                        // A session was restored from local storage — do NOT
+                        // sign the user in automatically. Ask first, so a
+                        // different account can be used instead without
+                        // needing to sign out manually.
+                        val restoredEmail =
+                            supabase.auth.currentUserOrNull()?.email
                         mutableUiState.value =
                             VolunteerAuthUiState(
                                 isCheckingSession = false,
-                                isAuthenticated = true
-                            )
-                    }
-
-                    is SessionStatus.RefreshFailure -> {
-                        mutableUiState.value =
-                            VolunteerAuthUiState(
-                                isCheckingSession = false,
-                                isAuthenticated =
-                                    isPreviouslyVerifiedVolunteer()
+                                pendingAccountEmail = restoredEmail ?: "this account"
                             )
                     }
 
                     is SessionStatus.NotAuthenticated,
+                    is SessionStatus.RefreshFailure,
                     SessionStatus.Initializing -> {
                         mutableUiState.value =
                             VolunteerAuthUiState(
@@ -145,28 +160,13 @@ class VolunteerAuthViewModel(
                     }
                 }
             } catch (_: Exception) {
+                runCatching { supabase.auth.signOut() }
                 mutableUiState.value =
                     VolunteerAuthUiState(
                         isCheckingSession = false
                     )
             }
         }
-    }
-
-    private fun rememberVerifiedVolunteer() {
-        val authUserId = supabase.auth.currentUserOrNull()?.id ?: return
-        offlineAccountPreferences.edit()
-            .putString("verified_auth_user_id", authUserId)
-            .apply()
-    }
-
-    private fun isPreviouslyVerifiedVolunteer(): Boolean {
-        val currentAuthUserId =
-            supabase.auth.currentUserOrNull()?.id ?: return false
-        return offlineAccountPreferences.getString(
-            "verified_auth_user_id",
-            null
-        ) == currentAuthUserId
     }
 
     private suspend fun confirmVolunteerProfile() {
@@ -201,7 +201,7 @@ private fun authErrorMessage(exception: Exception): String {
     val message = exception.message.orEmpty()
     return when {
         message.contains("invalid", ignoreCase = true) ||
-            message.contains("credentials", ignoreCase = true) ->
+                message.contains("credentials", ignoreCase = true) ->
             "The email or password is incorrect."
 
         message.contains("organisation", ignoreCase = true) ->
@@ -211,7 +211,7 @@ private fun authErrorMessage(exception: Exception): String {
             "This account does not have a VolunteerLink profile."
 
         message.contains("network", ignoreCase = true) ||
-            message.contains("connect", ignoreCase = true) ->
+                message.contains("connect", ignoreCase = true) ->
             "Unable to reach Supabase. Check the internet connection."
 
         else -> "Sign in failed. Please check the details and retry."
