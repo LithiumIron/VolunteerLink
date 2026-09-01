@@ -179,7 +179,7 @@ fun VolunteerSearchScreen(
                         event.eventDistanceKm != null &&
                             event.eventDistanceKm <= 10.0
                     "Long Term" -> event.eventIsLongTerm
-                    "Saved" -> event.eventIsSaved
+                    "Favourites" -> event.eventIsSaved
                     else -> true
                 }
 
@@ -198,6 +198,7 @@ fun VolunteerSearchScreen(
                     }
 
             matchesSearchQuery &&
+                (selectedModeFilter == "Favourites" || event.eventStatus == "PUBLISHED") &&
                 matchesMode &&
                 matchesCategory &&
                 matchesLevel &&
@@ -382,7 +383,7 @@ fun VolunteerSearchScreen(
                         "Near Me",
                         "Remote",
                         "Long Term",
-                        "Saved"
+                        "Favourites"
                     ),
                     selectedOption = selectedModeFilter,
                     onSelected = { selectedModeFilter = it }

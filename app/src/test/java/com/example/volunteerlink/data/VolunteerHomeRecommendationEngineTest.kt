@@ -11,6 +11,41 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class VolunteerHomeRecommendationEngineTest {
+    @Test
+    fun applicationWindowClosesAtStartDateIncludingRemote() {
+        val opportunity = event(1, "Communication", emptyList())
+            .copy(eventApplicationStartDate = "2026-09-12")
+        val before = java.time.Instant.parse("2026-09-11T23:59:59Z").toEpochMilli()
+        val start = java.time.Instant.parse("2026-09-12T00:00:00Z").toEpochMilli()
+        assertTrue(VolunteerApplicationWindow.canApply(opportunity, before))
+        assertFalse(VolunteerApplicationWindow.canApply(opportunity, start))
+        assertFalse(VolunteerApplicationWindow.canApply(
+            opportunity.copy(eventOpportunityType = "Remote"), start))
+        assertFalse(VolunteerApplicationWindow.canApply(
+            opportunity.copy(eventStatus = "COMPLETED"), before))
+    }
+
+    @Test
+    fun missingOrMalformedCachedDatesFailClosed() {
+        val opportunity = event(1, "Communication", emptyList())
+        val now = java.time.Instant.parse("2026-09-12T00:00:00Z").toEpochMilli()
+        assertFalse(VolunteerApplicationWindow.canApply(opportunity.copy(eventApplicationStartDate = ""), now))
+        assertFalse(VolunteerApplicationWindow.canApply(opportunity.copy(eventApplicationStartDate = "invalid"), now))
+    }
+
+    @Test
+    fun expiredPublishedEventsAreNotRecommended() {
+        val expired = event(1, "Communication", emptyList())
+            .copy(eventApplicationStartDate = "2000-01-01")
+        assertTrue(VolunteerHomeRecommendationEngine.recommend(listOf(expired), emptyList()).isEmpty())
+    }
+
+    @Test
+    fun fullRolesAreNotRecommended() {
+        val available = event(1, "Communication", emptyList())
+        val full = available.copy(eventVolunteerRoles = available.eventVolunteerRoles.map { it.copy(roleVacancies = 0) })
+        assertTrue(VolunteerHomeRecommendationEngine.recommend(listOf(full), emptyList()).isEmpty())
+    }
 
     @Test
     fun appliedEventIsNotRecommendedAgain() {
@@ -306,7 +341,8 @@ class VolunteerHomeRecommendationEngineTest {
                     )
                 ),
             eventDatabaseId = "POST$id",
-            eventStatus = status
+            eventStatus = status,
+            eventApplicationStartDate = "2099-09-20"
         )
 
     private fun role(

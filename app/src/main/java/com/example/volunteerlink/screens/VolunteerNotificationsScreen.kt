@@ -87,6 +87,31 @@ fun VolunteerNotificationsScreen(
     notificationViewModel: VolunteerNotificationViewModel = viewModel()
 ) {
     val uiState by notificationViewModel.uiState.collectAsStateWithLifecycle()
+    var showClearConfirmation by rememberSaveable { mutableStateOf(false) }
+    if (showClearConfirmation) {
+        androidx.compose.material3.AlertDialog(
+            containerColor = Color.White,
+            titleContentColor = Color(0xFF1A1A1A),
+            textContentColor = Color(0xFF5A6B5A),
+            onDismissRequest = { showClearConfirmation = false },
+            title = { Text("Clear all notifications?") },
+            text = { Text("This clears all current notifications, including those outside the selected filter. Your applications, favourites and achievements will not be deleted.") },
+            confirmButton = {
+                TextButton(
+                    enabled = !uiState.isClearing,
+                    onClick = {
+                        showClearConfirmation = false
+                        notificationViewModel.dismissAll()
+                    }
+                ) { Text("Clear all", color = Color(0xFFC62828)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearConfirmation = false }) {
+                    Text("Keep notifications", color = VolunteerLinkPrimaryGreen)
+                }
+            }
+        )
+    }
 
     // Reload on entry because the dashboard may have finished after this
     // shared ViewModel was first created.
@@ -161,7 +186,7 @@ fun VolunteerNotificationsScreen(
             }
             if (uiState.notifications.isNotEmpty()) {
                 TextButton(
-                    onClick = notificationViewModel::dismissAll,
+                    onClick = { showClearConfirmation = true },
                     enabled = !uiState.isClearing
                 ) {
                     Text(
@@ -191,6 +216,10 @@ fun VolunteerNotificationsScreen(
             }
         }
 
+        if (uiState.errorMessage != null && uiState.notifications.isNotEmpty()) {
+            Text(uiState.errorMessage.orEmpty(), color = Color(0xFFC62828),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+        }
         when {
             uiState.isLoading -> Box(
                 Modifier.fillMaxSize(),
@@ -437,4 +466,3 @@ private fun VolunteerNotification.category(): VolunteerNotificationCategory {
 
 private fun formatNotificationTime(timestamp: String): String =
     timestamp.take(16).replace('T', ' ')
-

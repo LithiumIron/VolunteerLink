@@ -1189,6 +1189,7 @@ private fun VolunteerSkillPathCard(
     val openEventRoleCount =
         VolunteerOpportunitySessionStore
             .volunteerOpportunityEvents
+            .filter { com.example.volunteerlink.data.VolunteerApplicationWindow.canApply(it) }
             .sumOf { event ->
                 event.eventVolunteerRoles.count { role ->
                     role.rolePrimarySkillPath ==
@@ -1883,6 +1884,7 @@ private fun VolunteerSkillPathRolesSection(
     val matchingEventRoles =
         VolunteerOpportunitySessionStore
             .volunteerOpportunityEvents
+            .filter { com.example.volunteerlink.data.VolunteerApplicationWindow.canApply(it) }
             .flatMap { event ->
                 event.eventVolunteerRoles
                     .filter { role ->

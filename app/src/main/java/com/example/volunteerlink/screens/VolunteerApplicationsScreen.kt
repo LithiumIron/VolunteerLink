@@ -513,8 +513,10 @@ fun VolunteerApplicationDetailsScreen(
                                     volunteerApplication.applicationScreeningAnswers
                                         .getOrElse(index) { "" }
                                 }
+                                volunteerOpportunityViewModel.clearApplicationActionError()
                                 shouldShowEditDialog = true
                             },
+                            enabled = com.example.volunteerlink.data.VolunteerApplicationWindow.beforeStart(volunteerOpportunityEvent),
                             modifier = Modifier.fillMaxWidth().height(48.dp),
                             shape = RoundedCornerShape(10.dp)
                         ) {
@@ -530,14 +532,25 @@ fun VolunteerApplicationDetailsScreen(
                     ) {
                         TextButton(
                             onClick = {
+                                volunteerOpportunityViewModel.clearApplicationActionError()
+                                selectedCancellationReason = ""
+                                cancellationDetails = ""
                                 shouldShowCancelDialog = true
                             },
+                            enabled = !opportunityUiState.isApplicationActionRunning &&
+                                com.example.volunteerlink.data.VolunteerApplicationWindow.beforeStart(volunteerOpportunityEvent),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
                                 text = "Cancel Application",
                                 fontWeight = FontWeight.SemiBold,
                                 color = VolunteerLinkError
+                            )
+                        }
+                        if (!com.example.volunteerlink.data.VolunteerApplicationWindow.beforeStart(volunteerOpportunityEvent)) {
+                            Text(
+                                "Cancellation unavailable: the activity has started or its dates need syncing.",
+                                color = VolunteerLinkTextSecondary, fontSize = 12.sp
                             )
                         }
                     }
@@ -551,8 +564,10 @@ fun VolunteerApplicationDetailsScreen(
                                 val questions = volunteerOpportunityRole
                                     ?.roleExtraApplicationQuestions.orEmpty()
                                 formAnswers = questions.map { "" }
+                                volunteerOpportunityViewModel.clearApplicationActionError()
                                 shouldShowReapplyDialog = true
                             },
+                            enabled = com.example.volunteerlink.data.VolunteerApplicationWindow.canApply(volunteerOpportunityEvent),
                             modifier = Modifier.fillMaxWidth().height(50.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = VolunteerLinkPrimaryGreen
@@ -560,7 +575,10 @@ fun VolunteerApplicationDetailsScreen(
                         ) { Text("Apply Again", fontWeight = FontWeight.Bold) }
 
                         TextButton(
-                            onClick = { shouldShowDeleteDialog = true },
+                            onClick = {
+                                volunteerOpportunityViewModel.clearApplicationActionError()
+                                shouldShowDeleteDialog = true
+                            },
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text("Delete application record", color = VolunteerLinkError)
@@ -573,6 +591,9 @@ fun VolunteerApplicationDetailsScreen(
 
     if (shouldShowCancelDialog) {
         AlertDialog(
+            titleContentColor = VolunteerLinkTextPrimary,
+            textContentColor = VolunteerLinkTextSecondary,
+            containerColor = Color.White,
             onDismissRequest = {
                 shouldShowCancelDialog = false
             },
@@ -596,7 +617,10 @@ fun VolunteerApplicationDetailsScreen(
                     cancellationReasons.forEach { reason ->
                         FilterChip(
                             selected = selectedCancellationReason == reason,
-                            onClick = { selectedCancellationReason = reason },
+                            onClick = {
+                                selectedCancellationReason = reason
+                                volunteerOpportunityViewModel.clearApplicationActionError()
+                            },
                             label = { Text(reason, fontSize = 11.sp) },
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -604,7 +628,10 @@ fun VolunteerApplicationDetailsScreen(
                     if (selectedCancellationReason == "Other") {
                         OutlinedTextField(
                             value = cancellationDetails,
-                            onValueChange = { cancellationDetails = it },
+                            onValueChange = {
+                                cancellationDetails = it
+                                volunteerOpportunityViewModel.clearApplicationActionError()
+                            },
                             label = { Text("Please explain") },
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -637,9 +664,7 @@ fun VolunteerApplicationDetailsScreen(
                             )
                     },
                     enabled =
-                        !opportunityUiState.isApplicationActionRunning &&
-                                selectedCancellationReason.isNotBlank() &&
-                                (selectedCancellationReason != "Other" || cancellationDetails.isNotBlank())
+                        !opportunityUiState.isApplicationActionRunning
                 ) {
                     Text(
                         text =
@@ -671,6 +696,9 @@ fun VolunteerApplicationDetailsScreen(
         val isReapply = shouldShowReapplyDialog
         val questions = volunteerOpportunityRole?.roleExtraApplicationQuestions.orEmpty()
         AlertDialog(
+            containerColor = Color.White,
+            titleContentColor = VolunteerLinkTextPrimary,
+            textContentColor = VolunteerLinkTextSecondary,
             onDismissRequest = {
                 shouldShowEditDialog = false
                 shouldShowReapplyDialog = false
@@ -753,6 +781,9 @@ fun VolunteerApplicationDetailsScreen(
 
     if (shouldShowDeleteDialog) {
         AlertDialog(
+            containerColor = Color.White,
+            titleContentColor = VolunteerLinkTextPrimary,
+            textContentColor = VolunteerLinkTextSecondary,
             onDismissRequest = { shouldShowDeleteDialog = false },
             title = { Text("Delete application record?") },
             text = {

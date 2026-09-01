@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -38,6 +39,8 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ModalBottomSheet
@@ -104,6 +107,7 @@ fun VolunteerHomeScreen(
     onVolunteerApplicationSelected: (applicationId: Int) -> Unit = {},
     onViewAllApplicationsSelected: () -> Unit = {},
     onVolunteerNotificationsSelected: () -> Unit = {},
+    onVolunteerFavouritesSelected: () -> Unit = {},
     unreadNotificationCount: Int = 0,
     onVolunteerSearchSelected: () -> Unit = {},
     isShowingCachedData: Boolean = false,
@@ -113,6 +117,7 @@ fun VolunteerHomeScreen(
         VolunteerSkillPathViewModel = viewModel()
 ) {
     val context = LocalContext.current
+    val applicationClock by com.example.volunteerlink.data.time.AppClock.state.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
     var selectedHomeFilter by rememberSaveable {
         mutableStateOf(VolunteerHomeFeedFilter.FOR_YOU)
@@ -241,6 +246,7 @@ fun VolunteerHomeScreen(
     val filteredVolunteerOpportunityEvents =
         remember(
             selectedHomeFilter,
+            applicationClock,
             allVolunteerOpportunityEvents
         ) {
             VolunteerHomeFeedEngine.filter(
@@ -253,6 +259,7 @@ fun VolunteerHomeScreen(
     val recommendedVolunteerOpportunityEvents =
         remember(
             allVolunteerOpportunityEvents,
+            applicationClock,
             allVolunteerApplications,
             currentSkillPathLevels
         ) {
@@ -302,6 +309,7 @@ fun VolunteerHomeScreen(
                         updatedHomeFilter
                 },
 
+                onVolunteerFavouritesSelected = onVolunteerFavouritesSelected,
                 onVolunteerNotificationsSelected =
                     onVolunteerNotificationsSelected,
 
@@ -476,6 +484,7 @@ private fun VolunteerHomeCompactHeader(
     onHomeFilterSelected:
         (VolunteerHomeFeedFilter) -> Unit,
     onVolunteerNotificationsSelected: () -> Unit,
+    onVolunteerFavouritesSelected: () -> Unit,
     unreadNotificationCount: Int
 ) {
 
@@ -522,11 +531,15 @@ private fun VolunteerHomeCompactHeader(
                     Alignment.CenterVertically,
 
                 horizontalArrangement =
-                    Arrangement.spacedBy(2.dp)
+                    Arrangement.spacedBy(0.dp)
             ) {
 
 
-                Box {
+                IconButton(onClick = onVolunteerFavouritesSelected, modifier = Modifier.size(48.dp)) {
+                    Icon(Icons.Filled.FavoriteBorder, contentDescription = "Favourites", tint = Color.White,
+                        modifier = Modifier.offset(x = 3.dp).size(22.dp))
+                }
+                Box(Modifier.size(48.dp)) {
                     IconButton(
                         onClick =
                             onVolunteerNotificationsSelected
@@ -538,7 +551,7 @@ private fun VolunteerHomeCompactHeader(
                             ),
                             contentDescription = "Notifications",
                             tint = Color.White,
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier.offset(x = (-3).dp).size(22.dp)
                         )
                     }
 
@@ -546,6 +559,7 @@ private fun VolunteerHomeCompactHeader(
                         Surface(
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
+                                .offset(x = (-3).dp)
                                 .size(18.dp),
                             shape = CircleShape,
                             color = VolunteerLinkError
@@ -1201,12 +1215,13 @@ private fun VolunteerHomeCompactApplicationCard(
 }
 
 @Composable
-private fun VolunteerHomeCompactCard(
+internal fun VolunteerHomeCompactCard(
     volunteerOpportunityEvent:
     VolunteerOpportunityEvent,
     recommendation:
         VolunteerHomeRecommendation? = null,
     onMatchDetailsSelected: () -> Unit = {},
+    availabilityNotice: String? = null,
     onVolunteerOpportunitySelected: () -> Unit
 ) {
     val primaryVolunteerRole =
@@ -1439,6 +1454,10 @@ private fun VolunteerHomeCompactCard(
                     modifier = Modifier.height(7.dp)
                 )
 
+                availabilityNotice?.let { notice ->
+                    Text(notice, color = VolunteerLinkTextSecondary, fontSize = 11.sp)
+                    Spacer(Modifier.height(7.dp))
+                }
                 recommendation?.let { match ->
                     Text(
                         text =

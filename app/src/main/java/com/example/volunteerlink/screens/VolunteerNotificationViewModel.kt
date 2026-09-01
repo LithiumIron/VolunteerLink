@@ -102,6 +102,7 @@ class VolunteerNotificationViewModel : ViewModel() {
     }
 
     fun dismiss(notification: VolunteerNotification) {
+        if (mutableUiState.value.isClearing) return
         viewModelScope.launch {
             mutableUiState.update { it.copy(isClearing = true, errorMessage = null) }
             runCatching {
@@ -128,6 +129,7 @@ class VolunteerNotificationViewModel : ViewModel() {
     }
 
     fun dismissAll() {
+        if (mutableUiState.value.isClearing) return
         val current = mutableUiState.value.notifications
         if (current.isEmpty()) return
         viewModelScope.launch {
@@ -138,7 +140,9 @@ class VolunteerNotificationViewModel : ViewModel() {
                 )
             }.onSuccess {
                 mutableUiState.update {
-                    it.copy(isClearing = false, notifications = emptyList())
+                    it.copy(isClearing = false, notifications = it.notifications.filterNot { item ->
+                        current.any { cleared -> cleared.stableKey == item.stableKey }
+                    })
                 }
             }.onFailure { exception ->
                 exception.printStackTrace()

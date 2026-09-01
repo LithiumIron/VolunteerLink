@@ -41,6 +41,8 @@ data class VolunteerOpportunityDashboardData(
 object VolunteerOpportunityRepository {
 
     suspend fun loadDashboard(): VolunteerOpportunityDashboardData {
+        // Refresh, but never modify, the organisation's shared business clock.
+        com.example.volunteerlink.data.time.AppClock.refreshFromDatabase()
         val organisations =
             supabase.from("organisations")
                 .select(
@@ -159,7 +161,7 @@ object VolunteerOpportunityRepository {
                     eventIsSaved = event.eventDatabaseId in savedPostIds
                 )
             }.filter { event ->
-                event.eventStatus == "PUBLISHED"
+                event.eventStatus == "PUBLISHED" || event.eventIsSaved
             },
             applications =
                 rpcApplications
@@ -716,7 +718,10 @@ object VolunteerOpportunityRepository {
                     eventLongitude = physical?.longitude,
                     eventThumbnailPath = post.thumbnailPath,
                     eventDatabaseId = post.postId,
-                    eventStatus = post.status
+                    eventStatus = post.status,
+                    eventApplicationStartDate = listOfNotNull(
+                        physical?.startDate, remote?.startDate
+                    ).filter { it.isNotBlank() }.minOrNull().orEmpty()
                 )
             }
     }

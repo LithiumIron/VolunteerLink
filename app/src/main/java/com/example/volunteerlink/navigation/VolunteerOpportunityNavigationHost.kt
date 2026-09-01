@@ -182,9 +182,10 @@ fun VolunteerOpportunityNavigationHost() {
 
                             volunteerNavigationController.navigate(
                                 VolunteerOpportunityNavigationRoutes
-                                    .createVolunteerRoleDetailsRoute(
+                                    .createVolunteerOpportunityDetailsRoute(
                                         volunteerEventId = volunteerEventId,
-                                        volunteerRoleId = volunteerRoleId
+                                        recommendedRoleId = volunteerRoleId,
+                                        source = "for_you"
                                     )
                             )
                         },
@@ -216,6 +217,9 @@ fun VolunteerOpportunityNavigationHost() {
                             )
                         },
 
+                        onVolunteerFavouritesSelected = {
+                            volunteerNavigationController.navigate(VolunteerOpportunityNavigationRoutes.VOLUNTEER_FAVOURITES_ROUTE)
+                        },
                         unreadNotificationCount =
                             notificationUiState.unreadCount,
 
@@ -324,6 +328,18 @@ fun VolunteerOpportunityNavigationHost() {
                     )
                 }
 
+                composable(VolunteerOpportunityNavigationRoutes.VOLUNTEER_FAVOURITES_ROUTE) {
+                    com.example.volunteerlink.screens.VolunteerFavouritesScreen(
+                        onBack = { volunteerNavigationController.popBackStack() },
+                        onEvent = { id ->
+                            volunteerNavigationController.navigate(
+                                VolunteerOpportunityNavigationRoutes.createVolunteerOpportunityDetailsRoute(id)
+                            )
+                        },
+                        opportunityViewModel = volunteerOpportunityViewModel
+                    )
+                }
+
                 // Opportunity Details
                 composable(
                     route =
@@ -337,7 +353,9 @@ fun VolunteerOpportunityNavigationHost() {
                                     .VOLUNTEER_EVENT_ID_ARGUMENT
                             ) {
                                 type = NavType.IntType
-                            }
+                            },
+                            navArgument("recommendedRoleId") { type = NavType.IntType; defaultValue = -1 },
+                            navArgument("source") { type = NavType.StringType; defaultValue = "" }
                         )
                 ) { navigationBackStackEntry ->
 
@@ -351,6 +369,8 @@ fun VolunteerOpportunityNavigationHost() {
                             ?: return@composable
 
                     VolunteerOpportunityDetailsScreen(
+                        recommendedRoleId = navigationBackStackEntry.arguments?.getInt("recommendedRoleId") ?: -1,
+                        recommendationSource = navigationBackStackEntry.arguments?.getString("source").orEmpty(),
                         volunteerEventId =
                             volunteerEventId,
                         opportunityViewModel =
@@ -727,11 +747,11 @@ fun VolunteerOpportunityNavigationHost() {
 
                             volunteerNavigationController.navigate(
                                 VolunteerOpportunityNavigationRoutes
-                                    .createVolunteerRoleDetailsRoute(
+                                    .createVolunteerOpportunityDetailsRoute(
                                         volunteerEventId =
                                             volunteerEventId,
-                                        volunteerRoleId =
-                                            volunteerRoleId
+                                        recommendedRoleId = volunteerRoleId,
+                                        source = "skill_path"
                                     )
                             )
                         }
@@ -924,4 +944,3 @@ private fun VolunteerTemporaryModuleScreen(
         )
     }
 }
-

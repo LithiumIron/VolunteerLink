@@ -88,7 +88,9 @@ data class VolunteerOpportunityEvent(
     val eventThumbnailPath: String? = null,
     val eventIsSaved: Boolean = false,
     val eventDatabaseId: String = "",
-    val eventStatus: String = "PUBLISHED"
+    val eventStatus: String = "PUBLISHED",
+    // ISO date from the earliest physical/remote phase, not a formatted UI date.
+    val eventApplicationStartDate: String = ""
 )
 
 @Serializable

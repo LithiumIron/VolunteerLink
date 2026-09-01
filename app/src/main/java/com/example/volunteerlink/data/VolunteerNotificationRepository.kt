@@ -107,9 +107,8 @@ object VolunteerNotificationRepository {
     }
 
     suspend fun markAllRead() {
-        runCatching {
-            supabase.postgrest.rpc("mark_my_notifications_read")
-        }
+        // Let the ViewModel display failure instead of reporting false success.
+        supabase.postgrest.rpc("mark_my_notifications_read")
     }
 
     suspend fun dismiss(notificationKey: String) {

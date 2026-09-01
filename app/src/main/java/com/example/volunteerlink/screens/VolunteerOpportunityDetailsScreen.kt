@@ -26,8 +26,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Bookmark
-import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -40,6 +40,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -73,6 +75,8 @@ import com.example.volunteerlink.ui.theme.VolunteerLinkWarning
 @Composable
 fun VolunteerOpportunityDetailsScreen(
     volunteerEventId: Int,
+    recommendedRoleId: Int = -1,
+    recommendationSource: String = "",
     opportunityViewModel: VolunteerOpportunityViewModel,
     onBackSelected: () -> Unit,
     onLocationSelected: (Int) -> Unit,
@@ -82,6 +86,10 @@ fun VolunteerOpportunityDetailsScreen(
     ) -> Unit
 ) {
     val context = LocalContext.current
+    val actionState by opportunityViewModel.uiState.collectAsStateWithLifecycle()
+    androidx.compose.runtime.LaunchedEffect(volunteerEventId) {
+        opportunityViewModel.clearApplicationActionError()
+    }
 
     val volunteerOpportunityEvent =
         VolunteerOpportunitySessionStore.findEventById(
@@ -124,6 +132,11 @@ fun VolunteerOpportunityDetailsScreen(
                 bottom = 28.dp
             )
         ) {
+            actionState.applicationActionError?.let { message ->
+                item(key = "action_error") {
+                    Text(message, color = VolunteerLinkError, modifier = Modifier.padding(16.dp))
+                }
+            }
             item(
                 key = "opportunity_summary"
             ) {
@@ -145,6 +158,32 @@ fun VolunteerOpportunityDetailsScreen(
                 )
             }
 
+            if (recommendedRoleId != -1) {
+                item(key = "recommended_role") {
+                    val recommended = volunteerOpportunityEvent.eventVolunteerRoles
+                        .firstOrNull { it.roleId == recommendedRoleId }
+                    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp)) {
+                        Text(
+                            if (recommendationSource == "skill_path") "Build this skill path"
+                            else "Recommended role for you",
+                            color = VolunteerLinkPrimaryGreen, fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        if (recommended != null && recommended.roleVacancies > 0 &&
+                            com.example.volunteerlink.data.VolunteerApplicationWindow.canApply(volunteerOpportunityEvent)) {
+                            VolunteerOpportunityRoleCard(
+                                volunteerEventId = volunteerEventId,
+                                volunteerOpportunityRole = recommended,
+                                onRoleSelected = { onVolunteerRoleSelected(volunteerEventId, recommended.roleId) }
+                            )
+                        } else {
+                            Text("This recommended role is no longer available. Review the other roles below.",
+                                color = VolunteerLinkTextSecondary)
+                        }
+                    }
+                }
+            }
             item(
                 key = "opportunity_roles"
             ) {
@@ -225,13 +264,13 @@ private fun VolunteerOpportunityDetailsTopBar(
         IconButton(onClick = onSavedSelected) {
             Icon(
                 imageVector = if (isSaved) {
-                    Icons.Filled.Bookmark
+                    Icons.Filled.Favorite
                 } else {
-                    Icons.Filled.BookmarkBorder
+                    Icons.Filled.FavoriteBorder
                 },
                 contentDescription =
-                    if (isSaved) "Remove from saved opportunities"
-                    else "Save opportunity",
+                    if (isSaved) "Remove from favourites"
+                    else "Add to favourites",
                 tint = Color.White
             )
         }

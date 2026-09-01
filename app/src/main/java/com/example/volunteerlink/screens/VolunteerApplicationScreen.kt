@@ -80,6 +80,10 @@ fun VolunteerApplicationScreen(
         volunteerOpportunityViewModel.uiState
             .collectAsStateWithLifecycle()
 
+    androidx.compose.runtime.LaunchedEffect(volunteerEventId, volunteerRoleId) {
+        volunteerOpportunityViewModel.clearApplicationActionError()
+    }
+
     val volunteerOpportunityEvent =
         VolunteerOpportunitySessionStore.findEventById(
             volunteerEventId
@@ -159,7 +163,9 @@ fun VolunteerApplicationScreen(
                         .isApplicationActionRunning,
                 serverErrorMessage =
                     opportunityUiState
-                        .applicationActionError,
+                        .applicationActionError ?: if (
+                            !com.example.volunteerlink.data.VolunteerApplicationWindow.canApply(volunteerOpportunityEvent)
+                        ) com.example.volunteerlink.data.VolunteerApplicationWindow.reason(volunteerOpportunityEvent) else null,
                 onApplicationSubmitted = {
                         submittedAnswers ->
                     volunteerOpportunityViewModel
@@ -614,7 +620,8 @@ private fun VolunteerApplicationFormScreen(
                     PaddingValues(
                         horizontal = 16.dp
                     ),
-                enabled = !isSubmitting
+                enabled = !isSubmitting &&
+                    com.example.volunteerlink.data.VolunteerApplicationWindow.canApply(volunteerOpportunityEvent)
             ) {
                 Text(
                     text =
@@ -1311,4 +1318,3 @@ private fun VolunteerApplicationNotFoundScreen(
         }
     }
 }
-

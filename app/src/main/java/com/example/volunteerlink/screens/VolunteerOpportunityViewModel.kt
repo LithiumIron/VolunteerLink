@@ -121,7 +121,7 @@ class VolunteerOpportunityViewModel(
                     mutableUiState.update {
                         it.copy(
                             applicationActionError =
-                                "Saved opportunities could not be updated.",
+                                "Favourites could not be updated. Please retry.",
                             dataVersion = it.dataVersion + 1
                         )
                     }
@@ -136,6 +136,12 @@ class VolunteerOpportunityViewModel(
         answers: List<String>,
         onSuccess: () -> Unit
     ) {
+        val event = VolunteerOpportunitySessionStore.findEventById(eventId)
+        if (!com.example.volunteerlink.data.VolunteerApplicationWindow.canApply(event)) {
+            mutableUiState.update { it.copy(applicationActionError =
+                com.example.volunteerlink.data.VolunteerApplicationWindow.reason(event)) }
+            return
+        }
         val role =
             VolunteerOpportunitySessionStore.findRoleById(
                 eventId = eventId,
@@ -296,6 +302,11 @@ class VolunteerOpportunityViewModel(
         details: String,
         onSuccess: () -> Unit = {}
     ) {
+        if (reason.isBlank() || (reason == "Other" && details.isBlank())) {
+            mutableUiState.update { it.copy(applicationActionError =
+                if (reason.isBlank()) "Please select a cancellation reason." else "Please enter your reason.") }
+            return
+        }
         val application =
             VolunteerOpportunitySessionStore
                 .findApplicationById(applicationId)
@@ -307,6 +318,13 @@ class VolunteerOpportunityViewModel(
                         "The selected application could not be found."
                 )
             }
+            return
+        }
+
+        val event = VolunteerOpportunitySessionStore.findEventById(application.applicationEventId)
+        if (!com.example.volunteerlink.data.VolunteerApplicationWindow.beforeStart(event)) {
+            mutableUiState.update { it.copy(applicationActionError =
+                "Cancellation is unavailable: the activity has started or its dates need syncing.") }
             return
         }
 
@@ -446,6 +464,11 @@ class VolunteerOpportunityViewModel(
         }
         if (event == null || role == null) {
             failApplicationAction(IllegalStateException(), "Role details could not be found.")
+            return@runApplicationAction
+        }
+        if (!com.example.volunteerlink.data.VolunteerApplicationWindow.canApply(event)) {
+            failApplicationAction(IllegalStateException(),
+                com.example.volunteerlink.data.VolunteerApplicationWindow.reason(event))
             return@runApplicationAction
         }
         try {
@@ -599,6 +622,14 @@ private fun Exception.toVolunteerMessage(
 ): String {
     val rawMessage = message.orEmpty()
     return when {
+        rawMessage.contains("Applications are closed", ignoreCase = true) ->
+            "Applications closed: this opportunity has already started."
+        rawMessage.contains("can no longer be cancelled", ignoreCase = true) ->
+            "This activity has already started. Your application can no longer be cancelled."
+        rawMessage.contains("no valid start date", ignoreCase = true) ->
+            "This opportunity has no valid start date. Please contact the organisation."
+        rawMessage.contains("selected role is unavailable", ignoreCase = true) ->
+            "This role is no longer open for applications. Please sync to refresh its details."
         rawMessage.contains("JWT", ignoreCase = true) ||
             rawMessage.contains("not authenticated", ignoreCase = true) ->
             "Your session has expired. Please sign in again."

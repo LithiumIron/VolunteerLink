@@ -56,10 +56,7 @@ object VolunteerHomeFeedEngine {
         events
             .asSequence()
             .filter { event ->
-                event.eventStatus.equals(
-                    other = "PUBLISHED",
-                    ignoreCase = true
-                )
+                VolunteerApplicationWindow.canApply(event)
             }
             .distinctBy { event ->
                 event.eventDatabaseId.ifBlank {
@@ -182,7 +179,7 @@ object VolunteerHomeRecommendationEngine {
             }
             .filter { event ->
                 event.eventAvailableSpots > 0 &&
-                    event.eventVolunteerRoles.isNotEmpty()
+                    event.eventVolunteerRoles.any { it.roleVacancies > 0 }
             }
             .map { event ->
                 createRecommendation(
@@ -216,6 +213,7 @@ object VolunteerHomeRecommendationEngine {
     ): VolunteerHomeRecommendation {
         val bestRoleMatch =
             event.eventVolunteerRoles
+                .filter { it.roleVacancies > 0 }
                 .map { role ->
                     scoreRole(
                         event = event,
@@ -512,5 +510,3 @@ private fun String.matchKey(): String =
         .replace("&", "and")
         .replace(Regex("[^a-z0-9]+"), " ")
         .trim()
-
-

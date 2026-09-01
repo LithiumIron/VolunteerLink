@@ -1,6 +1,7 @@
 package com.example.volunteerlink.navigation
 
 object VolunteerOpportunityNavigationRoutes {
+    const val VOLUNTEER_FAVOURITES_ROUTE = "volunteer_favourites"
 
     // Main bottom navigation destinations
     const val VOLUNTEER_HOME_ROUTE =
@@ -47,13 +48,16 @@ object VolunteerOpportunityNavigationRoutes {
     // Opportunity Details
     const val VOLUNTEER_OPPORTUNITY_DETAILS_ROUTE =
         "volunteer_opportunity_details/" +
-                "{$VOLUNTEER_EVENT_ID_ARGUMENT}"
+                "{$VOLUNTEER_EVENT_ID_ARGUMENT}?recommendedRoleId={recommendedRoleId}&source={source}"
 
     fun createVolunteerOpportunityDetailsRoute(
-        volunteerEventId: Int
+        volunteerEventId: Int,
+        recommendedRoleId: Int = -1,
+        source: String = ""
     ): String {
-        return "volunteer_opportunity_details/" +
-                volunteerEventId
+        val base = "volunteer_opportunity_details/$volunteerEventId"
+        return if (recommendedRoleId == -1) base
+        else "$base?recommendedRoleId=$recommendedRoleId&source=$source"
     }
 
 

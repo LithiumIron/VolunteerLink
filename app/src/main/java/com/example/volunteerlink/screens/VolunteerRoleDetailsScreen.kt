@@ -246,6 +246,9 @@ fun VolunteerRoleDetailsScreen(
         }
 
         VolunteerRoleJoinSection(
+            applicationWindowMessage = if (
+                com.example.volunteerlink.data.VolunteerApplicationWindow.canApply(volunteerOpportunityEvent)
+            ) null else com.example.volunteerlink.data.VolunteerApplicationWindow.reason(volunteerOpportunityEvent),
             volunteerOpportunityRole =
                 volunteerOpportunityRole,
             volunteerIsEligible =
@@ -859,6 +862,7 @@ private fun VolunteerRoleEligibilitySection(
 
 @Composable
 private fun VolunteerRoleJoinSection(
+    applicationWindowMessage: String?,
     volunteerOpportunityRole:
     VolunteerOpportunityRole,
     volunteerIsEligible: Boolean,
@@ -880,71 +884,6 @@ private fun VolunteerRoleJoinSection(
                 vertical = 12.dp
             )
         ) {
-            Button(
-                onClick = onJoinRoleSelected,
-                enabled =
-                    volunteerIsEligible &&
-                            eligibilityIsAvailable &&
-                            !eligibilityIsLoading &&
-                            !volunteerHasApplied,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp),
-                shape = RoundedCornerShape(11.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor =
-                        VolunteerLinkPrimaryGreen,
-                    contentColor = Color.White,
-                    disabledContainerColor =
-                        VolunteerLinkBorderColour,
-                    disabledContentColor =
-                        VolunteerLinkTextSecondary
-                )
-            ) {
-                Text(
-                    text =
-                        if (volunteerHasApplied) {
-                            "Already Registered"
-                        } else if (volunteerCanReapply) {
-                            "Apply Again"
-                        } else if (eligibilityIsLoading) {
-                            "Checking Skill Path Level..."
-                        } else if (!eligibilityIsAvailable) {
-                            "Skill Path Unavailable"
-                        } else if (!volunteerIsEligible) {
-                            "Skill Path Level Required"
-                        } else {
-                            when (
-                                volunteerOpportunityRole
-                                    .roleApplicationMethod
-                            ) {
-                                VolunteerRoleApplicationMethod
-                                    .INSTANT_JOIN ->
-                                    "Join Event"
-
-                                VolunteerRoleApplicationMethod
-                                    .REVIEW_APPLICANTS ->
-                                    if (
-                                        volunteerOpportunityRole
-                                            .roleApplicationFlow ==
-                                        VolunteerRoleApplicationFlow
-                                            .ADDITIONAL_FORM
-                                    ) {
-                                        "Continue to Application"
-                                    } else {
-                                        "Apply for Role"
-                                    }
-                            }
-                        },
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            Spacer(
-                modifier = Modifier.height(5.dp)
-            )
-
             Text(
                 text =
                     if (volunteerHasApplied) {
@@ -990,6 +929,83 @@ private fun VolunteerRoleJoinSection(
                         VolunteerLinkTextSecondary
                     }
             )
+            Spacer(Modifier.height(8.dp))
+            applicationWindowMessage?.let {
+                Text(it, color = VolunteerLinkTextSecondary, fontSize = 12.sp)
+                Spacer(Modifier.height(8.dp))
+            }
+            Button(
+                onClick = onJoinRoleSelected,
+                enabled =
+                    applicationWindowMessage == null &&
+                            volunteerOpportunityRole.roleVacancies > 0 &&
+                            volunteerIsEligible &&
+                            eligibilityIsAvailable &&
+                            !eligibilityIsLoading &&
+                            !volunteerHasApplied,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp),
+                shape = RoundedCornerShape(11.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor =
+                        VolunteerLinkPrimaryGreen,
+                    contentColor = Color.White,
+                    disabledContainerColor =
+                        VolunteerLinkBorderColour,
+                    disabledContentColor =
+                        VolunteerLinkTextSecondary
+                )
+            ) {
+                Text(
+                    text =
+                        if (applicationWindowMessage != null) {
+                            "Applications unavailable"
+                        } else if (volunteerOpportunityRole.roleVacancies <= 0) {
+                            "Role full"
+                        } else if (volunteerHasApplied) {
+                            "Already Registered"
+                        } else if (volunteerCanReapply) {
+                            "Apply Again"
+                        } else if (eligibilityIsLoading) {
+                            "Checking Skill Path Level..."
+                        } else if (!eligibilityIsAvailable) {
+                            "Skill Path Unavailable"
+                        } else if (!volunteerIsEligible) {
+                            "Skill Path Level Required"
+                        } else {
+                            when (
+                                volunteerOpportunityRole
+                                    .roleApplicationMethod
+                            ) {
+                                VolunteerRoleApplicationMethod
+                                    .INSTANT_JOIN ->
+                                    "Join Event"
+
+                                VolunteerRoleApplicationMethod
+                                    .REVIEW_APPLICANTS ->
+                                    if (
+                                        volunteerOpportunityRole
+                                            .roleApplicationFlow ==
+                                        VolunteerRoleApplicationFlow
+                                            .ADDITIONAL_FORM
+                                    ) {
+                                        "Continue to Application"
+                                    } else {
+                                        "Apply for Role"
+                                    }
+                            }
+                        },
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Spacer(
+                modifier = Modifier.height(5.dp)
+            )
+
+
         }
     }
 }
