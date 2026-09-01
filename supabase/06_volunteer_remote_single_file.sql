@@ -168,7 +168,7 @@ BEGIN
   IF NOT FOUND THEN RAISE EXCEPTION 'The file has not finished uploading. Retry the submission.'; END IF;
   v_size := (v_metadata->>'size')::bigint;
   IF v_size IS NULL OR v_size <= 0 OR v_size > 20000000 THEN RAISE EXCEPTION 'File must be between 1 byte and 20 MB.'; END IF;
-  IF coalesce(v_metadata->>'mimetype', '') <> CASE lower(split_part(p_file_name, '.', cardinality(string_to_array(p_file_name, '.'))))
+  IF coalesce(v_metadata->>'mimetype', '') <> (CASE lower(split_part(p_file_name, '.', cardinality(string_to_array(p_file_name, '.'))))
     WHEN 'pdf' THEN 'application/pdf' WHEN 'jpg' THEN 'image/jpeg' WHEN 'jpeg' THEN 'image/jpeg'
     WHEN 'png' THEN 'image/png' WHEN 'doc' THEN 'application/msword'
     WHEN 'docx' THEN 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
@@ -176,7 +176,7 @@ BEGIN
     WHEN 'xlsx' THEN 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     WHEN 'ppt' THEN 'application/vnd.ms-powerpoint'
     WHEN 'pptx' THEN 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
-    ELSE 'INVALID' END THEN RAISE EXCEPTION 'The file type does not match its extension.';
+    ELSE 'INVALID' END) THEN RAISE EXCEPTION 'The file type does not match its extension.';
   END IF;
   INSERT INTO v1_erd_test.remote_submissions (
     submission_id, post_id, role_template_id, user_id, submission_type,
