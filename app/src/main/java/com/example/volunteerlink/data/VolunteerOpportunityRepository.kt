@@ -674,7 +674,7 @@ object VolunteerOpportunityRepository {
                     eventDistanceKm = null,
                     eventDate = formatDatabaseDate(startDate),
                     eventEndDate = formatDatabaseDate(
-                        remote?.endDate ?: startDate
+                        remote?.newEndDate ?: remote?.endDate ?: startDate
                     ),
                     eventTime =
                         if (physical != null) {
@@ -694,7 +694,7 @@ object VolunteerOpportunityRepository {
                     eventDescription = post.description,
                     eventIsLongTerm =
                         remote?.let {
-                            it.startDate != it.endDate
+                            it.startDate != (it.newEndDate ?: it.endDate)
                         } ?: false,
                     eventVolunteerRoles = roles,
                     eventIsGovernmentApproved =
@@ -1098,6 +1098,8 @@ private data class RemoteDetailRow(
     val startDate: String,
     @SerialName("end_date")
     val endDate: String,
+    @SerialName("new_end_date")
+    val newEndDate: String? = null,
     @SerialName("volunteer_capacity")
     val volunteerCapacity: Int
 )

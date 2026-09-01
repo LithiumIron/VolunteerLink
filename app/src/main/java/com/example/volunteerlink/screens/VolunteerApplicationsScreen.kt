@@ -413,6 +413,18 @@ fun VolunteerApplicationDetailsScreen(
                 )
             }
 
+            if (volunteerApplication.applicationRoleMode == "REMOTE" ||
+                volunteerOpportunityRole?.roleMode == "REMOTE" ||
+                volunteerOpportunityEvent?.eventOpportunityType == "Remote") {
+                item(key = "remote_submission") {
+                    VolunteerRemoteSubmissionCard(
+                        participationId = volunteerApplication.applicationDatabaseId,
+                        dataVersion = opportunityUiState.dataVersion,
+                        onRefreshApplications = { volunteerOpportunityViewModel.refresh() }
+                    )
+                }
+            }
+
             item(
                 key = "application_actions"
             ) {
