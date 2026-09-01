@@ -10,6 +10,7 @@ import com.example.volunteerlink.data.post.PostTimingInput
 import com.example.volunteerlink.data.post.PostTimingState
 import com.example.volunteerlink.data.post.RoleApplicationWindowEvaluator
 import com.example.volunteerlink.data.post.RoleApplicationWindowInput
+import com.example.volunteerlink.data.supabase
 import com.example.volunteerlink.data.time.AppClock
 import com.example.volunteerlink.organisation.home.model.OrganisationHomePost
 import com.example.volunteerlink.organisation.home.model.OrganisationHomeRole
@@ -21,10 +22,15 @@ import com.example.volunteerlink.organisation.manage.model.ManagePostItem
 import com.example.volunteerlink.organisation.manage.model.OrganisationManageUiState
 import com.example.volunteerlink.organisation.repository.OrganisationHomeRepository
 import com.example.volunteerlink.organisation.repository.SupabaseOrganisationHomeRepository
+import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.query.Columns
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import java.util.Locale
 
 /**
@@ -65,7 +71,8 @@ class OrganisationManageViewModel : ViewModel() {
             )
 
             try {
-                val snapshot = repository.loadHomeSnapshot(TEST_ORGANISATION_ID)
+                val organisationId = resolveCurrentOrganisationId()
+                val snapshot = repository.loadHomeSnapshot(organisationId)
                 cachedSnapshot = snapshot
                 applySnapshot(snapshot)
             } catch (exception: Exception) {
@@ -82,6 +89,30 @@ class OrganisationManageViewModel : ViewModel() {
                 refreshInProgress = false
             }
         }
+    }
+
+    /**
+     * Resolves the ORGANISATION ID of whoever is actually signed in right now.
+     * Same lookup used in OrganisationHomeViewModel — replaces the previous
+     * hardcoded TEST_ORGANISATION_ID.
+     */
+    private suspend fun resolveCurrentOrganisationId(): String {
+        val authUserId = supabase.auth.currentUserOrNull()?.id
+            ?: error("No signed-in session.")
+
+        val profile = supabase.from("user_profiles")
+            .select(columns = Columns.raw("user_id")) {
+                filter { eq("auth_user_id", authUserId) }
+            }
+            .decodeSingle<ManageUserIdRow>()
+
+        val organisation = supabase.from("organisations")
+            .select(columns = Columns.raw("organisation_id")) {
+                filter { eq("user_id", profile.userId) }
+            }
+            .decodeSingle<ManageOrganisationIdRow>()
+
+        return organisation.organisationId
     }
 
     private fun observeAppClock() {
@@ -438,7 +469,16 @@ class OrganisationManageViewModel : ViewModel() {
     }
 
     companion object {
-        private const val TEST_ORGANISATION_ID = "ORG0001"
         private const val TAG = "OrganisationManageVM"
     }
 }
+
+@Serializable
+private data class ManageUserIdRow(
+    @SerialName("user_id") val userId: String
+)
+
+@Serializable
+private data class ManageOrganisationIdRow(
+    @SerialName("organisation_id") val organisationId: String
+)

@@ -24,17 +24,9 @@ import kotlinx.serialization.json.jsonPrimitive
  */
 class SupabaseOrganisationHomeRepository : OrganisationHomeRepository {
 
-    companion object {
-        // Temporary owner used by the organisation prototype until real organisation login is integrated.
-        private const val TEST_ORGANISATION_ID = "ORG0001"
-    }
-
     override suspend fun loadHomeSnapshot(
         organisationId: String
     ): OrganisationHomeSnapshot {
-        require(organisationId == TEST_ORGANISATION_ID) {
-            "Organisation prototype is currently scoped to $TEST_ORGANISATION_ID only."
-        }
         val organisationRow = supabase
             .from("organisations")
             .select(columns = Columns.raw("organisation_id,organisation_name")) {

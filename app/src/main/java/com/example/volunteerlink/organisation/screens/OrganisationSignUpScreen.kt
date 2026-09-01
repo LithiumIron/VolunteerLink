@@ -132,7 +132,7 @@ fun OrganisationSignUpScreen(
                     organisationAuthViewModel.clearError()
                 },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Contact email") },
+                label = { Text("Login email") },
                 leadingIcon = {
                     Icon(imageVector = Icons.Filled.Mail, contentDescription = null)
                 },
@@ -203,7 +203,7 @@ fun OrganisationSignUpScreen(
                 ) {
                     Text(
                         text = "Account created. Check your email to confirm it, " +
-                            "then sign in.",
+                                "then sign in.",
                         fontSize = 12.sp,
                         lineHeight = 17.sp,
                         color = VolunteerLinkTextSecondary

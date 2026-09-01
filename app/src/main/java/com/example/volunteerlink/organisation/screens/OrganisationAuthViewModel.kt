@@ -92,7 +92,6 @@ class OrganisationAuthViewModel : ViewModel() {
                 createOrganisationProfile(
                     authUserId = authUserId,
                     organisationName = normalizedOrgName,
-                    contactEmail = normalizedEmail,
                     contactPhone = contactPhone?.trim()?.ifBlank { null }
                 )
 
@@ -223,7 +222,6 @@ class OrganisationAuthViewModel : ViewModel() {
     private suspend fun createOrganisationProfile(
         authUserId: String,
         organisationName: String,
-        contactEmail: String,
         contactPhone: String?
     ) {
         // 1. Base account row, marked as an ORGANISATION account type.
@@ -243,12 +241,13 @@ class OrganisationAuthViewModel : ViewModel() {
             }
             .decodeSingle<UserProfileIdRow>()
 
-        // 3. The organisation-specific row.
+        // 3. The organisation-specific row. contact_email is intentionally
+        // left null here — it's a nullable column, and the org sets/edits it
+        // later from their Profile screen rather than at sign-up.
         supabase.from("organisations").insert(
             NewOrganisationRow(
                 userId = profile.userId,
                 organisationName = organisationName,
-                contactEmail = contactEmail,
                 contactPhone = contactPhone
             )
         )
@@ -318,7 +317,6 @@ private data class UserProfileIdRow(
 private data class NewOrganisationRow(
     @SerialName("user_id") val userId: String,
     @SerialName("organisation_name") val organisationName: String,
-    @SerialName("contact_email") val contactEmail: String,
     @SerialName("contact_phone") val contactPhone: String?
 )
 

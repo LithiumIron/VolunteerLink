@@ -42,11 +42,12 @@ fun AppNavGraph(
                     navController.popBackStack()
                 },
                 onSignedIn = {
+                    navController.popBackStack(AppRoutes.VOLUNTEER, inclusive = true)
                     navController.navigate(AppRoutes.VOLUNTEER) {
                         popUpTo(AppRoutes.VOLUNTEER_LOGIN) {
                             inclusive = true
                         }
-                        launchSingleTop = true
+                        launchSingleTop = false
                     }
                 }
             )
@@ -66,11 +67,16 @@ fun AppNavGraph(
                     navController.navigate(AppRoutes.ORGANISATION_SIGNUP)
                 },
                 onSignedIn = {
+                    // Clear out any stale Organisation entry from a
+                    // PREVIOUS session first — otherwise switching accounts
+                    // reuses its ViewModelStore and Home keeps showing the
+                    // previous org's data. No-op if there isn't one yet.
+                    navController.popBackStack(AppRoutes.ORGANISATION, inclusive = true)
                     navController.navigate(AppRoutes.ORGANISATION) {
-                        popUpTo(AppRoutes.USER_TYPE_SELECTION) {
-                            inclusive = false
+                        popUpTo(AppRoutes.ORGANISATION_LOGIN) {
+                            inclusive = true
                         }
-                        launchSingleTop = true
+                        launchSingleTop = false
                     }
                 }
             )
@@ -82,11 +88,12 @@ fun AppNavGraph(
                     navController.popBackStack()
                 },
                 onSignedUp = {
+                    navController.popBackStack(AppRoutes.ORGANISATION, inclusive = true)
                     navController.navigate(AppRoutes.ORGANISATION) {
-                        popUpTo(AppRoutes.USER_TYPE_SELECTION) {
-                            inclusive = false
+                        popUpTo(AppRoutes.ORGANISATION_SIGNUP) {
+                            inclusive = true
                         }
-                        launchSingleTop = true
+                        launchSingleTop = false
                     }
                 }
             )

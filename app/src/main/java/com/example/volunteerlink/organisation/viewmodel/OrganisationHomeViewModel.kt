@@ -10,6 +10,7 @@ import com.example.volunteerlink.data.post.PostTimingInput
 import com.example.volunteerlink.data.post.PostTimingState
 import com.example.volunteerlink.data.post.RoleApplicationWindowEvaluator
 import com.example.volunteerlink.data.post.RoleApplicationWindowInput
+import com.example.volunteerlink.data.supabase
 import com.example.volunteerlink.data.time.AppClock
 import com.example.volunteerlink.organisation.home.model.HomeAttentionItem
 import com.example.volunteerlink.organisation.home.model.HomeAttentionSeverity
@@ -20,10 +21,15 @@ import com.example.volunteerlink.organisation.home.model.OrganisationHomeSnapsho
 import com.example.volunteerlink.organisation.home.model.OrganisationHomeUiState
 import com.example.volunteerlink.organisation.repository.OrganisationHomeRepository
 import com.example.volunteerlink.organisation.repository.SupabaseOrganisationHomeRepository
+import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.query.Columns
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 /**
  * Prepares everything Organisation Home needs to display.
@@ -62,8 +68,9 @@ class OrganisationHomeViewModel : ViewModel() {
             )
 
             try {
+                val organisationId = resolveCurrentOrganisationId()
                 val snapshot = homeRepository.loadHomeSnapshot(
-                    organisationId = TEST_ORGANISATION_ID
+                    organisationId = organisationId
                 )
                 cachedSnapshot = snapshot
                 applySnapshot(snapshot)
@@ -81,6 +88,30 @@ class OrganisationHomeViewModel : ViewModel() {
                 refreshInProgress = false
             }
         }
+    }
+
+    /**
+     * Resolves the ORGANISATION ID of whoever is actually signed in right now,
+     * via the same two-step lookup used elsewhere (auth.uid() -> user_profiles
+     * -> organisations). Replaces the previous hardcoded TEST_ORGANISATION_ID.
+     */
+    private suspend fun resolveCurrentOrganisationId(): String {
+        val authUserId = supabase.auth.currentUserOrNull()?.id
+            ?: error("No signed-in session.")
+
+        val profile = supabase.from("user_profiles")
+            .select(columns = Columns.raw("user_id")) {
+                filter { eq("auth_user_id", authUserId) }
+            }
+            .decodeSingle<UserIdRow>()
+
+        val organisation = supabase.from("organisations")
+            .select(columns = Columns.raw("organisation_id")) {
+                filter { eq("user_id", profile.userId) }
+            }
+            .decodeSingle<OrganisationIdRow>()
+
+        return organisation.organisationId
     }
 
     /**
@@ -296,10 +327,10 @@ class OrganisationHomeViewModel : ViewModel() {
     }
 
     private fun com.example.volunteerlink.organisation.home.model.OrganisationHomeRole
-        .isApplicationReviewStillOpen(
-            post: OrganisationHomePost,
-            nowMillis: Long
-        ): Boolean {
+            .isApplicationReviewStillOpen(
+        post: OrganisationHomePost,
+        nowMillis: Long
+    ): Boolean {
         return RoleApplicationWindowEvaluator.evaluate(
             input = RoleApplicationWindowInput(
                 roleMode = roleMode,
@@ -459,9 +490,16 @@ class OrganisationHomeViewModel : ViewModel() {
     }
 
     companion object {
-        // Authentication/organisation identity is not integrated yet. Keep the
-        // same temporary organisation used by Create Post until that work begins.
-        private const val TEST_ORGANISATION_ID = "ORG0001"
         private const val TAG = "OrganisationHomeVM"
     }
 }
+
+@Serializable
+private data class UserIdRow(
+    @SerialName("user_id") val userId: String
+)
+
+@Serializable
+private data class OrganisationIdRow(
+    @SerialName("organisation_id") val organisationId: String
+)
