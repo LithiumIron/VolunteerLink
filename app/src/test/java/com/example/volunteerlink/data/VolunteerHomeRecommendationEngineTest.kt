@@ -26,6 +26,51 @@ class VolunteerHomeRecommendationEngineTest {
     }
 
     @Test
+    fun hybridApplicationWindowUsesEachRolesOwnStartDate() {
+        val physicalRole = role(
+            id = 101,
+            title = "Physical Helper",
+            path = "Path",
+            skills = emptyList(),
+            minimumLevel = 1
+        ).copy(roleMode = "PHYSICAL")
+        val remoteRole = role(
+            id = 102,
+            title = "Remote Helper",
+            path = "Path",
+            skills = emptyList(),
+            minimumLevel = 1
+        ).copy(roleMode = "REMOTE")
+
+        val opportunity = event(10, "Path", emptyList()).copy(
+            eventOpportunityType = "Hybrid",
+            eventVolunteerRoles = listOf(physicalRole, remoteRole),
+            eventPhysicalStartDate = "2026-09-10",
+            eventRemoteStartDate = "2026-09-15",
+            eventApplicationStartDate = "2026-09-10"
+        )
+
+        val september12 =
+            java.time.Instant.parse("2026-09-12T00:00:00Z").toEpochMilli()
+
+        assertFalse(
+            VolunteerApplicationWindow.canApply(
+                opportunity,
+                physicalRole,
+                september12
+            )
+        )
+        assertTrue(
+            VolunteerApplicationWindow.canApply(
+                opportunity,
+                remoteRole,
+                september12
+            )
+        )
+        assertTrue(VolunteerApplicationWindow.canApply(opportunity, september12))
+    }
+
+    @Test
     fun missingOrMalformedCachedDatesFailClosed() {
         val opportunity = event(1, "Communication", emptyList())
         val now = java.time.Instant.parse("2026-09-12T00:00:00Z").toEpochMilli()

@@ -63,6 +63,14 @@ interface OrganisationPostManagementRepository {
         isShortlisted: Boolean
     )
 
+    /** Accepts or declines one pending REVIEW_APPLICANTS application. */
+    suspend fun reviewApplicant(
+        postId: String,
+        roleTemplateId: String,
+        userId: String,
+        decision: String
+    )
+
     /**
      * Lazily opens today's Physical attendance session.
      * The database function validates ownership, lifecycle, live time window and volunteer count,

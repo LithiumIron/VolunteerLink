@@ -528,7 +528,7 @@ fun VolunteerApplicationDetailsScreen(
                                 volunteerOpportunityViewModel.clearApplicationActionError()
                                 shouldShowEditDialog = true
                             },
-                            enabled = com.example.volunteerlink.data.VolunteerApplicationWindow.beforeStart(volunteerOpportunityEvent),
+                            enabled = com.example.volunteerlink.data.VolunteerApplicationWindow.beforeStart(volunteerOpportunityEvent, volunteerOpportunityRole),
                             modifier = Modifier.fillMaxWidth().height(48.dp),
                             shape = RoundedCornerShape(10.dp)
                         ) {
@@ -550,7 +550,7 @@ fun VolunteerApplicationDetailsScreen(
                                 shouldShowCancelDialog = true
                             },
                             enabled = !opportunityUiState.isApplicationActionRunning &&
-                                com.example.volunteerlink.data.VolunteerApplicationWindow.beforeStart(volunteerOpportunityEvent),
+                                com.example.volunteerlink.data.VolunteerApplicationWindow.beforeStart(volunteerOpportunityEvent, volunteerOpportunityRole),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
@@ -559,18 +559,18 @@ fun VolunteerApplicationDetailsScreen(
                                 color = VolunteerLinkError
                             )
                         }
-                        if (!com.example.volunteerlink.data.VolunteerApplicationWindow.beforeStart(volunteerOpportunityEvent)) {
+                        if (!com.example.volunteerlink.data.VolunteerApplicationWindow.beforeStart(volunteerOpportunityEvent, volunteerOpportunityRole)) {
                             Text(
-                                "Cancellation unavailable: the activity has started or its dates need syncing.",
+                                "Cancellation unavailable: this role has started or its dates need syncing.",
                                 color = VolunteerLinkTextSecondary, fontSize = 12.sp
                             )
                         }
                     }
 
-                    if (volunteerApplication.applicationStatus in setOf(
-                            VolunteerApplicationStatus.CANCELLED,
-                            VolunteerApplicationStatus.REJECTED
-                        )) {
+                    if (
+                        volunteerApplication.applicationStatus ==
+                        VolunteerApplicationStatus.CANCELLED
+                    ) {
                         Button(
                             onClick = {
                                 val questions = volunteerOpportunityRole
@@ -579,7 +579,7 @@ fun VolunteerApplicationDetailsScreen(
                                 volunteerOpportunityViewModel.clearApplicationActionError()
                                 shouldShowReapplyDialog = true
                             },
-                            enabled = com.example.volunteerlink.data.VolunteerApplicationWindow.canApply(volunteerOpportunityEvent),
+                            enabled = com.example.volunteerlink.data.VolunteerApplicationWindow.canApply(volunteerOpportunityEvent, volunteerOpportunityRole),
                             modifier = Modifier.fillMaxWidth().height(50.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = VolunteerLinkPrimaryGreen
@@ -595,6 +595,21 @@ fun VolunteerApplicationDetailsScreen(
                         ) {
                             Text("Delete application record", color = VolunteerLinkError)
                         }
+                    }
+
+                    if (
+                        volunteerApplication.applicationStatus ==
+                        VolunteerApplicationStatus.REJECTED
+                    ) {
+                        Text(
+                            text =
+                                "You cannot apply again for this same role. " +
+                                    "You may choose another open role in this opportunity.",
+                            modifier = Modifier.fillMaxWidth(),
+                            fontSize = 12.sp,
+                            lineHeight = 17.sp,
+                            color = VolunteerLinkTextSecondary
+                        )
                     }
                 }
             }
@@ -800,7 +815,7 @@ fun VolunteerApplicationDetailsScreen(
             title = { Text("Delete application record?") },
             text = {
                 Column {
-                    Text("This permanently removes this cancelled or rejected application and its screening answers. This action cannot be undone.")
+                    Text("This permanently removes this cancelled application and its screening answers. This action cannot be undone.")
                     opportunityUiState.applicationActionError?.let {
                         Spacer(Modifier.height(8.dp))
                         Text(it, color = VolunteerLinkError, fontSize = 12.sp)

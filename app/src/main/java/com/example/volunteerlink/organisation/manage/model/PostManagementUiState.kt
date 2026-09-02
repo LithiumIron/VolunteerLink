@@ -20,6 +20,8 @@ data class OrganisationPostManagementUiState(
     val isUpdatingRemoteReview: Boolean = false,
     val remoteReviewActionMessage: String? = null,
     val remoteReviewFinalizeSucceeded: Boolean = false,
+    val isUpdatingApplicant: Boolean = false,
+    val applicantActionMessage: String? = null,
     val remoteReviewSession: PostManagementRemoteReviewSession = PostManagementRemoteReviewSession()
 )
 
@@ -29,6 +31,7 @@ data class OrganisationPostManagementUiState(
  */
 data class PostManagementPost(
     val postId: String,
+    val organisationName: String,
     val title: String,
     val description: String,
     val mode: String,
@@ -147,7 +150,9 @@ data class PostManagementPerson(
     val completedAt: String? = null,
     val appliedAt: String? = null,
     val decisionNote: String? = null,
-    val isShortlisted: Boolean = false
+    val isShortlisted: Boolean = false,
+    val screeningQuestions: List<String> = emptyList(),
+    val screeningAnswers: List<String> = emptyList()
 )
 
 /** One attendance session opened by the organisation for one Physical event day. */

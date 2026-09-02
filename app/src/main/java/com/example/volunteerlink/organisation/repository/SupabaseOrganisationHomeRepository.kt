@@ -7,6 +7,7 @@ import com.example.volunteerlink.organisation.home.model.OrganisationHomeRole
 import com.example.volunteerlink.organisation.home.model.OrganisationHomeSchedule
 import com.example.volunteerlink.organisation.home.model.OrganisationHomeSnapshot
 import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -27,6 +28,11 @@ class SupabaseOrganisationHomeRepository : OrganisationHomeRepository {
     override suspend fun loadHomeSnapshot(
         organisationId: String
     ): OrganisationHomeSnapshot {
+        // Persist role-start/full-capacity application outcomes before Home counts them.
+        supabase.postgrest.rpc(
+            function = "organisation_resolve_application_lifecycle"
+        )
+
         val organisationRow = supabase
             .from("organisations")
             .select(columns = Columns.raw("organisation_id,organisation_name")) {

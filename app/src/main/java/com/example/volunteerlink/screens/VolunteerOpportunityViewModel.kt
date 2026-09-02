@@ -137,11 +137,6 @@ class VolunteerOpportunityViewModel(
         onSuccess: () -> Unit
     ) {
         val event = VolunteerOpportunitySessionStore.findEventById(eventId)
-        if (!com.example.volunteerlink.data.VolunteerApplicationWindow.canApply(event)) {
-            mutableUiState.update { it.copy(applicationActionError =
-                com.example.volunteerlink.data.VolunteerApplicationWindow.reason(event)) }
-            return
-        }
         val role =
             VolunteerOpportunitySessionStore.findRoleById(
                 eventId = eventId,
@@ -158,6 +153,68 @@ class VolunteerOpportunityViewModel(
             return
         }
 
+        if (!com.example.volunteerlink.data.VolunteerApplicationWindow.canApply(event, role)) {
+            mutableUiState.update {
+                it.copy(
+                    applicationActionError =
+                        com.example.volunteerlink.data.VolunteerApplicationWindow.reason(event, role)
+                )
+            }
+            return
+        }
+
+        val rejectedSameRole =
+            VolunteerOpportunitySessionStore.volunteerApplications.any { application ->
+                application.applicationEventId == eventId &&
+                    application.applicationRoleId == roleId &&
+                    application.applicationStatus == VolunteerApplicationStatus.REJECTED
+            }
+
+        if (rejectedSameRole) {
+            mutableUiState.update {
+                it.copy(
+                    applicationActionError =
+                        "You were not selected for this role. You may choose another open role in this opportunity."
+                )
+            }
+            return
+        }
+
+        val activeApplication =
+            VolunteerOpportunitySessionStore.activeApplicationForEvent(eventId)
+                ?.takeIf { it.applicationRoleId != roleId }
+
+        if (activeApplication?.applicationStatus == VolunteerApplicationStatus.ACCEPTED) {
+            mutableUiState.update {
+                it.copy(
+                    applicationActionError =
+                        "You already joined ${activeApplication.applicationRoleTitle} in this opportunity."
+                )
+            }
+            return
+        }
+
+        if (
+            activeApplication?.applicationStatus == VolunteerApplicationStatus.PENDING &&
+            role.roleApplicationMethod ==
+                com.example.volunteerlink.model.VolunteerRoleApplicationMethod.REVIEW_APPLICANTS
+        ) {
+            mutableUiState.update {
+                it.copy(
+                    applicationActionError =
+                        "You already have a pending application for " +
+                            "${activeApplication.applicationRoleTitle}. " +
+                            "Only one pending application is allowed per opportunity."
+                )
+            }
+            return
+        }
+
+        val isSwitchingPendingToInstantJoin =
+            activeApplication?.applicationStatus == VolunteerApplicationStatus.PENDING &&
+                role.roleApplicationMethod ==
+                    com.example.volunteerlink.model.VolunteerRoleApplicationMethod.INSTANT_JOIN
+
         viewModelScope.launch {
             mutableUiState.update {
                 it.copy(
@@ -171,10 +228,7 @@ class VolunteerOpportunityViewModel(
                     .volunteerApplications.firstOrNull {
                         it.applicationEventId == eventId &&
                             it.applicationRoleId == roleId &&
-                            it.applicationStatus in setOf(
-                                VolunteerApplicationStatus.CANCELLED,
-                                VolunteerApplicationStatus.REJECTED
-                            )
+                            it.applicationStatus == VolunteerApplicationStatus.CANCELLED
                     }
                 if (priorApplication != null) {
                     VolunteerOpportunityRepository.reapplyForRole(
@@ -193,14 +247,22 @@ class VolunteerOpportunityViewModel(
             } catch (exception: Exception) {
                 exception.printStackTrace()
                 if (exception.isConnectivityFailure()) {
+                    if (isSwitchingPendingToInstantJoin) {
+                        mutableUiState.update {
+                            it.copy(
+                                isApplicationActionRunning = false,
+                                applicationActionError =
+                                    "Internet connection is required to switch from a pending application to Instant Join."
+                            )
+                        }
+                        return@launch
+                    }
+
                     val isReapply = VolunteerOpportunitySessionStore
                         .volunteerApplications.any {
                             it.applicationEventId == eventId &&
                                 it.applicationRoleId == roleId &&
-                                it.applicationStatus in setOf(
-                                    VolunteerApplicationStatus.CANCELLED,
-                                    VolunteerApplicationStatus.REJECTED
-                                )
+                                it.applicationStatus == VolunteerApplicationStatus.CANCELLED
                         }
                     if (isReapply) {
                         mutableUiState.update {
@@ -322,9 +384,15 @@ class VolunteerOpportunityViewModel(
         }
 
         val event = VolunteerOpportunitySessionStore.findEventById(application.applicationEventId)
-        if (!com.example.volunteerlink.data.VolunteerApplicationWindow.beforeStart(event)) {
+        val role = application.applicationRoleId?.let { roleId ->
+            VolunteerOpportunitySessionStore.findRoleById(
+                application.applicationEventId,
+                roleId
+            )
+        }
+        if (!com.example.volunteerlink.data.VolunteerApplicationWindow.beforeStart(event, role)) {
             mutableUiState.update { it.copy(applicationActionError =
-                "Cancellation is unavailable: the activity has started or its dates need syncing.") }
+                "Cancellation is unavailable: this role has started or its dates need syncing.") }
             return
         }
 
@@ -466,11 +534,40 @@ class VolunteerOpportunityViewModel(
             failApplicationAction(IllegalStateException(), "Role details could not be found.")
             return@runApplicationAction
         }
-        if (!com.example.volunteerlink.data.VolunteerApplicationWindow.canApply(event)) {
-            failApplicationAction(IllegalStateException(),
-                com.example.volunteerlink.data.VolunteerApplicationWindow.reason(event))
+        if (application.applicationStatus != VolunteerApplicationStatus.CANCELLED) {
+            failApplicationAction(
+                IllegalStateException(),
+                if (application.applicationStatus == VolunteerApplicationStatus.REJECTED) {
+                    "You were not selected for this role. You may choose another open role in this opportunity."
+                } else {
+                    "Only a cancelled application can be submitted again."
+                }
+            )
             return@runApplicationAction
         }
+        if (!com.example.volunteerlink.data.VolunteerApplicationWindow.canApply(event, role)) {
+            failApplicationAction(IllegalStateException(),
+                com.example.volunteerlink.data.VolunteerApplicationWindow.reason(event, role))
+            return@runApplicationAction
+        }
+
+        val otherActiveApplication =
+            VolunteerOpportunitySessionStore.activeApplicationForEvent(
+                application.applicationEventId
+            )?.takeIf { active -> active.applicationRoleId != application.applicationRoleId }
+
+        if (otherActiveApplication != null) {
+            val message = if (
+                otherActiveApplication.applicationStatus == VolunteerApplicationStatus.ACCEPTED
+            ) {
+                "You already joined ${otherActiveApplication.applicationRoleTitle} in this opportunity."
+            } else {
+                "You already have a pending application for ${otherActiveApplication.applicationRoleTitle}."
+            }
+            failApplicationAction(IllegalStateException(), message)
+            return@runApplicationAction
+        }
+
         try {
             VolunteerOpportunityRepository.reapplyForRole(
                 role.roleDatabaseId,
@@ -634,8 +731,14 @@ private fun Exception.toVolunteerMessage(
             rawMessage.contains("not authenticated", ignoreCase = true) ->
             "Your session has expired. Please sign in again."
 
+        rawMessage.contains("ALREADY_ACCEPTED_IN_POST", ignoreCase = true) ->
+            "You already joined another role in this opportunity."
+
+        rawMessage.contains("PENDING_APPLICATION_EXISTS", ignoreCase = true) ->
+            "You already have a pending application for another role in this opportunity."
+
         rawMessage.contains("duplicate", ignoreCase = true) ->
-            "You already have an application for this role."
+            "You already have an active role or application in this opportunity."
 
         rawMessage.contains("capacity", ignoreCase = true) ||
             rawMessage.contains("full", ignoreCase = true) ->

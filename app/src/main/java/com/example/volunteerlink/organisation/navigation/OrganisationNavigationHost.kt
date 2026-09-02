@@ -36,6 +36,7 @@ import com.example.volunteerlink.ui.theme.VolunteerLinkSurface
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextPrimary
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextSecondary
 import com.example.volunteerlink.organisation.screens.OrganisationChatsScreen
+import com.example.volunteerlink.organisation.screens.OrganisationApplicantReviewScreen
 import com.example.volunteerlink.organisation.screens.OrganisationCreateScreen
 import com.example.volunteerlink.organisation.screens.OrganisationHomeScreen
 import com.example.volunteerlink.organisation.screens.OrganisationManageEmptyModuleScreen
@@ -43,6 +44,9 @@ import com.example.volunteerlink.organisation.screens.OrganisationManageScreen
 import com.example.volunteerlink.organisation.screens.OrganisationPostManagementScreen
 import com.example.volunteerlink.organisation.screens.OrganisationVolunteerPostsScreen
 import com.example.volunteerlink.organisation.screens.OrganisationProfileScreen
+
+private const val RETURN_TO_PEOPLE_AFTER_APPLICANT_REVIEW =
+    "returnToPeopleAfterApplicantReview"
 
 /**
  * Navigation host for the Organisation side only.
@@ -77,6 +81,7 @@ fun OrganisationNavigationHost() {
         OrganisationNavigationRoutes.MANAGE_POSTS,
         OrganisationNavigationRoutes.MANAGE_POST_DETAIL,
         OrganisationNavigationRoutes.MANAGE_POST_EDIT,
+        OrganisationNavigationRoutes.MANAGE_APPLICANT_REVIEW,
         OrganisationNavigationRoutes.MANAGE_IMPACT_WEAVE,
         OrganisationNavigationRoutes.MANAGE_PROMOTIONS ->
             OrganisationNavigationRoutes.MANAGE
@@ -125,22 +130,24 @@ fun OrganisationNavigationHost() {
             WindowInsetsSides.Horizontal
         ),
         bottomBar = {
-            AppBottomNavigationBar(
-                items = organisationBottomNavigationItems,
-                currentRoute = bottomBarRoute,
-                onItemClick = { item ->
-                    if (item.route != currentRoute) {
-                        if (
-                            currentRoute == OrganisationNavigationRoutes.MANAGE_POST_DETAIL &&
-                            reviewExitProtected
-                        ) {
-                            pendingBottomRoute = item.route
-                        } else {
-                            navigateBottom(item.route)
+            if (currentRoute != OrganisationNavigationRoutes.MANAGE_APPLICANT_REVIEW) {
+                AppBottomNavigationBar(
+                    items = organisationBottomNavigationItems,
+                    currentRoute = bottomBarRoute,
+                    onItemClick = { item ->
+                        if (item.route != currentRoute) {
+                            if (
+                                currentRoute == OrganisationNavigationRoutes.MANAGE_POST_DETAIL &&
+                                reviewExitProtected
+                            ) {
+                                pendingBottomRoute = item.route
+                            } else {
+                                navigateBottom(item.route)
+                            }
                         }
                     }
-                }
-            )
+                )
+            }
         }
     ) { innerPadding ->
         NavHost(
@@ -190,12 +197,33 @@ fun OrganisationNavigationHost() {
 
             composable(OrganisationNavigationRoutes.MANAGE_POST_DETAIL) { backStackEntry ->
                 val postId = backStackEntry.arguments?.getString("postId").orEmpty()
+                val returnToPeopleAfterApplicantReview =
+                    backStackEntry.savedStateHandle.get<Boolean>(
+                        RETURN_TO_PEOPLE_AFTER_APPLICANT_REVIEW
+                    ) == true
+
                 OrganisationPostManagementScreen(
                     postId = postId,
                     onBack = { navController.popBackStack() },
                     onEdit = {
                         navController.navigate(
                             OrganisationNavigationRoutes.managePostEdit(postId)
+                        )
+                    },
+                    onViewApplication = { roleTemplateId, userId ->
+                        navController.navigate(
+                            OrganisationNavigationRoutes.manageApplicantReview(
+                                postId = postId,
+                                roleTemplateId = roleTemplateId,
+                                userId = userId
+                            )
+                        )
+                    },
+                    returnToPeopleAfterApplicantReview =
+                        returnToPeopleAfterApplicantReview,
+                    onReturnToPeopleHandled = {
+                        backStackEntry.savedStateHandle.remove<Boolean>(
+                            RETURN_TO_PEOPLE_AFTER_APPLICANT_REVIEW
                         )
                     },
                     onExitProtectionChanged = { protected, discard ->
@@ -210,6 +238,29 @@ fun OrganisationNavigationHost() {
                 OrganisationCreateScreen(
                     editPostId = postId,
                     onExitCreate = { navController.popBackStack() }
+                )
+            }
+
+            composable(OrganisationNavigationRoutes.MANAGE_APPLICANT_REVIEW) { backStackEntry ->
+                val postId = backStackEntry.arguments?.getString("postId").orEmpty()
+                val roleTemplateId = backStackEntry.arguments
+                    ?.getString("roleTemplateId")
+                    .orEmpty()
+                val userId = backStackEntry.arguments?.getString("userId").orEmpty()
+
+                OrganisationApplicantReviewScreen(
+                    postId = postId,
+                    roleTemplateId = roleTemplateId,
+                    userId = userId,
+                    onBack = { navController.popBackStack() },
+                    onDecisionSaved = {
+                        // Tell the previous Manage Post destination which main tab
+                        // must be shown after its applicant data refreshes.
+                        navController.previousBackStackEntry
+                            ?.savedStateHandle
+                            ?.set(RETURN_TO_PEOPLE_AFTER_APPLICANT_REVIEW, true)
+                        navController.popBackStack()
+                    }
                 )
             }
 

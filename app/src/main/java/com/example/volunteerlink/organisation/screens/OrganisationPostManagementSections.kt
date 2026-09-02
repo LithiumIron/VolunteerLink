@@ -2095,6 +2095,7 @@ internal fun PostManagementPersonCard(
     person: PostManagementPerson,
     isApplicant: Boolean,
     isApplicationOpen: Boolean,
+    applicationMethod: String = "INSTANT_JOIN",
     attendanceSummary: PostManagementVolunteerAttendanceSummary? = null,
     attendanceSelectedDate: String? = null,
     attendanceTodayDate: String? = null,
@@ -2108,6 +2109,7 @@ internal fun PostManagementPersonCard(
     onRequestMarkAbsent: (PostManagementPerson, String) -> Unit = { _, _ -> },
     onViewRemoteSubmission: (PostManagementPerson, PostManagementRemoteSubmission) -> Unit = { _, _ -> },
     onViewProfile: (PostManagementPerson) -> Unit,
+    onViewApplication: (PostManagementPerson) -> Unit = {},
     onToggleShortlist: (PostManagementPerson) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -2240,29 +2242,27 @@ internal fun PostManagementPersonCard(
                 )
             }
 
-            if (isApplicant) {
+            if (
+                isApplicant &&
+                applicationMethod.equals("REVIEW_APPLICANTS", ignoreCase = true)
+            ) {
                 Button(
-                    onClick = {},
+                    onClick = { onViewApplication(person) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 12.dp)
-                        .height(48.dp),
-                    enabled = false,
+                        .height(50.dp),
+                    enabled = isApplicationOpen,
+                    shape = RoundedCornerShape(11.dp),
                     colors = ButtonDefaults.buttonColors(
-                        disabledContainerColor = if (isApplicationOpen) {
-                            VolunteerLinkPrimaryGreen.copy(alpha = 0.18f)
-                        } else {
-                            VolunteerLinkWarning.copy(alpha = 0.12f)
-                        },
-                        disabledContentColor = if (isApplicationOpen) {
-                            VolunteerLinkPrimaryGreen.copy(alpha = 0.60f)
-                        } else {
-                            VolunteerLinkWarning.copy(alpha = 0.75f)
-                        }
+                        containerColor = VolunteerLinkPrimaryGreen,
+                        contentColor = VolunteerLinkSurface,
+                        disabledContainerColor = VolunteerLinkWarning.copy(alpha = 0.12f),
+                        disabledContentColor = VolunteerLinkWarning.copy(alpha = 0.75f)
                     )
                 ) {
                     Text(
-                        text = if (isApplicationOpen) "Review Application" else "Application Closed",
+                        text = if (isApplicationOpen) "View Application" else "Application Closed",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold
                     )

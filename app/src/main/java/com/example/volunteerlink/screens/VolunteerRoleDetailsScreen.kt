@@ -134,11 +134,21 @@ fun VolunteerRoleDetailsScreen(
         VolunteerOpportunitySessionStore.volunteerApplications.any {
             it.applicationEventId == volunteerEventId &&
                 it.applicationRoleId == volunteerRoleId &&
-                it.applicationStatus in setOf(
-                    com.example.volunteerlink.model.VolunteerApplicationStatus.CANCELLED,
-                    com.example.volunteerlink.model.VolunteerApplicationStatus.REJECTED
-                )
+                it.applicationStatus ==
+                    com.example.volunteerlink.model.VolunteerApplicationStatus.CANCELLED
         }
+
+    val volunteerWasRejected =
+        VolunteerOpportunitySessionStore.volunteerApplications.any {
+            it.applicationEventId == volunteerEventId &&
+                it.applicationRoleId == volunteerRoleId &&
+                it.applicationStatus ==
+                    com.example.volunteerlink.model.VolunteerApplicationStatus.REJECTED
+        }
+
+    val activeOtherApplication =
+        VolunteerOpportunitySessionStore.activeApplicationForEvent(volunteerEventId)
+            ?.takeIf { application -> application.applicationRoleId != volunteerRoleId }
 
     Column(
         modifier = Modifier
@@ -247,8 +257,14 @@ fun VolunteerRoleDetailsScreen(
 
         VolunteerRoleJoinSection(
             applicationWindowMessage = if (
-                com.example.volunteerlink.data.VolunteerApplicationWindow.canApply(volunteerOpportunityEvent)
-            ) null else com.example.volunteerlink.data.VolunteerApplicationWindow.reason(volunteerOpportunityEvent),
+                com.example.volunteerlink.data.VolunteerApplicationWindow.canApply(
+                    volunteerOpportunityEvent,
+                    volunteerOpportunityRole
+                )
+            ) null else com.example.volunteerlink.data.VolunteerApplicationWindow.reason(
+                volunteerOpportunityEvent,
+                volunteerOpportunityRole
+            ),
             volunteerOpportunityRole =
                 volunteerOpportunityRole,
             volunteerIsEligible =
@@ -260,6 +276,8 @@ fun VolunteerRoleDetailsScreen(
             volunteerHasApplied =
                 volunteerHasApplied,
             volunteerCanReapply = volunteerCanReapply,
+            volunteerWasRejected = volunteerWasRejected,
+            activeOtherApplication = activeOtherApplication,
             onJoinRoleSelected = {
                 onJoinRoleSelected(
                     volunteerOpportunityEvent.eventId,
@@ -870,8 +888,25 @@ private fun VolunteerRoleJoinSection(
     eligibilityIsAvailable: Boolean,
     volunteerHasApplied: Boolean,
     volunteerCanReapply: Boolean,
+    volunteerWasRejected: Boolean,
+    activeOtherApplication: com.example.volunteerlink.model.VolunteerOpportunityApplication?,
     onJoinRoleSelected: () -> Unit
 ) {
+    val hasAcceptedOtherRole =
+        activeOtherApplication?.applicationStatus ==
+            com.example.volunteerlink.model.VolunteerApplicationStatus.ACCEPTED
+    val hasPendingOtherRole =
+        activeOtherApplication?.applicationStatus ==
+            com.example.volunteerlink.model.VolunteerApplicationStatus.PENDING
+    val pendingBlocksThisRole =
+        hasPendingOtherRole &&
+            volunteerOpportunityRole.roleApplicationMethod ==
+                VolunteerRoleApplicationMethod.REVIEW_APPLICANTS
+    val canSwitchPendingToInstantJoin =
+        hasPendingOtherRole &&
+            volunteerOpportunityRole.roleApplicationMethod ==
+                VolunteerRoleApplicationMethod.INSTANT_JOIN
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = VolunteerLinkSurface,
@@ -888,6 +923,14 @@ private fun VolunteerRoleJoinSection(
                 text =
                     if (volunteerHasApplied) {
                         "Already registered — track status in My Applications."
+                    } else if (volunteerWasRejected) {
+                        "You were not selected for this role. You may choose another open role in this opportunity."
+                    } else if (hasAcceptedOtherRole) {
+                        "You already joined ${activeOtherApplication?.applicationRoleTitle} in this opportunity."
+                    } else if (pendingBlocksThisRole) {
+                        "You already have a pending application for ${activeOtherApplication?.applicationRoleTitle}."
+                    } else if (canSwitchPendingToInstantJoin) {
+                        "Joining this Instant Join role will cancel your pending application for ${activeOtherApplication?.applicationRoleTitle}."
                     } else when (
                         volunteerOpportunityRole
                             .roleApplicationMethod
@@ -942,7 +985,10 @@ private fun VolunteerRoleJoinSection(
                             volunteerIsEligible &&
                             eligibilityIsAvailable &&
                             !eligibilityIsLoading &&
-                            !volunteerHasApplied,
+                            !volunteerHasApplied &&
+                            !volunteerWasRejected &&
+                            !hasAcceptedOtherRole &&
+                            !pendingBlocksThisRole,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp),
@@ -965,6 +1011,14 @@ private fun VolunteerRoleJoinSection(
                             "Role full"
                         } else if (volunteerHasApplied) {
                             "Already Registered"
+                        } else if (volunteerWasRejected) {
+                            "Not Selected for This Role"
+                        } else if (hasAcceptedOtherRole) {
+                            "Already Joined Another Role"
+                        } else if (pendingBlocksThisRole) {
+                            "Pending Application Exists"
+                        } else if (canSwitchPendingToInstantJoin) {
+                            "Join This Role Instead"
                         } else if (volunteerCanReapply) {
                             "Apply Again"
                         } else if (eligibilityIsLoading) {

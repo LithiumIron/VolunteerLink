@@ -43,6 +43,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.volunteerlink.data.post.PostTimingState
@@ -77,13 +80,45 @@ fun OrganisationPostManagementScreen(
     postId: String,
     onBack: () -> Unit,
     onEdit: () -> Unit,
+    onViewApplication: (roleTemplateId: String, userId: String) -> Unit = { _, _ -> },
+    returnToPeopleAfterApplicantReview: Boolean = false,
+    onReturnToPeopleHandled: () -> Unit = {},
     onExitProtectionChanged: (Boolean, (() -> Unit)?) -> Unit = { _, _ -> },
     viewModel: OrganisationPostManagementViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
+    // Keep the main/People tab selection above the loading branch. A refresh used
+    // to remove OrganisationPostManagementContent from composition, which reset
+    // its local rememberSaveable state back to Overview.
+    var selectedTabName by rememberSaveable(postId) {
+        mutableStateOf(PostManagementTab.OVERVIEW.name)
+    }
+    var selectedPeopleTabName by rememberSaveable(postId) {
+        mutableStateOf(PostManagementPeopleTab.APPLICANTS.name)
+    }
+
+    LaunchedEffect(returnToPeopleAfterApplicantReview) {
+        if (returnToPeopleAfterApplicantReview) {
+            selectedTabName = PostManagementTab.PEOPLE.name
+            onReturnToPeopleHandled()
+        }
+    }
+
     LaunchedEffect(postId) {
         viewModel.load(postId)
+    }
+
+    // Applicant Review uses its own destination-scoped ViewModel. When a decision
+    // succeeds and that screen pops back here, refresh this existing Manage Post
+    // screen so the People tab immediately reflects Accepted/Declined state.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) viewModel.refresh()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     val post = uiState.post
@@ -117,6 +152,10 @@ fun OrganisationPostManagementScreen(
         )
         post != null -> OrganisationPostManagementContent(
             post = post,
+            selectedTabName = selectedTabName,
+            onSelectedTabNameChange = { selectedTabName = it },
+            selectedPeopleTabName = selectedPeopleTabName,
+            onSelectedPeopleTabNameChange = { selectedPeopleTabName = it },
             isStartingAttendance = uiState.isStartingAttendance,
             isUpdatingAttendance = uiState.isUpdatingAttendance,
             attendanceActionMessage = uiState.attendanceActionMessage,
@@ -130,6 +169,7 @@ fun OrganisationPostManagementScreen(
                 if (hasUnfinishedReview) confirmLeaveReview = true else onBack()
             },
             onEdit = onEdit,
+            onViewApplication = onViewApplication,
             onToggleShortlist = viewModel::toggleApplicantShortlist,
             onStartAttendance = viewModel::startPhysicalAttendance,
             onMarkPresent = viewModel::markVolunteerPresent,
@@ -306,6 +346,10 @@ fun OrganisationPostManagementScreen(
 @Composable
 private fun OrganisationPostManagementContent(
     post: PostManagementPost,
+    selectedTabName: String,
+    onSelectedTabNameChange: (String) -> Unit,
+    selectedPeopleTabName: String,
+    onSelectedPeopleTabNameChange: (String) -> Unit,
     isStartingAttendance: Boolean,
     isUpdatingAttendance: Boolean,
     attendanceActionMessage: String?,
@@ -317,6 +361,7 @@ private fun OrganisationPostManagementContent(
     remoteReviewSession: PostManagementRemoteReviewSession,
     onBack: () -> Unit,
     onEdit: () -> Unit,
+    onViewApplication: (roleTemplateId: String, userId: String) -> Unit,
     onToggleShortlist: (PostManagementPerson) -> Unit,
     onStartAttendance: () -> Unit,
     onMarkPresent: (PostManagementPerson, String) -> Unit,
@@ -341,12 +386,6 @@ private fun OrganisationPostManagementContent(
     onStartAttendancePolling: () -> Unit,
     onStopAttendancePolling: () -> Unit
 ) {
-    var selectedTabName by rememberSaveable {
-        mutableStateOf(PostManagementTab.OVERVIEW.name)
-    }
-    var selectedPeopleTabName by rememberSaveable {
-        mutableStateOf(PostManagementPeopleTab.APPLICANTS.name)
-    }
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var selectedRoleId by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedPerson by remember { mutableStateOf<PostManagementPerson?>(null) }
@@ -438,9 +477,9 @@ private fun OrganisationPostManagementContent(
 
     LaunchedEffect(showReview) {
         if (showReview && selectedTabName == PostManagementTab.PEOPLE.name) {
-            selectedTabName = PostManagementTab.REVIEW.name
+            onSelectedTabNameChange(PostManagementTab.REVIEW.name)
         } else if (!showReview && selectedTabName == PostManagementTab.REVIEW.name) {
-            selectedTabName = PostManagementTab.OVERVIEW.name
+            onSelectedTabNameChange(PostManagementTab.OVERVIEW.name)
         }
     }
 
@@ -480,21 +519,27 @@ private fun OrganisationPostManagementContent(
         }
     }
 
-    val openApplicationRoleIds = post.roles
-        .filter { it.isApplicationOpen }
+    val openReviewApplicantRoleIds = post.roles
+        .filter { role ->
+            role.isApplicationOpen &&
+                role.applicationMethod.equals("REVIEW_APPLICANTS", ignoreCase = true)
+        }
         .map { it.roleTemplateId }
         .toSet()
-    val showApplicantsTab = openApplicationRoleIds.isNotEmpty()
     val openApplicants = post.applicants.filter { applicant ->
-        applicant.roleTemplateId in openApplicationRoleIds
+        applicant.roleTemplateId in openReviewApplicantRoleIds
     }
+    // Do not keep an empty Applicants tab after every pending row has been
+    // accepted/declined/auto-declined. It reappears as soon as a new PENDING
+    // Review Applicants row exists.
+    val showApplicantsTab = openApplicants.isNotEmpty()
 
     LaunchedEffect(showApplicantsTab) {
         if (
             !showApplicantsTab &&
             selectedPeopleTabName != PostManagementPeopleTab.VOLUNTEERS.name
         ) {
-            selectedPeopleTabName = PostManagementPeopleTab.VOLUNTEERS.name
+            onSelectedPeopleTabNameChange(PostManagementPeopleTab.VOLUNTEERS.name)
             selectedRoleId = null
         }
     }
@@ -598,7 +643,7 @@ private fun OrganisationPostManagementContent(
                     selected = selectedTab,
                     pendingApplicantCount = openApplicants.size,
                     showReviewTab = showReview,
-                    onSelected = { selectedTabName = it.name }
+                    onSelected = { onSelectedTabNameChange(it.name) }
                 )
             }
 
@@ -722,7 +767,7 @@ private fun OrganisationPostManagementContent(
                             selectedRoleId = selectedRoleId,
                             roles = rolesForSelectedPeopleTab,
                             onTabSelected = {
-                                selectedPeopleTabName = it.name
+                                onSelectedPeopleTabNameChange(it.name)
                                 selectedRoleId = null
                             },
                             onQueryChange = { searchQuery = it },
@@ -812,6 +857,7 @@ private fun OrganisationPostManagementContent(
                                     person = person,
                                     isApplicant = selectedPeopleTab == PostManagementPeopleTab.APPLICANTS,
                                     isApplicationOpen = role.isApplicationOpen,
+                                    applicationMethod = role.applicationMethod,
                                     attendanceSummary = if (showPhysicalAttendance) {
                                         physicalAttendance?.summaryFor(person)
                                     } else {
@@ -848,6 +894,12 @@ private fun OrganisationPostManagementContent(
                                         remoteSubmissionFileError = null
                                     },
                                     onViewProfile = { selectedPerson = it },
+                                    onViewApplication = { selected ->
+                                        onViewApplication(
+                                            selected.roleTemplateId,
+                                            selected.userId
+                                        )
+                                    },
                                     onToggleShortlist = onToggleShortlist
                                 )
                             }
