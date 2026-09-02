@@ -376,13 +376,13 @@ fun ImpactWeaveActivityPlanScreen(
         isSearchingVenue = true
         venueSearchError = null
         try {
-            venueSuggestions = locationService.searchVenues(query)
+            venueSuggestions = locationService.searchEventLocations(query)
             if (venueSuggestions.isEmpty()) {
-                venueSearchError = "No matching venues or addresses found."
+                venueSearchError = "No matching event locations found."
             }
         } catch (_: Exception) {
             venueSuggestions = emptyList()
-            venueSearchError = "Unable to search venues right now."
+            venueSearchError = "Unable to search event locations right now."
         } finally {
             isSearchingVenue = false
         }
@@ -1003,8 +1003,8 @@ private fun ImpactWeaveLocationPicker(
 fun ImpactWeaveSupportNeededScreen(
     draft: ImpactWeaveDraft,
     onBack: () -> Unit,
-    onAddNeed: (String, String, String, Int) -> Unit,
-    onUpdateNeed: (Int, String, String, String, Int) -> Unit,
+    onAddNeed: (String, String, String, Int?) -> Unit,
+    onUpdateNeed: (Int, String, String, String, Int?) -> Unit,
     onRemoveNeed: (Int) -> Unit,
     onContinue: () -> Boolean
 ) {
@@ -1064,7 +1064,7 @@ fun ImpactWeaveSupportNeededScreen(
                                 color = Color(0xFF5F4815)
                             )
                             Text(
-                                text = "No venue is confirmed yet. Add the type and capacity you need for ${draft.areaLocation?.generalAreaName ?: "the preferred area"}.",
+                                text = "No venue is confirmed yet. Add the type of venue you need for ${draft.areaLocation?.generalAreaName ?: "the preferred area"}. Include capacity if you know it.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -1314,7 +1314,7 @@ private fun AddEditImpactWeaveNeedSheet(
     need: ImpactWeaveNeedDraft?,
     requiredSupportType: String? = null,
     onDismiss: () -> Unit,
-    onSave: (String, String, String, Int) -> Unit
+    onSave: (String, String, String, Int?) -> Unit
 ) {
     val scope = rememberCoroutineScope()
     val checkingService = remember { GroqService() }
@@ -1344,8 +1344,13 @@ private fun AddEditImpactWeaveNeedSheet(
     var showErrors by remember { mutableStateOf(false) }
 
     val supportType = analysis?.supportType
+    val isVenue = supportType == "VENUE"
     val amount = amountText.toIntOrNull()
-    val amountError = showErrors && (amount == null || amount <= 0)
+    val amountError = showErrors && if (isVenue) {
+        amountText.isNotBlank() && (amount == null || amount <= 0)
+    } else {
+        amount == null || amount <= 0
+    }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
@@ -1368,7 +1373,7 @@ private fun AddEditImpactWeaveNeedSheet(
                 )
                 Text(
                     text = if (requiredSupportType == "VENUE") {
-                        "Describe the type of venue and capacity this activity needs."
+                        "Describe the type of venue this activity needs. Include capacity if you know it."
                     } else {
                         "Describe one thing this activity still needs. We’ll arrange the details for you."
                     },
@@ -1443,7 +1448,7 @@ private fun AddEditImpactWeaveNeedSheet(
                                         requiredSupportType != null &&
                                         result.supportType != requiredSupportType
                                     ) {
-                                        checkError = "This step requires a venue. Describe a venue type and the number of people it should hold."
+                                        checkError = "This step requires a venue. Describe the type of place this activity needs."
                                     } else if (result.isValid) {
                                         analysis = result
                                         amountText = (
@@ -1492,8 +1497,6 @@ private fun AddEditImpactWeaveNeedSheet(
                     }
                 }
             } else {
-                val isVenue = supportType == "VENUE"
-
                 Text(
                     text = if (need == null) "Review support need" else "Edit support need",
                     fontSize = 22.sp,
@@ -1548,15 +1551,27 @@ private fun AddEditImpactWeaveNeedSheet(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 12.dp),
-                    label = { Text(if (isVenue) "Capacity needed" else "Quantity needed") },
-                    placeholder = { Text(if (isVenue) "e.g. 150 people" else "e.g. 2") },
+                    label = { Text(if (isVenue) "Capacity needed (optional)" else "Quantity needed") },
+                    placeholder = { Text(if (isVenue) "e.g. 150" else "e.g. 2") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     isError = amountError,
-                    supportingText = if (amountError) {
-                        { Text("Enter a value greater than 0.") }
-                    } else {
-                        null
+                    supportingText = when {
+                        amountError -> {
+                            {
+                                Text(
+                                    if (isVenue) {
+                                        "Enter a capacity greater than 0, or leave it blank if unknown."
+                                    } else {
+                                        "Enter a quantity greater than 0."
+                                    }
+                                )
+                            }
+                        }
+                        isVenue -> {
+                            { Text("Leave blank when the venue does not have a known fixed capacity.") }
+                        }
+                        else -> null
                     }
                 )
 
@@ -1574,7 +1589,13 @@ private fun AddEditImpactWeaveNeedSheet(
                 Button(
                     onClick = {
                         showErrors = true
-                        if (amount != null && amount > 0) {
+                        val amountIsValid = if (isVenue) {
+                            amountText.isBlank() || (amount != null && amount > 0)
+                        } else {
+                            amount != null && amount > 0
+                        }
+
+                        if (amountIsValid) {
                             onSave(
                                 description.trim(),
                                 supportType.orEmpty(),
@@ -1843,9 +1864,9 @@ private fun supportTypeLabel(value: String): String {
 
 private fun needAmountLabel(need: ImpactWeaveNeedDraft): String {
     return if (need.supportType == "VENUE") {
-        "Capacity ${need.capacityRequired ?: 0}"
+        need.capacityRequired?.let { "Capacity $it" } ?: "Capacity not specified"
     } else {
-        "${need.quantityRequired ?: 0} needed"
+        need.quantityRequired?.let { "$it needed" } ?: "Quantity not specified"
     }
 }
 

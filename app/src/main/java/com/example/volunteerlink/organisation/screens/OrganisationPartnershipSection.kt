@@ -60,7 +60,7 @@ private data class PartnershipSupportItem(
     val supportDescription: String,
     val supportType: String,
     val resourceName: String,
-    val amount: Int,
+    val amount: Int?,
     val venueLocation: LocationSuggestion? = null
 )
 
@@ -397,9 +397,9 @@ private fun PartnershipSupportRow(
 ) {
     val typeLabel = supportTypeLabel(support.supportType)
     val amountText = if (support.supportType == "VENUE") {
-        "Capacity ${support.amount}"
+        support.amount?.let { "Capacity $it" } ?: "Capacity not specified"
     } else {
-        "${support.amount} available"
+        support.amount?.let { "$it available" } ?: "Quantity not specified"
     }
 
     Row(
@@ -467,7 +467,7 @@ private fun AddEditSupportSheet(
         supportDescription: String,
         supportType: String,
         resourceName: String,
-        amount: Int,
+        amount: Int?,
         venueLocation: LocationSuggestion?
     ) -> Unit
 ) {
@@ -519,7 +519,11 @@ private fun AddEditSupportSheet(
     val supportType = analysis?.supportType
     val isVenue = supportType == "VENUE"
     val amount = amountText.toIntOrNull()
-    val amountError = showErrors && (amount == null || amount <= 0)
+    val amountError = showErrors && if (isVenue) {
+        amountText.isNotBlank() && (amount == null || amount <= 0)
+    } else {
+        amount == null || amount <= 0
+    }
     val venueError = if (showErrors && isVenue && venueLocation == null) {
         "Select the venue location from the suggestions."
     } else {
@@ -546,9 +550,9 @@ private fun AddEditSupportSheet(
         venueSearchError = null
 
         try {
-            venueSuggestions = locationService.searchLocations(cleanQuery)
+            venueSuggestions = locationService.searchVenues(cleanQuery)
             if (venueSuggestions.isEmpty()) {
-                venueSearchError = "No matching locations found."
+                venueSearchError = "No matching venues found."
             }
         } catch (_: Exception) {
             venueSuggestions = emptyList()
@@ -766,27 +770,31 @@ private fun AddEditSupportSheet(
                     },
                     modifier = Modifier.fillMaxWidth(),
                     label = {
-                        Text(if (isVenue) "Capacity" else "Quantity available")
+                        Text(if (isVenue) "Capacity (optional)" else "Quantity available")
                     },
                     placeholder = {
-                        Text(if (isVenue) "e.g. 100 people" else "e.g. 2")
+                        Text(if (isVenue) "e.g. 100" else "e.g. 2")
                     },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     enabled = !isSaving,
                     isError = amountError,
-                    supportingText = if (amountError) {
-                        {
-                            Text(
-                                if (isVenue) {
-                                    "Enter a capacity greater than 0."
-                                } else {
-                                    "Enter a quantity greater than 0."
-                                }
-                            )
+                    supportingText = when {
+                        amountError -> {
+                            {
+                                Text(
+                                    if (isVenue) {
+                                        "Enter a capacity greater than 0, or leave it blank if unknown."
+                                    } else {
+                                        "Enter a quantity greater than 0."
+                                    }
+                                )
+                            }
                         }
-                    } else {
-                        null
+                        isVenue -> {
+                            { Text("Leave blank if this venue does not have a known fixed capacity.") }
+                        }
+                        else -> null
                     }
                 )
 
@@ -849,11 +857,13 @@ private fun AddEditSupportSheet(
                     onClick = {
                         showErrors = true
 
-                        if (
-                            amount != null &&
-                            amount > 0 &&
-                            (!isVenue || venueLocation != null)
-                        ) {
+                        val amountIsValid = if (isVenue) {
+                            amountText.isBlank() || (amount != null && amount > 0)
+                        } else {
+                            amount != null && amount > 0
+                        }
+
+                        if (amountIsValid && (!isVenue || venueLocation != null)) {
                             onSave(
                                 description.trim(),
                                 supportType.orEmpty(),
@@ -898,9 +908,9 @@ private fun supportTypeLabel(value: String): String {
 
 private fun OrganisationSupportData.toPartnershipSupportItem(): PartnershipSupportItem {
     val amount = if (supportType == "VENUE") {
-        capacity ?: 0
+        capacity
     } else {
-        quantity ?: 0
+        quantity
     }
 
     val venueLocation = if (

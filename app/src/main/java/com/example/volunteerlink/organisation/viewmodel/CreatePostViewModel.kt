@@ -424,7 +424,7 @@ class CreatePostViewModel : ViewModel() {
             }
 
             try {
-                val results = locationService.searchLocations(
+                val results = locationService.searchEventLocations(
                     query = cleanQuery,
                     biasLatitude = locationBiasLatitude,
                     biasLongitude = locationBiasLongitude
@@ -439,7 +439,7 @@ class CreatePostViewModel : ViewModel() {
                             locationSuggestions = results,
                             isLocationSearching = false,
                             locationSearchError = if (results.isEmpty()) {
-                                "No matching location found."
+                                "No matching event location found."
                             } else {
                                 null
                             }
@@ -454,7 +454,7 @@ class CreatePostViewModel : ViewModel() {
                         it.copy(
                             locationSuggestions = emptyList(),
                             isLocationSearching = false,
-                            locationSearchError = "Unable to search locations."
+                            locationSearchError = "Unable to search event locations."
                         )
                     }
                 }

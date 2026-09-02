@@ -222,7 +222,7 @@ class ImpactWeaveViewModel : ViewModel() {
         originalText: String,
         supportType: String,
         resourceName: String,
-        amount: Int
+        amount: Int?
     ) {
         val need = ImpactWeaveNeedDraft(
             needId = nextNeedId++,
@@ -244,7 +244,7 @@ class ImpactWeaveViewModel : ViewModel() {
         originalText: String,
         supportType: String,
         resourceName: String,
-        amount: Int
+        amount: Int?
     ) {
         updateDraft {
             copy(

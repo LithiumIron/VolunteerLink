@@ -36,33 +36,75 @@ class GeoapifyLocationService {
 
 
     /**
-     * Searches for an exact venue/address and removes broad administrative
-     * results such as whole cities or states.
+     * Searches for named places that an organisation can provide as a venue.
+     * This is intentionally stricter than an event-location search: broad
+     * administrative areas and plain street results are not returned.
      */
     suspend fun searchVenues(
         query: String,
         biasLatitude: Double? = null,
         biasLongitude: Double? = null
     ): List<LocationSuggestion> {
-        val broadTypes = setOf(
-            "suburb",
-            "district",
-            "postcode",
-            "city",
-            "county",
-            "state",
-            "country"
+        val amenityResults = search(
+            query = query,
+            type = "amenity",
+            biasLatitude = biasLatitude,
+            biasLongitude = biasLongitude
         )
 
-        return search(
+        val exactPlaceResults = search(
             query = query,
             type = null,
             biasLatitude = biasLatitude,
             biasLongitude = biasLongitude
         )
             .filter { suggestion ->
-                suggestion.resultType == null || suggestion.resultType !in broadTypes
+                suggestion.resultType == "amenity" ||
+                    suggestion.resultType == "building"
             }
+
+        return (amenityResults + exactPlaceResults)
+            .distinctBy { it.placeId }
+            .take(5)
+    }
+
+    /**
+     * Searches for a real place where an activity can happen. Unlike the
+     * partnership venue search, this also allows outdoor POIs and exact
+     * addresses/streets while still rejecting city/state/country-only results.
+     * Examples include halls, parks, beaches, campuses, fields and stadiums.
+     */
+    suspend fun searchEventLocations(
+        query: String,
+        biasLatitude: Double? = null,
+        biasLongitude: Double? = null
+    ): List<LocationSuggestion> {
+        val amenityResults = search(
+            query = query,
+            type = "amenity",
+            biasLatitude = biasLatitude,
+            biasLongitude = biasLongitude
+        )
+
+        val eventResultTypes = setOf(
+            "amenity",
+            "building",
+            "street",
+            "unknown"
+        )
+
+        val exactLocationResults = search(
+            query = query,
+            type = null,
+            biasLatitude = biasLatitude,
+            biasLongitude = biasLongitude
+        )
+            .filter { suggestion ->
+                suggestion.resultType == null || suggestion.resultType in eventResultTypes
+            }
+
+        return (amenityResults + exactLocationResults)
+            .distinctBy { it.placeId }
             .take(5)
     }
 

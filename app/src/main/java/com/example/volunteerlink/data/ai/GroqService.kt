@@ -37,9 +37,10 @@ class GroqService {
 
             Rules:
             - The user must describe only one kind of support at a time.
-            - VENUE uses capacity and quantity must be null.
+            - VENUE always uses quantity = null. Capacity is optional: extract it only when the user gives a positive whole-number capacity. Otherwise return capacity = null.
+            - Never estimate, assume, or invent a VENUE capacity.
             - Every other allowed type uses quantity and capacity must be null.
-            - Quantity/capacity must be a positive whole number stated or clearly implied by the text.
+            - For non-VENUE support, quantity must be a positive whole number stated or clearly implied by the text.
             - SPECIALIST means a person provided because of specific professional, technical, academic, certified, or specialist expertise.
               Valid examples include lecturers, teachers, doctors, nurses, first aid officers, trainers, technicians, engineers, interpreters, counsellors, photographers, and legal advisers.
             - A stated number of specialists is valid, for example "2 English lecturers" -> SPECIALIST, resource_name "English lecturer", quantity 2.
@@ -56,6 +57,8 @@ class GroqService {
               "ABC Hotel Grand Ballroom for 500 people" -> VENUE, resource_name "Ballroom", capacity 500.
               "Penang Digital Library for 80 people" -> VENUE, resource_name "Library", capacity 80.
               "School football field for 150 people" -> VENUE, resource_name "Football field", capacity 150.
+              "We can provide our community park" -> VENUE, resource_name "Park", capacity null.
+              "We can provide an outdoor field" -> VENUE, resource_name "Outdoor field", capacity null.
 
             Return JSON only in exactly this shape:
             {
@@ -90,9 +93,10 @@ class GroqService {
 
             Rules:
             - The user must describe only one kind of support need at a time.
-            - VENUE uses capacity and quantity must be null.
+            - VENUE always uses quantity = null. Capacity is optional: extract it only when the user gives a positive whole-number capacity. Otherwise return capacity = null.
+            - Never estimate, assume, or invent a VENUE capacity.
             - Every other allowed type uses quantity and capacity must be null.
-            - Quantity/capacity must be a positive whole number stated or clearly implied by the text.
+            - For non-VENUE needs, quantity must be a positive whole number stated or clearly implied by the text.
             - SPECIALIST means a person needed because of specific professional, technical, academic, certified, or specialist expertise.
               Valid examples include lecturers, teachers, doctors, nurses, first aid officers, trainers, technicians, engineers, interpreters, counsellors, photographers, and legal advisers.
             - Reject GENERAL volunteer manpower or ordinary helpers such as "10 volunteers", "5 helpers", "event crew", "registration volunteers", or "people to help". Those belong in Volunteer Post roles, not Impact Weave support.
@@ -104,6 +108,7 @@ class GroqService {
               Examples can include Hall, Community Hall, Multipurpose Hall, Conference Hall, Banquet Hall, Ballroom, Auditorium, Lecture Hall, Meeting Room, Function Room, Classroom, Training Room, Workshop Space, Exhibition Hall, Event Space, Sports Hall, Stadium, Court, Field, Pavilion, Park, Garden, Outdoor Space, Library, or another sensible physical venue type.
             - Examples:
               "Need a hall for around 150 people" -> VENUE, resource_name "Hall", capacity 150.
+              "Need an outdoor park" -> VENUE, resource_name "Park", capacity null.
               "We need 2 passenger vans" -> TRANSPORT, resource_name "Passenger van", quantity 2.
               "Need 2 English lecturers" -> SPECIALIST, resource_name "English lecturer", quantity 2.
               "Need 100 bottles of water" -> REFRESHMENTS, resource_name "Bottled water", quantity 100.
@@ -218,11 +223,7 @@ class GroqService {
             return invalidAnalysis("I couldn't classify that support clearly. Try describing one resource and its amount.")
         }
 
-        if (supportType == "VENUE") {
-            if (capacity == null) {
-                return invalidAnalysis("Include how many people the venue can hold.")
-            }
-        } else if (quantity == null) {
+        if (supportType != "VENUE" && quantity == null) {
             return invalidAnalysis("Include a quantity greater than 0 for this resource.")
         }
 

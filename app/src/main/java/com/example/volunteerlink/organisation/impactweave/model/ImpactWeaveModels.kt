@@ -38,11 +38,11 @@ data class ImpactWeaveNeedDraft(
     val quantityRequired: Int? = null,
     val capacityRequired: Int? = null
 ) {
-    val amount: Int
+    val amount: Int?
         get() = if (supportType == "VENUE") {
-            capacityRequired ?: 0
+            capacityRequired
         } else {
-            quantityRequired ?: 0
+            quantityRequired
         }
 }
 
