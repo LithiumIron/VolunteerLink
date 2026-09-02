@@ -18,7 +18,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -91,29 +90,9 @@ fun EditVolunteerProfileScreen(
 
     val scope = rememberCoroutineScope()
 
-
-    // =========================
-    // AVAILABILITY
-    // =========================
-    // Declared here — before the LaunchedEffect below — because a local
-    // var must be declared above the point it's referenced. The old
-    // "selectedAvailabilityInit" two-step assigned this from inside
-    // LaunchedEffect before the var existed yet, which doesn't compile;
-    // LaunchedEffect can just assign this directly instead.
-
-    var selectedAvailability by remember { mutableStateOf(setOf<String>()) }
-
     var isSaving by remember {
         mutableStateOf(false)
     }
-
-    val availabilityOptions = listOf(
-        "Weekdays",
-        "Weekends",
-        "Mornings",
-        "Evenings",
-        "Night"
-    )
 
 
     // =========================
@@ -133,7 +112,6 @@ fun EditVolunteerProfileScreen(
             email = existingProfile.email
             phone = existingProfile.phone
             bio = existingProfile.bio
-            selectedAvailability = existingProfile.availability.toSet()
             profileImageUrl = existingProfile.profileImageUrl
         }
 
@@ -434,70 +412,6 @@ fun EditVolunteerProfileScreen(
 
 
                 Spacer(
-                    modifier = Modifier.height(20.dp)
-                )
-
-
-                // AVAILABILITY
-                Text(
-                    text = "Availability",
-                    fontWeight = FontWeight.Bold,
-                    color = DeepGreen
-                )
-
-                Spacer(
-                    modifier = Modifier.height(6.dp)
-                )
-
-
-                availabilityOptions.forEach { option ->
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-
-                                selectedAvailability =
-                                    if (option in selectedAvailability) {
-
-                                        selectedAvailability - option
-
-                                    } else {
-
-                                        selectedAvailability + option
-                                    }
-                            }
-                            .padding(vertical = 2.dp),
-
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-
-                        Checkbox(
-                            checked = option in selectedAvailability,
-
-                            onCheckedChange = { checked ->
-
-                                selectedAvailability =
-                                    if (checked) {
-
-                                        selectedAvailability + option
-
-                                    } else {
-
-                                        selectedAvailability - option
-                                    }
-                            }
-                        )
-
-                        Text(
-                            text = option,
-                            color = DeepGreen
-                        )
-                    }
-                }
-
-
-                Spacer(
                     modifier = Modifier.height(30.dp)
                 )
 
@@ -517,7 +431,6 @@ fun EditVolunteerProfileScreen(
                                     name = name,
                                     phone = phone,
                                     bio = bio,
-                                    availability = selectedAvailability.toList(),
                                     profileImageUrl = profileImageUrl
                                 )
 

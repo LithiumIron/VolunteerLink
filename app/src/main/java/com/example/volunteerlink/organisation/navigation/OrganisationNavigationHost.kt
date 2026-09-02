@@ -32,6 +32,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.volunteerlink.navigation.AppBottomNavigationBar
+import com.example.volunteerlink.navigation.AppRoutes
 import com.example.volunteerlink.organisation.auth.OrganisationSessionStore
 import com.example.volunteerlink.ui.theme.VolunteerLinkPrimaryGreen
 import com.example.volunteerlink.ui.theme.VolunteerLinkSurface
@@ -65,7 +66,9 @@ private const val OPEN_REVIEW_FROM_HOME = "openReviewFromHome"
  * screen easier to read and avoids mixing UI code with navigation logic.
  */
 @Composable
-fun OrganisationNavigationHost() {
+fun OrganisationNavigationHost(
+    onLoggedOut: () -> Unit
+) {
     val navController = rememberNavController()
     val context = LocalContext.current
 
@@ -170,6 +173,7 @@ fun OrganisationNavigationHost() {
             startDestination = OrganisationNavigationRoutes.HOME,
             route = "organisation_root_navigation_graph",
             modifier = Modifier.padding(innerPadding)
+
         ) {
             composable(OrganisationNavigationRoutes.HOME) {
                 OrganisationHomeScreen(
@@ -362,6 +366,20 @@ fun OrganisationNavigationHost() {
                     onEditProfileSelected = {
                         navController.navigate(OrganisationNavigationRoutes.EDIT_PROFILE)
                     },
+                    onRecentPostsSelected = {
+                        navController.navigate(OrganisationNavigationRoutes.MANAGE_POSTS) {
+                            popUpTo(OrganisationNavigationRoutes.HOME) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                    onPostSelected = { postId ->
+                        navController.navigate(
+                            OrganisationNavigationRoutes.managePostDetail(postId)
+                        )
+                    },
                     onRefresh = {
                         profileScope.launch {
                             OrganisationSessionStore.updateProfileLoading(true)
@@ -395,10 +413,7 @@ fun OrganisationNavigationHost() {
                     onEditProfileSelected = {
                         navController.navigate(OrganisationNavigationRoutes.EDIT_PROFILE)
                     },
-                    onLoggedOut = {
-                        // TODO: reset root nav graph to your auth/login flow —
-                        // same open item as the volunteer side's settings screen.
-                    }
+                    onLoggedOut = onLoggedOut
                 )
             }
         }

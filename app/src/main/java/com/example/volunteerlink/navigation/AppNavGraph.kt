@@ -78,7 +78,17 @@ fun AppNavGraph(
 
         composable(AppRoutes.VOLUNTEER) {
             // Teammate's existing Volunteer module is used as-is.
-            VolunteerOpportunityNavigationHost()
+            VolunteerOpportunityNavigationHost(
+                onLoggedOut = {
+                    navController.navigate(AppRoutes.USER_TYPE_SELECTION) {
+                        popUpTo(AppRoutes.VOLUNTEER) {
+                            inclusive = true
+                        }
+
+                        launchSingleTop = true
+                    }
+                }
+            )
         }
 
         composable(AppRoutes.ORGANISATION_LOGIN) {
@@ -123,7 +133,17 @@ fun AppNavGraph(
         }
 
         composable(AppRoutes.ORGANISATION) {
-            OrganisationNavigationHost()
+            OrganisationNavigationHost(
+                onLoggedOut = {
+                    navController.navigate(AppRoutes.USER_TYPE_SELECTION) {
+                        popUpTo(AppRoutes.VOLUNTEER) {
+                            inclusive = true
+                        }
+
+                        launchSingleTop = true
+                    }
+                }
+            )
         }
     }
 }

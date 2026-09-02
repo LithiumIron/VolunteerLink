@@ -2,8 +2,6 @@ package com.example.volunteerlink.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,14 +10,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Logout
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material.icons.filled.SupportAgent
@@ -49,7 +44,6 @@ import com.example.volunteerlink.ui.theme.DeepGreen
 import com.example.volunteerlink.ui.theme.VolunteerLinkBackground
 import com.example.volunteerlink.ui.theme.VolunteerLinkBorderColour
 import com.example.volunteerlink.ui.theme.VolunteerLinkPrimaryGreen
-import com.example.volunteerlink.ui.theme.VolunteerLinkSurface
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextPrimary
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextSecondary
 import io.github.jan.supabase.auth.auth
@@ -65,15 +59,11 @@ private data class SettingsInfoDialogContent(
 fun VolunteerSettingsScreen(
     onBackSelected: () -> Unit,
     onEditProfileSelected: () -> Unit,
-    // Called after Supabase sign-out succeeds. Wire this to whatever
-    // resets your root nav graph back to the login/auth flow — this
-    // screen doesn't know about that graph, only that logout finished.
     onLoggedOut: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
     var isLoggingOut by remember { mutableStateOf(false) }
     var showLogoutConfirmation by rememberSaveable { mutableStateOf(false) }
-    var notificationsEnabled by rememberSaveable { mutableStateOf(true) }
 
     // Placeholder content for rows that don't have a real destination yet
     // (Help & Support, Privacy Policy, About). Tapping one just shows a
@@ -164,15 +154,6 @@ fun VolunteerSettingsScreen(
                 title = "Edit Profile",
                 subtitle = "Name, phone, bio, availability",
                 onClick = onEditProfileSelected
-            )
-
-            SettingsSectionLabel("Preferences")
-            SettingsToggleRow(
-                icon = Icons.Filled.Notifications,
-                title = "Notifications",
-                subtitle = "Application updates and reminders",
-                checked = notificationsEnabled,
-                onCheckedChange = { notificationsEnabled = it }
             )
 
             SettingsSectionLabel("Support")

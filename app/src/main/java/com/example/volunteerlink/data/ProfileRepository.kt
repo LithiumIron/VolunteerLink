@@ -14,7 +14,6 @@ private data class UserProfileRow(
     val fullName: String? = null,
     val phone: String? = null,
     val bio: String? = null,
-    val availability: List<String>? = null,
     @SerialName("avatar_path")
     val avatarPath: String? = null,
     @SerialName("created_at")
@@ -59,7 +58,6 @@ object VolunteerProfileRepository {
                 email = currentUser.email ?: "",
                 bio = profile.bio ?: "",
                 phone = profile.phone ?: "",
-                availability = profile.availability ?: emptyList(),
                 memberSince = profile.createdAt?.take(10) ?: "",
                 profileImageUrl = profile.avatarPath,
                 verifiedHours = totalMinutes / 60,
@@ -79,7 +77,6 @@ object VolunteerProfileRepository {
         name: String,
         phone: String,
         bio: String,
-        availability: List<String>,
         profileImageUrl: String?
     ): Boolean {
         val currentUser = supabase.auth.currentUserOrNull()
@@ -97,7 +94,6 @@ object VolunteerProfileRepository {
                     set("full_name", name)
                     set("phone", phone)
                     set("bio", bio)
-                    set("availability", availability)
                     set("avatar_path", profileImageUrl)
                 }) {
                     filter { eq("auth_user_id", currentUser.id) }
@@ -123,7 +119,6 @@ object VolunteerProfileRepository {
                         fullName = name,
                         phone = phone,
                         bio = bio,
-                        availability = availability,
                         profileImageUrl = profileImageUrl
                     )
                 )

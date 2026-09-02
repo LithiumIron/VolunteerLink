@@ -1,6 +1,7 @@
 package com.example.volunteerlink.organisation.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -41,6 +42,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.volunteerlink.organisation.auth.OrganisationSessionStore
 import com.example.volunteerlink.organisation.repository.RecentPostSummary
+import com.example.volunteerlink.ui.theme.VolunteerLinkBorderColour
 
 @Composable
 fun OrganisationProfileScreen(
@@ -311,7 +313,7 @@ fun OrganisationProfileScreen(
         }
 
         // =====================================================
-        // RECENTLY POSTED EVENTS
+        // RECENTLY CREATED EVENTS
         // =====================================================
 
         Column(
@@ -324,7 +326,7 @@ fun OrganisationProfileScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Recently Posted Events",
+                    text = "Recently Created Events",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground,
@@ -357,6 +359,11 @@ fun OrganisationProfileScreen(
                                 .height(65.dp)
                                 .clip(RoundedCornerShape(10.dp))
                                 .background(MaterialTheme.colorScheme.surface)
+                                .border(
+                                    width = 1.dp,
+                                    color = VolunteerLinkBorderColour,
+                                    shape = RoundedCornerShape(10.dp)
+                                )
                                 .clickable { onPostSelected(post.postId) }
                                 .padding(12.dp)
                         ) {
