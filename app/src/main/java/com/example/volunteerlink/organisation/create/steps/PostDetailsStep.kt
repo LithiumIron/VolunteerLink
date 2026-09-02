@@ -36,9 +36,11 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.volunteerlink.R
+import com.example.volunteerlink.organisation.create.CreatePostValidator
 import com.example.volunteerlink.organisation.create.components.CategoryPicker
 import com.example.volunteerlink.organisation.create.components.CreateGreen
 import com.example.volunteerlink.organisation.create.components.CreateSectionCard
+import com.example.volunteerlink.organisation.create.components.EditRestrictionNotice
 import com.example.volunteerlink.organisation.create.components.FormError
 import com.example.volunteerlink.organisation.create.components.PostTypeCard
 import com.example.volunteerlink.organisation.create.components.ThumbnailPickerSection
@@ -62,11 +64,38 @@ fun PostDetailsStep(
     val canEditSharedInfo = !isExistingEdit || editPolicy?.canEditSharedPostInfo != false
     val listState = rememberLazyListState()
 
+    // Draft warnings on Home should remain obvious after opening Edit Post.
+    // Only unpublished drafts use the 7-day publication rule here; an already
+    // published post that is naturally approaching its start date is not an error.
+    val showDraftDateAttention = isExistingEdit && editPolicy?.postStatus == "DRAFT"
+    val physicalDraftDateAttention = if (showDraftDateAttention) {
+        CreatePostValidator.draftStartDateAttention(draft.physicalStartDateMillis)
+            .takeIf {
+                draft.postType == VolunteerPostType.PHYSICAL ||
+                    draft.postType == VolunteerPostType.HYBRID
+            }
+    } else {
+        null
+    }
+    val remoteDraftDateAttention = if (showDraftDateAttention) {
+        CreatePostValidator.draftStartDateAttention(draft.remoteStartDateMillis)
+            .takeIf {
+                draft.postType == VolunteerPostType.REMOTE ||
+                    draft.postType == VolunteerPostType.HYBRID
+            }
+    } else {
+        null
+    }
+    val hasDraftDateAttention =
+        physicalDraftDateAttention != null || remoteDraftDateAttention != null
+
     // Continue may reveal an error far above the button. Move the organiser
     // straight to the first section that needs attention instead of making
     // them hunt through the form.
     val firstErrorSectionIndex = run {
-        val existingInfoOffset = if (uiState.isExistingPostEdit) 1 else 0
+        val existingInfoOffset =
+            (if (uiState.isExistingPostEdit) 1 else 0) +
+                (if (hasDraftDateAttention) 1 else 0)
         val postTypeIndex = 1 + existingInfoOffset
         val postInformationIndex = postTypeIndex + 1
         var nextIndex = postInformationIndex + 1
@@ -91,6 +120,37 @@ fun PostDetailsStep(
             errors.hybridPhysicalCapacity != null || errors.hybridRemoteCapacity != null ->
                 hybridCapacityIndex
             else -> null
+        }
+    }
+
+    val firstDraftAttentionSectionIndex = run {
+        if (!hasDraftDateAttention) return@run null
+
+        val existingInfoOffset =
+            (if (uiState.isExistingPostEdit) 1 else 0) + 1 // combined attention notice
+        val postTypeIndex = 1 + existingInfoOffset
+        val postInformationIndex = postTypeIndex + 1
+        var nextIndex = postInformationIndex + 1
+        val hasPhysical = draft.postType == VolunteerPostType.PHYSICAL ||
+            draft.postType == VolunteerPostType.HYBRID
+        val hasRemote = draft.postType == VolunteerPostType.REMOTE ||
+            draft.postType == VolunteerPostType.HYBRID
+        val physicalIndex = if (hasPhysical) nextIndex++ else null
+        val remoteIndex = if (hasRemote) nextIndex++ else null
+
+        when {
+            physicalDraftDateAttention != null -> physicalIndex
+            remoteDraftDateAttention != null -> remoteIndex
+            else -> null
+        }
+    }
+
+    // Opening an outdated draft from Home should land on the first section that
+    // actually needs changing instead of leaving the organiser at the top of a
+    // long Edit Post form. This runs once for the loaded post.
+    LaunchedEffect(uiState.existingPostId) {
+        firstDraftAttentionSectionIndex?.let { target ->
+            listState.animateScrollToItem(target.coerceAtLeast(0))
         }
     }
 
@@ -194,6 +254,22 @@ fun PostDetailsStep(
                         )
                     }
                 }
+            }
+        }
+
+        if (hasDraftDateAttention) {
+            item {
+                EditRestrictionNotice(
+                    title = "Update before publishing",
+                    message = buildString {
+                        val affected = mutableListOf<String>()
+                        if (physicalDraftDateAttention != null) affected += "Physical start date"
+                        if (remoteDraftDateAttention != null) affected += "Remote start date"
+                        append(affected.joinToString(" and "))
+                        append(if (affected.size == 1) " needs" else " need")
+                        append(" attention. The affected date field is highlighted below.")
+                    }
+                )
             }
         }
 

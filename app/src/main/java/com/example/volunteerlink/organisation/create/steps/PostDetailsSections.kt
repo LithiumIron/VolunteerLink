@@ -55,7 +55,15 @@ fun PhysicalEventDetailsSection(
     val minimumStartDateMillis = remember(clockState.refreshVersion) {
         CreatePostValidator.minimumStartDateMillis()
     }
+    val physicalDraftDateAttention = if (
+        uiState.isExistingPostEdit && editPolicy?.postStatus == "DRAFT"
+    ) {
+        CreatePostValidator.draftStartDateAttention(draft.physicalStartDateMillis)
+    } else {
+        null
+    }
     val physicalStartDateError = when {
+        physicalDraftDateAttention != null -> physicalDraftDateAttention
         uiState.isExistingPostEdit -> errors.physicalStartDate
         draft.physicalStartDateMillis == null -> errors.physicalStartDate
         else -> CreatePostValidator.minimumLeadTimeError(draft.physicalStartDateMillis)
@@ -69,6 +77,12 @@ fun PhysicalEventDetailsSection(
             "Choose when the physical event will take place. Start dates must be at least 7 days from today."
         }
     ) {
+        if (physicalDraftDateAttention != null) {
+            EditRestrictionNotice(
+                title = "Start date needs attention",
+                message = physicalDraftDateAttention
+            )
+        }
         if (uiState.isExistingPostEdit && !canEditPhysicalCore) {
             EditRestrictionNotice(
                 title = "Schedule locked",
@@ -265,7 +279,15 @@ fun RemoteProjectDetailsSection(
     val minimumStartDateMillis = remember(clockState.refreshVersion) {
         CreatePostValidator.minimumStartDateMillis()
     }
+    val remoteDraftDateAttention = if (
+        uiState.isExistingPostEdit && editPolicy?.postStatus == "DRAFT"
+    ) {
+        CreatePostValidator.draftStartDateAttention(draft.remoteStartDateMillis)
+    } else {
+        null
+    }
     val remoteStartDateError = when {
+        remoteDraftDateAttention != null -> remoteDraftDateAttention
         uiState.isExistingPostEdit -> errors.remoteStartDate
         draft.remoteStartDateMillis == null -> errors.remoteStartDate
         else -> CreatePostValidator.minimumLeadTimeError(draft.remoteStartDateMillis)
@@ -282,6 +304,12 @@ fun RemoteProjectDetailsSection(
             "Set the working period for the remote part. Start dates must be at least 7 days from today."
         }
     ) {
+        if (remoteDraftDateAttention != null) {
+            EditRestrictionNotice(
+                title = "Start date needs attention",
+                message = remoteDraftDateAttention
+            )
+        }
         if (
             uiState.isExistingPostEdit &&
             (!canEditRemoteStart || !canEditRemoteDue || remoteDueExtensionOnly)

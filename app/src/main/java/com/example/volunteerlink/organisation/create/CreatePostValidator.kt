@@ -72,6 +72,27 @@ object CreatePostValidator {
     }
 
     /**
+     * Existing drafts can become outdated while they sit unpublished. Edit Post
+     * uses this message immediately so the organiser can see the exact date that
+     * needs changing instead of discovering it only after pressing Continue.
+     */
+    fun draftStartDateAttention(dateMillis: Long?): String? {
+        if (dateMillis == null) return null
+
+        val selected = startOfDayMillis(dateMillis)
+        val today = startOfDayMillis()
+        val minimum = minimumStartDateMillis()
+
+        return when {
+            selected < today ->
+                "Start date has passed. Choose ${formatDate(minimum)} or later before publishing."
+            selected < minimum ->
+                "Start date is less than 7 days away. Choose ${formatDate(minimum)} or later before publishing."
+            else -> null
+        }
+    }
+
+    /**
      * Message used by Review when Save Draft / Publish discovers that time has
      * moved forward since Step 1 was first completed.
      */
