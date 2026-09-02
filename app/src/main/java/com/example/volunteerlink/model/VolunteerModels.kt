@@ -89,7 +89,11 @@ data class VolunteerOpportunityEvent(
     val eventIsSaved: Boolean = false,
     val eventDatabaseId: String = "",
     val eventStatus: String = "PUBLISHED",
-    // ISO date from the earliest physical/remote phase, not a formatted UI date.
+    // Raw ISO dates are kept for role-specific application rules.
+    // Hybrid PHYSICAL roles use eventPhysicalStartDate; REMOTE roles use eventRemoteStartDate.
+    val eventPhysicalStartDate: String = "",
+    val eventRemoteStartDate: String = "",
+    // Retained for older cached payload compatibility. New application checks are role-specific.
     val eventApplicationStartDate: String = ""
 )
 

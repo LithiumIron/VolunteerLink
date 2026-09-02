@@ -42,6 +42,13 @@ object VolunteerOpportunityRepository {
     suspend fun loadDashboard(): VolunteerOpportunityDashboardData {
         // Refresh, but never modify, the organisation's shared business clock.
         com.example.volunteerlink.data.time.AppClock.refreshFromDatabase()
+
+        // Resolve stale pending applications before any Volunteer screen reads them.
+        // This is what turns role-start/full-capacity PENDING rows into DECLINED rows.
+        supabase.postgrest.rpc(
+            function = "volunteer_resolve_my_application_lifecycle"
+        )
+
         val organisations =
             supabase.from("organisations")
                 .select(
@@ -718,6 +725,8 @@ object VolunteerOpportunityRepository {
                     eventThumbnailPath = post.thumbnailPath,
                     eventDatabaseId = post.postId,
                     eventStatus = post.status,
+                    eventPhysicalStartDate = physical?.startDate.orEmpty(),
+                    eventRemoteStartDate = remote?.startDate.orEmpty(),
                     eventApplicationStartDate = listOfNotNull(
                         physical?.startDate, remote?.startDate
                     ).filter { it.isNotBlank() }.minOrNull().orEmpty()

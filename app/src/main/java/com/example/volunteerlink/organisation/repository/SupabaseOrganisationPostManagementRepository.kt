@@ -41,7 +41,16 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
     }
 
     override suspend fun loadPost(postId: String): PostManagementPost {
-        val organisationId = OrganisationSession.requireOrganisationId()
+        val organisationContext = OrganisationSession.requireContext()
+        val organisationId = organisationContext.organisationId
+
+        // Keep pending applicants truthful before building the screen snapshot.
+        // Role-full and role-started applications are persisted as DECLINED, not merely hidden.
+        supabase.postgrest.rpc(
+            function = "organisation_resolve_application_lifecycle",
+            parameters = buildJsonObject { put("p_post_id", postId) }
+        )
+
         val postRow = supabase
             .from("volunteer_posts")
             .select(
@@ -177,6 +186,25 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
             }
             .decodeList<JsonObject>()
 
+        val screeningAnswerRows = supabase
+            .from("role_participation_screening_answers")
+            .select(
+                columns = Columns.raw(
+                    "role_template_id,user_id,question_no,question_text,answer_text"
+                )
+            ) {
+                filter { eq("post_id", postId) }
+            }
+            .decodeList<JsonObject>()
+
+        val screeningByParticipation = screeningAnswerRows
+            .groupBy { row ->
+                row.requiredText("role_template_id") to row.requiredText("user_id")
+            }
+            .mapValues { (_, rows) ->
+                rows.sortedBy { row -> row.requiredInt("question_no") }
+            }
+
         val attendanceDayRows = supabase
             .from("attendance_days")
             .select(
@@ -272,7 +300,13 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
                 completedAt = participationRow.optionalText("completed_at"),
                 appliedAt = participationRow.optionalText("created_at"),
                 decisionNote = participationRow.optionalText("decision_note"),
-                isShortlisted = participationRow.optionalBoolean("is_shortlisted") ?: false
+                isShortlisted = participationRow.optionalBoolean("is_shortlisted") ?: false,
+                screeningQuestions = screeningByParticipation[roleTemplateId to userId]
+                    .orEmpty()
+                    .map { row -> row.requiredText("question_text") },
+                screeningAnswers = screeningByParticipation[roleTemplateId to userId]
+                    .orEmpty()
+                    .map { row -> row.requiredText("answer_text") }
             )
         }.sortedWith(
             compareBy<PostManagementPerson> { it.roleName }
@@ -281,6 +315,7 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
 
         return PostManagementPost(
             postId = postRow.requiredText("post_id"),
+            organisationName = organisationContext.organisationName,
             title = postRow.requiredText("title"),
             description = postRow.requiredText("description"),
             mode = postRow.requiredText("mode"),
@@ -591,6 +626,29 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
                 put("p_role_template_id", roleTemplateId)
                 put("p_user_id", userId)
                 put("p_is_shortlisted", isShortlisted)
+            }
+        )
+    }
+
+    override suspend fun reviewApplicant(
+        postId: String,
+        roleTemplateId: String,
+        userId: String,
+        decision: String
+    ) {
+        requireOwnedPost(postId)
+        val normalizedDecision = decision.trim().uppercase(Locale.US)
+        require(normalizedDecision in setOf("ACCEPT", "DECLINE")) {
+            "Applicant decision must be ACCEPT or DECLINE."
+        }
+
+        supabase.postgrest.rpc(
+            function = "organisation_review_role_applicant",
+            parameters = buildJsonObject {
+                put("p_post_id", postId)
+                put("p_role_template_id", roleTemplateId)
+                put("p_user_id", userId)
+                put("p_decision", normalizedDecision)
             }
         )
     }

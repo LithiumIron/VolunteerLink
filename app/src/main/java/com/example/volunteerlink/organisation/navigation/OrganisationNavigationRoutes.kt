@@ -7,6 +7,8 @@ object OrganisationNavigationRoutes {
     const val MANAGE_POSTS = "organisation_manage_posts"
     const val MANAGE_POST_DETAIL = "organisation_manage_post/{postId}"
     const val MANAGE_POST_EDIT = "organisation_manage_post/{postId}/edit"
+    const val MANAGE_APPLICANT_REVIEW =
+        "organisation_manage_post/{postId}/applicant/{roleTemplateId}/{userId}"
     const val MANAGE_IMPACT_WEAVE = "organisation_manage_impact_weave"
     const val MANAGE_PROMOTIONS = "organisation_manage_promotions"
     const val CREATE = "organisation_create"
@@ -18,4 +20,11 @@ object OrganisationNavigationRoutes {
 
     fun managePostEdit(postId: String): String =
         "organisation_manage_post/$postId/edit"
+
+    fun manageApplicantReview(
+        postId: String,
+        roleTemplateId: String,
+        userId: String
+    ): String =
+        "organisation_manage_post/$postId/applicant/$roleTemplateId/$userId"
 }

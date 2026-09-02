@@ -2,6 +2,7 @@ package com.example.volunteerlink.data
 
 import com.example.volunteerlink.data.time.AppClock
 import com.example.volunteerlink.model.VolunteerOpportunityEvent
+import com.example.volunteerlink.model.VolunteerOpportunityRole
 import java.text.ParsePosition
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -9,17 +10,100 @@ import java.util.Locale
 import java.util.TimeZone
 
 /**
- * Mirrors the existing RPC rule: applications close on the earliest phase's
- * start DATE (not its start time), including remote posts. Never changes a post
- * status or the shared clock. The database RPC remains the final authority.
- * UTC matches the Supabase RPC session's date conversion; display dates may use KL.
- * Older cached payloads without this date fail closed until a successful sync.
+ * Volunteer-side application window rules.
+ *
+ * The database remains the final authority, but Android mirrors the same rule so
+ * Hybrid opportunities do not close every role when only one phase starts:
+ * - PHYSICAL role -> eventPhysicalStartDate
+ * - REMOTE role   -> eventRemoteStartDate
+ *
+ * Event-level checks mean "at least one role is still open".
  */
 object VolunteerApplicationWindow {
-    fun beforeStart(event: VolunteerOpportunityEvent?, nowMillis: Long = AppClock.nowMillis()): Boolean {
-        val raw = event?.eventApplicationStartDate ?: return false
+
+    fun beforeStart(
+        event: VolunteerOpportunityEvent?,
+        role: VolunteerOpportunityRole?,
+        nowMillis: Long = AppClock.nowMillis()
+    ): Boolean {
+        val raw = roleStartDate(event, role)
+        return raw?.let { isBeforeDate(it, nowMillis) } ?: false
+    }
+
+    fun canApply(
+        event: VolunteerOpportunityEvent?,
+        role: VolunteerOpportunityRole?,
+        nowMillis: Long = AppClock.nowMillis()
+    ): Boolean =
+        event?.eventStatus.equals("PUBLISHED", ignoreCase = true) &&
+            beforeStart(event, role, nowMillis)
+
+    fun reason(
+        event: VolunteerOpportunityEvent?,
+        role: VolunteerOpportunityRole?
+    ): String = when {
+        event == null || role == null ->
+            "Application dates are unavailable. Please sync before continuing."
+
+        roleStartDate(event, role).isNullOrBlank() ->
+            "This role has no valid start date. Please sync before continuing."
+
+        !beforeStart(event, role) ->
+            "Applications closed: this role has already started."
+
+        else ->
+            "This opportunity is not open for applications."
+    }
+
+    /** Event-level compatibility helper: true while any role is still open. */
+    fun beforeStart(
+        event: VolunteerOpportunityEvent?,
+        nowMillis: Long = AppClock.nowMillis()
+    ): Boolean = event?.eventVolunteerRoles.orEmpty().any { role ->
+        beforeStart(event, role, nowMillis)
+    }
+
+    /** Event-level compatibility helper: true while any role is still open. */
+    fun canApply(
+        event: VolunteerOpportunityEvent?,
+        nowMillis: Long = AppClock.nowMillis()
+    ): Boolean =
+        event?.eventStatus.equals("PUBLISHED", ignoreCase = true) &&
+            beforeStart(event, nowMillis)
+
+    fun reason(event: VolunteerOpportunityEvent?): String = when {
+        event == null ->
+            "Application dates are unavailable. Please sync before continuing."
+
+        event.eventStatus.equals("PUBLISHED", ignoreCase = true) &&
+            !beforeStart(event) ->
+            "Applications closed: all roles in this opportunity have already started."
+
+        else ->
+            "This opportunity is not open for applications."
+    }
+
+    private fun roleStartDate(
+        event: VolunteerOpportunityEvent?,
+        role: VolunteerOpportunityRole?
+    ): String? {
+        if (event == null || role == null) return null
+
+        val raw = when (role.roleMode.trim().uppercase(Locale.US)) {
+            "PHYSICAL" -> event.eventPhysicalStartDate
+            "REMOTE" -> event.eventRemoteStartDate
+            else -> ""
+        }.takeIf { it.isNotBlank() }
+
+        // Older cached payloads do not have the two raw role-mode dates yet.
+        // Keep them usable only when the event is single-phase/legacy.
+        return raw ?: event.eventApplicationStartDate.takeIf { it.isNotBlank() }
+    }
+
+    private fun isBeforeDate(raw: String, nowMillis: Long): Boolean {
         if (!Regex("\\d{4}-\\d{2}-\\d{2}").matches(raw)) return false
-        // java.text keeps this compatible with the project's minimum API 24.
+
+        // Match Supabase's date-level rule. A role closes at the start of its date.
         val format = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
             isLenient = false
             timeZone = TimeZone.getTimeZone("UTC")
@@ -28,15 +112,5 @@ object VolunteerApplicationWindow {
         val start = format.parse(raw, position) ?: return false
         if (position.index != raw.length) return false
         return Date(nowMillis).before(start)
-    }
-
-    fun canApply(event: VolunteerOpportunityEvent?, nowMillis: Long = AppClock.nowMillis()): Boolean =
-        event?.eventStatus.equals("PUBLISHED", ignoreCase = true) && beforeStart(event, nowMillis)
-
-    fun reason(event: VolunteerOpportunityEvent?): String = when {
-        event == null || event.eventApplicationStartDate.isBlank() ->
-            "Application dates are unavailable. Please sync before continuing."
-        !beforeStart(event) -> "Applications closed: this opportunity has already started."
-        else -> "This opportunity is not open for applications."
     }
 }

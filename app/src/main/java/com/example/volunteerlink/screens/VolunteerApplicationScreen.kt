@@ -22,6 +22,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -35,6 +36,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -123,6 +125,45 @@ fun VolunteerApplicationScreen(
                         volunteerRoleId
             }
 
+    val activeApplicationInPost =
+        VolunteerOpportunitySessionStore.activeApplicationForEvent(
+            volunteerEventId
+        )
+
+    val otherPendingApplication =
+        VolunteerOpportunitySessionStore.pendingApplicationForEvent(
+            volunteerEventId
+        )?.takeIf { application ->
+            application.applicationRoleId != volunteerRoleId
+        }
+
+    val acceptedOtherRole = activeApplicationInPost?.takeIf { application ->
+        application.applicationStatus == VolunteerApplicationStatus.ACCEPTED &&
+            application.applicationRoleId != volunteerRoleId
+    }
+
+    val pendingBlocksReviewApplication =
+        otherPendingApplication != null &&
+            volunteerOpportunityRole.roleApplicationMethod ==
+                VolunteerRoleApplicationMethod.REVIEW_APPLICANTS
+
+    val applicationBlockedMessage = when {
+        acceptedOtherRole != null ->
+            "You already joined ${acceptedOtherRole.applicationRoleTitle} in this opportunity. " +
+                "A volunteer can only hold one accepted role per post."
+
+        pendingBlocksReviewApplication ->
+            "You already have a pending application for " +
+                "${otherPendingApplication?.applicationRoleTitle}. " +
+                "You can only keep one pending application in the same opportunity."
+
+        else -> null
+    }
+
+    var pendingInstantSwitchAnswers by rememberSaveable {
+        mutableStateOf<List<String>?>(null)
+    }
+
     when {
         applicationWasSubmitted -> {
             VolunteerApplicationSuccessScreen(
@@ -162,14 +203,26 @@ fun VolunteerApplicationScreen(
                     opportunityUiState
                         .isApplicationActionRunning,
                 serverErrorMessage =
-                    opportunityUiState
-                        .applicationActionError ?: if (
-                            !com.example.volunteerlink.data.VolunteerApplicationWindow.canApply(volunteerOpportunityEvent)
-                        ) com.example.volunteerlink.data.VolunteerApplicationWindow.reason(volunteerOpportunityEvent) else null,
-                onApplicationSubmitted = {
-                        submittedAnswers ->
-                    volunteerOpportunityViewModel
-                        .submitApplication(
+                    applicationBlockedMessage ?:
+                        opportunityUiState.applicationActionError ?: if (
+                            !com.example.volunteerlink.data.VolunteerApplicationWindow.canApply(
+                                volunteerOpportunityEvent,
+                                volunteerOpportunityRole
+                            )
+                        ) com.example.volunteerlink.data.VolunteerApplicationWindow.reason(
+                            volunteerOpportunityEvent,
+                            volunteerOpportunityRole
+                        ) else null,
+                submissionAllowed = applicationBlockedMessage == null,
+                onApplicationSubmitted = { submittedAnswers ->
+                    if (
+                        volunteerOpportunityRole.roleApplicationMethod ==
+                            VolunteerRoleApplicationMethod.INSTANT_JOIN &&
+                        otherPendingApplication != null
+                    ) {
+                        pendingInstantSwitchAnswers = submittedAnswers
+                    } else {
+                        volunteerOpportunityViewModel.submitApplication(
                             eventId = volunteerEventId,
                             roleId = volunteerRoleId,
                             answers = submittedAnswers,
@@ -177,9 +230,64 @@ fun VolunteerApplicationScreen(
                                 applicationWasSubmitted = true
                             }
                         )
+                    }
                 }
             )
         }
+    }
+
+    val switchAnswers = pendingInstantSwitchAnswers
+    if (switchAnswers != null && otherPendingApplication != null) {
+        AlertDialog(
+            titleContentColor = VolunteerLinkTextPrimary,
+            textContentColor = VolunteerLinkTextSecondary,
+            containerColor = Color.White,
+            onDismissRequest = {
+                pendingInstantSwitchAnswers = null
+            },
+            title = {
+                Text(
+                    text = "Join this role instead?"
+                )
+            },
+            text = {
+                Text(
+                    text =
+                        "You already have a pending application for " +
+                                otherPendingApplication.applicationRoleTitle +
+                                ". Joining " +
+                                volunteerOpportunityRole.roleTitle +
+                                " will cancel that pending application."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        pendingInstantSwitchAnswers = null
+                        volunteerOpportunityViewModel
+                            .submitApplication(
+                                eventId = volunteerEventId,
+                                roleId = volunteerRoleId,
+                                answers = switchAnswers,
+                                onSuccess = {
+                                    applicationWasSubmitted = true
+                                }
+                            )
+                    }
+                ) {
+                    Text("Join role")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        pendingInstantSwitchAnswers = null
+                    }
+                ) {
+                    Text("Keep application")
+                }
+            }
+        )
     }
 }
 
@@ -192,6 +300,7 @@ private fun VolunteerApplicationFormScreen(
     onBackSelected: () -> Unit,
     isSubmitting: Boolean,
     serverErrorMessage: String?,
+    submissionAllowed: Boolean,
     onApplicationSubmitted: (List<String>) -> Unit
 ) {
     val extraQuestions =
@@ -621,7 +730,11 @@ private fun VolunteerApplicationFormScreen(
                         horizontal = 16.dp
                     ),
                 enabled = !isSubmitting &&
-                    com.example.volunteerlink.data.VolunteerApplicationWindow.canApply(volunteerOpportunityEvent)
+                    submissionAllowed &&
+                    com.example.volunteerlink.data.VolunteerApplicationWindow.canApply(
+                        volunteerOpportunityEvent,
+                        volunteerOpportunityRole
+                    )
             ) {
                 Text(
                     text =

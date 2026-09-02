@@ -562,6 +562,58 @@ class OrganisationPostManagementViewModel : ViewModel() {
         }
     }
 
+    fun reviewApplicant(
+        person: PostManagementPerson,
+        decision: String,
+        onSuccess: () -> Unit = {}
+    ) {
+        val post = cachedPost ?: return
+        val normalizedDecision = decision.trim().uppercase(Locale.US)
+        if (normalizedDecision !in setOf("ACCEPT", "DECLINE")) return
+        if (!person.applicationStatus.equals("PENDING", ignoreCase = true)) {
+            _uiState.value = _uiState.value.copy(
+                applicantActionMessage = "This application is no longer pending."
+            )
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                isUpdatingApplicant = true,
+                applicantActionMessage = null
+            )
+            try {
+                repository.reviewApplicant(
+                    postId = post.postId,
+                    roleTemplateId = person.roleTemplateId,
+                    userId = person.userId,
+                    decision = normalizedDecision
+                )
+
+                val refreshedPost = repository.loadPost(post.postId)
+                cachedPost = refreshedPost
+                applyTiming(refreshedPost)
+                _uiState.value = _uiState.value.copy(
+                    isUpdatingApplicant = false,
+                    applicantActionMessage = null
+                )
+                onSuccess()
+            } catch (exception: Exception) {
+                Log.e(TAG, "Could not review applicant.", exception)
+                _uiState.value = _uiState.value.copy(
+                    isUpdatingApplicant = false,
+                    applicantActionMessage = exception.message
+                        ?.substringAfter("message=")
+                        ?.substringBefore(",")
+                        ?.trim()
+                        ?.takeIf { it.isNotBlank() }
+                        ?: exception.message
+                        ?: "Unable to save this applicant decision."
+                )
+            }
+        }
+    }
+
     /**
      * Opens today's Physical attendance lazily. The SQL function is the final
      * authority for the current event date, live time window, ownership and
@@ -1175,7 +1227,9 @@ class OrganisationPostManagementViewModel : ViewModel() {
             isUpdatingRemoteReview = _uiState.value.isUpdatingRemoteReview,
             remoteReviewActionMessage = _uiState.value.remoteReviewActionMessage,
             remoteReviewFinalizeSucceeded = _uiState.value.remoteReviewFinalizeSucceeded,
-            remoteReviewSession = _uiState.value.remoteReviewSession
+            remoteReviewSession = _uiState.value.remoteReviewSession,
+            isUpdatingApplicant = _uiState.value.isUpdatingApplicant,
+            applicantActionMessage = _uiState.value.applicantActionMessage
         )
     }
 

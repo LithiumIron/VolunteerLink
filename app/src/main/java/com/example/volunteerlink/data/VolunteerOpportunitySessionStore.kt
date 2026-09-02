@@ -162,6 +162,31 @@ object VolunteerOpportunitySessionStore {
             )
         }
 
+    fun activeApplicationForEvent(
+        eventId: Int
+    ): VolunteerOpportunityApplication? =
+        volunteerApplications
+            .filter { application ->
+                application.applicationEventId == eventId &&
+                    application.applicationStatus in setOf(
+                        VolunteerApplicationStatus.PENDING,
+                        VolunteerApplicationStatus.ACCEPTED
+                    )
+            }
+            // ACCEPTED is authoritative if legacy/offline data temporarily contains both.
+            .sortedBy { application ->
+                if (application.applicationStatus == VolunteerApplicationStatus.ACCEPTED) 0 else 1
+            }
+            .firstOrNull()
+
+    fun pendingApplicationForEvent(
+        eventId: Int
+    ): VolunteerOpportunityApplication? =
+        volunteerApplications.firstOrNull { application ->
+            application.applicationEventId == eventId &&
+                application.applicationStatus == VolunteerApplicationStatus.PENDING
+        }
+
     fun snapshot(): VolunteerOpportunityDashboardData =
         VolunteerOpportunityDashboardData(
             events = volunteerOpportunityEvents.toList(),
