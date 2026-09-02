@@ -3,11 +3,16 @@ package com.example.volunteerlink.organisation.manage.model
 import com.example.volunteerlink.data.post.PostTimingState
 import com.example.volunteerlink.data.post.RoleApplicationCutoffReason
 import com.example.volunteerlink.data.post.RoleApplicationWindowState
+import kotlinx.serialization.Serializable
 
 /** State for one Volunteer Post opened from Organisation > Manage > Volunteer Posts. */
+@Serializable
 data class OrganisationPostManagementUiState(
     val isLoading: Boolean = true,
     val post: PostManagementPost? = null,
+    val isShowingCachedData: Boolean = false,
+    val lastSyncedAtEpochMillis: Long? = null,
+    val isRefreshing: Boolean = false,
     val errorMessage: String? = null,
     val isStartingAttendance: Boolean = false,
     val isUpdatingAttendance: Boolean = false,
@@ -29,6 +34,7 @@ data class OrganisationPostManagementUiState(
  * One post-management snapshot. The repository loads normalized database rows;
  * the ViewModel only adds the time-dependent lifecycle values.
  */
+@Serializable
 data class PostManagementPost(
     val postId: String,
     val organisationName: String,
@@ -64,6 +70,7 @@ data class PostManagementPost(
         }
 }
 
+@Serializable
 data class PostManagementPhysicalDetails(
     val startDate: String,
     val endDate: String,
@@ -76,6 +83,7 @@ data class PostManagementPhysicalDetails(
     val timeZone: String? = null
 )
 
+@Serializable
 data class PostManagementRemoteDetails(
     val startDate: String,
     val endDate: String,
@@ -90,6 +98,7 @@ data class PostManagementRemoteDetails(
 }
 
 /** One Remote deliverable submission. Shared submissions belong to the post; individual submissions belong to one volunteer. */
+@Serializable
 data class PostManagementRemoteSubmission(
     val submissionId: String,
     val roleTemplateId: String? = null,
@@ -104,6 +113,7 @@ data class PostManagementRemoteSubmission(
     val updatedAt: String? = null
 )
 
+@Serializable
 data class PostManagementScheduleItem(
     val scheduleItemId: String,
     val scheduleType: String,
@@ -116,6 +126,7 @@ data class PostManagementScheduleItem(
     val roleTemplateIds: List<String> = emptyList()
 )
 
+@Serializable
 data class PostManagementRole(
     val roleTemplateId: String,
     val roleName: String,
@@ -134,6 +145,7 @@ data class PostManagementRole(
 }
 
 
+@Serializable
 data class PostManagementPerson(
     val userId: String,
     val fullName: String,
@@ -156,6 +168,7 @@ data class PostManagementPerson(
 )
 
 /** One attendance session opened by the organisation for one Physical event day. */
+@Serializable
 data class PostManagementAttendanceDay(
     val eventDate: String,
     val pinCode: String,
@@ -165,6 +178,7 @@ data class PostManagementAttendanceDay(
 )
 
 /** One normalized volunteer check-in for one Physical role and event day. */
+@Serializable
 data class PostManagementAttendanceRecord(
     val eventDate: String,
     val roleTemplateId: String,
@@ -175,6 +189,7 @@ data class PostManagementAttendanceRecord(
 )
 
 /** One final organisation review record for one volunteer participation. */
+@Serializable
 data class PostManagementEvaluation(
     val roleTemplateId: String,
     val userId: String,
@@ -188,12 +203,14 @@ data class PostManagementEvaluation(
 )
 
 /** Small attendance-only payload used by the active People-screen poll. */
+@Serializable
 data class PostManagementAttendanceSnapshot(
     val attendanceDays: List<PostManagementAttendanceDay> = emptyList(),
     val attendanceRecords: List<PostManagementAttendanceRecord> = emptyList()
 )
 
 /** Time-dependent Physical attendance state prepared for the Manage UI. */
+@Serializable
 data class PostManagementPhysicalAttendance(
     val todayDate: String,
     val todaySession: PostManagementAttendanceDay? = null,
@@ -216,6 +233,7 @@ data class PostManagementPhysicalAttendance(
     }
 }
 
+@Serializable
 data class PostManagementVolunteerAttendanceSummary(
     val userId: String,
     val roleTemplateId: String,
@@ -231,6 +249,7 @@ data class PostManagementVolunteerAttendanceSummary(
     }
 }
 
+@Serializable
 data class PostManagementVolunteerAttendanceDateStatus(
     val eventDate: String,
     val expected: Boolean,
@@ -244,6 +263,7 @@ data class PostManagementVolunteerAttendanceDateStatus(
 )
 
 /** One accepted Physical volunteer in the Physical close-out flow. Attendance determines verified time, not completion by itself. */
+@Serializable
 data class PostManagementPhysicalReviewEntry(
     val person: PostManagementPerson,
     val attendanceSummary: PostManagementVolunteerAttendanceSummary,
@@ -265,6 +285,7 @@ data class PostManagementPhysicalReviewEntry(
 }
 
 /** Feedback groups are reconstructed from equal feedback text; no group table is stored. */
+@Serializable
 data class PostManagementFeedbackGroup(
     val feedback: String,
     val userIds: List<String>,
@@ -275,6 +296,7 @@ data class PostManagementFeedbackGroup(
 }
 
 /** Physical close-out state. `ready` means full attendance/no flagged issue and is only a quick-completion candidate, not automatically completed. */
+@Serializable
 data class PostManagementPhysicalReview(
     val ready: List<PostManagementPhysicalReviewEntry> = emptyList(),
     val needsReview: List<PostManagementPhysicalReviewEntry> = emptyList(),
@@ -297,6 +319,7 @@ data class PostManagementPhysicalReview(
  * These values deliberately live only in the ViewModel. They are not written to
  * Supabase until the organisation presses Finalize Event.
  */
+@Serializable
 enum class PostManagementPhysicalReviewStage {
     ATTENDANCE,
     COMPLETION,
@@ -304,17 +327,20 @@ enum class PostManagementPhysicalReviewStage {
     FINISH
 }
 
+@Serializable
 enum class PostManagementPendingDecisionType {
     COMPLETED,
     NOT_COMPLETED
 }
 
+@Serializable
 enum class PostManagementPendingDecisionSource {
     FULL_ATTENDANCE,
     PARTIAL_ATTENDANCE,
     WORK_ISSUE
 }
 
+@Serializable
 data class PostManagementPendingReviewDecision(
     val roleTemplateId: String,
     val userId: String,
@@ -323,6 +349,7 @@ data class PostManagementPendingReviewDecision(
     val source: PostManagementPendingDecisionSource
 )
 
+@Serializable
 data class PostManagementPhysicalReviewSession(
     val stage: PostManagementPhysicalReviewStage = PostManagementPhysicalReviewStage.ATTENDANCE,
     val decisions: List<PostManagementPendingReviewDecision> = emptyList(),
@@ -344,18 +371,21 @@ data class PostManagementPhysicalReviewSession(
 
 
 /** Remote close-out uses submitted work rather than Physical attendance. */
+@Serializable
 enum class PostManagementRemoteReviewStage {
     SUBMISSION,
     FEEDBACK,
     FINISH
 }
 
+@Serializable
 enum class PostManagementRemoteSubmissionDecisionType {
     ACCEPT,
     REQUEST_REVISION,
     NOT_ACCEPT
 }
 
+@Serializable
 enum class PostManagementRemoteMissingAction {
     GIVE_MORE_TIME,
     CONTINUE_WITHOUT_WORK
@@ -366,12 +396,14 @@ enum class PostManagementRemoteMissingAction {
  * Shared Team work is represented by null role/user because remote_details already
  * tells the database that the post uses SHARED_TEAM; submission mode is not duplicated.
  */
+@Serializable
 data class PostManagementRemoteMissingDecision(
     val roleTemplateId: String? = null,
     val userId: String? = null,
     val action: PostManagementRemoteMissingAction
 )
 
+@Serializable
 data class PostManagementRemoteSubmissionDecision(
     val itemKey: String,
     val submissionId: String,
@@ -381,6 +413,7 @@ data class PostManagementRemoteSubmissionDecision(
 
 
 /** One submission stream shown in Remote > Needs Review. */
+@Serializable
 data class PostManagementRemoteReviewItem(
     val itemKey: String,
     val submissionType: String,
@@ -401,6 +434,7 @@ data class PostManagementRemoteReviewItem(
 }
 
 /** Derived Remote review data. No review history is duplicated here. */
+@Serializable
 data class PostManagementRemoteReview(
     val todayDate: String,
     val currentDeadline: String,
@@ -430,6 +464,7 @@ data class PostManagementRemoteReview(
  * same save, accepted work becomes COMPLETED and rejected/missing work becomes
  * NOT_COMPLETED. Only optional final feedback remains until Finish.
  */
+@Serializable
 data class PostManagementRemoteReviewSession(
     val stage: PostManagementRemoteReviewStage = PostManagementRemoteReviewStage.SUBMISSION,
     val submissionDecisions: List<PostManagementRemoteSubmissionDecision> = emptyList(),

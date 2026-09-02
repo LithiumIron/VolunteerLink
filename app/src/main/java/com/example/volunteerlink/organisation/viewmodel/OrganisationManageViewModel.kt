@@ -12,6 +12,7 @@ import com.example.volunteerlink.data.post.RoleApplicationWindowEvaluator
 import com.example.volunteerlink.data.post.RoleApplicationWindowInput
 import com.example.volunteerlink.data.time.AppClock
 import com.example.volunteerlink.organisation.auth.OrganisationSession
+import com.example.volunteerlink.organisation.data.OrganisationLocalStorage
 import com.example.volunteerlink.organisation.home.model.OrganisationHomePost
 import com.example.volunteerlink.organisation.home.model.OrganisationHomeRole
 import com.example.volunteerlink.organisation.home.model.OrganisationHomeSnapshot
@@ -59,21 +60,52 @@ class OrganisationManageViewModel : ViewModel() {
         refreshInProgress = true
 
         viewModelScope.launch {
-            val isInitialLoad = cachedSnapshot == null
-            _uiState.value = _uiState.value.copy(
-                isLoading = isInitialLoad,
-                errorMessage = null
-            )
+            val saved = runCatching {
+                OrganisationLocalStorage.loadSnapshot()
+            }.getOrNull()
+
+            if (cachedSnapshot == null && saved != null) {
+                cachedSnapshot = saved.snapshot
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    lastSyncedAtEpochMillis = saved.lastSyncedAtEpochMillis,
+                    isRefreshing = _uiState.value.isShowingCachedData,
+                    errorMessage = null
+                )
+                applySnapshot(saved.snapshot)
+            } else {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = cachedSnapshot == null,
+                    isRefreshing = cachedSnapshot != null && _uiState.value.isShowingCachedData,
+                    errorMessage = null
+                )
+            }
 
             try {
                 val organisationId = resolveCurrentOrganisationId()
                 val snapshot = repository.loadHomeSnapshot(organisationId)
+                val syncedAt = System.currentTimeMillis()
+
+                runCatching {
+                    OrganisationLocalStorage.saveSnapshot(
+                        snapshot = snapshot,
+                        syncedAtEpochMillis = syncedAt
+                    )
+                }
+
                 cachedSnapshot = snapshot
+                _uiState.value = _uiState.value.copy(
+                    isShowingCachedData = false,
+                    lastSyncedAtEpochMillis = syncedAt,
+                    isRefreshing = false
+                )
                 applySnapshot(snapshot)
             } catch (exception: Exception) {
                 Log.e(TAG, "Could not load Manage data.", exception)
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
+                    isRefreshing = false,
+                    isShowingCachedData = cachedSnapshot != null,
                     errorMessage = if (cachedSnapshot == null) {
                         exception.message ?: "Unable to load organisation posts."
                     } else {
@@ -238,6 +270,7 @@ class OrganisationManageViewModel : ViewModel() {
             }
         }
 
+        val currentState = _uiState.value
         _uiState.value = OrganisationManageUiState(
             isLoading = false,
             organisationName = snapshot.organisationName,
@@ -269,6 +302,9 @@ class OrganisationManageViewModel : ViewModel() {
                 compareByDescending<ManagePostItem> { it.endDate.orEmpty() }
                     .thenBy { it.title }
             ),
+            isShowingCachedData = currentState.isShowingCachedData,
+            lastSyncedAtEpochMillis = currentState.lastSyncedAtEpochMillis,
+            isRefreshing = currentState.isRefreshing,
             errorMessage = null
         )
     }

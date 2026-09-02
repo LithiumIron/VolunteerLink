@@ -49,6 +49,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.volunteerlink.data.post.PostTimingState
+import com.example.volunteerlink.organisation.components.OrganisationOfflineStatusCard
 import com.example.volunteerlink.organisation.manage.model.PostManagementPerson
 import com.example.volunteerlink.organisation.manage.model.PostManagementPost
 import com.example.volunteerlink.organisation.manage.model.PostManagementRole
@@ -132,9 +133,16 @@ fun OrganisationPostManagementScreen(
     // succeeds and that screen pops back here, refresh this existing Manage Post
     // screen so the People tab immediately reflects Accepted/Declined state.
     val lifecycleOwner = LocalLifecycleOwner.current
+    var hasHandledFirstResume by rememberSaveable(postId) { mutableStateOf(false) }
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) viewModel.refresh()
+            if (event == Lifecycle.Event.ON_RESUME) {
+                if (hasHandledFirstResume) {
+                    viewModel.refresh()
+                } else {
+                    hasHandledFirstResume = true
+                }
+            }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
@@ -184,6 +192,10 @@ fun OrganisationPostManagementScreen(
             isUpdatingRemoteReview = uiState.isUpdatingRemoteReview,
             remoteReviewActionMessage = uiState.remoteReviewActionMessage,
             remoteReviewSession = remoteReviewSession,
+            isShowingCachedData = uiState.isShowingCachedData,
+            lastSyncedAtEpochMillis = uiState.lastSyncedAtEpochMillis,
+            isRefreshing = uiState.isRefreshing,
+            onSyncSelected = viewModel::refresh,
             onBack = {
                 if (hasUnfinishedReview) confirmLeaveReview = true else onBack()
             },
@@ -394,6 +406,10 @@ private fun OrganisationPostManagementContent(
     isUpdatingRemoteReview: Boolean,
     remoteReviewActionMessage: String?,
     remoteReviewSession: PostManagementRemoteReviewSession,
+    isShowingCachedData: Boolean,
+    lastSyncedAtEpochMillis: Long?,
+    isRefreshing: Boolean,
+    onSyncSelected: () -> Unit,
     onBack: () -> Unit,
     onEdit: () -> Unit,
     onViewApplication: (roleTemplateId: String, userId: String) -> Unit,
@@ -544,7 +560,8 @@ private fun OrganisationPostManagementContent(
     }
 
     val shouldPollAttendance =
-        selectedTab == PostManagementTab.PEOPLE &&
+        !isShowingCachedData &&
+            selectedTab == PostManagementTab.PEOPLE &&
             selectedPeopleTab == PostManagementPeopleTab.VOLUNTEERS &&
             physicalAttendance != null
 
@@ -655,7 +672,7 @@ private fun OrganisationPostManagementContent(
             }
         }
 
-    val showEdit = when (post.databaseStatus.uppercase(Locale.US)) {
+    val showEdit = !isShowingCachedData && when (post.databaseStatus.uppercase(Locale.US)) {
         "COMPLETED", "CANCELLED" -> false
         else -> post.timingState != PostTimingState.PAST
     }
@@ -682,6 +699,16 @@ private fun OrganisationPostManagementContent(
             ),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            if (isShowingCachedData) {
+                item(key = "post_offline_status") {
+                    OrganisationOfflineStatusCard(
+                        lastSyncedAtEpochMillis = lastSyncedAtEpochMillis,
+                        isSyncing = isRefreshing,
+                        onSyncSelected = onSyncSelected
+                    )
+                }
+            }
+
             item(key = "post_summary") {
                 PostManagementSummaryCard(post)
             }

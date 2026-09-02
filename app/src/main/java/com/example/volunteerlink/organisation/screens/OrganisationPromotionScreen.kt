@@ -4,6 +4,9 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -24,11 +27,16 @@ fun OrganisationPromotionScreen(
     val promotionState by promotionViewModel.uiState.collectAsStateWithLifecycle()
 
     val lifecycleOwner = LocalLifecycleOwner.current
+    var hasHandledFirstResume by rememberSaveable { mutableStateOf(false) }
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                manageViewModel.refresh()
-                promotionViewModel.refreshPromotions()
+                if (hasHandledFirstResume) {
+                    manageViewModel.refresh()
+                    promotionViewModel.refreshPromotions()
+                } else {
+                    hasHandledFirstResume = true
+                }
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -48,6 +56,12 @@ fun OrganisationPromotionScreen(
                     promotionViewModel::isPostEligible
                 ),
                 promotionsByPostId = promotionState.promotionsByPostId,
+                isShowingCachedData = manageState.isShowingCachedData ||
+                    promotionState.isShowingCachedPromotionData,
+                lastSyncedAtEpochMillis = promotionState.promotionLastSyncedAtEpochMillis
+                    ?: manageState.lastSyncedAtEpochMillis,
+                isSyncing = manageState.isRefreshing ||
+                    promotionState.isRefreshingPromotions,
                 canPurchase = promotionViewModel::canPurchaseAnyPackage,
                 isPromotionActive = promotionViewModel::isPromotionActive,
                 onBack = onBack,

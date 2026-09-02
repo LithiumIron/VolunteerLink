@@ -1,6 +1,7 @@
 package com.example.volunteerlink.data.post
 
 import com.example.volunteerlink.data.time.AppClock
+import kotlinx.serialization.Serializable
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -102,11 +103,13 @@ data class RoleApplicationWindowInput(
     val remoteStartDate: String? = null
 )
 
+@Serializable
 enum class RoleApplicationWindowState {
     OPEN,
     CLOSED
 }
 
+@Serializable
 enum class RoleApplicationCutoffReason {
     ROLE_START,
     POST_STATUS

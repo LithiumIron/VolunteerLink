@@ -9,6 +9,8 @@ import com.example.volunteerlink.data.post.PostTimingState
 import com.example.volunteerlink.data.supabase
 import com.example.volunteerlink.data.time.AppClock
 import com.example.volunteerlink.organisation.manage.model.ManagePostItem
+import com.example.volunteerlink.organisation.data.CachedPromotionRecord
+import com.example.volunteerlink.organisation.data.OrganisationLocalStorage
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.postgrest
@@ -67,16 +69,52 @@ class OrganisationPromotionViewModel(
     )
     val uiState = _uiState.asStateFlow()
 
+    private var refreshInProgress = false
+
     init {
         refreshPromotions()
     }
 
     fun refreshPromotions() {
+        if (refreshInProgress) return
+        refreshInProgress = true
+
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(
-                isLoadingPromotions = true,
-                promotionLoadError = null
-            )
+            val saved = runCatching {
+                OrganisationLocalStorage.loadPromotions()
+            }.getOrNull()
+
+            if (_uiState.value.promotionsByPostId.isEmpty() && saved != null) {
+                val cachedByPost = saved.promotions
+                    .map { cached ->
+                        PromotionRecord(
+                            promotionId = cached.promotionId,
+                            postId = cached.postId,
+                            startAtMillis = cached.startAtMillis,
+                            endAtMillis = cached.endAtMillis,
+                            createdAtMillis = cached.createdAtMillis
+                        )
+                    }
+                    .groupBy { it.postId }
+                    .mapValues { (_, promotions) ->
+                        promotions.maxBy { it.startAtMillis }
+                    }
+
+                _uiState.value = _uiState.value.copy(
+                    isLoadingPromotions = false,
+                    isRefreshingPromotions = _uiState.value.isShowingCachedPromotionData,
+                    promotionLastSyncedAtEpochMillis = saved.lastSyncedAtEpochMillis,
+                    promotionsByPostId = cachedByPost,
+                    promotionLoadError = null
+                )
+            } else {
+                _uiState.value = _uiState.value.copy(
+                    isLoadingPromotions = _uiState.value.promotionsByPostId.isEmpty(),
+                    isRefreshingPromotions = _uiState.value.promotionsByPostId.isNotEmpty() &&
+                        _uiState.value.isShowingCachedPromotionData,
+                    promotionLoadError = null
+                )
+            }
 
             try {
                 val rows = supabase
@@ -115,18 +153,45 @@ class OrganisationPromotionViewModel(
                         promotions.maxBy { it.startAtMillis }
                     }
 
+                val syncedAt = System.currentTimeMillis()
+                runCatching {
+                    OrganisationLocalStorage.savePromotions(
+                        promotions = latestByPost.values.map { promotion ->
+                            CachedPromotionRecord(
+                                promotionId = promotion.promotionId,
+                                postId = promotion.postId,
+                                startAtMillis = promotion.startAtMillis,
+                                endAtMillis = promotion.endAtMillis,
+                                createdAtMillis = promotion.createdAtMillis
+                            )
+                        },
+                        syncedAtEpochMillis = syncedAt
+                    )
+                }
+
                 _uiState.value = _uiState.value.copy(
                     isLoadingPromotions = false,
+                    isRefreshingPromotions = false,
+                    isShowingCachedPromotionData = false,
+                    promotionLastSyncedAtEpochMillis = syncedAt,
                     promotionsByPostId = latestByPost,
                     promotionLoadError = null
                 )
             } catch (exception: Exception) {
                 exception.printStackTrace()
+                val hasCachedData = _uiState.value.promotionsByPostId.isNotEmpty() || saved != null
                 _uiState.value = _uiState.value.copy(
                     isLoadingPromotions = false,
-                    promotionLoadError = exception.message
-                        ?: "Unable to load promotion information."
+                    isRefreshingPromotions = false,
+                    isShowingCachedPromotionData = hasCachedData,
+                    promotionLoadError = if (hasCachedData) {
+                        null
+                    } else {
+                        exception.message ?: "Unable to load promotion information."
+                    }
                 )
+            } finally {
+                refreshInProgress = false
             }
         }
     }
@@ -202,6 +267,14 @@ class OrganisationPromotionViewModel(
         val state = _uiState.value
         val post = state.selectedPost ?: return
         val promotionPackage = state.selectedPackage ?: return
+
+        if (state.isShowingCachedPromotionData) {
+            _uiState.value = state.copy(
+                isProcessing = false,
+                message = "Connect to the internet and sync before making a promotion payment."
+            )
+            return
+        }
 
         if (!isPackageAvailable(post, promotionPackage)) {
             _uiState.value = state.copy(
@@ -403,12 +476,32 @@ class OrganisationPromotionViewModel(
                     putString("preferred_payment_method", method.name)
                 }
 
+                val updatedPromotions = _uiState.value.promotionsByPostId +
+                    (post.postId to promotionRecord)
+                val syncedAt = System.currentTimeMillis()
+
+                runCatching {
+                    OrganisationLocalStorage.savePromotions(
+                        promotions = updatedPromotions.values.map { promotion ->
+                            CachedPromotionRecord(
+                                promotionId = promotion.promotionId,
+                                postId = promotion.postId,
+                                startAtMillis = promotion.startAtMillis,
+                                endAtMillis = promotion.endAtMillis,
+                                createdAtMillis = promotion.createdAtMillis
+                            )
+                        },
+                        syncedAtEpochMillis = syncedAt
+                    )
+                }
+
                 _uiState.value = _uiState.value.copy(
                     step = PromotionStep.SUCCESS,
                     isProcessing = false,
                     completedPromotion = completed,
-                    promotionsByPostId = _uiState.value.promotionsByPostId +
-                        (post.postId to promotionRecord),
+                    promotionsByPostId = updatedPromotions,
+                    isShowingCachedPromotionData = false,
+                    promotionLastSyncedAtEpochMillis = syncedAt,
                     preferredPaymentMethod = method,
                     savedCardholderName = savedCardholderName,
                     savedCardLastFour = savedCardLastFour,
@@ -722,6 +815,9 @@ data class OrganisationPromotionUiState(
     val selectedPaymentMethod: PromotionPaymentMethod? = null,
     val isProcessing: Boolean = false,
     val isLoadingPromotions: Boolean = true,
+    val isRefreshingPromotions: Boolean = false,
+    val isShowingCachedPromotionData: Boolean = false,
+    val promotionLastSyncedAtEpochMillis: Long? = null,
     val completedPromotion: PromotionPurchase? = null,
     val promotionsByPostId: Map<String, PromotionRecord> = emptyMap(),
     val cardholderName: String = "",

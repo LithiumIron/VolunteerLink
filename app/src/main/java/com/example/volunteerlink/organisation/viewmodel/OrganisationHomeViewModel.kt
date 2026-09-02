@@ -12,6 +12,7 @@ import com.example.volunteerlink.data.post.RoleApplicationWindowEvaluator
 import com.example.volunteerlink.data.post.RoleApplicationWindowInput
 import com.example.volunteerlink.data.time.AppClock
 import com.example.volunteerlink.organisation.auth.OrganisationSession
+import com.example.volunteerlink.organisation.data.OrganisationLocalStorage
 import com.example.volunteerlink.organisation.home.model.HomeAttentionItem
 import com.example.volunteerlink.organisation.home.model.HomeAttentionSeverity
 import com.example.volunteerlink.organisation.home.model.HomeAttentionType
@@ -50,29 +51,60 @@ class OrganisationHomeViewModel : ViewModel() {
         observeAppClock()
     }
 
-    /** Reloads organisation/post data from Supabase. */
+    /** Loads saved data first, then tries to sync the latest snapshot from Supabase. */
     fun refresh() {
         if (refreshInProgress) return
         refreshInProgress = true
 
         viewModelScope.launch {
-            val isInitialLoad = cachedSnapshot == null
-            _uiState.value = _uiState.value.copy(
-                isLoading = isInitialLoad,
-                errorMessage = null
-            )
+            val saved = runCatching {
+                OrganisationLocalStorage.loadSnapshot()
+            }.getOrNull()
+
+            if (cachedSnapshot == null && saved != null) {
+                cachedSnapshot = saved.snapshot
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    lastSyncedAtEpochMillis = saved.lastSyncedAtEpochMillis,
+                    isRefreshing = _uiState.value.isShowingCachedData,
+                    errorMessage = null
+                )
+                applySnapshot(saved.snapshot)
+            } else {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = cachedSnapshot == null,
+                    isRefreshing = cachedSnapshot != null && _uiState.value.isShowingCachedData,
+                    errorMessage = null
+                )
+            }
 
             try {
                 val organisationId = resolveCurrentOrganisationId()
                 val snapshot = homeRepository.loadHomeSnapshot(
                     organisationId = organisationId
                 )
+                val syncedAt = System.currentTimeMillis()
+
+                runCatching {
+                    OrganisationLocalStorage.saveSnapshot(
+                        snapshot = snapshot,
+                        syncedAtEpochMillis = syncedAt
+                    )
+                }
+
                 cachedSnapshot = snapshot
+                _uiState.value = _uiState.value.copy(
+                    isShowingCachedData = false,
+                    lastSyncedAtEpochMillis = syncedAt,
+                    isRefreshing = false
+                )
                 applySnapshot(snapshot)
             } catch (exception: Exception) {
                 Log.e(TAG, "Could not load Organisation Home data.", exception)
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
+                    isRefreshing = false,
+                    isShowingCachedData = cachedSnapshot != null,
                     errorMessage = if (cachedSnapshot == null) {
                         exception.message ?: "Unable to load organisation home data."
                     } else {
@@ -216,6 +248,7 @@ class OrganisationHomeViewModel : ViewModel() {
                 .thenBy { it.postTitle }
         )
 
+        val currentState = _uiState.value
         _uiState.value = OrganisationHomeUiState(
             isLoading = false,
             organisationName = snapshot.organisationName,
@@ -225,6 +258,9 @@ class OrganisationHomeViewModel : ViewModel() {
             attentionItems = sortedAttention,
             ongoingPosts = sortedOngoing,
             upcomingPosts = sortedUpcoming,
+            isShowingCachedData = currentState.isShowingCachedData,
+            lastSyncedAtEpochMillis = currentState.lastSyncedAtEpochMillis,
+            isRefreshing = currentState.isRefreshing,
             errorMessage = null
         )
 

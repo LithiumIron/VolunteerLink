@@ -17,6 +17,9 @@ data class OrganisationHomeUiState(
     val attentionItems: List<HomeAttentionItem> = emptyList(),
     val ongoingPosts: List<HomePostItem> = emptyList(),
     val upcomingPosts: List<HomePostItem> = emptyList(),
+    val isShowingCachedData: Boolean = false,
+    val lastSyncedAtEpochMillis: Long? = null,
+    val isRefreshing: Boolean = false,
     val errorMessage: String? = null
 )
 

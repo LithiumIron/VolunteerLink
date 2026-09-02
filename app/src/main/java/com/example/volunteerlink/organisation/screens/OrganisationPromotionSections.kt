@@ -55,6 +55,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.volunteerlink.R
+import com.example.volunteerlink.organisation.components.OrganisationOfflineStatusCard
 import com.example.volunteerlink.organisation.components.OrganisationStatusPill
 import com.example.volunteerlink.organisation.manage.model.ManagePostItem
 import com.example.volunteerlink.organisation.viewmodel.PromotionPackage
@@ -83,6 +84,9 @@ fun PromotionPostSelectionScreen(
     errorMessage: String?,
     upcomingPosts: List<ManagePostItem>,
     promotionsByPostId: Map<String, PromotionRecord>,
+    isShowingCachedData: Boolean,
+    lastSyncedAtEpochMillis: Long?,
+    isSyncing: Boolean,
     canPurchase: (ManagePostItem) -> Boolean,
     isPromotionActive: (ManagePostItem) -> Boolean,
     onBack: () -> Unit,
@@ -165,6 +169,16 @@ fun PromotionPostSelectionScreen(
                     ),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+                    if (isShowingCachedData) {
+                        item(key = "promotion_offline_status") {
+                            OrganisationOfflineStatusCard(
+                                lastSyncedAtEpochMillis = lastSyncedAtEpochMillis,
+                                isSyncing = isSyncing,
+                                onSyncSelected = onRetry
+                            )
+                        }
+                    }
+
                     item {
                         Text(
                             text = "Choose an upcoming opportunity",
