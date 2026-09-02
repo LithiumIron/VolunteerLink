@@ -17,15 +17,15 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 data class VolunteerAuthUiState(
     val isCheckingSession: Boolean = true,
     val isSigningIn: Boolean = false,
+    val isSubmitting: Boolean = false,
     val isAuthenticated: Boolean = false,
-    // Set only when a SAVED session was found on launch. The screen should
-    // show a "Continue as <email>?" prompt instead of signing in silently,
-    // so a different account can be used for testing without needing to
-    // manually sign out first.
+    val needsEmailConfirmation: Boolean = false,
     val pendingAccountEmail: String? = null,
     val errorMessage: String? = null
 )
@@ -99,6 +99,105 @@ class VolunteerAuthViewModel(
                     )
             }
         }
+    }
+
+    fun signUp(
+        fullName: String,
+        email: String,
+        phone: String,
+        password: String
+    ) {
+        val normalizedName = fullName.trim()
+        val normalizedEmail = email.trim()
+        val normalizedPhone = phone.trim()
+
+        when {
+            normalizedName.isBlank() -> {
+                showError("Enter your name.")
+                return
+            }
+            normalizedEmail.isBlank() -> {
+                showError("Enter an email address.")
+                return
+            }
+            normalizedPhone.isBlank() -> {
+                showError("Enter a contact phone number.")
+                return
+            }
+            !isValidVolunteerPhoneNumber(normalizedPhone) -> {
+                showError("Enter a valid phone number starting with 0.")
+                return
+            }
+            password.length < 6 -> {
+                showError("Password must be at least 6 characters.")
+                return
+            }
+        }
+
+        viewModelScope.launch {
+            mutableUiState.update {
+                it.copy(isSubmitting = true, errorMessage = null)
+            }
+
+            try {
+                // Volunteer equivalent of the organisation trigger: an
+                // auth.users insert trigger reads this metadata and
+                // atomically creates the matching user_profiles row.
+                supabase.auth.signUpWith(Email) {
+                    this.email = normalizedEmail
+                    this.password = password
+                    data = buildJsonObject {
+                        put("volunteerlink_account_type", "VOLUNTEER")
+                        put("full_name", normalizedName)
+                        put("phone", normalizedPhone)
+                    }
+                }
+
+                val authUserId = supabase.auth.currentUserOrNull()?.id
+
+                if (authUserId == null) {
+                    // Email confirmation is enabled — the trigger already
+                    // created the profile row; sign-in works once confirmed.
+                    mutableUiState.value = VolunteerAuthUiState(
+                        isCheckingSession = false,
+                        needsEmailConfirmation = true
+                    )
+                    return@launch
+                }
+
+                confirmVolunteerProfile()
+
+                // Sync phone into auth.users.phone too. Requires Phone auth
+                // + an SMS provider configured — don't let a failure here
+                // block account creation, since user_profiles.phone is
+                // already reliably captured via the signup trigger.
+                runCatching {
+                    supabase.auth.updateUser {
+                        this.phone = normalizedPhone
+                    }
+                }.onFailure { it.printStackTrace() }
+
+                rememberVerifiedVolunteer()
+
+                mutableUiState.value = VolunteerAuthUiState(
+                    isCheckingSession = false,
+                    isAuthenticated = true
+                )
+            } catch (exception: Exception) {
+                exception.printStackTrace()
+                runCatching { supabase.auth.signOut() }
+                mutableUiState.value = VolunteerAuthUiState(
+                    isCheckingSession = false,
+                    errorMessage = authErrorMessage(exception)
+                )
+            }
+        }
+    }
+
+    private fun isValidVolunteerPhoneNumber(phone: String): Boolean {
+        val cleaned = phone.replace(Regex("[\\s\\-()]"), "")
+        val isLocalFormat = cleaned.matches(Regex("^0\\d{8,9}$"))
+        return isLocalFormat
     }
 
     fun clearError() {

@@ -1,22 +1,25 @@
 package com.example.volunteerlink.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Mail
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -24,8 +27,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -33,7 +36,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -42,112 +44,84 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.volunteerlink.ui.theme.VolunteerLinkBackground
-import com.example.volunteerlink.ui.theme.VolunteerLinkError
-import com.example.volunteerlink.ui.theme.VolunteerLinkPrimaryGreen
-import com.example.volunteerlink.ui.theme.VolunteerLinkTextPrimary
-import com.example.volunteerlink.ui.theme.VolunteerLinkTextSecondary
 
 @Composable
-fun VolunteerSignInScreen(
+fun VolunteerSignUpScreen(
     onBackSelected: () -> Unit,
-    onSignUpSelected: () -> Unit,
-    onSignedIn: () -> Unit,
+    onSignedUp: () -> Unit,
     volunteerAuthViewModel: VolunteerAuthViewModel = viewModel()
 ) {
     val uiState by volunteerAuthViewModel.uiState
         .collectAsStateWithLifecycle()
 
-    var email by rememberSaveable {
-        mutableStateOf("")
-    }
-    var password by rememberSaveable {
-        mutableStateOf("")
-    }
+    var fullName by rememberSaveable { mutableStateOf("") }
+    var email by rememberSaveable { mutableStateOf("") }
+    var phone by rememberSaveable { mutableStateOf("") }
+    var password by rememberSaveable { mutableStateOf("") }
 
     LaunchedEffect(uiState.isAuthenticated) {
-        if (uiState.isAuthenticated) onSignedIn()
+        if (uiState.isAuthenticated) onSignedUp()
     }
 
-    val isBusy = uiState.isSigningIn || uiState.isCheckingSession
-
-    // A saved session was restored on launch — ask before signing in
-    // automatically, so a different account can be used instead without
-    // needing to sign out manually first. Same pattern as the
-    // organisation sign-in screen.
-    uiState.pendingAccountEmail?.let { pendingEmail ->
-        AlertDialog(
-            // Empty on purpose — force an explicit choice rather than
-            // letting a tap-outside or back-press silently sign someone in.
-            onDismissRequest = {},
-            title = { Text("Continue as $pendingEmail?") },
-            text = {
-                Text(
-                    "You're already signed in with this account on this " +
-                            "device. Continue with it, or sign in with a " +
-                            "different account instead."
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = { volunteerAuthViewModel.continueWithRestoredSession() }
-                ) {
-                    Text("Continue")
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { volunteerAuthViewModel.useDifferentAccount() }
-                ) {
-                    Text("Use a different account")
-                }
-            }
-        )
-    }
+    val isBusy = uiState.isSubmitting || uiState.isCheckingSession
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(VolunteerLinkBackground)
+            .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
     ) {
-        IconButton(
-            onClick = onBackSelected,
-            enabled = !isBusy
-        ) {
+        IconButton(onClick = onBackSelected, enabled = !isBusy) {
             Icon(
-                imageVector =
-                    Icons.AutoMirrored.Filled.ArrowBack,
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                 contentDescription = "Back",
-                tint = VolunteerLinkPrimaryGreen
+                tint = MaterialTheme.colorScheme.primary
             )
         }
 
         Column(
             modifier = Modifier
                 .weight(1f)
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 28.dp),
             verticalArrangement = Arrangement.Center
         ) {
             Text(
-                text = "Volunteer sign in",
-                fontSize = 28.sp,
+                text = "Create a volunteer account",
+                fontSize = 26.sp,
                 fontWeight = FontWeight.Bold,
-                color = VolunteerLinkTextPrimary
+                color = MaterialTheme.colorScheme.onBackground
             )
 
             Spacer(Modifier.height(7.dp))
 
             Text(
-                text =
-                    "Sign in to load your opportunities, applications " +
-                            "and verified Skill Path progress from Supabase.",
+                text = "Find opportunities and track your verified volunteering hours.",
                 fontSize = 13.sp,
                 lineHeight = 19.sp,
-                color = VolunteerLinkTextSecondary
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             Spacer(Modifier.height(26.dp))
+
+            OutlinedTextField(
+                value = fullName,
+                onValueChange = {
+                    fullName = it
+                    volunteerAuthViewModel.clearError()
+                },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Full name") },
+                leadingIcon = {
+                    Icon(imageVector = Icons.Filled.Person, contentDescription = null)
+                },
+                singleLine = true,
+                enabled = !isBusy,
+                shape = RoundedCornerShape(12.dp),
+                colors = volunteerFieldColours()
+            )
+
+            Spacer(Modifier.height(13.dp))
 
             OutlinedTextField(
                 value = email,
@@ -158,15 +132,36 @@ fun VolunteerSignInScreen(
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text("Email address") },
                 leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Filled.Mail,
-                        contentDescription = null
-                    )
+                    Icon(imageVector = Icons.Filled.Mail, contentDescription = null)
                 },
                 singleLine = true,
                 enabled = !isBusy,
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Email,
+                    imeAction = ImeAction.Next
+                ),
+                shape = RoundedCornerShape(12.dp),
+                colors = volunteerFieldColours()
+            )
+
+            Spacer(Modifier.height(13.dp))
+
+            OutlinedTextField(
+                value = phone,
+                onValueChange = {
+                    phone = it
+                    volunteerAuthViewModel.clearError()
+                },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Contact phone") },
+                leadingIcon = {
+                    Icon(imageVector = Icons.Filled.Phone, contentDescription = null)
+                },
+                placeholder = { Text("e.g. 0123456789") },
+                singleLine = true,
+                enabled = !isBusy,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Phone,
                     imeAction = ImeAction.Next
                 ),
                 shape = RoundedCornerShape(12.dp),
@@ -184,15 +179,11 @@ fun VolunteerSignInScreen(
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text("Password") },
                 leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Filled.Lock,
-                        contentDescription = null
-                    )
+                    Icon(imageVector = Icons.Filled.Lock, contentDescription = null)
                 },
                 singleLine = true,
                 enabled = !isBusy,
-                visualTransformation =
-                    PasswordVisualTransformation(),
+                visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Password,
                     imeAction = ImeAction.Done
@@ -201,13 +192,33 @@ fun VolunteerSignInScreen(
                 colors = volunteerFieldColours()
             )
 
+            if (uiState.needsEmailConfirmation) {
+                Spacer(Modifier.height(11.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            color = MaterialTheme.colorScheme.surface,
+                            shape = RoundedCornerShape(10.dp)
+                        )
+                        .padding(12.dp)
+                ) {
+                    Text(
+                        text = "Account created. Check your email to confirm it, then sign in.",
+                        fontSize = 12.sp,
+                        lineHeight = 17.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
             uiState.errorMessage?.let { message ->
                 Spacer(Modifier.height(11.dp))
                 Text(
                     text = message,
                     fontSize = 12.sp,
                     lineHeight = 17.sp,
-                    color = VolunteerLinkError
+                    color = MaterialTheme.colorScheme.error
                 )
             }
 
@@ -215,8 +226,10 @@ fun VolunteerSignInScreen(
 
             Button(
                 onClick = {
-                    volunteerAuthViewModel.signIn(
+                    volunteerAuthViewModel.signUp(
+                        fullName = fullName,
                         email = email,
+                        phone = phone,
                         password = password
                     )
                 },
@@ -226,47 +239,32 @@ fun VolunteerSignInScreen(
                 enabled = !isBusy,
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = VolunteerLinkPrimaryGreen,
-                    contentColor = Color.White
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
                 )
             ) {
                 if (isBusy) {
                     CircularProgressIndicator(
                         modifier = Modifier.height(22.dp),
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onPrimary,
                         strokeWidth = 2.dp
                     )
                 } else {
-                    Text(
-                        text = "Sign in as Volunteer",
-                        fontWeight = FontWeight.Bold
-                    )
+                    Text(text = "Create account", fontWeight = FontWeight.Bold)
                 }
             }
-            Spacer(Modifier.height(14.dp))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Text(
-                    text = "New volunteer?",
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                TextButton(
-                    onClick = onSignUpSelected,
-                    enabled = !isBusy
-                ) {
-                    Text(
-                        text = "Create an account",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
+            Spacer(Modifier.height(24.dp))
         }
     }
 }
+
+@Composable
+internal fun volunteerFieldColours() =
+    OutlinedTextFieldDefaults.colors(
+        focusedContainerColor = MaterialTheme.colorScheme.surface,
+        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+        focusedBorderColor = MaterialTheme.colorScheme.primary,
+        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+        cursorColor = MaterialTheme.colorScheme.primary
+    )

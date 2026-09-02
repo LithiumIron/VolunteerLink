@@ -667,6 +667,7 @@ object VolunteerOpportunityRepository {
                     eventOrganisationName =
                         organisation?.organisationName
                             ?: "VolunteerLink Organisation",
+                    eventOrganisationId = post.organisationId,
                     eventIsVerifiedOrganisation =
                         organisation?.verificationStatus ==
                                 "VERIFIED",

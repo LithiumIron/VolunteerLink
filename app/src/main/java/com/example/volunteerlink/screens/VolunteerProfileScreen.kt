@@ -1,6 +1,5 @@
 package com.example.volunteerlink.screens
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -151,12 +150,12 @@ fun VolunteerProfileScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 15.dp, start = 20.dp, end = 10.dp),
+                .padding(top = 16.dp, start = 20.dp, end = 12.dp),
             verticalAlignment = Alignment.Top
         ) {
             Box(
                 modifier = Modifier
-                    .size(115.dp)
+                    .size(76.dp)
                     .clip(CircleShape)
                     .background(VolunteerLinkSoftGreenSurface),
                 contentAlignment = Alignment.Center
@@ -169,61 +168,52 @@ fun VolunteerProfileScreen(
                         contentScale = ContentScale.Crop
                     )
                 } else {
-                    Icon(
-                        painter = painterResource(id = R.drawable.profile),
-                        contentDescription = "Profile Picture",
-                        tint = VolunteerLinkPrimaryGreen,
-                        modifier = Modifier.size(80.dp)
+                    Text(
+                        text = name
+                            .trim()
+                            .split(" ")
+                            .filter { it.isNotBlank() }
+                            .take(2)
+                            .mapNotNull { it.firstOrNull()?.uppercaseChar() }
+                            .joinToString("")
+                            .ifBlank { "V" },
+                        fontSize = 26.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = VolunteerLinkPrimaryGreen
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(14.dp))
 
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(top = 12.dp)
+                    .padding(top = 2.dp)
             ) {
                 Text(
                     text = name,
-                    fontSize = 20.sp,
+                    fontSize = 19.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.Black
+                    color = Color.Black,
+                    maxLines = 2
                 )
 
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(3.dp))
 
                 Text(
                     text = email,
-                    fontSize = 14.sp,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
-                    color = DeepGreen
-                )
-
-                if (bio.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = bio,
-                        fontSize = 13.sp,
-                        color = Color.DarkGray
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    text = "Member since $memberSince",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.Gray
+                    color = DeepGreen,
+                    maxLines = 1
                 )
             }
 
             IconButton(
                 onClick = onEditProfileSelected,
                 modifier = Modifier
-                    .size(40.dp)
+                    .size(36.dp)
                     .clip(CircleShape)
                     .background(VolunteerLinkSoftGreenSurface)
             ) {
@@ -231,10 +221,34 @@ fun VolunteerProfileScreen(
                     painter = painterResource(id = R.drawable.edit),
                     contentDescription = "Edit Profile",
                     tint = VolunteerLinkPrimaryGreen,
-                    modifier = Modifier.size(25.dp)
+                    modifier = Modifier.size(18.dp)
                 )
             }
         }
+
+        // Bio and member-since now sit full-width below the header row,
+        // instead of squeezed into the narrow column beside the avatar.
+        if (bio.isNotBlank()) {
+            Text(
+                text = bio,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 20.dp, end = 20.dp, top = 10.dp),
+                fontSize = 13.sp,
+                lineHeight = 19.sp,
+                color = Color.DarkGray
+            )
+        }
+
+        Text(
+            text = "Member since $memberSince",
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 20.dp, end = 20.dp, top = 8.dp),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.Gray
+        )
 
         // =====================================================
         // AVAILABILITY

@@ -414,16 +414,20 @@ fun OrganisationSignUpScreen(
                 value = phone,
                 onValueChange = {
                     phone = it
+                    organisationAuthViewModel.clearError()
                 },
                 modifier = Modifier.fillMaxWidth(),
                 label = {
-                    Text("Contact phone (optional)")
+                    Text("Contact phone")
                 },
                 leadingIcon = {
                     Icon(
                         imageVector = Icons.Filled.Phone,
                         contentDescription = null
                     )
+                },
+                placeholder = {
+                    Text("e.g. 0123456789")
                 },
                 singleLine = true,
                 enabled = !isBusy,

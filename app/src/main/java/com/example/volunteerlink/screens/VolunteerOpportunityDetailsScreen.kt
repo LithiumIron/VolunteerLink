@@ -18,12 +18,15 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Favorite
@@ -32,26 +35,37 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.volunteerlink.R
+import com.example.volunteerlink.data.OrganisationPublicProfile
+import com.example.volunteerlink.data.OrganisationPublicProfileRepository
 import com.example.volunteerlink.data.VolunteerOpportunitySessionStore
 import com.example.volunteerlink.model.VolunteerApplicationStatus
 import com.example.volunteerlink.model.VolunteerOpportunityCategory
@@ -71,6 +85,7 @@ import com.example.volunteerlink.ui.theme.VolunteerLinkSurface
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextPrimary
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextSecondary
 import com.example.volunteerlink.ui.theme.VolunteerLinkWarning
+import kotlinx.coroutines.launch
 
 @Composable
 fun VolunteerOpportunityDetailsScreen(
@@ -90,6 +105,12 @@ fun VolunteerOpportunityDetailsScreen(
     androidx.compose.runtime.LaunchedEffect(volunteerEventId) {
         opportunityViewModel.clearApplicationActionError()
     }
+    var showOrganisationPreview by remember { mutableStateOf(false) }
+    var organisationPreviewProfile by remember {
+        mutableStateOf<OrganisationPublicProfile?>(null)
+    }
+    var isLoadingOrganisationPreview by remember { mutableStateOf(false) }
+    val previewScope = rememberCoroutineScope()
 
     val volunteerOpportunityEvent =
         VolunteerOpportunitySessionStore.findEventById(
@@ -137,14 +158,28 @@ fun VolunteerOpportunityDetailsScreen(
                     Text(message, color = VolunteerLinkError, modifier = Modifier.padding(16.dp))
                 }
             }
-            item(
-                key = "opportunity_summary"
-            ) {
+            item(key = "opportunity_summary") {
                 VolunteerOpportunitySummarySection(
-                    volunteerOpportunityEvent =
-                        volunteerOpportunityEvent,
+                    volunteerOpportunityEvent = volunteerOpportunityEvent,
                     onLocationSelected = {
                         onLocationSelected(volunteerOpportunityEvent.eventId)
+                    },
+                    onOrganisationSelected = {
+                        showOrganisationPreview = true
+                        if (organisationPreviewProfile?.organisationId !=
+                            volunteerOpportunityEvent.eventOrganisationId
+                        ) {
+                            previewScope.launch {
+                                isLoadingOrganisationPreview = true
+                                organisationPreviewProfile =
+                                    OrganisationPublicProfileRepository
+                                        .getPublicProfile(
+                                            volunteerOpportunityEvent
+                                                .eventOrganisationId
+                                        )
+                                isLoadingOrganisationPreview = false
+                            }
+                        }
                     }
                 )
             }
@@ -220,6 +255,220 @@ fun VolunteerOpportunityDetailsScreen(
                 )
             }
         }
+        if (showOrganisationPreview) {
+            OrganisationPreviewSheet(
+                profile = organisationPreviewProfile,
+                isLoading = isLoadingOrganisationPreview,
+                fallbackName = volunteerOpportunityEvent.eventOrganisationName,
+                onDismissRequest = { showOrganisationPreview = false }
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun OrganisationPreviewSheet(
+    profile: OrganisationPublicProfile?,
+    isLoading: Boolean,
+    fallbackName: String,
+    onDismissRequest: () -> Unit
+) {
+    val context = LocalContext.current
+
+    ModalBottomSheet(
+        onDismissRequest = onDismissRequest,
+        containerColor = VolunteerLinkSurface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 200.dp)
+                .verticalScroll(rememberScrollState())
+                .padding(
+                    horizontal = VolunteerLinkScreenHorizontalPadding,
+                    vertical = 8.dp
+                )
+                .padding(bottom = 24.dp)
+        ) {
+            if (isLoading || profile == null) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(180.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isLoading) {
+                        androidx.compose.material3.CircularProgressIndicator(
+                            color = VolunteerLinkPrimaryGreen
+                        )
+                    } else {
+                        Text(
+                            text = "Couldn't load $fallbackName's profile.",
+                            color = VolunteerLinkTextSecondary
+                        )
+                    }
+                }
+                return@Column
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(CircleShape)
+                        .background(VolunteerLinkSoftGreenSurface),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (!profile.profileImageUrl.isNullOrBlank()) {
+                        AsyncImage(
+                            model = profile.profileImageUrl,
+                            contentDescription = "Organisation logo",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Text(
+                            text = profile.organisationName.firstOrNull()
+                                ?.uppercase() ?: "O",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = VolunteerLinkPrimaryGreen
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.size(12.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = profile.organisationName,
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = VolunteerLinkTextPrimary
+                    )
+                    if (profile.organisationType.isNotBlank()) {
+                        Text(
+                            text = profile.organisationType,
+                            fontSize = 11.sp,
+                            color = VolunteerLinkTextSecondary
+                        )
+                    }
+                }
+
+                if (profile.isVerified) {
+                    VerifiedOrganisationBadge()
+                }
+            }
+
+            if (profile.description.isNotBlank()) {
+                Spacer(modifier = Modifier.height(14.dp))
+                Text(
+                    text = profile.description,
+                    fontSize = 13.sp,
+                    lineHeight = 19.sp,
+                    color = VolunteerLinkTextSecondary
+                )
+            }
+
+            val location = listOf(
+                profile.locationName, profile.stateRegion, profile.country
+            ).filter { it.isNotBlank() }.joinToString(", ")
+
+            if (location.isNotBlank()) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = location,
+                    fontSize = 12.sp,
+                    color = VolunteerLinkTextSecondary
+                )
+            }
+
+            val hasContact = profile.websiteUrl.isNotBlank() ||
+                    profile.contactPhone.isNotBlank() ||
+                    profile.contactEmail.isNotBlank()
+
+            if (hasContact) {
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider(color = VolunteerLinkBorderColour)
+                Spacer(modifier = Modifier.height(12.dp))
+
+                if (profile.websiteUrl.isNotBlank()) {
+                    OrganisationPreviewContactRow(
+                        label = "Website",
+                        value = profile.websiteUrl,
+                        onClick = {
+                            val url = if (
+                                profile.websiteUrl.startsWith("http://") ||
+                                profile.websiteUrl.startsWith("https://")
+                            ) profile.websiteUrl else "https://${profile.websiteUrl}"
+                            startVolunteerIntent(
+                                context = context,
+                                intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)),
+                                unavailableMessage = "No browser is available."
+                            )
+                        }
+                    )
+                }
+
+                if (profile.contactPhone.isNotBlank()) {
+                    OrganisationPreviewContactRow(
+                        label = "Phone",
+                        value = profile.contactPhone,
+                        onClick = {
+                            openVolunteerPhone(context, profile.contactPhone)
+                        }
+                    )
+                }
+
+                if (profile.contactEmail.isNotBlank()) {
+                    OrganisationPreviewContactRow(
+                        label = "Email",
+                        value = profile.contactEmail,
+                        onClick = {
+                            openVolunteerEmail(context, profile.contactEmail)
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OrganisationPreviewContactRow(
+    label: String,
+    value: String,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = label,
+                fontSize = 10.sp,
+                color = VolunteerLinkTextSecondary
+            )
+            Text(
+                text = value,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = VolunteerLinkTextPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        Text(
+            text = "›",
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+            color = VolunteerLinkPrimaryGreen
+        )
     }
 }
 
@@ -292,7 +541,8 @@ private fun VolunteerOpportunityDetailsTopBar(
 private fun VolunteerOpportunitySummarySection(
     volunteerOpportunityEvent:
     VolunteerOpportunityEvent,
-    onLocationSelected: () -> Unit
+    onLocationSelected: () -> Unit,
+    onOrganisationSelected: () -> Unit
 ) {
     val categoryIconResourceId =
         when (volunteerOpportunityEvent.eventCategory) {
@@ -352,29 +602,21 @@ private fun VolunteerOpportunitySummarySection(
                 )
 
                 Row(
-                    verticalAlignment =
-                        Alignment.CenterVertically,
-                    horizontalArrangement =
-                        Arrangement.spacedBy(6.dp)
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.clickable(onClick = onOrganisationSelected)  // NEW
                 ) {
                     Text(
-                        text =
-                            volunteerOpportunityEvent
-                                .eventOrganisationName,
-                        modifier = Modifier.weight(
-                            weight = 1f,
-                            fill = false
-                        ),
+                        text = volunteerOpportunityEvent.eventOrganisationName,
+                        modifier = Modifier.weight(weight = 1f, fill = false),
                         fontSize = 13.sp,
-                        color = VolunteerLinkTextSecondary,
+                        color = VolunteerLinkPrimaryGreen,   // tinted to signal it's tappable
+                        fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
 
-                    if (
-                        volunteerOpportunityEvent
-                            .eventIsVerifiedOrganisation
-                    ) {
+                    if (volunteerOpportunityEvent.eventIsVerifiedOrganisation) {
                         VerifiedOrganisationBadge()
                     }
                 }

@@ -273,9 +273,14 @@ fun VolunteerOpportunityNavigationHost() {
 
                         onSkillPathSelected = {
                             volunteerNavigationController.navigate(
-                                VolunteerOpportunityNavigationRoutes
-                                    .VOLUNTEER_SKILL_PATH_ROUTE
-                            )
+                                VolunteerOpportunityNavigationRoutes.VOLUNTEER_SKILL_PATH_ROUTE
+                            ) {
+                                popUpTo(VolunteerOpportunityNavigationRoutes.VOLUNTEER_HOME_ROUTE) {
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
                         },
 
                         notificationViewModel =
@@ -834,10 +839,16 @@ fun VolunteerOpportunityNavigationHost() {
                         },
                         onSkillPathSelected = {
                             volunteerNavigationController.navigate(
-                                VolunteerOpportunityNavigationRoutes
-                                    .VOLUNTEER_SKILL_PATH_ROUTE
-                            )
+                                VolunteerOpportunityNavigationRoutes.VOLUNTEER_SKILL_PATH_ROUTE
+                            ) {
+                                popUpTo(VolunteerOpportunityNavigationRoutes.VOLUNTEER_HOME_ROUTE) {
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
                         },
+
                         onRefresh = {
                             profileScope.launch {
                                 VolunteerOpportunitySessionStore.updateProfileLoading(true)

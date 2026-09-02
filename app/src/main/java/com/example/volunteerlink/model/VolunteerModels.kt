@@ -63,6 +63,7 @@ data class VolunteerOpportunityEvent(
     val eventId: Int,
     val eventTitle: String,
     val eventOrganisationName: String,
+    val eventOrganisationId: String = "",
     val eventIsVerifiedOrganisation: Boolean,
     val eventOpportunityType: String,
     val eventCategory: VolunteerOpportunityCategory,

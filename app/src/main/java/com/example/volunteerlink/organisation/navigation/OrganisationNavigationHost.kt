@@ -20,6 +20,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -31,13 +32,16 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.volunteerlink.navigation.AppBottomNavigationBar
+import com.example.volunteerlink.organisation.auth.OrganisationSessionStore
 import com.example.volunteerlink.ui.theme.VolunteerLinkPrimaryGreen
 import com.example.volunteerlink.ui.theme.VolunteerLinkSurface
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextPrimary
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextSecondary
+import com.example.volunteerlink.organisation.repository.OrganisationProfileRepository
 import com.example.volunteerlink.organisation.screens.OrganisationChatsScreen
 import com.example.volunteerlink.organisation.screens.OrganisationApplicantReviewScreen
 import com.example.volunteerlink.organisation.screens.OrganisationCreateScreen
+import com.example.volunteerlink.organisation.screens.EditOrganisationProfileScreen
 import com.example.volunteerlink.organisation.screens.OrganisationHomeScreen
 import com.example.volunteerlink.organisation.screens.OrganisationManageEmptyModuleScreen
 import com.example.volunteerlink.organisation.screens.OrganisationManageScreen
@@ -45,6 +49,8 @@ import com.example.volunteerlink.organisation.screens.OrganisationPostManagement
 import com.example.volunteerlink.organisation.screens.OrganisationVolunteerPostsScreen
 import com.example.volunteerlink.organisation.screens.OrganisationProfileScreen
 import com.example.volunteerlink.organisation.home.model.HomeAttentionType
+import com.example.volunteerlink.organisation.screens.OrganisationSettingScreen
+import kotlinx.coroutines.launch
 
 private const val RETURN_TO_PEOPLE_AFTER_APPLICANT_REVIEW =
     "returnToPeopleAfterApplicantReview"
@@ -133,7 +139,11 @@ fun OrganisationNavigationHost() {
             WindowInsetsSides.Horizontal
         ),
         bottomBar = {
-            if (currentRoute != OrganisationNavigationRoutes.MANAGE_APPLICANT_REVIEW) {
+            if (
+                currentRoute != OrganisationNavigationRoutes.MANAGE_APPLICANT_REVIEW &&
+                currentRoute != OrganisationNavigationRoutes.EDIT_PROFILE &&
+                currentRoute != OrganisationNavigationRoutes.SETTINGS
+            ) {
                 AppBottomNavigationBar(
                     items = organisationBottomNavigationItems,
                     currentRoute = bottomBarRoute,
@@ -343,7 +353,53 @@ fun OrganisationNavigationHost() {
             }
 
             composable(OrganisationNavigationRoutes.PROFILE) {
-                OrganisationProfileScreen()
+                val profileScope = rememberCoroutineScope()
+
+                OrganisationProfileScreen(
+                    onSettingsSelected = {
+                        navController.navigate(OrganisationNavigationRoutes.SETTINGS)
+                    },
+                    onEditProfileSelected = {
+                        navController.navigate(OrganisationNavigationRoutes.EDIT_PROFILE)
+                    },
+                    onRefresh = {
+                        profileScope.launch {
+                            OrganisationSessionStore.updateProfileLoading(true)
+                            val loadedProfile = OrganisationProfileRepository.loadProfile()
+                            if (loadedProfile != null) {
+                                OrganisationSessionStore.setProfileData(loadedProfile)
+                            } else {
+                                OrganisationSessionStore.updateProfileLoading(false)
+                            }
+                        }
+                    }
+                )
+            }
+
+            composable(OrganisationNavigationRoutes.EDIT_PROFILE) {
+                EditOrganisationProfileScreen(
+                    onBack = { navController.popBackStack() },
+                    onSaved = {
+                        // Invalidate the cached profile so navigating back
+                        // to OrganisationProfileScreen refetches the
+                        // updated fields instead of showing what was
+                        // cached before the edit.
+                        OrganisationSessionStore.clearProfileData()
+                    }
+                )
+            }
+
+            composable(OrganisationNavigationRoutes.SETTINGS) {
+                OrganisationSettingScreen(
+                    onBackSelected = { navController.popBackStack() },
+                    onEditProfileSelected = {
+                        navController.navigate(OrganisationNavigationRoutes.EDIT_PROFILE)
+                    },
+                    onLoggedOut = {
+                        // TODO: reset root nav graph to your auth/login flow —
+                        // same open item as the volunteer side's settings screen.
+                    }
+                )
             }
         }
     }

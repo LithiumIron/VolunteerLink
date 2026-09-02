@@ -233,6 +233,11 @@ fun VolunteerHomeScreen(
                 }
         }
 
+    val currentVolunteerInitials =
+        volunteerInitials(
+            VolunteerOpportunitySessionStore.profileData?.fullName
+        )
+
     val allVolunteerOpportunityEvents =
         VolunteerOpportunitySessionStore
             .volunteerOpportunityEvents
@@ -314,7 +319,10 @@ fun VolunteerHomeScreen(
                     onVolunteerNotificationsSelected,
 
                 unreadNotificationCount =
-                    unreadNotificationCount
+                    unreadNotificationCount,
+
+                volunteerInitials =
+                    currentVolunteerInitials
             )
         }
 
@@ -485,7 +493,8 @@ private fun VolunteerHomeCompactHeader(
         (VolunteerHomeFeedFilter) -> Unit,
     onVolunteerNotificationsSelected: () -> Unit,
     onVolunteerFavouritesSelected: () -> Unit,
-    unreadNotificationCount: Int
+    unreadNotificationCount: Int,
+    volunteerInitials: String
 ) {
 
     Column(
@@ -592,14 +601,11 @@ private fun VolunteerHomeCompactHeader(
                         contentAlignment =
                             Alignment.Center
                     ) {
-
                         Text(
-                            text = "MH",
-                            color =
-                                VolunteerLinkPrimaryGreen,
+                            text = volunteerInitials,
+                            color = VolunteerLinkPrimaryGreen,
                             fontSize = 11.sp,
-                            fontWeight =
-                                FontWeight.Bold
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 }
@@ -2124,5 +2130,17 @@ private fun formatVolunteerImpactMinutes(minutes: Int): String {
         hours == 0 -> "${remainder}m"
         remainder == 0 -> "${hours}h"
         else -> "${hours}h ${remainder}m"
+    }
+}
+
+private fun volunteerInitials(fullName: String?): String {
+    val trimmed = fullName?.trim().orEmpty()
+    if (trimmed.isEmpty()) return "?"
+
+    val parts = trimmed.split(Regex("\\s+")).filter { it.isNotBlank() }
+    return when {
+        parts.size >= 2 -> "${parts.first().first()}${parts.last().first()}".uppercase()
+        parts.size == 1 -> parts.first().take(2).uppercase()
+        else -> "?"
     }
 }

@@ -72,6 +72,8 @@ class OrganisationAuthViewModel(
         val normalizedOrgName = organisationName.trim()
         val normalizedOrgType = organisationType.trim()
 
+        val normalizedPhone = contactPhone?.trim().orEmpty()
+
         when {
             normalizedOrgName.isBlank() -> {
                 showError("Enter your organisation name.")
@@ -83,6 +85,14 @@ class OrganisationAuthViewModel(
             }
             normalizedEmail.isBlank() -> {
                 showError("Enter an email address.")
+                return
+            }
+            normalizedPhone.isBlank() -> {
+                showError("Enter a contact phone number.")
+                return
+            }
+            !isValidPhoneNumber(normalizedPhone) -> {
+                showError("Enter a valid phone number (eg. must start with 0, 9-10 digits).")
                 return
             }
             password.length < 6 -> {
@@ -109,8 +119,8 @@ class OrganisationAuthViewModel(
                         put("volunteerlink_account_type", "ORGANISATION")
                         put("organisation_name", normalizedOrgName)
                         put("organisation_type", normalizedOrgType)
-                        contactPhone?.trim()?.ifBlank { null }?.let { phone ->
-                            put("contact_phone", phone)
+                        contactPhone?.trim()?.ifBlank { null }?.let {
+                            put("contact_phone", normalizedPhone)
                         }
                         locationName?.trim()?.ifBlank { null }?.let { location ->
                             put("location_name", location)
@@ -140,6 +150,17 @@ class OrganisationAuthViewModel(
                 // When confirmation is disabled we already have a session.
                 // Verify that the SQL trigger created the matching profile.
                 confirmOrganisationProfile()
+
+                contactPhone?.trim()?.ifBlank { null }?.let {
+                    runCatching {
+                        supabase.auth.updateUser {
+                            this.phone = normalizedPhone
+                        }
+                    }.onFailure { phoneException ->
+                        phoneException.printStackTrace()
+                    }
+                }
+
                 rememberVerifiedOrganisation()
 
                 mutableUiState.value = OrganisationAuthUiState(
@@ -378,6 +399,18 @@ private fun authErrorMessage(exception: Exception): String {
 
         else -> "Something went wrong. Please check the details and retry."
     }
+}
+
+private fun isValidPhoneNumber(phone: String): Boolean {
+    val cleaned = phone.replace(Regex("[\\s\\-()]"), "")
+
+    val isLocalFormat =
+        cleaned.matches(Regex("^0\\d{8,9}$"))
+
+    val isCountryCodeFormat =
+        cleaned.matches(Regex("^\\+?60\\d{8,9}$"))
+
+    return isLocalFormat || isCountryCodeFormat
 }
 
 @Serializable

@@ -14,6 +14,8 @@ object OrganisationNavigationRoutes {
     const val CREATE = "organisation_create"
     const val CHATS = "organisation_chats"
     const val PROFILE = "organisation_profile"
+    const val EDIT_PROFILE = "organisation_edit_profile"
+    const val SETTINGS = "organisation_settings"
 
     fun managePostDetail(postId: String): String =
         "organisation_manage_post/$postId"
