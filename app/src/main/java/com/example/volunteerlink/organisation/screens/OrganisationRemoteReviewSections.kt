@@ -277,7 +277,7 @@ private fun RemoteSubmissionReviewStage(
         subtitle = "Resolve every deliverable. Accepted work becomes Completed automatically."
     ) {
         OrganisationInfoStrip(
-            title = "Project deadline passed",
+            title = "Remote deadline passed",
             message = "Current deadline · ${formatRemoteDate(review.currentDeadline)}",
             accent = VolunteerLinkWarning,
             iconRes = R.drawable.calendar
@@ -329,7 +329,7 @@ private fun RemoteSubmissionReviewStage(
         OrganisationPrimaryButton(
             text = when {
                 busy -> "Saving..."
-                extensionRequired -> "Save & Extend Deadline"
+                extensionRequired -> "Save & Extend Remote Deadline"
                 else -> "Save & Continue"
             },
             onClick = onContinue,
@@ -563,9 +563,9 @@ private fun RemoteDeadlineExtensionPanel(
 
     Column(modifier = modifier.fillMaxWidth()) {
         OrganisationSectionHeader(
-            title = "New project deadline",
+            title = "New Remote deadline",
             subtitle = if (review.submissionMode.equals("SHARED_TEAM", true)) {
-                "The shared team receives one revised deadline."
+                "The shared team receives one revised Remote deadline."
             } else {
                 "Only unresolved work stays open; finalized outcomes remain unchanged."
             }
@@ -604,7 +604,7 @@ private fun RemoteDeadlineExtensionPanel(
             border = BorderStroke(1.dp, VolunteerLinkPrimaryGreen)
         ) {
             Text(
-                text = selectedDate?.let { formatRemoteDate(it) } ?: "Choose new deadline",
+                text = selectedDate?.let { formatRemoteDate(it) } ?: "Choose new Remote deadline",
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
                 color = VolunteerLinkPrimaryGreen

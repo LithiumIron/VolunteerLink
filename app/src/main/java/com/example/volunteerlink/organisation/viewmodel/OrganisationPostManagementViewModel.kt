@@ -461,7 +461,13 @@ class OrganisationPostManagementViewModel : ViewModel() {
                 return@launch
             }
 
-            val locallyCompletedPost = currentPost.copy(databaseStatus = "COMPLETED")
+            val locallyCompletedPost = currentPost.copy(
+                databaseStatus = if (currentPost.mode.equals("HYBRID", ignoreCase = true)) {
+                    currentPost.databaseStatus
+                } else {
+                    "COMPLETED"
+                }
+            )
             cachedPost = locallyCompletedPost
             _uiState.value = _uiState.value.copy(
                 remoteReviewSession = PostManagementRemoteReviewSession(),
@@ -470,7 +476,11 @@ class OrganisationPostManagementViewModel : ViewModel() {
             applyTiming(locallyCompletedPost)
             _uiState.value = _uiState.value.copy(
                 remoteReviewFinalizeSucceeded = true,
-                remoteReviewActionMessage = "Remote project review finalized successfully."
+                remoteReviewActionMessage = if (currentPost.mode.equals("HYBRID", ignoreCase = true)) {
+                    "Remote side finalized successfully."
+                } else {
+                    "Remote project review finalized successfully."
+                }
             )
 
             try {
@@ -479,7 +489,11 @@ class OrganisationPostManagementViewModel : ViewModel() {
                 applyTiming(refreshedPost)
                 _uiState.value = _uiState.value.copy(
                     remoteReviewFinalizeSucceeded = true,
-                    remoteReviewActionMessage = "Remote project review finalized successfully.",
+                    remoteReviewActionMessage = if (currentPost.mode.equals("HYBRID", ignoreCase = true)) {
+                        "Remote side finalized successfully."
+                    } else {
+                        "Remote project review finalized successfully."
+                    },
                     remoteReviewSession = PostManagementRemoteReviewSession()
                 )
             } catch (reloadException: Exception) {
@@ -1065,7 +1079,11 @@ class OrganisationPostManagementViewModel : ViewModel() {
                 it.roleTemplateId to it.userId
             }
             val locallyCompletedPost = currentPost.copy(
-                databaseStatus = "COMPLETED",
+                databaseStatus = if (currentPost.mode.equals("HYBRID", ignoreCase = true)) {
+                    currentPost.databaseStatus
+                } else {
+                    "COMPLETED"
+                },
                 people = currentPost.people.map { person ->
                     val decision = decisionByKey[person.roleTemplateId to person.userId]
                     if (decision == null) {
@@ -1085,7 +1103,11 @@ class OrganisationPostManagementViewModel : ViewModel() {
                 isUpdatingAttendance = false,
                 attendanceActionMessage = null,
                 isUpdatingReview = false,
-                reviewActionMessage = "Event review finalized successfully."
+                reviewActionMessage = if (currentPost.mode.equals("HYBRID", ignoreCase = true)) {
+                    "Physical side finalized successfully."
+                } else {
+                    "Event review finalized successfully."
+                }
             )
             _uiState.value = _uiState.value.copy(reviewFinalizeSucceeded = true)
 
@@ -1104,7 +1126,11 @@ class OrganisationPostManagementViewModel : ViewModel() {
                     isUpdatingAttendance = false,
                     attendanceActionMessage = null,
                     isUpdatingReview = false,
-                    reviewActionMessage = "Event review finalized successfully."
+                    reviewActionMessage = if (currentPost.mode.equals("HYBRID", ignoreCase = true)) {
+                        "Physical side finalized successfully."
+                    } else {
+                        "Event review finalized successfully."
+                    }
                 )
                 _uiState.value = _uiState.value.copy(reviewFinalizeSucceeded = true)
             } catch (reloadException: Exception) {
@@ -1238,7 +1264,7 @@ class OrganisationPostManagementViewModel : ViewModel() {
         nowMillis: Long
     ): PostManagementRemoteReview? {
         val remote = post.remote ?: return null
-        if (!post.mode.equals("REMOTE", ignoreCase = true)) return null
+        if (post.mode.uppercase(Locale.US) !in setOf("REMOTE", "HYBRID")) return null
         if (post.databaseStatus.uppercase(Locale.US) !in setOf("PUBLISHED", "CLOSED", "COMPLETED")) {
             return null
         }
@@ -1488,7 +1514,7 @@ class OrganisationPostManagementViewModel : ViewModel() {
         post: PostManagementPost,
         attendance: PostManagementPhysicalAttendance?
     ): PostManagementPhysicalReview? {
-        if (!post.mode.equals("PHYSICAL", ignoreCase = true)) return null
+        if (post.mode.uppercase(Locale.US) !in setOf("PHYSICAL", "HYBRID")) return null
         if (post.physical == null || attendance == null) return null
         if (post.databaseStatus.uppercase(Locale.US) !in setOf("PUBLISHED", "CLOSED", "COMPLETED")) {
             return null
@@ -1586,7 +1612,11 @@ class OrganisationPostManagementViewModel : ViewModel() {
                 .filterNot { it.hasFeedback }
                 .sortedBy { it.person.fullName },
             canEdit = !post.databaseStatus.equals("CANCELLED", ignoreCase = true) &&
-                !post.databaseStatus.equals("COMPLETED", ignoreCase = true)
+                !post.databaseStatus.equals("COMPLETED", ignoreCase = true) &&
+                (
+                    !post.mode.equals("HYBRID", ignoreCase = true) ||
+                        unresolved.isNotEmpty()
+                    )
         )
     }
 

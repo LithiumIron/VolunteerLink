@@ -24,6 +24,7 @@ import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.storage.storage
 import io.ktor.http.ContentType
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -34,6 +35,7 @@ import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import java.text.SimpleDateFormat
@@ -92,17 +94,23 @@ class SupabaseCreatePostRepository : CreatePostRepository {
             roleCatalogue = roleCatalogue
         )
 
-        val created = supabase.postgrest.rpc(
-            function = "organisation_create_volunteer_post",
-            parameters = buildJsonObject {
-                put("p_payload", payload)
-            }
-        ).decodeSingle<JsonObject>()
-
-        val postId = created.requiredText("post_id")
+        var createdPostId: String? = null
         var uploadedThumbnailPath: String? = null
 
         try {
+            // RPCs that return JSONB come back as a JSON object, not a PostgREST row array.
+            // Parse the raw RPC response directly instead of using decodeSingle(), which
+            // expects an array-shaped SELECT response.
+            val createResponse = supabase.postgrest.rpc(
+                function = "organisation_create_volunteer_post",
+                parameters = buildJsonObject {
+                    put("p_payload", payload)
+                }
+            )
+            val created = Json.parseToJsonElement(createResponse.data).jsonObject
+            val postId = created.requiredText("post_id")
+            createdPostId = postId
+
             if (thumbnail != null) {
                 val safeExtension = thumbnail.fileExtension
                     .lowercase()
@@ -148,11 +156,13 @@ class SupabaseCreatePostRepository : CreatePostRepository {
                 }
             }
 
-            runCatching {
-                supabase.postgrest.rpc(
-                    function = "organisation_delete_created_draft",
-                    parameters = buildJsonObject { put("p_post_id", postId) }
-                )
+            createdPostId?.let { postId ->
+                runCatching {
+                    supabase.postgrest.rpc(
+                        function = "organisation_delete_created_draft",
+                        parameters = buildJsonObject { put("p_post_id", postId) }
+                    )
+                }
             }
             throw exception
         }
@@ -311,7 +321,7 @@ class SupabaseCreatePostRepository : CreatePostRepository {
                 "role_template_id,application_status,completion_status,joined_at"
             )) { filter { eq("post_id", postId) } }
             .decodeList<JsonObject>()
-        val screeningAnswerRows = supabase.from("participation_screening_answers")
+        val screeningAnswerRows = supabase.from("role_participation_screening_answers")
             .select(columns = Columns.raw("role_template_id")) {
                 filter { eq("post_id", postId) }
             }.decodeList<JsonObject>()

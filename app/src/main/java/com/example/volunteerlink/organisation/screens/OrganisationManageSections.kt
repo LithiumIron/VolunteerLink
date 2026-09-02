@@ -339,15 +339,37 @@ internal fun ManageVolunteerPostCard(
                     )
                 }
 
-                Text(
-                    text = "$modeLabel · $timeline",
-                    modifier = Modifier.padding(top = 4.dp),
-                    fontSize = 13.sp,
-                    lineHeight = 18.sp,
-                    color = VolunteerLinkTextSecondary,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
+                if (post.mode.equals("HYBRID", true)) {
+                    Text(
+                        text = modeLabel,
+                        modifier = Modifier.padding(top = 4.dp),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = VolunteerLinkTextSecondary
+                    )
+                    ManageHybridPhaseLine(
+                        label = "Physical",
+                        timing = post.physicalTimingState,
+                        dateRange = manageDateRange(post.physicalStartDate, post.physicalEndDate),
+                        modifier = Modifier.padding(top = 3.dp)
+                    )
+                    ManageHybridPhaseLine(
+                        label = "Remote",
+                        timing = post.remoteTimingState,
+                        dateRange = manageDateRange(post.remoteStartDate, post.remoteEndDate),
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                } else {
+                    Text(
+                        text = "$modeLabel · $timeline",
+                        modifier = Modifier.padding(top = 4.dp),
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp,
+                        color = VolunteerLinkTextSecondary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
 
                 if (post.mode.equals("HYBRID", true)) {
                     post.physicalLocationName?.takeIf { it.isNotBlank() }?.let {
@@ -425,6 +447,34 @@ internal fun ManageEmptySectionMessage(
         message = message,
         modifier = modifier,
         accent = VolunteerLinkPrimaryGreen
+    )
+}
+
+@Composable
+private fun ManageHybridPhaseLine(
+    label: String,
+    timing: PostTimingState?,
+    dateRange: String,
+    modifier: Modifier = Modifier
+) {
+    val status = when (timing) {
+        PostTimingState.ONGOING -> "Ongoing"
+        PostTimingState.UPCOMING -> "Upcoming"
+        PostTimingState.PAST -> "Ended"
+        null -> "Not set"
+    }
+    Text(
+        text = "$label · $status · $dateRange",
+        modifier = modifier,
+        fontSize = 12.sp,
+        lineHeight = 17.sp,
+        color = if (timing == PostTimingState.PAST) {
+            VolunteerLinkInformation
+        } else {
+            VolunteerLinkTextSecondary
+        },
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis
     )
 }
 

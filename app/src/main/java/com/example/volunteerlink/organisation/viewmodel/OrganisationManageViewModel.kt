@@ -116,6 +116,24 @@ class OrganisationManageViewModel : ViewModel() {
             val timingState = timingInput?.let {
                 PostTimingEvaluator.evaluatePostTiming(it, nowMillis)
             }
+            val physicalTimingState = evaluateSinglePeriod(
+                PostMode.PHYSICAL,
+                post.physicalStartDate,
+                post.physicalEndDate,
+                nowMillis
+            )
+            val remoteTimingState = evaluateSinglePeriod(
+                PostMode.REMOTE,
+                post.remoteStartDate,
+                post.effectiveRemoteEndDate,
+                nowMillis
+            )
+            val hybridHasReviewSide =
+                post.mode.equals("HYBRID", ignoreCase = true) &&
+                    (
+                        physicalTimingState == PostTimingState.PAST ||
+                            remoteTimingState == PostTimingState.PAST
+                    )
 
             when (status) {
                 "DRAFT" -> {
@@ -130,43 +148,80 @@ class OrganisationManageViewModel : ViewModel() {
                     )
                 }
 
-                "PUBLISHED", "CLOSED" -> when (timingState) {
-                    PostTimingState.UPCOMING,
-                    PostTimingState.ONGOING -> {
-                        val attention = mutableListOf<ManageAttentionItem>()
-
-                        if (status == "PUBLISHED") {
-                            buildApplicationAttention(
-                                post = post,
-                                nowMillis = nowMillis
-                            )?.let(attention::add)
+                "PUBLISHED", "CLOSED" -> {
+                    if (hybridHasReviewSide) {
+                        val endedSides = buildList {
+                            if (physicalTimingState == PostTimingState.PAST) add("Physical")
+                            if (remoteTimingState == PostTimingState.PAST) add("Remote")
+                        }
+                        val stillActiveSides = buildList {
+                            if (physicalTimingState in setOf(PostTimingState.ONGOING, PostTimingState.UPCOMING)) add("Physical")
+                            if (remoteTimingState in setOf(PostTimingState.ONGOING, PostTimingState.UPCOMING)) add("Remote")
+                        }
+                        val message = when {
+                            endedSides.size == 2 ->
+                                "Both Physical and Remote phases have ended. Finish each side's close-out before the Hybrid post can complete."
+                            stillActiveSides.isNotEmpty() ->
+                                "${endedSides.joinToString()} close-out is available while ${stillActiveSides.joinToString()} is still active."
+                            else ->
+                                "${endedSides.joinToString()} close-out is available."
                         }
 
-
-                        active += post.toManageItem(
-                            timingState = timingState,
-                            nowMillis = nowMillis,
-                            attentionItems = attention.sortedBySeverity()
-                        )
-                    }
-
-                    PostTimingState.PAST -> {
                         review += post.toManageItem(
-                            timingState = PostTimingState.PAST,
+                            timingState = timingState,
                             nowMillis = nowMillis,
                             attentionItems = listOf(
                                 ManageAttentionItem(
                                     type = ManageAttentionType.COMPLETION_REVIEW,
                                     severity = ManageAttentionSeverity.NEEDS_REVIEW,
-                                    kindLabel = "CLOSE-OUT",
-                                    title = "Completion review required",
-                                    message = "The activity has ended. Finish attendance and volunteer review before marking this post completed."
+                                    kindLabel = "HYBRID CLOSE-OUT",
+                                    title = when {
+                                        endedSides.size == 2 -> "Physical and Remote review available"
+                                        else -> "${endedSides.first()} review available"
+                                    },
+                                    message = message
                                 )
                             )
                         )
-                    }
+                    } else {
+                        when (timingState) {
+                            PostTimingState.UPCOMING,
+                            PostTimingState.ONGOING -> {
+                                val attention = mutableListOf<ManageAttentionItem>()
 
-                    null -> Unit
+                                if (status == "PUBLISHED") {
+                                    buildApplicationAttention(
+                                        post = post,
+                                        nowMillis = nowMillis
+                                    )?.let(attention::add)
+                                }
+
+                                active += post.toManageItem(
+                                    timingState = timingState,
+                                    nowMillis = nowMillis,
+                                    attentionItems = attention.sortedBySeverity()
+                                )
+                            }
+
+                            PostTimingState.PAST -> {
+                                review += post.toManageItem(
+                                    timingState = PostTimingState.PAST,
+                                    nowMillis = nowMillis,
+                                    attentionItems = listOf(
+                                        ManageAttentionItem(
+                                            type = ManageAttentionType.COMPLETION_REVIEW,
+                                            severity = ManageAttentionSeverity.NEEDS_REVIEW,
+                                            kindLabel = "CLOSE-OUT",
+                                            title = "Completion review required",
+                                            message = "The activity has ended. Finish attendance and volunteer review before marking this post completed."
+                                        )
+                                    )
+                                )
+                            }
+
+                            null -> Unit
+                        }
+                    }
                 }
 
                 "COMPLETED" -> {

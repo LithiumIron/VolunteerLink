@@ -44,9 +44,12 @@ import com.example.volunteerlink.organisation.screens.OrganisationManageScreen
 import com.example.volunteerlink.organisation.screens.OrganisationPostManagementScreen
 import com.example.volunteerlink.organisation.screens.OrganisationVolunteerPostsScreen
 import com.example.volunteerlink.organisation.screens.OrganisationProfileScreen
+import com.example.volunteerlink.organisation.home.model.HomeAttentionType
 
 private const val RETURN_TO_PEOPLE_AFTER_APPLICANT_REVIEW =
     "returnToPeopleAfterApplicantReview"
+private const val OPEN_PEOPLE_FROM_HOME = "openPeopleFromHome"
+private const val OPEN_REVIEW_FROM_HOME = "openReviewFromHome"
 
 /**
  * Navigation host for the Organisation side only.
@@ -166,6 +169,39 @@ fun OrganisationNavigationHost() {
                             launchSingleTop = true
                             restoreState = true
                         }
+                    },
+                    onPostClick = { postId ->
+                        navController.navigate(
+                            OrganisationNavigationRoutes.managePostDetail(postId)
+                        )
+                    },
+                    onAttentionClick = { item ->
+                        when (item.type) {
+                            HomeAttentionType.DRAFT_START_TOO_SOON,
+                            HomeAttentionType.DRAFT_START_DATE_PASSED -> {
+                                navController.navigate(
+                                    OrganisationNavigationRoutes.managePostEdit(item.postId)
+                                )
+                            }
+
+                            HomeAttentionType.APPLICATIONS_TO_REVIEW -> {
+                                navController.navigate(
+                                    OrganisationNavigationRoutes.managePostDetail(item.postId)
+                                )
+                                navController.currentBackStackEntry
+                                    ?.savedStateHandle
+                                    ?.set(OPEN_PEOPLE_FROM_HOME, true)
+                            }
+
+                            HomeAttentionType.POST_COMPLETION_REVIEW -> {
+                                navController.navigate(
+                                    OrganisationNavigationRoutes.managePostDetail(item.postId)
+                                )
+                                navController.currentBackStackEntry
+                                    ?.savedStateHandle
+                                    ?.set(OPEN_REVIEW_FROM_HOME, true)
+                            }
+                        }
                     }
                 )
             }
@@ -201,6 +237,10 @@ fun OrganisationNavigationHost() {
                     backStackEntry.savedStateHandle.get<Boolean>(
                         RETURN_TO_PEOPLE_AFTER_APPLICANT_REVIEW
                     ) == true
+                val openPeopleFromHome =
+                    backStackEntry.savedStateHandle.get<Boolean>(OPEN_PEOPLE_FROM_HOME) == true
+                val openReviewFromHome =
+                    backStackEntry.savedStateHandle.get<Boolean>(OPEN_REVIEW_FROM_HOME) == true
 
                 OrganisationPostManagementScreen(
                     postId = postId,
@@ -221,10 +261,16 @@ fun OrganisationNavigationHost() {
                     },
                     returnToPeopleAfterApplicantReview =
                         returnToPeopleAfterApplicantReview,
+                    openPeopleFromHome = openPeopleFromHome,
+                    openReviewFromHome = openReviewFromHome,
                     onReturnToPeopleHandled = {
                         backStackEntry.savedStateHandle.remove<Boolean>(
                             RETURN_TO_PEOPLE_AFTER_APPLICANT_REVIEW
                         )
+                    },
+                    onHomeTargetHandled = {
+                        backStackEntry.savedStateHandle.remove<Boolean>(OPEN_PEOPLE_FROM_HOME)
+                        backStackEntry.savedStateHandle.remove<Boolean>(OPEN_REVIEW_FROM_HOME)
                     },
                     onExitProtectionChanged = { protected, discard ->
                         reviewExitProtected = protected

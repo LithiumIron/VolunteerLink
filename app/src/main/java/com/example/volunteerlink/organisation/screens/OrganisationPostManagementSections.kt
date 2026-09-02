@@ -87,6 +87,18 @@ internal enum class PostManagementPeopleTab {
     VOLUNTEERS
 }
 
+internal enum class PostManagementHybridReviewSide {
+    PHYSICAL,
+    REMOTE
+}
+
+private data class PostManagementPhaseLine(
+    val label: String,
+    val dates: Pair<String?, String?>,
+    val location: String?,
+    val timing: PostTimingState?
+)
+
 private val PostManagementCardShape = RoundedCornerShape(VolunteerLinkCardCornerRadius)
 private val PostManagementSmallShape = RoundedCornerShape(10.dp)
 private val PostManagementPillShape = RoundedCornerShape(50)
@@ -227,32 +239,128 @@ internal fun PostManagementSummaryCard(
 
         val phaseLines = when {
             post.mode.equals("HYBRID", true) -> listOf(
-                Triple("Remote", post.remote?.startDate to post.remote?.effectiveEndDate, null),
-                Triple("Physical", post.physical?.startDate to post.physical?.endDate, post.physical?.locationName)
+                PostManagementPhaseLine(
+                    "Physical",
+                    post.physical?.startDate to post.physical?.endDate,
+                    post.physical?.locationName,
+                    post.physicalTimingState
+                ),
+                PostManagementPhaseLine(
+                    "Remote",
+                    post.remote?.startDate to post.remote?.effectiveEndDate,
+                    null,
+                    post.remoteTimingState
+                )
             )
             post.mode.equals("PHYSICAL", true) -> listOf(
-                Triple("Physical", post.physical?.startDate to post.physical?.endDate, post.physical?.locationName)
+                PostManagementPhaseLine(
+                    "Physical",
+                    post.physical?.startDate to post.physical?.endDate,
+                    post.physical?.locationName,
+                    post.physicalTimingState
+                )
             )
             else -> listOf(
-                Triple("Remote", post.remote?.startDate to post.remote?.effectiveEndDate, null)
+                PostManagementPhaseLine(
+                    "Remote",
+                    post.remote?.startDate to post.remote?.effectiveEndDate,
+                    null,
+                    post.remoteTimingState
+                )
             )
         }
 
         OrganisationDivider(modifier = Modifier.padding(top = 16.dp))
         phaseLines.forEachIndexed { index, phase ->
-            val dateText = postManagementDateRange(phase.second.first, phase.second.second)
+            val dateText = postManagementDateRange(phase.dates.first, phase.dates.second)
+            val timingText = when (phase.timing) {
+                PostTimingState.ONGOING -> "Ongoing"
+                PostTimingState.UPCOMING -> "Upcoming"
+                PostTimingState.PAST -> if (post.databaseStatus.equals("COMPLETED", true)) "Completed" else "Ended"
+                null -> null
+            }
             Text(
                 text = buildString {
-                    append(phase.first)
+                    append(phase.label)
+                    timingText?.let { append(" · $it") }
                     append(" · ")
                     append(dateText)
-                    phase.third?.takeIf { it.isNotBlank() }?.let { append(" · $it") }
+                    phase.location?.takeIf { it.isNotBlank() }?.let { append(" · $it") }
                 },
                 modifier = Modifier.padding(top = if (index == 0) 12.dp else 7.dp),
                 fontSize = 13.sp,
                 lineHeight = 18.sp,
-                color = VolunteerLinkTextSecondary
+                color = if (phase.timing == PostTimingState.PAST && !post.databaseStatus.equals("COMPLETED", true)) {
+                    VolunteerLinkInformation
+                } else {
+                    VolunteerLinkTextSecondary
+                }
             )
+        }
+    }
+}
+
+@Composable
+internal fun PostManagementHybridReviewSelector(
+    selected: PostManagementHybridReviewSide,
+    showPhysical: Boolean,
+    showRemote: Boolean,
+    onSelected: (PostManagementHybridReviewSide) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val options = buildList {
+        if (showPhysical) add(PostManagementHybridReviewSide.PHYSICAL to "Physical")
+        if (showRemote) add(PostManagementHybridReviewSide.REMOTE to "Remote")
+    }
+    if (options.size <= 1) return
+
+    Column(modifier = modifier.fillMaxWidth()) {
+        Text(
+            text = "Hybrid review",
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            color = VolunteerLinkTextPrimary
+        )
+        Text(
+            text = "Review each side separately. Finishing one side will not close the other.",
+            modifier = Modifier.padding(top = 2.dp),
+            fontSize = 11.sp,
+            lineHeight = 16.sp,
+            color = VolunteerLinkTextSecondary
+        )
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+            shape = RoundedCornerShape(12.dp),
+            color = VolunteerLinkSoftGreenSurface.copy(alpha = 0.55f),
+            border = BorderStroke(1.dp, VolunteerLinkBorderColour)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                options.forEach { (side, label) ->
+                    Surface(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { onSelected(side) },
+                        shape = RoundedCornerShape(9.dp),
+                        color = if (selected == side) VolunteerLinkPrimaryGreen else Color.Transparent
+                    ) {
+                        Text(
+                            text = label,
+                            modifier = Modifier.padding(vertical = 9.dp),
+                            textAlign = TextAlign.Center,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (selected == side) VolunteerLinkSurface else VolunteerLinkPrimaryGreen
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -261,14 +369,15 @@ internal fun PostManagementSummaryCard(
 internal fun PostManagementMainTabs(
     selected: PostManagementTab,
     pendingApplicantCount: Int,
+    showPeopleTab: Boolean,
     showReviewTab: Boolean,
     onSelected: (PostManagementTab) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val tabs = buildList {
         add(PostManagementTab.OVERVIEW to "Overview")
+        if (showPeopleTab) add(PostManagementTab.PEOPLE to "People")
         if (showReviewTab) add(PostManagementTab.REVIEW to "Review")
-        else add(PostManagementTab.PEOPLE to "People")
     }
 
     Surface(

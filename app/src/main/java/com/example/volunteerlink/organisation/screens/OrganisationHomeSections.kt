@@ -117,6 +117,7 @@ internal fun OrganisationHomeHeader(
 @Composable
 internal fun OrganisationAttentionSection(
     items: List<HomeAttentionItem>,
+    onItemClick: (HomeAttentionItem) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
@@ -136,6 +137,7 @@ internal fun OrganisationAttentionSection(
                 OrganisationSectionSurface(contentPadding = 0.dp) {
                     AttentionRow(
                         item = item,
+                        onClick = { onItemClick(item) },
                         modifier = Modifier.padding(horizontal = 14.dp)
                     )
                 }
@@ -173,6 +175,7 @@ internal fun OrganisationAttentionSection(
 @Composable
 private fun AttentionRow(
     item: HomeAttentionItem,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val accent = when (item.severity) {
@@ -185,6 +188,7 @@ private fun AttentionRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .clickable(onClick = onClick)
             .padding(vertical = 13.dp),
         verticalAlignment = Alignment.Top
     ) {
@@ -274,27 +278,33 @@ internal fun HomeSectionHeading(
 
 /** Existing function name retained so HomeScreen wiring stays unchanged. */
 @Composable
-internal fun OngoingPostCard(post: HomePostItem) {
-    HomePostRow(post = post, ongoing = true)
+internal fun OngoingPostCard(
+    post: HomePostItem,
+    onClick: () -> Unit
+) {
+    HomePostRow(post = post, ongoing = true, onClick = onClick)
 }
 
 @Composable
 internal fun UpcomingPostRow(
     post: HomePostItem,
-    showDivider: Boolean
+    showDivider: Boolean,
+    onClick: () -> Unit
 ) {
-    HomePostRow(post = post, ongoing = false)
+    HomePostRow(post = post, ongoing = false, onClick = onClick)
     if (showDivider) OrganisationDivider()
 }
 
 @Composable
 private fun HomePostRow(
     post: HomePostItem,
-    ongoing: Boolean
+    ongoing: Boolean,
+    onClick: () -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable(onClick = onClick)
             .padding(vertical = 10.dp),
         verticalAlignment = Alignment.Top
     ) {

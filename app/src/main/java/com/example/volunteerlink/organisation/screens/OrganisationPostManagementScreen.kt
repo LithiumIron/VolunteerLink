@@ -82,7 +82,10 @@ fun OrganisationPostManagementScreen(
     onEdit: () -> Unit,
     onViewApplication: (roleTemplateId: String, userId: String) -> Unit = { _, _ -> },
     returnToPeopleAfterApplicantReview: Boolean = false,
+    openPeopleFromHome: Boolean = false,
+    openReviewFromHome: Boolean = false,
     onReturnToPeopleHandled: () -> Unit = {},
+    onHomeTargetHandled: () -> Unit = {},
     onExitProtectionChanged: (Boolean, (() -> Unit)?) -> Unit = { _, _ -> },
     viewModel: OrganisationPostManagementViewModel = viewModel()
 ) {
@@ -102,6 +105,22 @@ fun OrganisationPostManagementScreen(
         if (returnToPeopleAfterApplicantReview) {
             selectedTabName = PostManagementTab.PEOPLE.name
             onReturnToPeopleHandled()
+        }
+    }
+
+
+    LaunchedEffect(openPeopleFromHome, openReviewFromHome) {
+        when {
+            openReviewFromHome -> {
+                selectedTabName = PostManagementTab.REVIEW.name
+                onHomeTargetHandled()
+            }
+
+            openPeopleFromHome -> {
+                selectedTabName = PostManagementTab.PEOPLE.name
+                selectedPeopleTabName = PostManagementPeopleTab.APPLICANTS.name
+                onHomeTargetHandled()
+            }
         }
     }
 
@@ -227,7 +246,7 @@ fun OrganisationPostManagementScreen(
                             isRemoteFinalize ->
                                 "Saving final Remote feedback and completing the project. Please wait."
                             isRemoteOperation ->
-                                "Saving submission decisions and the project-wide deadline. Please wait."
+                                "Saving submission decisions and the Remote deadline. Please wait."
                             else ->
                                 "Saving completion decisions, verified hours and feedback. Please wait."
                         },
@@ -247,7 +266,11 @@ fun OrganisationPostManagementScreen(
             onDismissRequest = viewModel::dismissPhysicalReviewFinalizeSuccess,
             title = {
                 Text(
-                    text = "Event review completed",
+                    text = if (post?.mode.equals("HYBRID", ignoreCase = true)) {
+                        "Physical review completed"
+                    } else {
+                        "Event review completed"
+                    },
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = VolunteerLinkTextPrimary
@@ -255,7 +278,13 @@ fun OrganisationPostManagementScreen(
             },
             text = {
                 Text(
-                    text = "The review has been finalized successfully. This post has moved from Needs Review to Completed. Saved attendance, completion decisions and feedback are now read-only.",
+                    text = if (post?.mode.equals("HYBRID", ignoreCase = true) &&
+                        !post?.databaseStatus.equals("COMPLETED", ignoreCase = true)
+                    ) {
+                        "The Physical side has been finalized successfully. Remote activity and Remote review remain independent, so the Hybrid post stays open until both sides are finished."
+                    } else {
+                        "The review has been finalized successfully. This post has moved from Needs Review to Completed. Saved attendance, completion decisions and feedback are now read-only."
+                    },
                     fontSize = 14.sp,
                     lineHeight = 20.sp,
                     color = VolunteerLinkTextSecondary
@@ -287,7 +316,13 @@ fun OrganisationPostManagementScreen(
             },
             text = {
                 Text(
-                    text = "The Remote project review has been finalized successfully. The post is now Completed and the saved outcomes are read-only.",
+                    text = if (post?.mode.equals("HYBRID", ignoreCase = true) &&
+                        !post?.databaseStatus.equals("COMPLETED", ignoreCase = true)
+                    ) {
+                        "The Remote side has been finalized successfully. Physical activity and Physical review remain independent, so the Hybrid post stays open until both sides are finished."
+                    } else {
+                        "The Remote project review has been finalized successfully. The post is now Completed and the saved outcomes are read-only."
+                    },
                     fontSize = 14.sp,
                     lineHeight = 20.sp,
                     color = VolunteerLinkTextSecondary
@@ -460,26 +495,51 @@ private fun OrganisationPostManagementContent(
     val physicalReview = post.physicalReview
     val remoteReview = post.remoteReview
     val showPhysicalReview =
-        post.mode.equals("PHYSICAL", ignoreCase = true) &&
+        post.mode.uppercase(Locale.US) in setOf("PHYSICAL", "HYBRID") &&
             physicalReview != null &&
             (
                 post.physicalTimingState == PostTimingState.PAST ||
                     post.databaseStatus.equals("COMPLETED", ignoreCase = true)
             )
     val showRemoteReview =
-        post.mode.equals("REMOTE", ignoreCase = true) &&
+        post.mode.uppercase(Locale.US) in setOf("REMOTE", "HYBRID") &&
             remoteReview != null &&
             (
                 post.remoteTimingState == PostTimingState.PAST ||
                     post.databaseStatus.equals("COMPLETED", ignoreCase = true)
             )
     val showReview = showPhysicalReview || showRemoteReview
+    val showPeople = !showReview || post.mode.equals("HYBRID", ignoreCase = true)
 
-    LaunchedEffect(showReview) {
-        if (showReview && selectedTabName == PostManagementTab.PEOPLE.name) {
-            onSelectedTabNameChange(PostManagementTab.REVIEW.name)
+    var selectedHybridReviewSideName by rememberSaveable(post.postId) {
+        mutableStateOf(
+            if (showPhysicalReview) {
+                PostManagementHybridReviewSide.PHYSICAL.name
+            } else {
+                PostManagementHybridReviewSide.REMOTE.name
+            }
+        )
+    }
+    val selectedHybridReviewSide = runCatching {
+        PostManagementHybridReviewSide.valueOf(selectedHybridReviewSideName)
+    }.getOrDefault(
+        if (showPhysicalReview) PostManagementHybridReviewSide.PHYSICAL
+        else PostManagementHybridReviewSide.REMOTE
+    )
+
+    LaunchedEffect(showPhysicalReview, showRemoteReview) {
+        if (selectedHybridReviewSide == PostManagementHybridReviewSide.PHYSICAL && !showPhysicalReview && showRemoteReview) {
+            selectedHybridReviewSideName = PostManagementHybridReviewSide.REMOTE.name
+        } else if (selectedHybridReviewSide == PostManagementHybridReviewSide.REMOTE && !showRemoteReview && showPhysicalReview) {
+            selectedHybridReviewSideName = PostManagementHybridReviewSide.PHYSICAL.name
+        }
+    }
+
+    LaunchedEffect(showReview, showPeople) {
+        if (!showPeople && selectedTabName == PostManagementTab.PEOPLE.name) {
+            onSelectedTabNameChange(if (showReview) PostManagementTab.REVIEW.name else PostManagementTab.OVERVIEW.name)
         } else if (!showReview && selectedTabName == PostManagementTab.REVIEW.name) {
-            onSelectedTabNameChange(PostManagementTab.OVERVIEW.name)
+            onSelectedTabNameChange(if (showPeople) PostManagementTab.PEOPLE.name else PostManagementTab.OVERVIEW.name)
         }
     }
 
@@ -642,6 +702,7 @@ private fun OrganisationPostManagementContent(
                 PostManagementMainTabs(
                     selected = selectedTab,
                     pendingApplicantCount = openApplicants.size,
+                    showPeopleTab = showPeople,
                     showReviewTab = showReview,
                     onSelected = { onSelectedTabNameChange(it.name) }
                 )
@@ -908,8 +969,32 @@ private fun OrganisationPostManagementContent(
                 }
 
                 PostManagementTab.REVIEW -> {
+                    if (post.mode.equals("HYBRID", ignoreCase = true) && showPhysicalReview && showRemoteReview) {
+                        item(key = "hybrid_review_selector") {
+                            PostManagementHybridReviewSelector(
+                                selected = selectedHybridReviewSide,
+                                showPhysical = showPhysicalReview,
+                                showRemote = showRemoteReview,
+                                onSelected = { selectedHybridReviewSideName = it.name }
+                            )
+                        }
+                    }
+
+                    val showSelectedPhysical = showPhysicalReview &&
+                        (
+                            !post.mode.equals("HYBRID", ignoreCase = true) ||
+                                !showRemoteReview ||
+                                selectedHybridReviewSide == PostManagementHybridReviewSide.PHYSICAL
+                            )
+                    val showSelectedRemote = showRemoteReview &&
+                        (
+                            !post.mode.equals("HYBRID", ignoreCase = true) ||
+                                !showPhysicalReview ||
+                                selectedHybridReviewSide == PostManagementHybridReviewSide.REMOTE
+                            )
+
                     val review = physicalReview
-                    if (showPhysicalReview && review != null) {
+                    if (showSelectedPhysical && review != null) {
                         item(key = "physical_completion_review") {
                             PostManagementPhysicalReviewContent(
                                 review = review,
@@ -934,7 +1019,7 @@ private fun OrganisationPostManagementContent(
                                 onViewProfile = { selectedPerson = it }
                             )
                         }
-                    } else if (showRemoteReview && remoteReview != null) {
+                    } else if (showSelectedRemote && remoteReview != null) {
                         item(key = "remote_completion_review") {
                             PostManagementRemoteReviewContent(
                                 review = remoteReview,

@@ -27,6 +27,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.volunteerlink.data.time.AppClock
 import com.example.volunteerlink.organisation.components.OrganisationDivider
 import com.example.volunteerlink.organisation.components.OrganisationSectionSurface
+import com.example.volunteerlink.organisation.home.model.HomeAttentionItem
 import com.example.volunteerlink.organisation.home.model.OrganisationHomeUiState
 import com.example.volunteerlink.organisation.viewmodel.OrganisationHomeViewModel
 import com.example.volunteerlink.ui.theme.VolunteerLinkBackground
@@ -44,6 +45,8 @@ import com.example.volunteerlink.ui.theme.VolunteerLinkTextSecondary
 @Composable
 fun OrganisationHomeScreen(
     onViewAllPosts: () -> Unit,
+    onPostClick: (String) -> Unit,
+    onAttentionClick: (HomeAttentionItem) -> Unit,
     viewModel: OrganisationHomeViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -60,6 +63,8 @@ fun OrganisationHomeScreen(
     OrganisationHomeContent(
         uiState = uiState,
         onViewAllPosts = onViewAllPosts,
+        onPostClick = onPostClick,
+        onAttentionClick = onAttentionClick,
         onRetry = viewModel::refresh
     )
 }
@@ -68,6 +73,8 @@ fun OrganisationHomeScreen(
 private fun OrganisationHomeContent(
     uiState: OrganisationHomeUiState,
     onViewAllPosts: () -> Unit,
+    onPostClick: (String) -> Unit,
+    onAttentionClick: (HomeAttentionItem) -> Unit,
     onRetry: () -> Unit
 ) {
     when {
@@ -143,9 +150,10 @@ private fun OrganisationHomeContent(
                 if (uiState.attentionItems.isNotEmpty()) {
                     item(key = "home_attention") {
                         OrganisationAttentionSection(
-                        items = uiState.attentionItems,
-                        modifier = Modifier.padding(horizontal = VolunteerLinkScreenHorizontalPadding)
-                    )
+                            items = uiState.attentionItems,
+                            onItemClick = onAttentionClick,
+                            modifier = Modifier.padding(horizontal = VolunteerLinkScreenHorizontalPadding)
+                        )
                     }
                 }
 
@@ -178,7 +186,10 @@ private fun OrganisationHomeContent(
                             val visibleOngoing = uiState.ongoingPosts.take(2)
                             OrganisationSectionSurface(contentPadding = 14.dp) {
                                 visibleOngoing.forEachIndexed { index, post ->
-                                    OngoingPostCard(post = post)
+                                    OngoingPostCard(
+                                        post = post,
+                                        onClick = { onPostClick(post.postId) }
+                                    )
                                     if (index != visibleOngoing.lastIndex) {
                                         OrganisationDivider()
                                     }
@@ -213,7 +224,8 @@ private fun OrganisationHomeContent(
                                 visibleUpcoming.forEachIndexed { index, post ->
                                     UpcomingPostRow(
                                         post = post,
-                                        showDivider = index != visibleUpcoming.lastIndex
+                                        showDivider = index != visibleUpcoming.lastIndex,
+                                        onClick = { onPostClick(post.postId) }
                                     )
                                 }
                             }
