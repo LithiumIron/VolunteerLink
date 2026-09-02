@@ -82,10 +82,16 @@ object VolunteerProfileRepository {
         availability: List<String>,
         profileImageUrl: String?
     ): Boolean {
-        val currentUser = supabase.auth.currentUserOrNull() ?: return false
+        val currentUser = supabase.auth.currentUserOrNull()
+        if (currentUser == null) {
+            android.util.Log.e("VL_UPDATE", "No current user — not logged in?")
+            return false
+        }
+
+        android.util.Log.d("VL_UPDATE", "Attempting update for auth_user_id=${currentUser.id}")
 
         return try {
-            supabase
+            val updatedRows = supabase
                 .from("user_profiles")
                 .update({
                     set("full_name", name)
@@ -95,7 +101,20 @@ object VolunteerProfileRepository {
                     set("avatar_path", profileImageUrl)
                 }) {
                     filter { eq("auth_user_id", currentUser.id) }
+                    select()
                 }
+                .decodeList<Map<String, kotlinx.serialization.json.JsonElement>>()
+
+            android.util.Log.d("VL_UPDATE", "Rows updated: ${updatedRows.size}")
+
+            if (updatedRows.isEmpty()) {
+                android.util.Log.e(
+                    "VL_UPDATE",
+                    "0 rows matched auth_user_id=${currentUser.id}. " +
+                            "Check RLS UPDATE policy, or that a user_profiles row exists for this user."
+                )
+                return false
+            }
 
             val existingProfile = VolunteerOpportunitySessionStore.profileData
             if (existingProfile != null) {
@@ -111,7 +130,7 @@ object VolunteerProfileRepository {
             }
             true
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.e("VL_UPDATE", "Exception during update", e)
             false
         }
     }

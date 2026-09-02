@@ -46,6 +46,7 @@ import com.example.volunteerlink.screens.VolunteerOpportunityViewModel
 import com.example.volunteerlink.screens.VolunteerProfileScreen
 import com.example.volunteerlink.screens.VolunteerRoleDetailsScreen
 import com.example.volunteerlink.screens.VolunteerSearchScreen
+import com.example.volunteerlink.screens.VolunteerSettingsScreen
 import com.example.volunteerlink.screens.VolunteerSkillPathDetailsScreen
 import com.example.volunteerlink.screens.VolunteerSkillPathScreen
 import com.example.volunteerlink.ui.theme.VolunteerLinkBackground
@@ -783,6 +784,18 @@ fun VolunteerOpportunityNavigationHost() {
                     val profileScope = rememberCoroutineScope()
 
                     VolunteerProfileScreen(
+                        onVolunteerSettingSelected = {
+                            volunteerNavigationController.navigate(
+                                VolunteerOpportunityNavigationRoutes
+                                    .VOLUNTEER_SETTINGS_ROUTE
+                            )
+                        },
+                        onVolunteerNotificationsSelected = {
+                            volunteerNavigationController.navigate(
+                                VolunteerOpportunityNavigationRoutes
+                                    .VOLUNTEER_NOTIFICATIONS_ROUTE
+                            )
+                        },
                         onEditProfileSelected = {
                             volunteerNavigationController.navigate(
                                 VolunteerOpportunityNavigationRoutes
@@ -856,6 +869,30 @@ fun VolunteerOpportunityNavigationHost() {
                             // updated name/phone/bio/availability instead
                             // of showing what was cached before the edit.
                             VolunteerOpportunitySessionStore.clearProfileData()
+                        }
+                    )
+                }
+
+                // Settings
+                composable(
+                    route =
+                        VolunteerOpportunityNavigationRoutes
+                            .VOLUNTEER_SETTINGS_ROUTE
+                ) {
+                    VolunteerSettingsScreen(
+                        onBackSelected = {
+                            volunteerNavigationController.popBackStack()
+                        },
+
+                        onEditProfileSelected = {
+                            volunteerNavigationController.navigate(
+                                VolunteerOpportunityNavigationRoutes
+                                    .VOLUNTEER_EDIT_PROFILE_ROUTE
+                            )
+                        },
+
+                        onLoggedOut = {
+                            // Your existing logout/root-navigation logic
                         }
                     )
                 }

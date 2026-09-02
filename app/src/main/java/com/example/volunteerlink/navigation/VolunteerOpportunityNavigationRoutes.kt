@@ -24,6 +24,8 @@ object VolunteerOpportunityNavigationRoutes {
 
     const val VOLUNTEER_CERTIFICATES_ROUTE=
         "volunteer_all_certificate"
+    const val VOLUNTEER_SETTINGS_ROUTE=
+        "volunteer_settings"
 
 
     // Volunteer Opportunity destinations
