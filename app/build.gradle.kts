@@ -17,6 +17,12 @@ val geoapifyApiKey =
         ""
     )
 
+val groqApiKey =
+    localProperties.getProperty(
+        "GROQ_API_KEY",
+        ""
+    )
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -42,6 +48,12 @@ android {
             "String",
             "GEOAPIFY_API_KEY",
             "\"$geoapifyApiKey\""
+        )
+
+        buildConfigField(
+            "String",
+            "GROQ_API_KEY",
+            "\"$groqApiKey\""
         )
 
     }

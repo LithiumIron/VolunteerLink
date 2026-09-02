@@ -44,6 +44,8 @@ private data class OrganisationRow(
     val stateRegion: String? = null,
     @SerialName("country")
     val country: String? = null,
+    @SerialName("open_to_partnership")
+    val openToPartnership: Boolean = false,
     @SerialName("created_at")
     val createdAt: String
 )
@@ -60,10 +62,78 @@ private data class VolunteerPostSummaryRow(
     val createdAt: String
 )
 
+@Serializable
+private data class OrganisationSupportRow(
+    @SerialName("support_id")
+    val supportId: String,
+    @SerialName("organisation_id")
+    val organisationId: String,
+    @SerialName("support_description")
+    val supportDescription: String,
+    @SerialName("support_type")
+    val supportType: String,
+    @SerialName("resource_name")
+    val resourceName: String,
+    @SerialName("quantity")
+    val quantity: Int? = null,
+    @SerialName("capacity")
+    val capacity: Int? = null,
+    @SerialName("location_name")
+    val locationName: String? = null,
+    @SerialName("state_region")
+    val stateRegion: String? = null,
+    @SerialName("country")
+    val country: String? = null,
+    @SerialName("latitude")
+    val latitude: Double? = null,
+    @SerialName("longitude")
+    val longitude: Double? = null
+)
+
+@Serializable
+private data class OrganisationSupportInsert(
+    @SerialName("organisation_id")
+    val organisationId: String,
+    @SerialName("support_description")
+    val supportDescription: String,
+    @SerialName("support_type")
+    val supportType: String,
+    @SerialName("resource_name")
+    val resourceName: String,
+    @SerialName("quantity")
+    val quantity: Int? = null,
+    @SerialName("capacity")
+    val capacity: Int? = null,
+    @SerialName("location_name")
+    val locationName: String? = null,
+    @SerialName("state_region")
+    val stateRegion: String? = null,
+    @SerialName("country")
+    val country: String? = null,
+    @SerialName("latitude")
+    val latitude: Double? = null,
+    @SerialName("longitude")
+    val longitude: Double? = null
+)
+
 data class RecentPostSummary(
     val postId: String,
     val title: String,
     val status: String
+)
+
+data class OrganisationSupportData(
+    val supportId: String,
+    val supportDescription: String,
+    val supportType: String,
+    val resourceName: String,
+    val quantity: Int?,
+    val capacity: Int?,
+    val locationName: String?,
+    val stateRegion: String?,
+    val country: String?,
+    val latitude: Double?,
+    val longitude: Double?
 )
 
 data class OrganisationProfileData(
@@ -82,25 +152,16 @@ data class OrganisationProfileData(
     val profileImageUrl: String?,
     val verificationStatus: String,
     val memberSince: String,
+    val openToPartnership: Boolean,
+    val supports: List<OrganisationSupportData>,
     val recentPosts: List<RecentPostSummary>
 )
 
 object OrganisationProfileRepository {
 
-    // Wrapped end-to-end in try/catch. This function runs inside a
-    // LaunchedEffect on the Profile screen — an uncaught exception here has
-    // nowhere to go and crashes the whole app rather than just failing to
-    // load the screen. OrganisationSession.requireContext() throws
-    // IllegalStateException on an incomplete/missing profile, which this
-    // catch converts into a plain "couldn't load" null instead of a crash.
     suspend fun loadProfile(): OrganisationProfileData? {
         return try {
             val currentUser = supabase.auth.currentUserOrNull() ?: return null
-
-            // Canonical organisation lookup — the same source Home, Manage,
-            // Create Post and Post Management use, so this screen can't
-            // silently drift onto a different organisation id than the rest
-            // of the app.
             val context = OrganisationSession.requireContext()
 
             val organisation = supabase
@@ -119,10 +180,19 @@ object OrganisationProfileRepository {
                 .decodeList<UserProfileRow>()
                 .firstOrNull()
 
-            // Recently posted events — newest first, capped to a short
-            // preview. This replaces "Completed Events" from the
-            // volunteer profile, since organisations post events rather
-            // than complete them.
+            val supports = try {
+                supabase
+                    .from("organisation_supports")
+                    .select {
+                        filter { eq("organisation_id", context.organisationId) }
+                        order("created_at", Order.ASCENDING)
+                    }
+                    .decodeList<OrganisationSupportRow>()
+                    .map { it.toData() }
+            } catch (_: Exception) {
+                emptyList()
+            }
+
             val recentPosts = try {
                 supabase
                     .from("volunteer_posts")
@@ -154,11 +224,6 @@ object OrganisationProfileRepository {
             }
 
             OrganisationProfileData(
-                // organisationId/organisationName/verificationStatus come
-                // from OrganisationSession — the authoritative values — not
-                // from the organisations row, even though the row also
-                // carries them. One source of truth, no chance of the two
-                // disagreeing.
                 organisationId = context.organisationId,
                 userId = organisation.userId,
                 organisationName = context.organisationName,
@@ -174,11 +239,140 @@ object OrganisationProfileRepository {
                 profileImageUrl = organisation.profileImagePath ?: profile?.avatarPath,
                 verificationStatus = context.verificationStatus,
                 memberSince = memberSince,
+                openToPartnership = organisation.openToPartnership,
+                supports = supports,
                 recentPosts = recentPosts
             )
         } catch (e: Exception) {
             e.printStackTrace()
             null
+        }
+    }
+
+    suspend fun updateOpenToPartnership(openToPartnership: Boolean): Boolean {
+        return try {
+            val organisationId = OrganisationSession.requireOrganisationId()
+
+            supabase
+                .from("organisations")
+                .update({
+                    set("open_to_partnership", openToPartnership)
+                }) {
+                    filter { eq("organisation_id", organisationId) }
+                }
+
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    suspend fun addSupport(
+        supportDescription: String,
+        supportType: String,
+        resourceName: String,
+        amount: Int,
+        locationName: String? = null,
+        stateRegion: String? = null,
+        country: String? = null,
+        latitude: Double? = null,
+        longitude: Double? = null
+    ): OrganisationSupportData? {
+        return try {
+            val organisationId = OrganisationSession.requireOrganisationId()
+            val isVenue = supportType == "VENUE"
+
+            val row = supabase
+                .from("organisation_supports")
+                .insert(
+                    OrganisationSupportInsert(
+                        organisationId = organisationId,
+                        supportDescription = supportDescription.trim(),
+                        supportType = supportType,
+                        resourceName = resourceName.trim(),
+                        quantity = if (isVenue) null else amount,
+                        capacity = if (isVenue) amount else null,
+                        locationName = if (isVenue) locationName else null,
+                        stateRegion = if (isVenue) stateRegion else null,
+                        country = if (isVenue) country else null,
+                        latitude = if (isVenue) latitude else null,
+                        longitude = if (isVenue) longitude else null
+                    )
+                ) {
+                    select()
+                }
+                .decodeSingle<OrganisationSupportRow>()
+
+            row.toData()
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
+    suspend fun updateSupport(
+        supportId: String,
+        supportDescription: String,
+        supportType: String,
+        resourceName: String,
+        amount: Int,
+        locationName: String? = null,
+        stateRegion: String? = null,
+        country: String? = null,
+        latitude: Double? = null,
+        longitude: Double? = null
+    ): OrganisationSupportData? {
+        return try {
+            val organisationId = OrganisationSession.requireOrganisationId()
+            val isVenue = supportType == "VENUE"
+
+            val row = supabase
+                .from("organisation_supports")
+                .update({
+                    set("support_description", supportDescription.trim())
+                    set("support_type", supportType)
+                    set("resource_name", resourceName.trim())
+                    set("quantity", if (isVenue) null else amount)
+                    set("capacity", if (isVenue) amount else null)
+                    set("location_name", if (isVenue) locationName else null)
+                    set("state_region", if (isVenue) stateRegion else null)
+                    set("country", if (isVenue) country else null)
+                    set("latitude", if (isVenue) latitude else null)
+                    set("longitude", if (isVenue) longitude else null)
+                }) {
+                    select()
+                    filter {
+                        eq("support_id", supportId)
+                        eq("organisation_id", organisationId)
+                    }
+                }
+                .decodeSingle<OrganisationSupportRow>()
+
+            row.toData()
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
+    suspend fun removeSupport(supportId: String): Boolean {
+        return try {
+            val organisationId = OrganisationSession.requireOrganisationId()
+
+            supabase
+                .from("organisation_supports")
+                .delete {
+                    filter {
+                        eq("support_id", supportId)
+                        eq("organisation_id", organisationId)
+                    }
+                }
+
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
         }
     }
 
@@ -194,17 +388,8 @@ object OrganisationProfileRepository {
     ): Boolean {
         return try {
             val currentUser = supabase.auth.currentUserOrNull() ?: return false
-
-            // Same canonical lookup as loadProfile() — updates target the
-            // organisation OrganisationSession says is current, not one
-            // re-derived here independently.
             val organisationId = OrganisationSession.requireOrganisationId()
 
-            // Keep user_profiles.full_name in sync with organisation_name —
-            // signup already writes both as the same value, so letting
-            // them drift apart here would be confusing anywhere full_name
-            // is shown instead of organisation_name (e.g. applicant lists,
-            // messages).
             supabase
                 .from("user_profiles")
                 .update({
@@ -235,4 +420,20 @@ object OrganisationProfileRepository {
             false
         }
     }
+}
+
+private fun OrganisationSupportRow.toData(): OrganisationSupportData {
+    return OrganisationSupportData(
+        supportId = supportId,
+        supportDescription = supportDescription,
+        supportType = supportType,
+        resourceName = resourceName,
+        quantity = quantity,
+        capacity = capacity,
+        locationName = locationName,
+        stateRegion = stateRegion,
+        country = country,
+        latitude = latitude,
+        longitude = longitude
+    )
 }

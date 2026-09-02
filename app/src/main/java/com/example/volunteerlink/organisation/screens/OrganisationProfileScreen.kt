@@ -313,6 +313,12 @@ fun OrganisationProfileScreen(
         }
 
         // =====================================================
+        // PARTNERSHIP PROFILE
+        // =====================================================
+
+        OrganisationPartnershipSection(profileData = data)
+
+        // =====================================================
         // RECENTLY CREATED EVENTS
         // =====================================================
 
