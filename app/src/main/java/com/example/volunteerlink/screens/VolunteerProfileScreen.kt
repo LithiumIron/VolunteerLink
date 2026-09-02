@@ -1,0 +1,607 @@
+package com.example.volunteerlink.screens
+
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import com.example.volunteerlink.R
+import com.example.volunteerlink.data.VolunteerOpportunitySessionStore
+import com.example.volunteerlink.ui.theme.DeepGreen
+import com.example.volunteerlink.ui.theme.VolunteerLinkBorderColour
+import com.example.volunteerlink.ui.theme.VolunteerLinkPrimaryGreen
+import com.example.volunteerlink.ui.theme.VolunteerLinkSoftGreenSurface
+import com.example.volunteerlink.ui.theme.VolunteerLinkTheme
+
+@Composable
+fun VolunteerProfileScreen(
+    onVolunteerSettingSelected: () -> Unit = {},
+    onVolunteerNotificationsSelected: () -> Unit = {},
+    onEditProfileSelected: () -> Unit = {},
+    onCompletedEventSelected: (applicationId: Int) -> Unit = {},
+    onCompletedEventsSelected: () -> Unit = {},
+    onCertificateSelected: (applicationId: Int) -> Unit = {},
+    onCertificatesSelected: () -> Unit = {},
+    onSkillPathItemSelected: (skillPathId: String) -> Unit = {},
+    onSkillPathSelected: () -> Unit = {},
+    onRefresh: () -> Unit = {}
+) {
+    // Use shared data from SessionStore
+    val profileData = VolunteerOpportunitySessionStore.profileData
+
+    LaunchedEffect(Unit) {
+        onRefresh()
+    }
+
+    val isLoading = profileData == null
+
+    val name = profileData?.fullName ?: "Loading..."
+    val email = profileData?.email ?: "Loading..."
+    val bio = profileData?.bio ?: ""
+    val availability = profileData?.availability ?: emptyList()
+    val memberSince = profileData?.memberSince ?: "Loading..."
+    val profileImageUrl = profileData?.profileImageUrl
+    val verifiedHours = profileData?.verifiedHours ?: 0
+    val completedEvents = profileData?.completedEvents ?: emptyList()
+    val certificates = profileData?.certificates ?: emptyList()
+    val skillPaths = profileData?.skillPaths ?: emptyList()
+
+    if (isLoading) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator(
+                color = VolunteerLinkPrimaryGreen
+            )
+        }
+        return
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(bottom = 102.dp)
+    ) {
+
+        // =====================================================
+        // TOP BAR
+        // =====================================================
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(DeepGreen)
+                .height(70.dp)
+        ) {
+            Text(
+                text = "PROFILE",
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = 20.sp,
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = 20.dp, bottom = 14.dp)
+            )
+
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 8.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                IconButton(onClick = onVolunteerNotificationsSelected) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_volunteer_notifications),
+                        contentDescription = "Notifications",
+                        tint = Color.White,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+
+                IconButton(onClick = onVolunteerSettingSelected) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.setting),
+                        contentDescription = "Settings",
+                        tint = Color.White,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
+        }
+
+        // =====================================================
+        // PROFILE HEADER
+        // =====================================================
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 15.dp, start = 20.dp, end = 10.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(115.dp)
+                    .clip(CircleShape)
+                    .background(VolunteerLinkSoftGreenSurface),
+                contentAlignment = Alignment.Center
+            ) {
+                if (!profileImageUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = profileImageUrl,
+                        contentDescription = "Profile Picture",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Icon(
+                        painter = painterResource(id = R.drawable.profile),
+                        contentDescription = "Profile Picture",
+                        tint = VolunteerLinkPrimaryGreen,
+                        modifier = Modifier.size(80.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(top = 12.dp)
+            ) {
+                Text(
+                    text = name,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Text(
+                    text = email,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = DeepGreen
+                )
+
+                if (bio.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = bio,
+                        fontSize = 13.sp,
+                        color = Color.DarkGray
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "Member since $memberSince",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Gray
+                )
+            }
+
+            IconButton(
+                onClick = onEditProfileSelected,
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(VolunteerLinkSoftGreenSurface)
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.edit),
+                    contentDescription = "Edit Profile",
+                    tint = VolunteerLinkPrimaryGreen,
+                    modifier = Modifier.size(25.dp)
+                )
+            }
+        }
+
+        // =====================================================
+        // AVAILABILITY
+        // =====================================================
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 20.dp, end = 20.dp, top = 18.dp)
+        ) {
+            Text(
+                text = "Availability",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = DeepGreen
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (availability.isNotEmpty()) {
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    availability.forEach { day ->
+                        Box(
+                            modifier = Modifier
+                                .background(Color(0xFFACD8A7), CircleShape)
+                                .padding(horizontal = 12.dp, vertical = 7.dp)
+                        ) {
+                            Text(
+                                text = day,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = DeepGreen
+                            )
+                        }
+                    }
+                }
+            } else {
+                Text(
+                    text = "No availability set",
+                    fontSize = 13.sp,
+                    color = Color.Gray
+                )
+            }
+        }
+
+        // =====================================================
+        // VERIFIED HOURS + COMPLETED EVENTS
+        // =====================================================
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 20.dp, end = 20.dp, top = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(90.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(VolunteerLinkSoftGreenSurface)
+                    .border(
+                        width = 1.dp,
+                        color = VolunteerLinkBorderColour,
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    .padding(15.dp)
+            ) {
+                Column {
+                    Text(
+                        text = "Verified Hours",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = DeepGreen
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "$verifiedHours hrs",
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = VolunteerLinkPrimaryGreen
+                    )
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(90.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(VolunteerLinkSoftGreenSurface)
+                    .border(
+                        width = 1.dp,
+                        color = VolunteerLinkBorderColour,
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    .clickable { onCompletedEventsSelected() }
+                    .padding(15.dp)
+            ) {
+                Column {
+                    Text(
+                        text = "Completed Events",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = DeepGreen
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "${completedEvents.size}",
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = VolunteerLinkPrimaryGreen
+                    )
+                }
+            }
+        }
+
+        // =====================================================
+        // COMPLETED EVENTS LIST
+        // =====================================================
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 20.dp, end = 20.dp, top = 24.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Completed Events",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = DeepGreen,
+                    modifier = Modifier.weight(1f)
+                )
+
+                Text(
+                    text = "See all",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = VolunteerLinkPrimaryGreen,
+                    modifier = Modifier.clickable {
+                        onCompletedEventsSelected()
+                    }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            if (completedEvents.isEmpty()) {
+                Text(
+                    text = "No completed events yet",
+                    fontSize = 13.sp,
+                    color = Color.Gray
+                )
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    completedEvents.take(3).forEach { application ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(65.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color.White)
+                                .border(
+                                    width = 1.dp,
+                                    color = VolunteerLinkBorderColour,
+                                    shape = RoundedCornerShape(10.dp)
+                                )
+                                .clickable {
+                                    onCompletedEventSelected(
+                                        application.applicationId
+                                    )
+                                }
+                                .padding(12.dp)
+                        ) {
+                            Column {
+                                Text(
+                                    text = application.applicationEventTitle,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.Black
+                                )
+                                Text(
+                                    text = application.applicationRoleTitle,
+                                    fontSize = 11.sp,
+                                    color = Color.Gray
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // =====================================================
+        // CERTIFICATES
+        // =====================================================
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 20.dp, end = 20.dp, top = 24.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Certificates",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = DeepGreen,
+                    modifier = Modifier.weight(1f)
+                )
+
+                Text(
+                    text = "See all",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = VolunteerLinkPrimaryGreen,
+                    modifier = Modifier.clickable {
+                        onCertificatesSelected()
+                    }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            if (certificates.isEmpty()) {
+                Text(
+                    text = "No certificates yet",
+                    fontSize = 13.sp,
+                    color = Color.Gray
+                )
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    certificates.take(1).forEach { application ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(65.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color.White)
+                                .border(
+                                    width = 1.dp,
+                                    color = VolunteerLinkBorderColour,
+                                    shape = RoundedCornerShape(10.dp)
+                                )
+                                .clickable {
+                                    onCertificateSelected(
+                                        application.applicationId
+                                    )
+                                }
+                                .padding(12.dp)
+                        ) {
+                            Text(
+                                text = application.applicationEventTitle,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.Black
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // =====================================================
+        // SKILL PATHS
+        // =====================================================
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 20.dp, end = 20.dp, top = 24.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Skill Paths",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = DeepGreen,
+                    modifier = Modifier.weight(1f)
+                )
+
+                Text(
+                    text = "See all",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = VolunteerLinkPrimaryGreen,
+                    modifier = Modifier.clickable {
+                        onSkillPathSelected()
+                    }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            if (skillPaths.isEmpty()) {
+                Text(
+                    text = "No skill paths yet",
+                    fontSize = 13.sp,
+                    color = Color.Gray
+                )
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    skillPaths.take(3).forEach { skillPath ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(VolunteerLinkSoftGreenSurface)
+                                .border(
+                                    width = 1.dp,
+                                    color = VolunteerLinkBorderColour,
+                                    shape = RoundedCornerShape(10.dp)
+                                )
+                                .clickable {
+                                    onSkillPathItemSelected(
+                                        skillPath.skillPathId
+                                    )
+                                }
+                                .padding(14.dp)
+                        ) {
+                            Column {
+                                Text(
+                                    text = skillPath.name,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = DeepGreen
+                                )
+                                Spacer(modifier = Modifier.height(5.dp))
+                                Text(
+                                    text = "Level ${skillPath.currentLevel}",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = VolunteerLinkPrimaryGreen
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "${skillPath.verifiedAssignments} verified assignments",
+                                    fontSize = 12.sp,
+                                    color = Color.Gray
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun ProfilePreview() {
+    VolunteerLinkTheme {
+        VolunteerProfileScreen()
+    }
+}

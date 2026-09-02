@@ -22,6 +22,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -33,7 +34,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -42,13 +42,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.volunteerlink.ui.theme.VolunteerLinkBackground
-import com.example.volunteerlink.ui.theme.VolunteerLinkBorderColour
-import com.example.volunteerlink.ui.theme.VolunteerLinkError
-import com.example.volunteerlink.ui.theme.VolunteerLinkPrimaryGreen
-import com.example.volunteerlink.ui.theme.VolunteerLinkSurface
-import com.example.volunteerlink.ui.theme.VolunteerLinkTextPrimary
-import com.example.volunteerlink.ui.theme.VolunteerLinkTextSecondary
 
 @Composable
 fun OrganisationSignInScreen(
@@ -102,14 +95,14 @@ fun OrganisationSignInScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(VolunteerLinkBackground)
+            .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
     ) {
         IconButton(onClick = onBackSelected, enabled = !isBusy) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                 contentDescription = "Back",
-                tint = VolunteerLinkPrimaryGreen
+                tint = MaterialTheme.colorScheme.primary
             )
         }
 
@@ -123,7 +116,7 @@ fun OrganisationSignInScreen(
                 text = "Organisation sign in",
                 fontSize = 28.sp,
                 fontWeight = FontWeight.Bold,
-                color = VolunteerLinkTextPrimary
+                color = MaterialTheme.colorScheme.onBackground
             )
 
             Spacer(Modifier.height(7.dp))
@@ -132,7 +125,7 @@ fun OrganisationSignInScreen(
                 text = "Sign in to manage your posts and volunteer applicants.",
                 fontSize = 13.sp,
                 lineHeight = 19.sp,
-                color = VolunteerLinkTextSecondary
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             Spacer(Modifier.height(26.dp))
@@ -188,7 +181,7 @@ fun OrganisationSignInScreen(
                     text = message,
                     fontSize = 12.sp,
                     lineHeight = 17.sp,
-                    color = VolunteerLinkError
+                    color = MaterialTheme.colorScheme.error
                 )
             }
 
@@ -204,14 +197,14 @@ fun OrganisationSignInScreen(
                 enabled = !isBusy,
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = VolunteerLinkPrimaryGreen,
-                    contentColor = Color.White
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
                 )
             ) {
                 if (isBusy) {
                     CircularProgressIndicator(
                         modifier = Modifier.height(22.dp),
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onPrimary,
                         strokeWidth = 2.dp
                     )
                 } else {
@@ -228,14 +221,14 @@ fun OrganisationSignInScreen(
                 Text(
                     text = "New organisation?",
                     fontSize = 13.sp,
-                    color = VolunteerLinkTextSecondary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 TextButton(onClick = onSignUpSelected, enabled = !isBusy) {
                     Text(
                         text = "Create an account",
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = VolunteerLinkPrimaryGreen
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
             }
@@ -246,9 +239,9 @@ fun OrganisationSignInScreen(
 @Composable
 internal fun organisationFieldColours() =
     OutlinedTextFieldDefaults.colors(
-        focusedContainerColor = VolunteerLinkSurface,
-        unfocusedContainerColor = VolunteerLinkSurface,
-        focusedBorderColor = VolunteerLinkPrimaryGreen,
-        unfocusedBorderColor = VolunteerLinkBorderColour,
-        cursorColor = VolunteerLinkPrimaryGreen
+        focusedContainerColor = MaterialTheme.colorScheme.surface,
+        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+        focusedBorderColor = MaterialTheme.colorScheme.primary,
+        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+        cursorColor = MaterialTheme.colorScheme.primary
     )

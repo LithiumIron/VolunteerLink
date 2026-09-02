@@ -1,4 +1,3 @@
-
 package com.example.volunteerlink.navigation
 
 import androidx.compose.foundation.background
@@ -29,8 +28,12 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import androidx.compose.runtime.rememberCoroutineScope
 import com.example.volunteerlink.data.VolunteerOpportunitySessionStore
+import com.example.volunteerlink.data.VolunteerProfileRepository
+import com.example.volunteerlink.screens.EditVolunteerProfileScreen
 import com.example.volunteerlink.screens.MapScreen
+import com.example.volunteerlink.screens.VolunteerAllCertificatesScreen
 import com.example.volunteerlink.screens.VolunteerApplicationDetailsScreen
 import com.example.volunteerlink.screens.VolunteerApplicationScreen
 import com.example.volunteerlink.screens.VolunteerCertificateScreen
@@ -40,6 +43,7 @@ import com.example.volunteerlink.screens.VolunteerOpportunityDetailsScreen
 import com.example.volunteerlink.screens.VolunteerNotificationsScreen
 import com.example.volunteerlink.screens.VolunteerNotificationViewModel
 import com.example.volunteerlink.screens.VolunteerOpportunityViewModel
+import com.example.volunteerlink.screens.VolunteerProfileScreen
 import com.example.volunteerlink.screens.VolunteerRoleDetailsScreen
 import com.example.volunteerlink.screens.VolunteerSearchScreen
 import com.example.volunteerlink.screens.VolunteerSkillPathDetailsScreen
@@ -48,22 +52,23 @@ import com.example.volunteerlink.ui.theme.VolunteerLinkBackground
 import com.example.volunteerlink.ui.theme.VolunteerLinkPrimaryGreen
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextPrimary
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextSecondary
+import kotlinx.coroutines.launch
 
 @Composable
 fun VolunteerOpportunityNavigationHost() {
     val volunteerOpportunityViewModel:
-        VolunteerOpportunityViewModel = viewModel()
+            VolunteerOpportunityViewModel = viewModel()
 
     val opportunityUiState by
-        volunteerOpportunityViewModel.uiState
-            .collectAsStateWithLifecycle()
+    volunteerOpportunityViewModel.uiState
+        .collectAsStateWithLifecycle()
 
     val volunteerNotificationViewModel:
-        VolunteerNotificationViewModel = viewModel()
+            VolunteerNotificationViewModel = viewModel()
 
     val notificationUiState by
-        volunteerNotificationViewModel.uiState
-            .collectAsStateWithLifecycle()
+    volunteerNotificationViewModel.uiState
+        .collectAsStateWithLifecycle()
 
     if (opportunityUiState.isLoading) {
         VolunteerOpportunityLoadingScreen()
@@ -775,8 +780,97 @@ fun VolunteerOpportunityNavigationHost() {
                         VolunteerOpportunityNavigationRoutes
                             .VOLUNTEER_PROFILE_ROUTE
                 ) {
-                    VolunteerTemporaryModuleScreen(
-                        moduleTitle = "Profile"
+                    val profileScope = rememberCoroutineScope()
+
+                    VolunteerProfileScreen(
+                        onEditProfileSelected = {
+                            volunteerNavigationController.navigate(
+                                VolunteerOpportunityNavigationRoutes
+                                    .VOLUNTEER_EDIT_PROFILE_ROUTE
+                            )
+                        },
+                        onCompletedEventSelected = { applicationId ->
+                            volunteerNavigationController.navigate(
+                                VolunteerOpportunityNavigationRoutes
+                                    .createVolunteerApplicationDetailsRoute(applicationId)
+                            )
+                        },
+                        onCompletedEventsSelected = {
+                            volunteerNavigationController.navigate(
+                                VolunteerOpportunityNavigationRoutes
+                                    .VOLUNTEER_MY_APPLICATIONS_ROUTE
+                            )
+                        },
+                        onCertificateSelected = { applicationId ->
+                            volunteerNavigationController.navigate(
+                                VolunteerOpportunityNavigationRoutes
+                                    .createVolunteerCertificateRoute(applicationId)
+                            )
+                        },
+                        onCertificatesSelected = {
+                            volunteerNavigationController.navigate(
+                                VolunteerOpportunityNavigationRoutes
+                                    .VOLUNTEER_CERTIFICATES_ROUTE  // new — see below
+                            )
+                        },
+                        onSkillPathItemSelected = { skillPathId ->
+                            volunteerNavigationController.navigate(
+                                VolunteerOpportunityNavigationRoutes
+                                    .createVolunteerSkillPathDetailsRoute(skillPathId)
+                            )
+                        },
+                        onSkillPathSelected = {
+                            volunteerNavigationController.navigate(
+                                VolunteerOpportunityNavigationRoutes
+                                    .VOLUNTEER_SKILL_PATH_ROUTE
+                            )
+                        },
+                        onRefresh = {
+                            profileScope.launch {
+                                VolunteerOpportunitySessionStore.updateProfileLoading(true)
+                                val loadedProfile = VolunteerProfileRepository.loadProfile()
+                                if (loadedProfile != null) {
+                                    VolunteerOpportunitySessionStore.setProfileData(loadedProfile)
+                                } else {
+                                    VolunteerOpportunitySessionStore.updateProfileLoading(false)
+                                }
+                            }
+                        }
+                    )
+
+
+                }
+                // Edit Profile
+                composable(
+                    route =
+                        VolunteerOpportunityNavigationRoutes
+                            .VOLUNTEER_EDIT_PROFILE_ROUTE
+                ) {
+                    EditVolunteerProfileScreen(
+                        onBack = {
+                            volunteerNavigationController.popBackStack()
+                        },
+                        onSaved = {
+                            // Invalidate the cached profile so navigating
+                            // back to VolunteerProfileScreen refetches the
+                            // updated name/phone/bio/availability instead
+                            // of showing what was cached before the edit.
+                            VolunteerOpportunitySessionStore.clearProfileData()
+                        }
+                    )
+                }
+
+                composable(
+                    route = VolunteerOpportunityNavigationRoutes.VOLUNTEER_CERTIFICATES_ROUTE
+                ) {
+                    VolunteerAllCertificatesScreen(
+                        onBackSelected = { volunteerNavigationController.popBackStack() },
+                        onCertificateSelected = { applicationId ->
+                            volunteerNavigationController.navigate(
+                                VolunteerOpportunityNavigationRoutes
+                                    .createVolunteerCertificateRoute(applicationId)
+                            )
+                        }
                     )
                 }
             }

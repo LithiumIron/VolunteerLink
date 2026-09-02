@@ -50,7 +50,7 @@ private val DarkColorScheme = darkColorScheme(
 
 @Composable
 fun VolunteerLinkTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = false,       //isSystemInDarkTheme(),
     // Off by default — Material You's dynamic color pulls its palette from
     // the phone's wallpaper on Android 12+, which is exactly what was
     // overriding the green scheme with purple on some devices. Flip this

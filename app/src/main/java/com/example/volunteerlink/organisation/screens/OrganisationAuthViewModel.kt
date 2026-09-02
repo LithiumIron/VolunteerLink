@@ -62,14 +62,23 @@ class OrganisationAuthViewModel(
         email: String,
         password: String,
         organisationName: String,
-        contactPhone: String?
+        contactPhone: String?,
+        locationName: String?,
+        stateRegion: String?,
+        country: String?,
+        organisationType: String
     ) {
         val normalizedEmail = email.trim()
         val normalizedOrgName = organisationName.trim()
+        val normalizedOrgType = organisationType.trim()
 
         when {
             normalizedOrgName.isBlank() -> {
                 showError("Enter your organisation name.")
+                return
+            }
+            normalizedOrgType.isBlank() -> {
+                showError("Select an organisation type.")
                 return
             }
             normalizedEmail.isBlank() -> {
@@ -99,8 +108,18 @@ class OrganisationAuthViewModel(
                     data = buildJsonObject {
                         put("volunteerlink_account_type", "ORGANISATION")
                         put("organisation_name", normalizedOrgName)
+                        put("organisation_type", normalizedOrgType)
                         contactPhone?.trim()?.ifBlank { null }?.let { phone ->
                             put("contact_phone", phone)
+                        }
+                        locationName?.trim()?.ifBlank { null }?.let { location ->
+                            put("location_name", location)
+                        }
+                        stateRegion?.trim()?.ifBlank { null }?.let { region ->
+                            put("state_region", region)
+                        }
+                        country?.trim()?.ifBlank { null }?.let { countryValue ->
+                            put("country", countryValue)
                         }
                     }
                 }

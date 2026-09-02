@@ -1,12 +1,33 @@
-
 package com.example.volunteerlink.data
 
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import com.example.volunteerlink.data.location.VolunteerDistanceCalculator
 import com.example.volunteerlink.model.VolunteerApplicationStatus
 import com.example.volunteerlink.model.VolunteerOpportunityApplication
 import com.example.volunteerlink.model.VolunteerOpportunityEvent
 import com.example.volunteerlink.model.VolunteerOpportunityRole
+import com.example.volunteerlink.model.VolunteerSkillPath
+
+data class VolunteerProfileData(
+    val userId: String,
+    val fullName: String,
+    val email: String,
+    val bio: String = "",
+    val phone: String = "",
+    val availability: List<String> = emptyList(),
+    val memberSince: String = "",
+    val profileImageUrl: String? = null,
+    val verifiedHours: Int = 0,
+    val verifiedMinutes: Int = 0,
+    // Changed from List<String> — carrying full application objects gives
+    // the profile screen an applicationId to navigate with per item.
+    val completedEvents: List<VolunteerOpportunityApplication> = emptyList(),
+    val certificates: List<VolunteerOpportunityApplication> = emptyList(),
+    val skillPaths: List<VolunteerSkillPath> = emptyList()
+)
 
 /**
  * Observable in-memory session cache populated only by Supabase repositories.
@@ -22,6 +43,31 @@ object VolunteerOpportunitySessionStore {
 
     val volunteerApplications =
         mutableStateListOf<VolunteerOpportunityApplication>()
+
+    // Cached profile data, shared across VolunteerProfileScreen visits so it
+    // doesn't refetch on every navigation. null means "not loaded yet" —
+    // VolunteerProfileScreen treats that as its cue to call onRefresh().
+    private var _profileData by mutableStateOf<VolunteerProfileData?>(null)
+
+    val profileData: VolunteerProfileData?
+        get() = _profileData
+
+    var isProfileLoading by mutableStateOf(false)
+        private set
+    fun updateProfileLoading(loading: Boolean) {
+        isProfileLoading = loading
+    }
+
+    fun setProfileData(data: VolunteerProfileData) {
+        _profileData = data
+        isProfileLoading = false
+    }
+
+    // Called from EditVolunteerProfileScreen's onSaved so the next visit to
+    // VolunteerProfileScreen refetches instead of showing stale cached data.
+    fun clearProfileData() {
+        _profileData = null
+    }
 
     fun replaceWith(data: VolunteerOpportunityDashboardData) {
         volunteerOpportunityEvents.clear()
@@ -109,11 +155,11 @@ object VolunteerOpportunitySessionStore {
     ): Boolean =
         volunteerApplications.any {
             it.applicationEventId == eventId &&
-                it.applicationRoleId == roleId &&
-                it.applicationStatus !in setOf(
-                    VolunteerApplicationStatus.CANCELLED,
-                    VolunteerApplicationStatus.REJECTED
-                )
+                    it.applicationRoleId == roleId &&
+                    it.applicationStatus !in setOf(
+                VolunteerApplicationStatus.CANCELLED,
+                VolunteerApplicationStatus.REJECTED
+            )
         }
 
     fun snapshot(): VolunteerOpportunityDashboardData =
@@ -127,7 +173,7 @@ object VolunteerOpportunitySessionStore {
     ) {
         volunteerApplications.removeAll {
             it.applicationEventId == application.applicationEventId &&
-                it.applicationRoleId == application.applicationRoleId
+                    it.applicationRoleId == application.applicationRoleId
         }
         volunteerApplications.add(0, application)
     }

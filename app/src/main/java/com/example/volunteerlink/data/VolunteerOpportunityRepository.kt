@@ -1,4 +1,3 @@
-
 package com.example.volunteerlink.data
 
 import com.example.volunteerlink.model.VolunteerApplicationStatus
@@ -48,7 +47,7 @@ object VolunteerOpportunityRepository {
                 .select(
                     columns = Columns.raw(
                         "organisation_id,organisation_name,contact_email," +
-                            "contact_phone,verification_status"
+                                "contact_phone,verification_status"
                     )
                 )
                 .decodeList<OrganisationRow>()
@@ -348,7 +347,7 @@ object VolunteerOpportunityRepository {
         }.getOrDefault(emptySet())
 
     private suspend fun loadMetricsSafely():
-        Map<String, OpportunityMetricRow> {
+            Map<String, OpportunityMetricRow> {
         return try {
             supabase.postgrest
                 .rpc("get_published_opportunity_metrics")
@@ -362,7 +361,7 @@ object VolunteerOpportunityRepository {
     }
 
     private suspend fun loadRoleMetricsSafely():
-        Map<String, RoleMetricRow> {
+            Map<String, RoleMetricRow> {
         return try {
             supabase.postgrest
                 .rpc("get_published_role_metrics")
@@ -374,7 +373,7 @@ object VolunteerOpportunityRepository {
     }
 
     private suspend fun loadAchievementsSafely():
-        Map<String, VolunteerAchievementRow> {
+            Map<String, VolunteerAchievementRow> {
         return try {
             supabase.postgrest
                 .rpc("get_my_volunteer_achievement_records")
@@ -388,7 +387,7 @@ object VolunteerOpportunityRepository {
     }
 
     private suspend fun loadApplicationsFromRpcSafely():
-        List<MyVolunteerApplicationRow>? {
+            List<MyVolunteerApplicationRow>? {
         return try {
             runCatching {
                 supabase.postgrest
@@ -504,12 +503,12 @@ object VolunteerOpportunityRepository {
                                             item.scheduleItemId
                                         ].orEmpty()
                                     item.postId == post.postId &&
-                                        item.scheduleType != "TRAINING" &&
-                                        (
-                                                targetRoleIds.isEmpty() ||
-                                                    postRole.roleTemplateId in
-                                                        targetRoleIds
-                                            )
+                                            item.scheduleType != "TRAINING" &&
+                                            (
+                                                    targetRoleIds.isEmpty() ||
+                                                            postRole.roleTemplateId in
+                                                            targetRoleIds
+                                                    )
                                 }
                                 .sortedWith(
                                     compareBy<ScheduleItemRow> {
@@ -663,7 +662,7 @@ object VolunteerOpportunityRepository {
                             ?: "VolunteerLink Organisation",
                     eventIsVerifiedOrganisation =
                         organisation?.verificationStatus ==
-                            "VERIFIED",
+                                "VERIFIED",
                     eventOpportunityType = opportunityType,
                     eventCategory = parseCategory(post.category),
                     eventLocation =
@@ -679,7 +678,7 @@ object VolunteerOpportunityRepository {
                     eventTime =
                         if (physical != null) {
                             "${formatDatabaseTime(physical.startTime)} - " +
-                                formatDatabaseTime(physical.endTime)
+                                    formatDatabaseTime(physical.endTime)
                         } else {
                             "Flexible"
                         },
@@ -713,7 +712,7 @@ object VolunteerOpportunityRepository {
                         organisation?.contactPhone.orEmpty(),
                     eventShareLink =
                         "https://volunteerlink.example/opportunities/" +
-                            post.postId,
+                                post.postId,
                     eventLatitude = physical?.latitude,
                     eventLongitude = physical?.longitude,
                     eventThumbnailPath = post.thumbnailPath,
@@ -751,23 +750,23 @@ object VolunteerOpportunityRepository {
                 val status =
                     when {
                         participation.completionStatus ==
-                            "COMPLETED" ->
+                                "COMPLETED" ->
                             VolunteerApplicationStatus.COMPLETED
 
                         participation.completionStatus ==
-                            "NOT_COMPLETED" ->
+                                "NOT_COMPLETED" ->
                             VolunteerApplicationStatus.NOT_COMPLETED
 
                         participation.applicationStatus ==
-                            "ACCEPTED" ->
+                                "ACCEPTED" ->
                             VolunteerApplicationStatus.ACCEPTED
 
                         participation.applicationStatus ==
-                            "DECLINED" ->
+                                "DECLINED" ->
                             VolunteerApplicationStatus.REJECTED
 
                         participation.applicationStatus ==
-                            "CANCELLED" ->
+                                "CANCELLED" ->
                             VolunteerApplicationStatus.CANCELLED
 
                         else ->
@@ -783,10 +782,10 @@ object VolunteerOpportunityRepository {
                 val certificateId =
                     if (status == VolunteerApplicationStatus.COMPLETED) {
                         "VL-${participation.participationId}-" +
-                            (achievement?.completedAt
-                                ?: participation.completedAt
-                                ?: participation.createdAt)
-                                .take(4)
+                                (achievement?.completedAt
+                                    ?: participation.completedAt
+                                    ?: participation.createdAt)
+                                    .take(4)
                     } else {
                         null
                     }
@@ -859,7 +858,7 @@ object VolunteerOpportunityRepository {
                 val certificateId =
                     if (status == VolunteerApplicationStatus.COMPLETED) {
                         "VL-${row.participationId}-" +
-                            (row.completedAt ?: row.createdAt).take(4)
+                                (row.completedAt ?: row.createdAt).take(4)
                     } else {
                         null
                     }
@@ -1053,8 +1052,11 @@ private data class OrganisationRow(
     val verificationStatus: String
 )
 
+// Made internal (was private) so other repositories in this package — e.g.
+// ProfileRepository.kt — can decode volunteer_posts rows with this same
+// class instead of declaring their own duplicate.
 @Serializable
-private data class VolunteerPostRow(
+internal data class VolunteerPostRow(
     @SerialName("post_id")
     val postId: String,
     @SerialName("organisation_id")
