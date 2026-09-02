@@ -23,7 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.volunteerlink.data.time.AppClock
 import com.example.volunteerlink.organisation.create.CreatePostValidator
-import com.example.volunteerlink.organisation.create.components.CreateGreen
+import com.example.volunteerlink.ui.theme.CreateGreen
 import com.example.volunteerlink.organisation.create.components.CreateSectionCard
 import com.example.volunteerlink.organisation.create.components.DateSelectionField
 import com.example.volunteerlink.organisation.create.components.EditRestrictionNotice

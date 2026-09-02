@@ -1,6 +1,7 @@
 package com.example.volunteerlink.data.post
 
 import com.example.volunteerlink.data.time.AppClock
+import kotlinx.serialization.Serializable
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -233,6 +234,7 @@ enum class PostMode {
     }
 }
 
+@Serializable
 enum class PostTimingState {
     UPCOMING,
     ONGOING,

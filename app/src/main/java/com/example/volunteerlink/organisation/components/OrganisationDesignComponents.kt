@@ -41,6 +41,9 @@ import com.example.volunteerlink.ui.theme.VolunteerLinkSoftGreenSurface
 import com.example.volunteerlink.ui.theme.VolunteerLinkSurface
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextPrimary
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextSecondary
+import com.example.volunteerlink.ui.theme.VolunteerLinkWarning
+import java.text.DateFormat
+import java.util.Date
 
 /**
  * Small shared building blocks for the Organisation branch.
@@ -251,6 +254,65 @@ fun OrganisationDivider(modifier: Modifier = Modifier) {
         thickness = 1.dp,
         color = VolunteerLinkBorderColour.copy(alpha = 0.9f)
     )
+}
+
+
+@Composable
+fun OrganisationOfflineStatusCard(
+    lastSyncedAtEpochMillis: Long?,
+    isSyncing: Boolean,
+    onSyncSelected: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val lastSyncText = lastSyncedAtEpochMillis?.let { timestamp ->
+        DateFormat.getDateTimeInstance(
+            DateFormat.MEDIUM,
+            DateFormat.SHORT
+        ).format(Date(timestamp))
+    }
+
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = VolunteerLinkWarning.copy(alpha = 0.13f),
+        border = BorderStroke(
+            width = 1.dp,
+            color = VolunteerLinkWarning.copy(alpha = 0.45f)
+        )
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Offline data",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    color = VolunteerLinkTextPrimary
+                )
+                Text(
+                    text = lastSyncText?.let {
+                        "Showing your last successful sync from $it."
+                    } ?: "Showing your last saved organisation data.",
+                    modifier = Modifier.padding(top = 3.dp),
+                    fontSize = 12.sp,
+                    color = VolunteerLinkTextSecondary
+                )
+            }
+
+            TextButton(
+                onClick = onSyncSelected,
+                enabled = !isSyncing
+            ) {
+                Text(
+                    text = if (isSyncing) "SYNCING…" else "SYNC",
+                    fontWeight = FontWeight.Bold,
+                    color = VolunteerLinkPrimaryGreen
+                )
+            }
+        }
+    }
 }
 
 @Composable

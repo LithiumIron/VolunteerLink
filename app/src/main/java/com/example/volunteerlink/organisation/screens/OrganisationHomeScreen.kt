@@ -13,6 +13,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -26,6 +29,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.volunteerlink.data.time.AppClock
 import com.example.volunteerlink.organisation.components.OrganisationDivider
+import com.example.volunteerlink.organisation.components.OrganisationOfflineStatusCard
 import com.example.volunteerlink.organisation.components.OrganisationSectionSurface
 import com.example.volunteerlink.organisation.home.model.HomeAttentionItem
 import com.example.volunteerlink.organisation.home.model.OrganisationHomeUiState
@@ -52,9 +56,16 @@ fun OrganisationHomeScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     val lifecycleOwner = LocalLifecycleOwner.current
+    var hasHandledFirstResume by rememberSaveable { mutableStateOf(false) }
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) viewModel.refresh()
+            if (event == Lifecycle.Event.ON_RESUME) {
+                if (hasHandledFirstResume) {
+                    viewModel.refresh()
+                } else {
+                    hasHandledFirstResume = true
+                }
+            }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
@@ -145,6 +156,19 @@ private fun OrganisationHomeContent(
                         organisationName = uiState.organisationName,
                         nowMillis = AppClock.nowMillis()
                     )
+                }
+
+                if (uiState.isShowingCachedData) {
+                    item(key = "home_offline_status") {
+                        OrganisationOfflineStatusCard(
+                            lastSyncedAtEpochMillis = uiState.lastSyncedAtEpochMillis,
+                            isSyncing = uiState.isRefreshing,
+                            onSyncSelected = onRetry,
+                            modifier = Modifier.padding(
+                                horizontal = VolunteerLinkScreenHorizontalPadding
+                            )
+                        )
+                    }
                 }
 
                 if (uiState.attentionItems.isNotEmpty()) {

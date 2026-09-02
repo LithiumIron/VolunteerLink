@@ -35,9 +35,20 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.volunteerlink.R
+import com.example.volunteerlink.ui.theme.ScheduleBorder
+import com.example.volunteerlink.ui.theme.ScheduleMuted
+import com.example.volunteerlink.ui.theme.ScheduleWarning
+import com.example.volunteerlink.ui.theme.ScheduleAttention
+import com.example.volunteerlink.ui.theme.CreateGreen
+import com.example.volunteerlink.ui.theme.CreateLightGreen
+import com.example.volunteerlink.ui.theme.CreateCardBackground
 import com.example.volunteerlink.organisation.create.CreatePostValidator
-import com.example.volunteerlink.organisation.create.components.CreateGreen
-import com.example.volunteerlink.organisation.create.components.CreateLightGreen
+import com.example.volunteerlink.ui.theme.ScheduleBorder
+import com.example.volunteerlink.ui.theme.ScheduleMuted
+import com.example.volunteerlink.ui.theme.ScheduleWarning
+import com.example.volunteerlink.ui.theme.ScheduleAttention
+import com.example.volunteerlink.ui.theme.CreateGreen
+import com.example.volunteerlink.ui.theme.CreateLightGreen
 import com.example.volunteerlink.organisation.create.components.DateSelectionField
 import com.example.volunteerlink.organisation.create.components.TimeSelectionField
 import com.example.volunteerlink.organisation.create.model.CreatePostDraft
@@ -51,10 +62,6 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private val ScheduleBorder = Color(0xFFDCE5D8)
-private val ScheduleMuted = Color(0xFFF7F9F6)
-private val ScheduleAttention = Color(0xFFFFE9E7)
-private val ScheduleWarning = Color(0xFFFFF4E5)
 
 @Composable
 fun ScheduleSectionSelector(
@@ -1227,7 +1234,7 @@ private fun scheduleTimeRangeText(
     return "${formatScheduleTime(startMinutes)} – ${formatScheduleTime(endMinutes)}"
 }
 
-private fun formatScheduleTime(minutes: Int?): String {
+fun formatScheduleTime(minutes: Int?): String {
     if (minutes == null) return "Not set"
 
     val hour24 = minutes / 60
@@ -1246,7 +1253,7 @@ private fun formatScheduleTime(minutes: Int?): String {
     )
 }
 
-private fun formatDayHeading(dateMillis: Long): String {
+fun formatDayHeading(dateMillis: Long): String {
     return SimpleDateFormat(
         "EEE, dd MMM",
         Locale.ENGLISH

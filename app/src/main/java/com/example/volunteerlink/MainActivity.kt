@@ -15,6 +15,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import com.example.volunteerlink.data.time.AppClock
 import com.example.volunteerlink.data.VolunteerDashboardDataSource
+import com.example.volunteerlink.organisation.data.OrganisationLocalStorage
 import com.example.volunteerlink.navigation.AppNavGraph
 import com.example.volunteerlink.ui.theme.VolunteerLinkTheme
 import kotlinx.coroutines.Job
@@ -57,6 +58,7 @@ class MainActivity : ComponentActivity() {
 
         AppClock.initialise(applicationContext)
         VolunteerDashboardDataSource.initialise(applicationContext)
+        OrganisationLocalStorage.initialise(applicationContext)
 
         setContent {
             VolunteerLinkTheme(

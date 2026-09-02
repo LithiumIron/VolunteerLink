@@ -37,8 +37,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.volunteerlink.R
 import com.example.volunteerlink.organisation.create.CreatePostValidator
-import com.example.volunteerlink.organisation.create.components.CreateGreen
-import com.example.volunteerlink.organisation.create.components.CreateLightGreen
+import com.example.volunteerlink.ui.theme.CreateGreen
+import com.example.volunteerlink.ui.theme.CreateLightGreen
 import com.example.volunteerlink.organisation.create.model.CreatePostUiState
 import com.example.volunteerlink.organisation.create.model.ScheduleItemDraft
 import com.example.volunteerlink.organisation.create.model.ScheduleType

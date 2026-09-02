@@ -6,7 +6,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -69,7 +68,6 @@ fun VolunteerProfileScreen(
     val name = profileData?.fullName ?: "Loading..."
     val email = profileData?.email ?: "Loading..."
     val bio = profileData?.bio ?: ""
-    val availability = profileData?.availability ?: emptyList()
     val memberSince = profileData?.memberSince ?: "Loading..."
     val profileImageUrl = profileData?.profileImageUrl
     val verifiedHours = profileData?.verifiedHours ?: 0
@@ -250,53 +248,7 @@ fun VolunteerProfileScreen(
             color = Color.Gray
         )
 
-        // =====================================================
-        // AVAILABILITY
-        // =====================================================
 
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 20.dp, end = 20.dp, top = 18.dp)
-        ) {
-            Text(
-                text = "Availability",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                color = DeepGreen
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            if (availability.isNotEmpty()) {
-                FlowRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    availability.forEach { day ->
-                        Box(
-                            modifier = Modifier
-                                .background(Color(0xFFACD8A7), CircleShape)
-                                .padding(horizontal = 12.dp, vertical = 7.dp)
-                        ) {
-                            Text(
-                                text = day,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = DeepGreen
-                            )
-                        }
-                    }
-                }
-            } else {
-                Text(
-                    text = "No availability set",
-                    fontSize = 13.sp,
-                    color = Color.Gray
-                )
-            }
-        }
 
         // =====================================================
         // VERIFIED HOURS + COMPLETED EVENTS

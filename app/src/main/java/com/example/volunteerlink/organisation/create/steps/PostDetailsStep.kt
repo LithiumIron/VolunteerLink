@@ -38,7 +38,7 @@ import androidx.compose.ui.unit.dp
 import com.example.volunteerlink.R
 import com.example.volunteerlink.organisation.create.CreatePostValidator
 import com.example.volunteerlink.organisation.create.components.CategoryPicker
-import com.example.volunteerlink.organisation.create.components.CreateGreen
+import com.example.volunteerlink.ui.theme.CreateGreen
 import com.example.volunteerlink.organisation.create.components.CreateSectionCard
 import com.example.volunteerlink.organisation.create.components.EditRestrictionNotice
 import com.example.volunteerlink.organisation.create.components.FormError

@@ -55,7 +55,7 @@ import java.util.Locale
 
 /** Green Organisation header intentionally retained as VolunteerLink identity. */
 @Composable
-internal fun OrganisationHomeHeader(
+fun OrganisationHomeHeader(
     organisationName: String,
     nowMillis: Long
 ) {
@@ -115,7 +115,7 @@ internal fun OrganisationHomeHeader(
  * emphasis.  Individual alerts are rows rather than nested cards.
  */
 @Composable
-internal fun OrganisationAttentionSection(
+fun OrganisationAttentionSection(
     items: List<HomeAttentionItem>,
     onItemClick: (HomeAttentionItem) -> Unit,
     modifier: Modifier = Modifier
@@ -234,7 +234,7 @@ private fun AttentionRow(
 }
 
 @Composable
-internal fun OrganisationPostSummarySection(
+fun OrganisationPostSummarySection(
     ongoingCount: Int,
     upcomingCount: Int,
     draftCount: Int,
@@ -264,7 +264,7 @@ internal fun OrganisationPostSummarySection(
 }
 
 @Composable
-internal fun HomeSectionHeading(
+fun HomeSectionHeading(
     title: String,
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null
@@ -278,7 +278,7 @@ internal fun HomeSectionHeading(
 
 /** Existing function name retained so HomeScreen wiring stays unchanged. */
 @Composable
-internal fun OngoingPostCard(
+fun OngoingPostCard(
     post: HomePostItem,
     onClick: () -> Unit
 ) {
@@ -286,7 +286,7 @@ internal fun OngoingPostCard(
 }
 
 @Composable
-internal fun UpcomingPostRow(
+fun UpcomingPostRow(
     post: HomePostItem,
     showDivider: Boolean,
     onClick: () -> Unit
@@ -394,7 +394,7 @@ private fun HomePostRow(
 }
 
 @Composable
-internal fun HomeEmptyMessage(text: String) {
+fun HomeEmptyMessage(text: String) {
     OrganisationInfoStrip(
         title = "Nothing here right now",
         message = text,
@@ -465,10 +465,10 @@ private fun greetingFor(nowMillis: Long): String {
     }
 }
 
-private fun formatCurrentDate(nowMillis: Long): String =
+fun formatCurrentDate(nowMillis: Long): String =
     SimpleDateFormat("EEEE, d MMMM yyyy", Locale.getDefault()).format(Date(nowMillis))
 
-private fun formatDateRange(start: String?, end: String?): String {
+fun formatDateRange(start: String?, end: String?): String {
     val startText = formatSingleDate(start)
     val endText = formatSingleDate(end)
     return when {
@@ -479,12 +479,12 @@ private fun formatDateRange(start: String?, end: String?): String {
     }
 }
 
-private fun formatSingleDate(value: String?): String? {
+fun formatSingleDate(value: String?): String? {
     val date = parseDatabaseDate(value) ?: return null
     return SimpleDateFormat("d MMM yyyy", Locale.getDefault()).format(date)
 }
 
-private fun parseDatabaseDate(value: String?): Date? {
+fun parseDatabaseDate(value: String?): Date? {
     if (value.isNullOrBlank()) return null
     return runCatching {
         SimpleDateFormat("yyyy-MM-dd", Locale.US).apply { isLenient = false }.parse(value)

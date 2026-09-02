@@ -24,18 +24,21 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.volunteerlink.R
-import com.example.volunteerlink.organisation.create.components.CreateGreen
+import com.example.volunteerlink.ui.theme.CreateGreen
+import com.example.volunteerlink.ui.theme.CreateLightGreen
+import com.example.volunteerlink.ui.theme.CreateCardBackground
+import com.example.volunteerlink.ui.theme.CreateGreen
+import com.example.volunteerlink.ui.theme.ReviewText
+import com.example.volunteerlink.ui.theme.ReviewSecondaryText
+import com.example.volunteerlink.ui.theme.ReviewBorder
+import com.example.volunteerlink.ui.theme.ReviewSoftSurface
+import com.example.volunteerlink.ui.theme.ReviewChipBackground
+import com.example.volunteerlink.ui.theme.ReviewWarningBackground
+import com.example.volunteerlink.ui.theme.ReviewWarningText
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-val ReviewText = Color(0xFF263824)
-val ReviewSecondaryText = Color(0xFF687266)
-val ReviewBorder = Color(0xFFDDE5DA)
-val ReviewSoftSurface = Color(0xFFF5F8F3)
-val ReviewChipBackground = Color(0xFFE8F1E4)
-val ReviewWarningBackground = Color(0xFFFFF5E8)
-val ReviewWarningText = Color(0xFF85500C)
 
 @Composable
 fun ReviewPausedScheduleBanner() {

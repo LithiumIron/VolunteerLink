@@ -56,7 +56,9 @@ import com.example.volunteerlink.ui.theme.VolunteerLinkTextSecondary
 import kotlinx.coroutines.launch
 
 @Composable
-fun VolunteerOpportunityNavigationHost() {
+fun VolunteerOpportunityNavigationHost(
+    onLoggedOut: () -> Unit
+) {
     val volunteerOpportunityViewModel:
             VolunteerOpportunityViewModel = viewModel()
 
@@ -903,9 +905,7 @@ fun VolunteerOpportunityNavigationHost() {
                             )
                         },
 
-                        onLoggedOut = {
-                            // Your existing logout/root-navigation logic
-                        }
+                        onLoggedOut = onLoggedOut
                     )
                 }
 

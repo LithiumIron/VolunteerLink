@@ -50,6 +50,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.volunteerlink.R
 import com.example.volunteerlink.organisation.components.OrganisationMessageButton
+import com.example.volunteerlink.organisation.components.OrganisationOfflineStatusCard
 import com.example.volunteerlink.organisation.manage.model.PostManagementPerson
 import com.example.volunteerlink.organisation.manage.model.PostManagementPost
 import com.example.volunteerlink.organisation.manage.model.PostManagementRole
@@ -119,6 +120,10 @@ fun OrganisationApplicantReviewScreen(
             person = person,
             isSaving = uiState.isUpdatingApplicant,
             actionMessage = uiState.applicantActionMessage,
+            isShowingCachedData = uiState.isShowingCachedData,
+            lastSyncedAtEpochMillis = uiState.lastSyncedAtEpochMillis,
+            isRefreshing = uiState.isRefreshing,
+            onSyncSelected = viewModel::refresh,
             onBack = onBack,
             onViewProfile = { showProfile = true },
             onAccept = { pendingDecision = "ACCEPT" },
@@ -193,6 +198,10 @@ private fun OrganisationApplicantReviewContent(
     person: PostManagementPerson,
     isSaving: Boolean,
     actionMessage: String?,
+    isShowingCachedData: Boolean,
+    lastSyncedAtEpochMillis: Long?,
+    isRefreshing: Boolean,
+    onSyncSelected: () -> Unit,
     onBack: () -> Unit,
     onViewProfile: () -> Unit,
     onAccept: () -> Unit,
@@ -220,6 +229,16 @@ private fun OrganisationApplicantReviewContent(
                 bottom = 24.dp
             )
         ) {
+            if (isShowingCachedData) {
+                item(key = "application_offline_status") {
+                    OrganisationOfflineStatusCard(
+                        lastSyncedAtEpochMillis = lastSyncedAtEpochMillis,
+                        isSyncing = isRefreshing,
+                        onSyncSelected = onSyncSelected
+                    )
+                }
+            }
+
             item(key = "application_summary") {
                 OrganisationApplicationRoleSummary(
                     post = post,
@@ -346,7 +365,7 @@ private fun OrganisationApplicantReviewContent(
             ) {
                 OutlinedButton(
                     onClick = onDecline,
-                    enabled = isPending && !isSaving,
+                    enabled = isPending && !isSaving && !isShowingCachedData,
                     modifier = Modifier
                         .weight(1f)
                         .height(50.dp),
@@ -361,7 +380,7 @@ private fun OrganisationApplicantReviewContent(
 
                 Button(
                     onClick = onAccept,
-                    enabled = isPending && !isSaving,
+                    enabled = isPending && !isSaving && !isShowingCachedData,
                     modifier = Modifier
                         .weight(1f)
                         .height(50.dp),
@@ -537,7 +556,7 @@ private fun OrganisationApplicationRoleSummary(
     }
 }
 
-private fun formatApplicationDate(raw: String): String {
+fun formatApplicationDate(raw: String): String {
     if (raw.isBlank()) return "Date unavailable"
     return runCatching {
         val parser = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {

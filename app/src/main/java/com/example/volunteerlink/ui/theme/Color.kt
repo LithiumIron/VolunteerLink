@@ -48,3 +48,39 @@ val AccentGold = Color(0xFFC9A24B)
 val MapBackground = Color(0xFFEDEADF)
 val RiverBlue = Color(0xFFA9C6D8)
 val UnreadBadge = Color(0xFF2F4A2E)
+
+// Organisation module colours (shared above file scope per the team standard)
+val OrgTouchNGoBlue = Color(0xFF0067B1)
+val OrgDisabledSurface = Color(0xFFF1F3F1)
+val OrgDisabledBorder = Color(0xFFC7CBC5)
+
+// Create Post shared colours
+val CreateGreen = Color(0xFF2A4A1E)
+val CreateLightGreen = Color(0xFFE5EFE1)
+val CreateCardBackground = Color(0xFFFBFCF9)
+
+// Review summary colours
+val ReviewText = Color(0xFF263824)
+val ReviewSecondaryText = Color(0xFF687266)
+val ReviewBorder = Color(0xFFDDE5DA)
+val ReviewSoftSurface = Color(0xFFF5F8F3)
+val ReviewChipBackground = Color(0xFFE8F1E4)
+val ReviewWarningBackground = Color(0xFFFFF5E8)
+val ReviewWarningText = Color(0xFF85500C)
+
+// Role settings colours
+val RoleSettingsBorder = Color(0xFFDDE4DA)
+val RoleSettingsOrange = Color(0xFFB76614)
+val RoleSettingsOrangeBackground = Color(0xFFFFF0DF)
+val RoleSettingsPurple = Color(0xFF6A45A5)
+val RoleSettingsPurpleBackground = Color(0xFFF0EAF8)
+val RoleSettingsMuted = Color(0xFF667064)
+
+// Create schedule colours
+val ScheduleBorder = Color(0xFFDCE5D8)
+val ScheduleMuted = Color(0xFFF7F9F6)
+val ScheduleAttention = Color(0xFFFFE9E7)
+val ScheduleWarning = Color(0xFFFFF4E5)
+
+// Role selection colours
+val RoleSelectionBorder = Color(0xFFC8D4C4)

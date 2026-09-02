@@ -10,6 +10,9 @@ data class OrganisationManageUiState(
     val draftPosts: List<ManagePostItem> = emptyList(),
     val reviewPosts: List<ManagePostItem> = emptyList(),
     val completedPosts: List<ManagePostItem> = emptyList(),
+    val isShowingCachedData: Boolean = false,
+    val lastSyncedAtEpochMillis: Long? = null,
+    val isRefreshing: Boolean = false,
     val errorMessage: String? = null
 ) {
     /**

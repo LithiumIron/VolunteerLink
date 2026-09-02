@@ -42,9 +42,9 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.volunteerlink.R
-import com.example.volunteerlink.organisation.create.components.CreateCardBackground
-import com.example.volunteerlink.organisation.create.components.CreateGreen
-import com.example.volunteerlink.organisation.create.components.CreateLightGreen
+import com.example.volunteerlink.ui.theme.CreateCardBackground
+import com.example.volunteerlink.ui.theme.CreateGreen
+import com.example.volunteerlink.ui.theme.CreateLightGreen
 import com.example.volunteerlink.organisation.create.components.EditRestrictionNotice
 import com.example.volunteerlink.organisation.create.model.CreatePostDraft
 import com.example.volunteerlink.organisation.create.model.CreatePostUiState
@@ -54,7 +54,10 @@ import com.example.volunteerlink.organisation.create.model.SelectedRoleDraft
 import com.example.volunteerlink.organisation.create.model.VolunteerPostType
 import com.example.volunteerlink.organisation.create.model.VolunteerRoleMode
 import com.example.volunteerlink.organisation.viewmodel.CreatePostViewModel
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.delay
+import com.example.volunteerlink.ui.theme.RoleSettingsBorder
+import com.example.volunteerlink.ui.theme.RoleSettingsOrange
+import com.example.volunteerlink.ui.theme.RoleSettingsOrangeBackground
 
 /** Step 3 of Create Post: configure every role selected in Step 2. */
 @Composable

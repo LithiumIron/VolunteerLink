@@ -21,6 +21,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.volunteerlink.organisation.components.OrganisationOfflineStatusCard
 import com.example.volunteerlink.organisation.manage.model.ManagePostSection
 import com.example.volunteerlink.organisation.manage.model.OrganisationManageUiState
 import com.example.volunteerlink.organisation.viewmodel.OrganisationManageViewModel
@@ -40,9 +41,16 @@ fun OrganisationVolunteerPostsScreen(
     // later resumes so a post finalized in Detail moves from Needs Review to
     // Completed as soon as the organisation returns to this list.
     val lifecycleOwner = LocalLifecycleOwner.current
+    var hasHandledFirstResume by rememberSaveable { mutableStateOf(false) }
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) viewModel.refresh()
+            if (event == Lifecycle.Event.ON_RESUME) {
+                if (hasHandledFirstResume) {
+                    viewModel.refresh()
+                } else {
+                    hasHandledFirstResume = true
+                }
+            }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
@@ -57,7 +65,8 @@ fun OrganisationVolunteerPostsScreen(
         else -> OrganisationVolunteerPostsContent(
             uiState = uiState,
             onBack = onBack,
-            onPostClick = onPostClick
+            onPostClick = onPostClick,
+            onSyncSelected = viewModel::refresh
         )
     }
 }
@@ -66,7 +75,8 @@ fun OrganisationVolunteerPostsScreen(
 private fun OrganisationVolunteerPostsContent(
     uiState: OrganisationManageUiState,
     onBack: () -> Unit,
-    onPostClick: (String) -> Unit
+    onPostClick: (String) -> Unit,
+    onSyncSelected: () -> Unit
 ) {
     var selectedSection by rememberSaveable {
         mutableStateOf(ManagePostSection.ACTIVE)
@@ -131,6 +141,18 @@ private fun OrganisationVolunteerPostsContent(
             title = "Volunteer Posts",
             onBack = onBack
         )
+
+        if (uiState.isShowingCachedData) {
+            OrganisationOfflineStatusCard(
+                lastSyncedAtEpochMillis = uiState.lastSyncedAtEpochMillis,
+                isSyncing = uiState.isRefreshing,
+                onSyncSelected = onSyncSelected,
+                modifier = Modifier.padding(
+                    horizontal = VolunteerLinkScreenHorizontalPadding,
+                    vertical = 10.dp
+                )
+            )
+        }
 
         ManagePostSectionSelector(
             selected = selectedSection,

@@ -55,7 +55,8 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withContext
+import com.example.volunteerlink.ui.theme.CreateGreen
 
 /**
  * Reusable date, time and image pickers used by Create Post.
@@ -174,7 +175,7 @@ private fun formatDate(dateMillis: Long?): String {
     ).format(Date(dateMillis))
 }
 
-private fun formatTime(minutesAfterMidnight: Int?): String {
+fun formatTime(minutesAfterMidnight: Int?): String {
     if (minutesAfterMidnight == null) return ""
 
     val calendar = Calendar.getInstance().apply {

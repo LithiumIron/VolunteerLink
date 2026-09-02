@@ -55,6 +55,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.volunteerlink.R
+import com.example.volunteerlink.organisation.components.OrganisationOfflineStatusCard
 import com.example.volunteerlink.organisation.components.OrganisationStatusPill
 import com.example.volunteerlink.organisation.manage.model.ManagePostItem
 import com.example.volunteerlink.organisation.viewmodel.PromotionPackage
@@ -69,13 +70,13 @@ import com.example.volunteerlink.ui.theme.VolunteerLinkSoftGreenSurface
 import com.example.volunteerlink.ui.theme.VolunteerLinkSuccess
 import com.example.volunteerlink.ui.theme.VolunteerLinkSurface
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextPrimary
+import com.example.volunteerlink.ui.theme.OrgTouchNGoBlue
+import com.example.volunteerlink.ui.theme.OrgDisabledSurface
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextSecondary
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-val TouchNGoBlue = Color(0xFF0067B1)
-val DisabledSurface = Color(0xFFF1F3F1)
 
 @Composable
 fun PromotionPostSelectionScreen(
@@ -83,6 +84,9 @@ fun PromotionPostSelectionScreen(
     errorMessage: String?,
     upcomingPosts: List<ManagePostItem>,
     promotionsByPostId: Map<String, PromotionRecord>,
+    isShowingCachedData: Boolean,
+    lastSyncedAtEpochMillis: Long?,
+    isSyncing: Boolean,
     canPurchase: (ManagePostItem) -> Boolean,
     isPromotionActive: (ManagePostItem) -> Boolean,
     onBack: () -> Unit,
@@ -165,6 +169,16 @@ fun PromotionPostSelectionScreen(
                     ),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+                    if (isShowingCachedData) {
+                        item(key = "promotion_offline_status") {
+                            OrganisationOfflineStatusCard(
+                                lastSyncedAtEpochMillis = lastSyncedAtEpochMillis,
+                                isSyncing = isSyncing,
+                                onSyncSelected = onRetry
+                            )
+                        }
+                    }
+
                     item {
                         Text(
                             text = "Choose an upcoming opportunity",
@@ -468,7 +482,7 @@ fun PromotionPaymentMethodScreen(
                         "Pay using QR code"
                     },
                     badge = "TNG",
-                    badgeColor = TouchNGoBlue,
+                    badgeColor = OrgTouchNGoBlue,
                     onClick = onTouchNGo
                 )
             }
@@ -536,7 +550,7 @@ fun PromotionTouchNGoScreen(
                     ) {
                         Surface(
                             shape = RoundedCornerShape(10.dp),
-                            color = TouchNGoBlue
+                            color = OrgTouchNGoBlue
                         ) {
                             Text(
                                 text = "Touch 'n Go eWallet",
@@ -1182,7 +1196,7 @@ fun PromotionPackageCard(
         else -> VolunteerLinkBorderColour
     }
     val containerColor = when {
-        !enabled -> DisabledSurface
+        !enabled -> OrgDisabledSurface
         selected -> VolunteerLinkSoftGreenSurface
         else -> VolunteerLinkSurface
     }

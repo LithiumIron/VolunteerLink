@@ -42,7 +42,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.volunteerlink.R
 import com.example.volunteerlink.organisation.create.CreatePostValidator
-import com.example.volunteerlink.organisation.create.components.CreateGreen
+import com.example.volunteerlink.ui.theme.CreateGreen
 import com.example.volunteerlink.organisation.create.model.CreatePostUiState
 import com.example.volunteerlink.organisation.create.model.CreateRoleTemplate
 import com.example.volunteerlink.organisation.create.model.RemoteSubmissionMode
@@ -51,6 +51,10 @@ import com.example.volunteerlink.organisation.create.model.ScheduleType
 import com.example.volunteerlink.organisation.create.model.SelectedRoleDraft
 import com.example.volunteerlink.organisation.create.model.VolunteerPostType
 import com.example.volunteerlink.organisation.create.model.VolunteerRoleMode
+import com.example.volunteerlink.ui.theme.ReviewText
+import com.example.volunteerlink.ui.theme.ReviewSecondaryText
+import com.example.volunteerlink.ui.theme.ReviewBorder
+import com.example.volunteerlink.ui.theme.ReviewSoftSurface
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale

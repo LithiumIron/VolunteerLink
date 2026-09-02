@@ -10,6 +10,7 @@ import com.example.volunteerlink.data.post.PostTimingState
 import com.example.volunteerlink.data.post.RoleApplicationWindowEvaluator
 import com.example.volunteerlink.data.post.RoleApplicationWindowInput
 import com.example.volunteerlink.data.time.AppClock
+import com.example.volunteerlink.organisation.data.OrganisationLocalStorage
 import com.example.volunteerlink.organisation.manage.model.OrganisationPostManagementUiState
 import com.example.volunteerlink.organisation.manage.model.PostManagementFeedbackGroup
 import com.example.volunteerlink.organisation.manage.model.PostManagementPerson
@@ -61,6 +62,7 @@ class OrganisationPostManagementViewModel : ViewModel() {
 
     private var loadedPostId: String? = null
     private var cachedPost: PostManagementPost? = null
+    private var refreshInProgress = false
 
     private var attendancePollingJob: Job? = null
     private val attendanceRefreshMutex = Mutex()
@@ -146,6 +148,9 @@ class OrganisationPostManagementViewModel : ViewModel() {
         )
 
         val refreshedPost = repository.loadPost(currentPost.postId)
+        runCatching {
+            OrganisationLocalStorage.savePost(refreshedPost)
+        }
         cachedPost = refreshedPost
         applyTiming(refreshedPost)
     }
@@ -356,6 +361,9 @@ class OrganisationPostManagementViewModel : ViewModel() {
                 _uiState.value = _uiState.value.copy(remoteReviewSession = nextSession)
 
                 val refreshedPost = repository.loadPost(currentPost.postId)
+                runCatching {
+                    OrganisationLocalStorage.savePost(refreshedPost)
+                }
                 cachedPost = refreshedPost
                 applyTiming(
                     post = refreshedPost,
@@ -468,6 +476,9 @@ class OrganisationPostManagementViewModel : ViewModel() {
                     "COMPLETED"
                 }
             )
+            runCatching {
+                OrganisationLocalStorage.savePost(locallyCompletedPost)
+            }
             cachedPost = locallyCompletedPost
             _uiState.value = _uiState.value.copy(
                 remoteReviewSession = PostManagementRemoteReviewSession(),
@@ -485,6 +496,9 @@ class OrganisationPostManagementViewModel : ViewModel() {
 
             try {
                 val refreshedPost = repository.loadPost(currentPost.postId)
+                runCatching {
+                    OrganisationLocalStorage.savePost(refreshedPost)
+                }
                 cachedPost = refreshedPost
                 applyTiming(refreshedPost)
                 _uiState.value = _uiState.value.copy(
@@ -568,6 +582,9 @@ class OrganisationPostManagementViewModel : ViewModel() {
                     }
                 )
 
+                runCatching {
+                    OrganisationLocalStorage.savePost(updatedPost)
+                }
                 cachedPost = updatedPost
                 applyTiming(updatedPost)
             } catch (exception: Exception) {
@@ -605,6 +622,9 @@ class OrganisationPostManagementViewModel : ViewModel() {
                 )
 
                 val refreshedPost = repository.loadPost(post.postId)
+                runCatching {
+                    OrganisationLocalStorage.savePost(refreshedPost)
+                }
                 cachedPost = refreshedPost
                 applyTiming(refreshedPost)
                 _uiState.value = _uiState.value.copy(
@@ -920,27 +940,74 @@ class OrganisationPostManagementViewModel : ViewModel() {
 
     fun refresh() {
         val postId = loadedPostId ?: return
+        if (refreshInProgress) return
+        refreshInProgress = true
 
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(
-                isLoading = true,
-                errorMessage = null,
-                attendanceActionMessage = null,
-                reviewActionMessage = null,
-                remoteReviewActionMessage = null
-            )
+            val saved = runCatching {
+                OrganisationLocalStorage.loadPost(postId)
+            }.getOrNull()
+
+            if (cachedPost == null && saved != null) {
+                cachedPost = saved.post
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    lastSyncedAtEpochMillis = saved.lastSyncedAtEpochMillis,
+                    isRefreshing = _uiState.value.isShowingCachedData,
+                    errorMessage = null,
+                    attendanceActionMessage = null,
+                    reviewActionMessage = null,
+                    remoteReviewActionMessage = null
+                )
+                applyTiming(saved.post)
+            } else {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = cachedPost == null,
+                    isRefreshing = cachedPost != null && _uiState.value.isShowingCachedData,
+                    errorMessage = null,
+                    attendanceActionMessage = null,
+                    reviewActionMessage = null,
+                    remoteReviewActionMessage = null
+                )
+            }
 
             try {
                 val post = repository.loadPost(postId)
+                val syncedAt = System.currentTimeMillis()
+
+                runCatching {
+                    OrganisationLocalStorage.savePost(
+                        post = post,
+                        syncedAtEpochMillis = syncedAt
+                    )
+                }
+
                 cachedPost = post
+                _uiState.value = _uiState.value.copy(
+                    isShowingCachedData = false,
+                    lastSyncedAtEpochMillis = syncedAt,
+                    isRefreshing = false
+                )
                 applyTiming(post)
             } catch (exception: Exception) {
                 Log.e(TAG, "Could not load post management data.", exception)
-                _uiState.value = OrganisationPostManagementUiState(
-                    isLoading = false,
-                    errorMessage = exception.message
-                        ?: "Unable to load this Volunteer Post."
-                )
+
+                if (cachedPost != null) {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        isRefreshing = false,
+                        isShowingCachedData = true,
+                        errorMessage = null
+                    )
+                } else {
+                    _uiState.value = OrganisationPostManagementUiState(
+                        isLoading = false,
+                        errorMessage = exception.message
+                            ?: "Unable to load this Volunteer Post."
+                    )
+                }
+            } finally {
+                refreshInProgress = false
             }
         }
     }
@@ -976,6 +1043,9 @@ class OrganisationPostManagementViewModel : ViewModel() {
         // derived locally from attendance, so correcting attendance must not mutate
         // role_participations to NEEDS_REVIEW or any other completion status.
         val refreshedPost = repository.loadPost(postId)
+        runCatching {
+            OrganisationLocalStorage.savePost(refreshedPost)
+        }
         cachedPost = refreshedPost
         applyTiming(
             post = refreshedPost,
@@ -987,6 +1057,9 @@ class OrganisationPostManagementViewModel : ViewModel() {
 
     private suspend fun reloadAfterReviewAction(postId: String) {
         val refreshedPost = repository.loadPost(postId)
+        runCatching {
+            OrganisationLocalStorage.savePost(refreshedPost)
+        }
         cachedPost = refreshedPost
         applyTiming(
             post = refreshedPost,
@@ -1096,6 +1169,9 @@ class OrganisationPostManagementViewModel : ViewModel() {
                 }
             )
 
+            runCatching {
+                OrganisationLocalStorage.savePost(locallyCompletedPost)
+            }
             cachedPost = locallyCompletedPost
             applyTiming(
                 post = locallyCompletedPost,
@@ -1116,6 +1192,9 @@ class OrganisationPostManagementViewModel : ViewModel() {
             // A refresh failure must not turn a successful commit into a false failure.
             try {
                 val refreshedPost = repository.loadPost(currentPost.postId)
+                runCatching {
+                    OrganisationLocalStorage.savePost(refreshedPost)
+                }
                 cachedPost = refreshedPost
                 _uiState.value = _uiState.value.copy(
                     physicalReviewSession = PostManagementPhysicalReviewSession()
@@ -1236,6 +1315,8 @@ class OrganisationPostManagementViewModel : ViewModel() {
             nowMillis = nowMillis
         )
 
+        val currentState = _uiState.value
+
         _uiState.value = OrganisationPostManagementUiState(
             isLoading = false,
             post = timedPost.copy(
@@ -1243,6 +1324,9 @@ class OrganisationPostManagementViewModel : ViewModel() {
                 physicalReview = physicalReview,
                 remoteReview = remoteReview
             ),
+            isShowingCachedData = currentState.isShowingCachedData,
+            lastSyncedAtEpochMillis = currentState.lastSyncedAtEpochMillis,
+            isRefreshing = currentState.isRefreshing,
             isStartingAttendance = isStartingAttendance,
             isUpdatingAttendance = isUpdatingAttendance,
             attendanceActionMessage = attendanceActionMessage,

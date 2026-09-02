@@ -37,9 +37,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.volunteerlink.R
-import com.example.volunteerlink.organisation.create.components.CreateCardBackground
-import com.example.volunteerlink.organisation.create.components.CreateGreen
-import com.example.volunteerlink.organisation.create.components.CreateLightGreen
+import com.example.volunteerlink.ui.theme.CreateGreen
+import com.example.volunteerlink.ui.theme.CreateLightGreen
+import com.example.volunteerlink.ui.theme.CreateCardBackground
+import com.example.volunteerlink.ui.theme.CreateGreen
+import com.example.volunteerlink.ui.theme.CreateLightGreen
 import com.example.volunteerlink.organisation.create.model.CreatePostDraft
 import com.example.volunteerlink.organisation.create.model.CreateRoleSkill
 import com.example.volunteerlink.organisation.create.model.CreateRoleTemplate
@@ -47,7 +49,12 @@ import com.example.volunteerlink.organisation.create.model.RemoteSubmissionMode
 import com.example.volunteerlink.organisation.create.model.RoleApplicationMethod
 import com.example.volunteerlink.organisation.create.model.SelectedRoleDraft
 import com.example.volunteerlink.organisation.create.model.VolunteerRoleLevel
-import com.example.volunteerlink.organisation.create.model.VolunteerRoleMode
+import com.example.volunteerlink.organisation.create.model.VolunteerRoleMode
+import com.example.volunteerlink.ui.theme.RoleSettingsBorder
+import com.example.volunteerlink.ui.theme.RoleSettingsOrange
+import com.example.volunteerlink.ui.theme.RoleSettingsOrangeBackground
+import com.example.volunteerlink.ui.theme.RoleSettingsPurple
+import com.example.volunteerlink.ui.theme.RoleSettingsPurpleBackground
 
 @Composable
 fun RoleInformationSection(
@@ -751,12 +758,6 @@ fun RoleSubmissionAndNotesSection(
 // Step 3 UI helpers stay in this file because they are only used by Role Settings.
 // Keeping them here avoids creating a fragmented file for every small card or row.
 
-val RoleSettingsBorder = Color(0xFFDDE4DA)
-val RoleSettingsOrange = Color(0xFFB76614)
-val RoleSettingsOrangeBackground = Color(0xFFFFF0DF)
-val RoleSettingsPurple = Color(0xFF6A45A5)
-val RoleSettingsPurpleBackground = Color(0xFFF0EAF8)
-val RoleSettingsMuted = Color(0xFF667064)
 
 @Composable
 fun RoleSettingsSectionCard(
