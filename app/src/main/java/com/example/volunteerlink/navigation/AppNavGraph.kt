@@ -10,6 +10,7 @@ import com.example.volunteerlink.organisation.OrganisationSignInScreen
 import com.example.volunteerlink.organisation.OrganisationSignUpScreen
 import com.example.volunteerlink.screens.UserTypeSelectionScreen
 import com.example.volunteerlink.screens.VolunteerSignInScreen
+import com.example.volunteerlink.screens.VolunteerSignUpScreen
 
 /**
  * Root navigation graph for the whole application.
@@ -45,6 +46,28 @@ fun AppNavGraph(
                     navController.popBackStack(AppRoutes.VOLUNTEER, inclusive = true)
                     navController.navigate(AppRoutes.VOLUNTEER) {
                         popUpTo(AppRoutes.VOLUNTEER_LOGIN) {
+                            inclusive = true
+                        }
+                        launchSingleTop = false
+                    }
+                },
+                onSignUpSelected = {
+                    navController.navigate(
+                        AppRoutes.VOLUNTEER_SIGNUP
+                    )
+                }
+            )
+        }
+
+        composable(AppRoutes.VOLUNTEER_SIGNUP) {
+            VolunteerSignUpScreen(
+                onBackSelected = {
+                    navController.popBackStack()
+                },
+                onSignedUp = {
+                    navController.popBackStack(AppRoutes.VOLUNTEER, inclusive = true)
+                    navController.navigate(AppRoutes.VOLUNTEER) {
+                        popUpTo(AppRoutes.VOLUNTEER_SIGNUP) {
                             inclusive = true
                         }
                         launchSingleTop = false

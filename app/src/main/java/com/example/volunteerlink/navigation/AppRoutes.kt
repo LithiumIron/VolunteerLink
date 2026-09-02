@@ -9,6 +9,7 @@ package com.example.volunteerlink.navigation
 object AppRoutes {
     const val USER_TYPE_SELECTION = "user_type_selection"
     const val VOLUNTEER_LOGIN = "volunteer_login"
+    const val VOLUNTEER_SIGNUP = "volunteer_signup"
     const val VOLUNTEER = "volunteer"
 
     const val ORGANISATION_LOGIN = "organisation_login"
