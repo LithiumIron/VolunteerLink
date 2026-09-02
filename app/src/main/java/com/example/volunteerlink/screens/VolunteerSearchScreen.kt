@@ -198,7 +198,6 @@ fun VolunteerSearchScreen(
                     }
 
             matchesSearchQuery &&
-                (selectedModeFilter == "Favourites" || event.eventStatus == "PUBLISHED") &&
                 matchesMode &&
                 matchesCategory &&
                 matchesLevel &&

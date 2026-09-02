@@ -1186,6 +1186,7 @@ private fun VolunteerSkillPathCard(
     volunteerSkillPath: VolunteerSkillPath,
     onSelected: () -> Unit
 ) {
+    val businessNow = volunteerBusinessTime()
     val openEventRoleCount =
         VolunteerOpportunitySessionStore
             .volunteerOpportunityEvents
@@ -1194,7 +1195,10 @@ private fun VolunteerSkillPathCard(
                 event.eventVolunteerRoles.count { role ->
                     role.rolePrimarySkillPath ==
                         volunteerSkillPath.name &&
-                        role.roleVacancies > 0
+                        role.roleMinimumSkillPathLevel <= volunteerSkillPath.currentLevel &&
+                        com.example.volunteerlink.data.VolunteerDiscoveryEligibility.canRecommendRole(
+                            event, role, VolunteerOpportunitySessionStore.volunteerApplications, businessNow
+                        )
                 }
             }
 
@@ -1881,6 +1885,7 @@ private fun VolunteerSkillPathRolesSection(
         roleId: Int
     ) -> Unit
 ) {
+    val businessNow = volunteerBusinessTime()
     val matchingEventRoles =
         VolunteerOpportunitySessionStore
             .volunteerOpportunityEvents
@@ -1890,12 +1895,10 @@ private fun VolunteerSkillPathRolesSection(
                     .filter { role ->
                         role.rolePrimarySkillPath ==
                             volunteerSkillPath.name &&
-                            role.roleVacancies > 0 &&
-                            !VolunteerOpportunitySessionStore
-                                .hasApplicationForRole(
-                                    eventId = event.eventId,
-                                    roleId = role.roleId
-                                )
+                            role.roleMinimumSkillPathLevel <= volunteerSkillPath.currentLevel &&
+                            com.example.volunteerlink.data.VolunteerDiscoveryEligibility.canRecommendRole(
+                                event, role, VolunteerOpportunitySessionStore.volunteerApplications, businessNow
+                            )
                     }
                     .map { role -> event to role }
             }

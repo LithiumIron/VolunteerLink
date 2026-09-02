@@ -51,12 +51,16 @@ object VolunteerHomeFeedEngine {
 
     fun filter(
         events: List<VolunteerOpportunityEvent>,
-        filter: VolunteerHomeFeedFilter
+        filter: VolunteerHomeFeedFilter,
+        applications: List<VolunteerOpportunityApplication> = emptyList(),
+        nowMillis: Long = com.example.volunteerlink.data.time.AppClock.nowMillis()
     ): List<VolunteerOpportunityEvent> =
         events
             .asSequence()
             .filter { event ->
-                VolunteerApplicationWindow.canApply(event)
+                event.eventVolunteerRoles.any { role ->
+                    VolunteerDiscoveryEligibility.canRecommendRole(event, role, applications, nowMillis)
+                }
             }
             .distinctBy { event ->
                 event.eventDatabaseId.ifBlank {
@@ -107,7 +111,8 @@ object VolunteerHomeRecommendationEngine {
     fun recommend(
         volunteerOpportunityEvents: List<VolunteerOpportunityEvent>,
         volunteerApplications: List<VolunteerOpportunityApplication>,
-        currentSkillPathLevels: Map<String, Int> = emptyMap()
+        currentSkillPathLevels: Map<String, Int> = emptyMap(),
+        nowMillis: Long = com.example.volunteerlink.data.time.AppClock.nowMillis()
     ): List<VolunteerHomeRecommendation> {
         val completedApplications =
             volunteerApplications.filter { application ->
@@ -162,28 +167,22 @@ object VolunteerHomeRecommendationEngine {
                 .map(String::matchKey)
                 .toSet()
 
-        val appliedEventIds =
-            volunteerApplications
-                .map { application ->
-                    application.applicationEventId
-                }
-                .toSet()
-
         return VolunteerHomeFeedEngine
             .filter(
                 events = volunteerOpportunityEvents,
-                filter = VolunteerHomeFeedFilter.ALL
+                filter = VolunteerHomeFeedFilter.ALL,
+                applications = volunteerApplications,
+                nowMillis = nowMillis
             )
-            .filterNot { event ->
-                event.eventId in appliedEventIds
-            }
             .filter { event ->
                 event.eventAvailableSpots > 0 &&
                     event.eventVolunteerRoles.any { it.roleVacancies > 0 }
             }
-            .map { event ->
+            .mapNotNull { event ->
                 createRecommendation(
                     event = event,
+                    applications = volunteerApplications,
+                    nowMillis = nowMillis,
                     experiencedPaths = experiencedPaths,
                     interestPaths = interestPaths,
                     verifiedSkills = verifiedSkills,
@@ -206,14 +205,21 @@ object VolunteerHomeRecommendationEngine {
 
     private fun createRecommendation(
         event: VolunteerOpportunityEvent,
+        applications: List<VolunteerOpportunityApplication>,
+        nowMillis: Long,
         experiencedPaths: Set<String>,
         interestPaths: Set<String>,
         verifiedSkills: Set<String>,
         currentSkillPathLevels: Map<String, Int>
-    ): VolunteerHomeRecommendation {
+    ): VolunteerHomeRecommendation? {
         val bestRoleMatch =
             event.eventVolunteerRoles
-                .filter { it.roleVacancies > 0 }
+                .filter { role ->
+                    VolunteerDiscoveryEligibility.canRecommendRole(event, role, applications, nowMillis) &&
+                        role.roleMinimumSkillPathLevel <= (currentSkillPathLevels.entries
+                            .firstOrNull { it.key.matchKey() == role.rolePrimarySkillPath.matchKey() }
+                            ?.value ?: 1)
+                }
                 .map { role ->
                     scoreRole(
                         event = event,
@@ -231,9 +237,7 @@ object VolunteerHomeRecommendationEngine {
                     }.thenBy { roleMatch ->
                         roleMatch.role.roleVacancies
                     }
-                ) ?: error(
-                    "A recommendation requires at least one role."
-                )
+                ) ?: return null
 
         return VolunteerHomeRecommendation(
             event = event,

@@ -672,14 +672,7 @@ private fun VolunteerOpportunitySummarySection(
             modifier = Modifier.height(18.dp)
         )
 
-        VolunteerOpportunityInformationRow(
-            iconResourceId =
-                R.drawable.ic_volunteer_calendar,
-            informationTitle = "Date and time",
-            informationValue =
-                "${volunteerOpportunityEvent.eventDate}\n" +
-                        volunteerOpportunityEvent.eventTime
-        )
+        VolunteerEventSchedule(volunteerOpportunityEvent)
 
         Spacer(
             modifier = Modifier.height(12.dp)
@@ -868,10 +861,28 @@ private fun VolunteerOpportunityRolesSection(
             )
     ) {
         VolunteerOpportunitySectionTitle(
-            sectionTitle = "Available Roles",
+            sectionTitle = "Roles",
             sectionSupportingText =
-                "Choose a role that matches your interests and experience."
+                "You can view every role. Closed or full roles cannot accept applications."
         )
+
+        VolunteerOpportunitySessionStore.activeApplicationForEvent(
+            volunteerOpportunityEvent.eventId
+        )?.let { application ->
+            Spacer(Modifier.height(10.dp))
+            Text(
+                text = if (application.applicationDatabaseId.startsWith("offline|")) {
+                    "Your selected role: ${application.applicationRoleTitle}. " +
+                        "Waiting to sync: no place has been reserved."
+                } else {
+                    "Your current role: ${application.applicationRoleTitle}. " +
+                        if (application.applicationStatus == VolunteerApplicationStatus.ACCEPTED)
+                            "Accepted." else "Waiting for organisation review."
+                },
+                color = VolunteerLinkTextPrimary,
+                fontSize = 13.sp
+            )
+        }
 
         Spacer(
             modifier = Modifier.height(10.dp)
@@ -908,6 +919,14 @@ private fun VolunteerOpportunityRoleCard(
     VolunteerOpportunityRole,
     onRoleSelected: () -> Unit
 ) {
+    val event = VolunteerOpportunitySessionStore.findEventById(volunteerEventId)
+    val businessNow = volunteerBusinessTime()
+    val unavailableReason = when {
+        !com.example.volunteerlink.data.VolunteerApplicationWindow.canApply(event, volunteerOpportunityRole, businessNow) ->
+            com.example.volunteerlink.data.VolunteerApplicationWindow.reason(event, volunteerOpportunityRole)
+        volunteerOpportunityRole.roleVacancies <= 0 -> "Full: no places are available for this role."
+        else -> null
+    }
     val existingApplication =
         VolunteerOpportunitySessionStore
             .volunteerApplications
@@ -987,6 +1006,28 @@ private fun VolunteerOpportunityRoleCard(
                             .roleExperienceRequirement
                     }
 
+            event?.let {
+                Text(
+                    text = com.example.volunteerlink.data.VolunteerScheduleText.compact(it, volunteerOpportunityRole),
+                    color = VolunteerLinkTextPrimary,
+                    fontSize = 14.sp,
+                    lineHeight = 21.sp,
+                    fontWeight = FontWeight.Normal,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            }
+
+            unavailableReason?.let { reason ->
+                OpportunityBadge("Applications unavailable", Color(0xFF5C5C5C), Color(0xFFEEEEEE))
+                Text(
+                    text = reason + " You can still view the role details.",
+                    color = VolunteerLinkTextSecondary,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 12.sp,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
+                )
+            }
+
             Text(
                 text = roleDescription,
                 fontSize = 12.sp,
@@ -1049,7 +1090,8 @@ private fun VolunteerOpportunityRoleCard(
                     text =
                         existingApplication
                             ?.let { application ->
-                                when (application.applicationStatus) {
+                                if (application.applicationDatabaseId.startsWith("offline|")) "Waiting to sync"
+                                else when (application.applicationStatus) {
                                     VolunteerApplicationStatus.PENDING ->
                                         "Applied • Pending"
                                     VolunteerApplicationStatus.ACCEPTED ->

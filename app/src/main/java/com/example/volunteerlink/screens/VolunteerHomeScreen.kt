@@ -78,6 +78,7 @@ import com.example.volunteerlink.data.VolunteerHomeRecommendationEngine
 import com.example.volunteerlink.data.VolunteerMatchFactor
 import com.example.volunteerlink.data.VolunteerMatchFactorStatus
 import com.example.volunteerlink.data.VolunteerOpportunitySessionStore
+import com.example.volunteerlink.data.VolunteerPromotionEngine
 import com.example.volunteerlink.data.location.DeviceLocationHelper
 import com.example.volunteerlink.model.VolunteerApplicationStatus
 import com.example.volunteerlink.model.VolunteerOpportunityApplication
@@ -111,12 +112,14 @@ fun VolunteerHomeScreen(
     unreadNotificationCount: Int = 0,
     onVolunteerSearchSelected: () -> Unit = {},
     isShowingCachedData: Boolean = false,
+    syncWarning: String? = null,
     lastSyncedAtEpochMillis: Long? = null,
     onSyncSelected: () -> Unit = {},
     skillPathViewModel:
         VolunteerSkillPathViewModel = viewModel()
 ) {
     val context = LocalContext.current
+    val businessNow = volunteerBusinessTime()
     val applicationClock by com.example.volunteerlink.data.time.AppClock.state.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
     var selectedHomeFilter by rememberSaveable {
@@ -251,19 +254,32 @@ fun VolunteerHomeScreen(
     val filteredVolunteerOpportunityEvents =
         remember(
             selectedHomeFilter,
+            businessNow,
             applicationClock,
+            allVolunteerApplications,
             allVolunteerOpportunityEvents
         ) {
             VolunteerHomeFeedEngine.filter(
                 events = allVolunteerOpportunityEvents,
-                filter = selectedHomeFilter
+                filter = selectedHomeFilter,
+                applications = allVolunteerApplications,
+                nowMillis = businessNow
             )
         }
 
+    val promotionFeed = rememberVolunteerPromotionFeed(isShowingCachedData)
+    val activePromotions = VolunteerPromotionEngine.activeByPost(promotionFeed.entries, businessNow)
+    val orderedVolunteerOpportunityEvents = VolunteerPromotionEngine.prioritize(
+        filteredVolunteerOpportunityEvents, promotionFeed.entries, businessNow
+    )
+    val featuredVolunteerOpportunityEvents = orderedVolunteerOpportunityEvents.filter {
+        activePromotions.containsKey(it.eventDatabaseId)
+    }
 
     val recommendedVolunteerOpportunityEvents =
         remember(
             allVolunteerOpportunityEvents,
+            businessNow,
             applicationClock,
             allVolunteerApplications,
             currentSkillPathLevels
@@ -274,7 +290,8 @@ fun VolunteerHomeScreen(
                 volunteerApplications =
                     allVolunteerApplications,
                 currentSkillPathLevels =
-                    currentSkillPathLevels
+                    currentSkillPathLevels,
+                nowMillis = businessNow
             ).take(4)
         }
 
@@ -326,6 +343,14 @@ fun VolunteerHomeScreen(
             )
         }
 
+        if (syncWarning != null) {
+            item(key = "sync_warning") {
+                Column(Modifier.padding(16.dp)) {
+                    Text(syncWarning, color = Color(0xFF895B00))
+                    TextButton(onClick = onSyncSelected) { Text("Sync application result") }
+                }
+            }
+        }
         if (isShowingCachedData) {
             item(key = "volunteer_home_offline_status") {
                 VolunteerOfflineStatusCard(
@@ -335,6 +360,17 @@ fun VolunteerHomeScreen(
             }
         }
 
+
+        if (promotionFeed.failed) {
+            item(key = "promotion_load_notice") { VolunteerPromotionLoadNotice(promotionFeed.retry) }
+        }
+        if (selectedHomeFilter == VolunteerHomeFeedFilter.FOR_YOU && featuredVolunteerOpportunityEvents.isNotEmpty()) {
+            item(key = "volunteer_promoted_opportunities") {
+                Column(Modifier.padding(top = 16.dp, bottom = 8.dp)) {
+                    VolunteerPromotionSection(featuredVolunteerOpportunityEvents, onVolunteerOpportunitySelected)
+                }
+            }
+        }
 
         item(
             key = "volunteer_home_impact"
@@ -413,7 +449,8 @@ fun VolunteerHomeScreen(
                         },
 
                     volunteerOpportunityEvents =
-                        filteredVolunteerOpportunityEvents,
+                        orderedVolunteerOpportunityEvents,
+                    promotedPostIds = activePromotions.keys,
 
                     onVolunteerOpportunitySelected =
                         onVolunteerOpportunitySelected
@@ -1064,6 +1101,7 @@ private fun VolunteerHomeOpportunitySection(
     sectionTitle: String,
     volunteerOpportunityEvents:
     List<VolunteerOpportunityEvent>,
+    promotedPostIds: Set<String> = emptySet(),
     onVolunteerOpportunitySelected:
         (eventId: Int) -> Unit
 ) {
@@ -1096,6 +1134,7 @@ private fun VolunteerHomeOpportunitySection(
                     VolunteerHomeCompactCard(
                         volunteerOpportunityEvent =
                             volunteerOpportunityEvent,
+                        isPromoted = volunteerOpportunityEvent.eventDatabaseId in promotedPostIds,
                         onVolunteerOpportunitySelected = {
                             onVolunteerOpportunitySelected(
                                 volunteerOpportunityEvent.eventId
@@ -1228,6 +1267,7 @@ internal fun VolunteerHomeCompactCard(
         VolunteerHomeRecommendation? = null,
     onMatchDetailsSelected: () -> Unit = {},
     availabilityNotice: String? = null,
+    isPromoted: Boolean = false,
     onVolunteerOpportunitySelected: () -> Unit
 ) {
     val primaryVolunteerRole =
@@ -1312,6 +1352,13 @@ internal fun VolunteerHomeCompactCard(
             Column(
                 modifier = Modifier.weight(1f)
             ) {
+                if (isPromoted) {
+                    Surface(color = VolunteerLinkSoftGreenSurface, shape = RoundedCornerShape(6.dp)) {
+                        Text("Promoted", modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = VolunteerLinkPrimaryGreen)
+                    }
+                    Spacer(Modifier.height(6.dp))
+                }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement =
@@ -1391,10 +1438,15 @@ internal fun VolunteerHomeCompactCard(
 
                     Text(
                         text =
-                            volunteerOpportunityEvent.eventDate,
+                            listOf(volunteerOpportunityEvent.eventDate, volunteerOpportunityEvent.eventEndDate)
+                                .filter(String::isNotBlank).distinct().joinToString(" – "),
                         fontSize = 11.sp,
                         color = VolunteerLinkTextSecondary
                     )
+                }
+
+                if (!com.example.volunteerlink.data.VolunteerApplicationWindow.canApply(volunteerOpportunityEvent)) {
+                    Text("Applications closed · details available", color = Color(0xFF686868), fontSize = 11.sp)
                 }
 
                 Spacer(

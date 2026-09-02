@@ -30,6 +30,8 @@ data class VolunteerOpportunityUiState(
     val isApplicationActionRunning: Boolean = false,
     val errorMessage: String? = null,
     val applicationActionError: String? = null,
+    val lastApplicationResult: String? = null,
+    val syncWarning: String? = null,
     val isShowingCachedData: Boolean = false,
     val lastSyncedAtEpochMillis: Long? = null,
     val dataVersion: Int = 0
@@ -134,226 +136,88 @@ class VolunteerOpportunityViewModel(
         eventId: Int,
         roleId: Int,
         answers: List<String>,
+        confirmedPrevious: VolunteerOpportunityApplication? = null,
         onSuccess: () -> Unit
     ) {
+        if (mutableUiState.value.isApplicationActionRunning) return
         val event = VolunteerOpportunitySessionStore.findEventById(eventId)
-        val role =
-            VolunteerOpportunitySessionStore.findRoleById(
-                eventId = eventId,
-                roleId = roleId
-            )
-
-        if (role == null) {
-            mutableUiState.update {
-                it.copy(
-                    applicationActionError =
-                        "The selected role could not be found."
-                )
-            }
+        val role = VolunteerOpportunitySessionStore.findRoleById(eventId, roleId)
+        if (event == null || role == null) {
+            mutableUiState.update { it.copy(applicationActionError = "Role details are unavailable. Sync and try again.") }
             return
         }
-
         if (!com.example.volunteerlink.data.VolunteerApplicationWindow.canApply(event, role)) {
-            mutableUiState.update {
-                it.copy(
-                    applicationActionError =
-                        com.example.volunteerlink.data.VolunteerApplicationWindow.reason(event, role)
-                )
-            }
+            mutableUiState.update { it.copy(applicationActionError =
+                com.example.volunteerlink.data.VolunteerApplicationWindow.reason(event, role)) }
             return
         }
-
-        val rejectedSameRole =
-            VolunteerOpportunitySessionStore.volunteerApplications.any { application ->
-                application.applicationEventId == eventId &&
-                    application.applicationRoleId == roleId &&
-                    application.applicationStatus == VolunteerApplicationStatus.REJECTED
-            }
-
-        if (rejectedSameRole) {
-            mutableUiState.update {
-                it.copy(
-                    applicationActionError =
-                        "You were not selected for this role. You may choose another open role in this opportunity."
-                )
-            }
+        val other = VolunteerOpportunitySessionStore.activeApplicationForEvent(eventId)
+            ?.takeIf { it.applicationRoleId != roleId }
+        if (other != confirmedPrevious) {
+            mutableUiState.update { it.copy(applicationActionError = "Your current role changed. Reopen this role and review the change before confirming.") }
             return
         }
-
-        val activeApplication =
-            VolunteerOpportunitySessionStore.activeApplicationForEvent(eventId)
-                ?.takeIf { it.applicationRoleId != roleId }
-
-        if (activeApplication?.applicationStatus == VolunteerApplicationStatus.ACCEPTED) {
-            mutableUiState.update {
-                it.copy(
-                    applicationActionError =
-                        "You already joined ${activeApplication.applicationRoleTitle} in this opportunity."
-                )
-            }
+        if (other != null && (other.applicationCreatedAtRaw.isBlank() ||
+            other.applicationDatabaseId.startsWith("offline|"))) {
+            mutableUiState.update { it.copy(applicationActionError = "Sync your current application before changing roles.") }
             return
         }
-
-        if (
-            activeApplication?.applicationStatus == VolunteerApplicationStatus.PENDING &&
-            role.roleApplicationMethod ==
-                com.example.volunteerlink.model.VolunteerRoleApplicationMethod.REVIEW_APPLICANTS
-        ) {
-            mutableUiState.update {
-                it.copy(
-                    applicationActionError =
-                        "You already have a pending application for " +
-                            "${activeApplication.applicationRoleTitle}. " +
-                            "Only one pending application is allowed per opportunity."
-                )
-            }
+        val previousRole = other?.applicationRoleId?.let { VolunteerOpportunitySessionStore.findRoleById(eventId, it) }
+        if (other != null && !com.example.volunteerlink.data.VolunteerApplicationWindow.beforeStart(event, previousRole)) {
+            mutableUiState.update { it.copy(applicationActionError = "Your current role has started. It can no longer be cancelled or changed.") }
             return
         }
-
-        val isSwitchingPendingToInstantJoin =
-            activeApplication?.applicationStatus == VolunteerApplicationStatus.PENDING &&
-                role.roleApplicationMethod ==
-                    com.example.volunteerlink.model.VolunteerRoleApplicationMethod.INSTANT_JOIN
-
+        val reapply = VolunteerOpportunitySessionStore.volunteerApplications.any {
+            it.applicationEventId == eventId && it.applicationRoleId == roleId &&
+                it.applicationStatus == VolunteerApplicationStatus.CANCELLED
+        }
+        val onlineOnly = other != null || reapply
+        mutableUiState.update { it.copy(isApplicationActionRunning = true, applicationActionError = null, lastApplicationResult = null) }
         viewModelScope.launch {
-            mutableUiState.update {
-                it.copy(
-                    isApplicationActionRunning = true,
-                    applicationActionError = null
-                )
-            }
-
             try {
-                val priorApplication = VolunteerOpportunitySessionStore
-                    .volunteerApplications.firstOrNull {
-                        it.applicationEventId == eventId &&
-                            it.applicationRoleId == roleId &&
-                            it.applicationStatus == VolunteerApplicationStatus.CANCELLED
-                    }
-                if (priorApplication != null) {
-                    VolunteerOpportunityRepository.reapplyForRole(
-                        roleDatabaseId = role.roleDatabaseId,
-                        answers = answers
-                    )
-                } else {
-                    VolunteerOpportunityRepository.submitApplication(
-                        roleDatabaseId = role.roleDatabaseId,
-                        questions = role.roleExtraApplicationQuestions,
-                        answers = answers
-                    )
-                }
-                refreshAfterAction()
-                onSuccess()
-            } catch (exception: Exception) {
-                exception.printStackTrace()
-                if (exception.isConnectivityFailure()) {
-                    if (isSwitchingPendingToInstantJoin) {
-                        mutableUiState.update {
-                            it.copy(
-                                isApplicationActionRunning = false,
-                                applicationActionError =
-                                    "Internet connection is required to switch from a pending application to Instant Join."
-                            )
-                        }
-                        return@launch
-                    }
-
-                    val isReapply = VolunteerOpportunitySessionStore
-                        .volunteerApplications.any {
-                            it.applicationEventId == eventId &&
-                                it.applicationRoleId == roleId &&
-                                it.applicationStatus == VolunteerApplicationStatus.CANCELLED
-                        }
-                    if (isReapply) {
-                        mutableUiState.update {
-                            it.copy(
-                                isApplicationActionRunning = false,
-                                applicationActionError =
-                                    "Internet connection is required to apply again."
-                            )
-                        }
-                        return@launch
-                    }
-                    val event =
-                        VolunteerOpportunitySessionStore
-                            .findEventById(eventId)
-                    if (event != null) {
-                        val payload = buildJsonObject {
-                            putJsonArray("answers") {
-                                role.roleExtraApplicationQuestions
-                                    .forEachIndexed { index, question ->
-                                        add(
-                                            buildJsonObject {
-                                                put("question", question)
-                                                put(
-                                                    "answer",
-                                                    answers.getOrElse(index) { "" }
-                                                )
-                                            }
-                                        )
-                                    }
-                            }
-                        }.toString()
-                        VolunteerDashboardDataSource.enqueuePendingAction(
-                            actionType = "SUBMIT",
-                            targetId = role.roleDatabaseId,
-                            payloadJson = payload
+                val result = com.example.volunteerlink.data.VolunteerApplicationActions.submit(
+                    getApplication<Application>(), event.eventDatabaseId, role.roleTemplateId, answers,
+                    previousRole?.roleTemplateId, other?.applicationStatus?.name, other?.applicationCreatedAtRaw,
+                    onlineOnly
+                )
+                if (result == null) {
+                    VolunteerOpportunitySessionStore.addOfflinePendingApplication(
+                        VolunteerOpportunityApplication(
+                            applicationId = ("offline|" + role.roleDatabaseId).hashCode(),
+                            applicationEventId = eventId, applicationEventTitle = event.eventTitle,
+                            applicationOrganisationName = event.eventOrganisationName,
+                            applicationRoleTitle = role.roleTitle,
+                            applicationSubmittedDate = DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date()),
+                            applicationStatus = VolunteerApplicationStatus.PENDING,
+                            applicationRoleId = roleId, applicationRoleMode = role.roleMode,
+                            applicationStatusMessage = "Waiting to sync. Not sent for review and no place reserved. Connect and Sync to receive the server result.",
+                            applicationScreeningQuestions = role.roleExtraApplicationQuestions,
+                            applicationScreeningAnswers = answers,
+                            applicationDatabaseId = "offline|" + role.roleDatabaseId
                         )
-                        VolunteerOpportunitySessionStore
-                            .addOfflinePendingApplication(
-                                VolunteerOpportunityApplication(
-                                    applicationId =
-                                        ("offline|" + role.roleDatabaseId)
-                                            .hashCode(),
-                                    applicationEventId = event.eventId,
-                                    applicationEventTitle = event.eventTitle,
-                                    applicationOrganisationName =
-                                        event.eventOrganisationName,
-                                    applicationRoleTitle = role.roleTitle,
-                                    applicationSubmittedDate =
-                                        DateFormat.getDateInstance(
-                                            DateFormat.MEDIUM
-                                        ).format(Date()),
-                                    applicationStatus =
-                                        VolunteerApplicationStatus.PENDING,
-                                    applicationRoleId = role.roleId,
-                                    applicationStatusMessage =
-                                        "Waiting for internet connection to sync.",
-                                    applicationEventDate = event.eventDate,
-                                    applicationEventTime = event.eventTime,
-                                    applicationEventLocation =
-                                        event.eventFullAddress,
-                                    applicationPrimarySkillPath =
-                                        role.rolePrimarySkillPath,
-                                    applicationPractisedSkills =
-                                        role.roleSkillsPractised,
-                                    applicationDatabaseId =
-                                        "offline|" + role.roleDatabaseId
-                                )
-                            )
-                        VolunteerDashboardDataSource.cacheCurrentSession()
-                        mutableUiState.update {
-                            it.copy(
-                                isApplicationActionRunning = false,
-                                applicationActionError = null,
-                                isShowingCachedData = true,
-                                dataVersion = it.dataVersion + 1
-                            )
-                        }
-                        onSuccess()
-                        return@launch
-                    }
-                }
-                mutableUiState.update {
-                    it.copy(
-                        isApplicationActionRunning = false,
-                        applicationActionError =
-                            exception.toVolunteerMessage(
-                                fallback =
-                                    "Application could not be submitted."
-                            )
                     )
+                    VolunteerDashboardDataSource.cacheCurrentSession()
+                    finishLocalAction()
+                    mutableUiState.update { it.copy(lastApplicationResult = "Waiting to sync. Nothing has been accepted yet. No place is reserved. Connect and Sync to receive your application result.") }
+                    onSuccess()
+                } else if (!result.success) {
+                    mutableUiState.update { it.copy(isApplicationActionRunning = false, applicationActionError =
+                        result.message + if (other != null) " This attempt did not cancel your previous role." else "") }
+                } else {
+                    mutableUiState.update { it.copy(lastApplicationResult = result.message) }
+                    try { refreshAfterAction() }
+                    catch (e: kotlinx.coroutines.CancellationException) { throw e }
+                    catch (_: Exception) {
+                        mutableUiState.update { it.copy(isApplicationActionRunning = false,
+                            applicationActionError = result.message + " Refresh to load your latest application.", isShowingCachedData = true) }
+                    }
+                    onSuccess()
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (e: Exception) {
+                val detail = if (e is IllegalStateException) e.message.orEmpty()
+                    else "We could not confirm the server result. Connect and Sync before trying again. Do not assume the role was joined or cancelled."
+                mutableUiState.update { it.copy(isApplicationActionRunning = false, applicationActionError = detail) }
             }
         }
     }
@@ -364,6 +228,11 @@ class VolunteerOpportunityViewModel(
         details: String,
         onSuccess: () -> Unit = {}
     ) {
+        if (mutableUiState.value.isApplicationActionRunning) return
+        if (!com.example.volunteerlink.data.VolunteerOnline.available(getApplication<Application>())) {
+            mutableUiState.update { it.copy(applicationActionError = "Internet connection is required to cancel an application. Your place has not been released.") }
+            return
+        }
         if (reason.isBlank() || (reason == "Other" && details.isBlank())) {
             mutableUiState.update { it.copy(applicationActionError =
                 if (reason.isBlank()) "Please select a cancellation reason." else "Please enter your reason.") }
@@ -414,37 +283,6 @@ class VolunteerOpportunityViewModel(
                 onSuccess()
             } catch (exception: Exception) {
                 exception.printStackTrace()
-                if (exception.isConnectivityFailure()) {
-                    VolunteerDashboardDataSource.enqueuePendingAction(
-                        actionType = "CANCEL_V2",
-                        targetId = application.applicationDatabaseId,
-                        payloadJson = buildJsonObject {
-                            put("reason", reason)
-                            put("details", details)
-                        }.toString()
-                    )
-                    VolunteerOpportunitySessionStore.replaceApplication(
-                        application.copy(
-                            applicationStatus =
-                                VolunteerApplicationStatus.CANCELLED,
-                            applicationStatusMessage =
-                                "Cancellation is waiting to sync.",
-                            applicationRejectionReason =
-                                "Cancelled by volunteer: $reason. " + details
-                        )
-                    )
-                    VolunteerDashboardDataSource.cacheCurrentSession()
-                    mutableUiState.update {
-                        it.copy(
-                            isApplicationActionRunning = false,
-                            applicationActionError = null,
-                            isShowingCachedData = true,
-                            dataVersion = it.dataVersion + 1
-                        )
-                    }
-                    onSuccess()
-                    return@launch
-                }
                 mutableUiState.update {
                     it.copy(
                         isApplicationActionRunning = false,
@@ -471,28 +309,9 @@ class VolunteerOpportunityViewModel(
             )
             refreshAfterAction()
             onSuccess()
+        } catch (exception: kotlinx.coroutines.CancellationException) { throw exception
         } catch (exception: Exception) {
-            if (exception.isConnectivityFailure()) {
-                VolunteerDashboardDataSource.enqueuePendingAction(
-                    "UPDATE_APPLICATION",
-                    application.applicationDatabaseId,
-                    buildJsonObject {
-                        putJsonArray("answers") {
-                            answers.forEach { answer -> add(JsonPrimitive(answer)) }
-                        }
-                    }.toString()
-                )
-                VolunteerOpportunitySessionStore.replaceApplication(
-                    application.copy(
-                        applicationScreeningAnswers = answers,
-                        applicationStatusMessage =
-                            "Your edits are waiting to sync."
-                    )
-                )
-                VolunteerDashboardDataSource.cacheCurrentSession()
-                finishLocalAction()
-                onSuccess()
-            } else failApplicationAction(exception, "Application changes could not be saved.")
+            failApplicationAction(exception, "Unable to confirm your changes. Sync before retrying.")
         }
     }
 
@@ -589,6 +408,11 @@ class VolunteerOpportunityViewModel(
         applicationId: Int,
         block: suspend (VolunteerOpportunityApplication) -> Unit
     ) {
+        if (mutableUiState.value.isApplicationActionRunning) return
+        if (!com.example.volunteerlink.data.VolunteerOnline.available(getApplication<Application>())) {
+            mutableUiState.update { it.copy(applicationActionError = "Internet connection is required for this action. Connect and try again.") }
+            return
+        }
         val application = VolunteerOpportunitySessionStore.findApplicationById(applicationId)
         if (application == null) {
             mutableUiState.update {
@@ -664,7 +488,14 @@ class VolunteerOpportunityViewModel(
             }
 
             try {
-                VolunteerDashboardDataSource.syncPendingActions()
+                val requestWarning = try {
+                    com.example.volunteerlink.data.VolunteerApplicationActions.sync(getApplication<Application>())
+                    null
+                } catch (e: kotlinx.coroutines.CancellationException) { throw e
+                } catch (_: Exception) {
+                    "An application request is still unconfirmed. Do not assume a role was joined or cancelled. Connect and Sync again to receive the result."
+                }
+                val syncWarnings = VolunteerDashboardDataSource.syncPendingActions() + listOfNotNull(requestWarning)
                 val data = VolunteerDashboardDataSource.refreshFromCloud()
                 VolunteerOpportunitySessionStore.replaceWith(data)
 
@@ -674,6 +505,7 @@ class VolunteerOpportunityViewModel(
                         isRefreshing = false,
                         isApplicationActionRunning = false,
                         errorMessage = null,
+                        syncWarning = syncWarnings.takeIf { it.isNotEmpty() }?.distinct()?.joinToString("\n"),
                         isShowingCachedData = false,
                         lastSyncedAtEpochMillis = System.currentTimeMillis(),
                         dataVersion = it.dataVersion + 1

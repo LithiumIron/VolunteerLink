@@ -83,6 +83,7 @@ fun VolunteerMyApplicationsScreen(
         applicationId: Int
     ) -> Unit
 ) {
+    val businessNow = volunteerBusinessTime()
     var selectedStatusFilter by
     rememberSaveable {
         mutableStateOf("All")
@@ -91,11 +92,14 @@ fun VolunteerMyApplicationsScreen(
     val statusFilters =
         listOf(
             "All",
+            "Today",
+            "Waiting to sync",
             "Pending",
             "Accepted",
             "Rejected",
             "Completed",
-            "Not Completed"
+            "Not Completed",
+            "Cancelled"
         )
 
     val filteredApplications =
@@ -103,7 +107,11 @@ fun VolunteerMyApplicationsScreen(
             .volunteerApplications
             .filter { volunteerApplication ->
                 when (selectedStatusFilter) {
+                    "Today" -> volunteerApplicationIsRelevantToday(volunteerApplication, businessNow)
+                    "Waiting to sync" -> volunteerApplication.applicationDatabaseId.startsWith("offline|")
+                    "Cancelled" -> volunteerApplication.applicationStatus == VolunteerApplicationStatus.CANCELLED
                     "Pending" ->
+                        !volunteerApplication.applicationDatabaseId.startsWith("offline|") &&
                         volunteerApplication.applicationStatus ==
                                 VolunteerApplicationStatus.PENDING
 
@@ -302,7 +310,6 @@ fun VolunteerApplicationDetailsScreen(
     }
     var shouldShowEditDialog by rememberSaveable { mutableStateOf(false) }
     var shouldShowDeleteDialog by rememberSaveable { mutableStateOf(false) }
-    var shouldShowReapplyDialog by rememberSaveable { mutableStateOf(false) }
     var selectedCancellationReason by rememberSaveable { mutableStateOf("") }
     var cancellationDetails by rememberSaveable { mutableStateOf("") }
     var formAnswers by remember { mutableStateOf(emptyList<String>()) }
@@ -387,15 +394,20 @@ fun VolunteerApplicationDetailsScreen(
                         volunteerApplication,
                     applicationIsRemote =
                         applicationIsRemote,
-                    eventDate =
-                        volunteerOpportunityEvent?.eventDate
-                            ?: volunteerApplication.applicationEventDate,
-                    eventEndDate =
-                        volunteerOpportunityEvent?.eventEndDate
-                            ?.takeIf(String::isNotBlank),
+                    eventDate = volunteerOpportunityEvent?.let {
+                        com.example.volunteerlink.data.VolunteerScheduleText.date(
+                            if (applicationIsRemote) it.eventRemoteStartDate else it.eventPhysicalStartDate)
+                    } ?: volunteerApplication.applicationEventDate,
+                    eventEndDate = volunteerOpportunityEvent?.let {
+                        com.example.volunteerlink.data.VolunteerScheduleText.date(
+                            if (applicationIsRemote) it.eventRemoteEndDate else it.eventPhysicalEndDate)
+                    },
                     eventTime =
-                        volunteerOpportunityEvent?.eventTime
-                            ?: volunteerApplication.applicationEventTime,
+                        if (applicationIsRemote) "See submission deadline below" else
+                            volunteerOpportunityEvent?.let {
+                                "${com.example.volunteerlink.data.VolunteerScheduleText.time(it.eventPhysicalStartTime)} – " +
+                                    "${com.example.volunteerlink.data.VolunteerScheduleText.time(it.eventPhysicalEndTime)}"
+                            } ?: volunteerApplication.applicationEventTime,
                     eventLocation =
                         if (applicationIsRemote) {
                             "Online"
@@ -411,6 +423,20 @@ fun VolunteerApplicationDetailsScreen(
                                     .applicationEventLocation
                         }
                 )
+            }
+
+            if (volunteerOpportunityEvent != null && volunteerOpportunityRole != null) {
+                item(key = "my_role_arrangements") {
+                    VolunteerRoleInformationCard(volunteerOpportunityEvent, volunteerOpportunityRole, includeTasks = true)
+                }
+                if (volunteerOpportunityRole.roleMode == "PHYSICAL" &&
+                    volunteerApplication.applicationStatus in listOf(
+                        VolunteerApplicationStatus.ACCEPTED, VolunteerApplicationStatus.COMPLETED,
+                        VolunteerApplicationStatus.NOT_COMPLETED)) {
+                    item(key = "my_attendance") {
+                        VolunteerAttendanceCard(volunteerOpportunityEvent, volunteerOpportunityRole, volunteerApplication)
+                    }
+                }
             }
 
             if (volunteerApplication.applicationRoleMode == "REMOTE" ||
@@ -515,6 +541,7 @@ fun VolunteerApplicationDetailsScreen(
                     }
 
                     if (
+                        !volunteerApplication.applicationDatabaseId.startsWith("offline|") &&
                         volunteerApplication.applicationStatus == VolunteerApplicationStatus.PENDING &&
                         volunteerOpportunityRole?.roleExtraApplicationQuestions?.isNotEmpty() == true
                     ) {
@@ -537,6 +564,7 @@ fun VolunteerApplicationDetailsScreen(
                     }
 
                     if (
+                        !volunteerApplication.applicationDatabaseId.startsWith("offline|") &&
                         volunteerApplication.applicationStatus in setOf(
                             VolunteerApplicationStatus.PENDING,
                             VolunteerApplicationStatus.ACCEPTED
@@ -573,18 +601,24 @@ fun VolunteerApplicationDetailsScreen(
                     ) {
                         Button(
                             onClick = {
-                                val questions = volunteerOpportunityRole
-                                    ?.roleExtraApplicationQuestions.orEmpty()
-                                formAnswers = questions.map { "" }
                                 volunteerOpportunityViewModel.clearApplicationActionError()
-                                shouldShowReapplyDialog = true
+                                volunteerOpportunityRole?.let { role ->
+                                    onVolunteerRoleSelected(
+                                        volunteerApplication.applicationEventId,
+                                        role.roleId
+                                    )
+                                }
                             },
-                            enabled = com.example.volunteerlink.data.VolunteerApplicationWindow.canApply(volunteerOpportunityEvent, volunteerOpportunityRole),
+                            enabled = volunteerOpportunityRole != null &&
+                                com.example.volunteerlink.data.VolunteerApplicationWindow.canApply(
+                                    volunteerOpportunityEvent,
+                                    volunteerOpportunityRole
+                                ),
                             modifier = Modifier.fillMaxWidth().height(50.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = VolunteerLinkPrimaryGreen
                             )
-                        ) { Text("Apply Again", fontWeight = FontWeight.Bold) }
+                        ) { Text("Review and Apply Again", fontWeight = FontWeight.Bold) }
 
                         TextButton(
                             onClick = {
@@ -719,8 +753,7 @@ fun VolunteerApplicationDetailsScreen(
         )
     }
 
-    if (shouldShowEditDialog || shouldShowReapplyDialog) {
-        val isReapply = shouldShowReapplyDialog
+    if (shouldShowEditDialog) {
         val questions = volunteerOpportunityRole?.roleExtraApplicationQuestions.orEmpty()
         AlertDialog(
             containerColor = Color.White,
@@ -728,9 +761,8 @@ fun VolunteerApplicationDetailsScreen(
             textContentColor = VolunteerLinkTextSecondary,
             onDismissRequest = {
                 shouldShowEditDialog = false
-                shouldShowReapplyDialog = false
             },
-            title = { Text(if (isReapply) "Apply again" else "Edit application") },
+            title = { Text("Edit application") },
             text = {
                 Column(
                     modifier = Modifier.verticalScroll(rememberScrollState()),
@@ -781,17 +813,10 @@ fun VolunteerApplicationDetailsScreen(
                     enabled = !opportunityUiState.isApplicationActionRunning &&
                             formAnswers.all { it.isNotBlank() },
                     onClick = {
-                        if (isReapply) {
-                            volunteerOpportunityViewModel.reapplyForRole(
-                                volunteerApplicationId,
-                                formAnswers
-                            ) { shouldShowReapplyDialog = false }
-                        } else {
-                            volunteerOpportunityViewModel.updatePendingApplication(
-                                volunteerApplicationId,
-                                formAnswers
-                            ) { shouldShowEditDialog = false }
-                        }
+                        volunteerOpportunityViewModel.updatePendingApplication(
+                            volunteerApplicationId,
+                            formAnswers
+                        ) { shouldShowEditDialog = false }
                     }
                 ) {
                     Text(if (opportunityUiState.isApplicationActionRunning) "Saving..." else "Save")
@@ -800,7 +825,6 @@ fun VolunteerApplicationDetailsScreen(
             dismissButton = {
                 TextButton(onClick = {
                     shouldShowEditDialog = false
-                    shouldShowReapplyDialog = false
                 }) { Text("Back") }
             }
         )
@@ -934,7 +958,9 @@ private fun VolunteerApplicationListCard(
                     modifier = Modifier.size(8.dp)
                 )
 
-                VolunteerApplicationStatusBadge(
+                if (volunteerApplication.applicationDatabaseId.startsWith("offline|")) {
+                    Text("Waiting to sync", color = Color(0xFF895B00), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                } else VolunteerApplicationStatusBadge(
                     applicationStatus =
                         volunteerApplication
                             .applicationStatus
@@ -986,7 +1012,7 @@ private fun VolunteerApplicationListCard(
             ) {
                 Text(
                     text =
-                        "Submitted ${volunteerApplication.applicationSubmittedDate}",
+                        "${if (volunteerApplication.applicationDatabaseId.startsWith("offline|")) "Saved on device" else "Submitted"} ${volunteerApplication.applicationSubmittedDate}",
                     fontSize = 10.sp,
                     color = VolunteerLinkTextSecondary
                 )
@@ -1057,7 +1083,7 @@ private fun VolunteerApplicationStatusCard(
             ) {
                 Text(
                     text =
-                        volunteerApplicationStatusText(
+                        if (volunteerApplication.applicationDatabaseId.startsWith("offline|")) "Waiting to sync" else volunteerApplicationStatusText(
                             volunteerApplication
                                 .applicationStatus
                         ),
@@ -1250,9 +1276,29 @@ private fun VolunteerApplicationTimelineRow(
     }
 }
 
+private fun volunteerApplicationIsRelevantToday(application: VolunteerOpportunityApplication, nowMillis: Long): Boolean {
+    if (application.applicationStatus != VolunteerApplicationStatus.ACCEPTED) return false
+    val event = VolunteerOpportunitySessionStore.findEventById(application.applicationEventId) ?: return false
+    val role = application.applicationRoleId?.let { VolunteerOpportunitySessionStore.findRoleById(event.eventId, it) } ?: return false
+    return runCatching {
+        val remote = role.roleMode == "REMOTE"
+        val today = com.example.volunteerlink.data.VolunteerAttendanceWindow.localDate(
+            nowMillis, if (remote) "UTC" else event.eventTimeZone)
+        val start = if (remote) event.eventRemoteStartDate else event.eventPhysicalStartDate
+        val end = if (remote) event.eventRemoteEndDate else event.eventPhysicalEndDate
+        val assignedDates = role.roleScheduleItems.filter { it.assignedToRole && it.scheduleType == "PHYSICAL" }.map { it.rawDate }
+        start.isNotBlank() && end.isNotBlank() && today >= start && today <= end &&
+            (remote || assignedDates.isEmpty() || today in assignedDates)
+    }.getOrDefault(false)
+}
+
 private fun volunteerApplicationTimelineSteps(
     application: VolunteerOpportunityApplication
 ): List<VolunteerApplicationTimelineStep> {
+    if (application.applicationDatabaseId.startsWith("offline|")) return listOf(
+        VolunteerApplicationTimelineStep("Waiting to sync", "Saved on this device only. Not sent for review; no place is reserved.", "CURRENT"),
+        VolunteerApplicationTimelineStep("Server confirmation", "Connect and Sync. Instant Join becomes accepted only after the server confirms a place. Review applications still need organisation approval.", "PENDING")
+    )
     val submitted =
         VolunteerApplicationTimelineStep(
             title = "Application submitted",
@@ -1451,11 +1497,11 @@ private fun VolunteerApplicationInformationCard(
                         listOfNotNull(eventDate, endDate)
                             .joinToString(" - ")
                     } else {
-                        listOfNotNull(eventDate, eventTime)
-                            .joinToString(" • ")
+                        listOfNotNull(eventDate, eventEndDate?.takeUnless { it == eventDate })
+                            .joinToString(" – ") + (eventTime?.let { "\nCheck-in hours: $it" } ?: "")
                     }
                 VolunteerApplicationInformationRow(
-                    label = "Event schedule",
+                    label = "Work period",
                     value = scheduleText
                 )
             }
@@ -1550,25 +1596,24 @@ private fun VolunteerApplicationInformationRow(
     label: String,
     value: String
 ) {
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 5.dp),
-        verticalAlignment = Alignment.Top
+            .padding(vertical = 7.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp)
     ) {
         Text(
             text = label,
-            modifier = Modifier.weight(0.38f),
-            fontSize = 11.sp,
-            fontWeight = FontWeight.SemiBold,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
             color = VolunteerLinkTextSecondary
         )
 
         Text(
             text = value,
-            modifier = Modifier.weight(0.62f),
-            fontSize = 12.sp,
-            lineHeight = 17.sp,
+            fontSize = 14.sp,
+            lineHeight = 21.sp,
+            fontWeight = FontWeight.Normal,
             color = VolunteerLinkTextPrimary
         )
     }

@@ -49,6 +49,7 @@ class VolunteerRemoteSubmissionViewModel(application: Application) : AndroidView
         viewModelScope.launch {
             try {
                 val uid = Repository.readyAccountId()
+                com.example.volunteerlink.data.VolunteerOnline.requireConnection(getApplication<Application>(), "refresh submission status")
                 if (ownerAuthId != null && ownerAuthId != uid) {
                     state.value.selected?.file?.delete()
                     state.update { it.copy(selected = null, context = null) }
@@ -68,6 +69,7 @@ class VolunteerRemoteSubmissionViewModel(application: Application) : AndroidView
 
     fun choose(uri: Uri) {
         if (state.value.busy) return
+        if (!requireOnline("select a project file")) return
         state.update { it.copy(busy = true, stage = "Checking selected file…", error = null, message = null) }
         viewModelScope.launch {
             try {
@@ -106,6 +108,7 @@ class VolunteerRemoteSubmissionViewModel(application: Application) : AndroidView
     }
 
     fun submit() {
+        if (!requireOnline("submit project work")) return
         if (!validateSelection()) return
         val selected = state.value.selected ?: return
         state.update { it.copy(busy = true, stage = "Uploading file…", progress = 0f, error = null, message = null) }
@@ -138,6 +141,7 @@ class VolunteerRemoteSubmissionViewModel(application: Application) : AndroidView
 
     fun openFile(path: String, onReady: (String) -> Unit) {
         if (state.value.busy) return
+        if (!requireOnline("open a submitted file")) return
         state.update { it.copy(busy = true, stage = "Opening file…", error = null) }
         viewModelScope.launch {
             try {
@@ -166,6 +170,12 @@ class VolunteerRemoteSubmissionViewModel(application: Application) : AndroidView
             return false
         }
         return true
+    }
+
+    private fun requireOnline(action: String): Boolean {
+        if (com.example.volunteerlink.data.VolunteerOnline.available(getApplication<Application>())) return true
+        state.update { it.copy(error = "Internet connection is required to $action. Connect and try again.") }
+        return false
     }
 
     override fun onCleared() {

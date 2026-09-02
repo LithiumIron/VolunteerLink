@@ -10,8 +10,10 @@ import com.example.volunteerlink.data.local.PendingVolunteerAction
 /** Coordinates Supabase (cloud) and SQLite (local) dashboard data. */
 object VolunteerDashboardDataSource {
     private lateinit var localDatabase: VolunteerLocalDatabase
+    private lateinit var applicationContext: Context
 
     fun initialise(context: Context) {
+        applicationContext = context.applicationContext
         if (!::localDatabase.isInitialized) {
             localDatabase = VolunteerLocalDatabase.getInstance(context)
         }
@@ -21,9 +23,12 @@ object VolunteerDashboardDataSource {
         database().readDashboard(currentUserScope())
 
     suspend fun refreshFromCloud(): VolunteerOpportunityDashboardData {
-        val dashboard = VolunteerOpportunityRepository.loadDashboard()
+        val scope = currentUserScope()
+        val cloud = VolunteerOpportunityRepository.loadDashboard()
+        val dashboard = cloud.copy(applications = cloud.applications + VolunteerApplicationActions.pendingApplications(applicationContext, cloud))
+        check(currentUserScope() == scope) { "Account changed. Reopen the Volunteer home screen." }
         database().writeDashboard(
-            userScope = currentUserScope(),
+            userScope = scope,
             dashboard = dashboard
         )
         return dashboard
@@ -62,15 +67,27 @@ object VolunteerDashboardDataSource {
     suspend fun deletePendingAction(actionId: Long) =
         database().deletePendingAction(actionId)
 
-    suspend fun syncPendingActions() {
+    suspend fun syncPendingActions(): List<String> {
+        val warnings = mutableListOf<String>()
+        val ownerScope = currentUserScope()
         readPendingActions().forEach { action ->
-            VolunteerOpportunityRepository.replayPendingAction(
-                actionType = action.actionType,
-                targetId = action.targetId,
-                payloadJson = action.payloadJson
-            )
-            deletePendingAction(action.actionId)
+            check(currentUserScope() == ownerScope) { "Account changed. Reopen Volunteer home before syncing." }
+            try {
+                VolunteerOpportunityRepository.replayPendingAction(
+                    actionType = action.actionType,
+                    targetId = action.targetId,
+                    payloadJson = action.payloadJson
+                )
+                check(currentUserScope() == ownerScope) { "Account changed. Reopen Volunteer home before syncing." }
+                deletePendingAction(action.actionId)
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e
+            } catch (_: Exception) {
+                // Keep the original request for recovery; do not pretend it succeeded
+                // and do not stop the unrelated dashboard refresh.
+                warnings += "An earlier ${action.actionType.lowercase().replace('_', ' ')} request for ${action.targetId.substringBefore('|')} is still unconfirmed. Check My Applications before retrying."
+            }
         }
+        return warnings
     }
 
     private fun currentUserScope(): String {

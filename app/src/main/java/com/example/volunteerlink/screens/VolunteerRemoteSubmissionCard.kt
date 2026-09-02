@@ -20,6 +20,13 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.ProvideTextStyle
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Schedule
+import com.example.volunteerlink.data.VolunteerScheduleText
+import com.example.volunteerlink.data.VolunteerOnline
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -58,6 +65,8 @@ fun VolunteerRemoteSubmissionCard(
     val androidContext = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     var confirm by remember(participationId) { mutableStateOf(false) }
+    var showHistory by remember(participationId) { mutableStateOf(false) }
+    var connectionMessage by remember(participationId) { mutableStateOf<String?>(null) }
     var pendingFileUri by remember(participationId) { mutableStateOf<Uri?>(null) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) pendingFileUri = uri
@@ -85,16 +94,11 @@ fun VolunteerRemoteSubmissionCard(
         onDispose { lifecycle.removeObserver(observer) }
     }
 
-    Card(
-        modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        border = BorderStroke(1.dp, VolunteerLinkBorderColour)
-    ) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Project submission", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = VolunteerLinkTextPrimary)
+    ProvideTextStyle(MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp, lineHeight = 21.sp, fontWeight = FontWeight.Normal)) {
+        VolunteerDetailCard("Project submission", Icons.Default.Description) {
             val project = state.context
             if (project != null) {
-                Text("Submission deadline: ${project.deadline} (inclusive)", color = VolunteerLinkTextPrimary)
+                VolunteerDetailField("Submit before · Malaysia time", VolunteerScheduleText.deadline(project.deadline, true), Icons.Default.Schedule)
                 Text(if (project.mode == "SHARED_TEAM") "Shared team deliverable" else "Individual deliverable",
                     fontWeight = FontWeight.SemiBold, color = VolunteerLinkTextSecondary)
                 if (project.requirement.isNotBlank()) Text(project.requirement, color = VolunteerLinkTextPrimary)
@@ -104,14 +108,17 @@ fun VolunteerRemoteSubmissionCard(
                 }
                 if (project.reason.isNotBlank()) Text(project.reason, color = VolunteerLinkTextSecondary)
                 if (project.canSubmit) {
-                    Text("One file, up to 20 MB. PDF, JPG, PNG, Word, Excel or PowerPoint. Internet is required.",
-                        fontSize = 14.sp, color = VolunteerLinkTextSecondary)
+                    VolunteerDetailText("1 file · Maximum 20 MB · Internet required", secondary = true)
+                    VolunteerDetailText("PDF, images (JPG/PNG), Word, Excel or PowerPoint.", secondary = true)
                     project.history.firstOrNull()?.takeIf { it.status == "REVISION_REQUESTED" }?.let { latest ->
                         Text("Revision requested", fontWeight = FontWeight.Bold, color = VolunteerLinkTextPrimary)
                         Text(latest.feedback.orEmpty(), color = VolunteerLinkTextPrimary)
                     }
                     OutlinedButton(
-                        onClick = { picker.launch(VolunteerRemoteFileRules.mimeTypes.values.distinct().toTypedArray()) },
+                        onClick = {
+                            if (!VolunteerOnline.available(androidContext)) connectionMessage = "Connect to the internet before choosing and submitting your file."
+                            else { connectionMessage = null; picker.launch(VolunteerRemoteFileRules.mimeTypes.values.distinct().toTypedArray()) }
+                        },
                         enabled = !state.busy, modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = VolunteerLinkPrimaryGreen)
                     ) { Text(if (state.selected == null) "Choose file" else "Choose another file") }
@@ -124,6 +131,7 @@ fun VolunteerRemoteSubmissionCard(
                     colors = ButtonDefaults.textButtonColors(contentColor = VolunteerLinkPrimaryGreen)) { Text("Remove selected file") }
             }
             state.error?.let { Text(it, color = VolunteerLinkError) }
+            connectionMessage?.let { VolunteerDetailNotice(it) }
             state.message?.let { Text(it, color = VolunteerLinkPrimaryGreen) }
             if (state.busy) {
                 Text(state.stage, color = VolunteerLinkTextSecondary)
@@ -131,11 +139,10 @@ fun VolunteerRemoteSubmissionCard(
                     LinearProgressIndicator(progress = { state.progress }, modifier = Modifier.fillMaxWidth(), color = VolunteerLinkPrimaryGreen)
                     Text("${(state.progress * 100).toInt()}%", color = VolunteerLinkTextSecondary)
                 } else LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = VolunteerLinkPrimaryGreen)
-                Text("Keep the app open until confirmation.", fontSize = 12.sp, color = VolunteerLinkTextSecondary)
+                VolunteerDetailText("Keep the app open until confirmation.", secondary = true)
             }
             if (project?.canSubmit == true) {
-                Text("After submission, changes are allowed only when the organisation requests a revision.",
-                    fontSize = 13.sp, color = VolunteerLinkTextSecondary)
+                VolunteerDetailText("You can resubmit only if the organiser requests a revision.", secondary = true)
                 Button(
                     onClick = { if (model.validateSelection()) confirm = true }, enabled = !state.busy,
                     modifier = Modifier.fillMaxWidth(),
@@ -147,8 +154,8 @@ fun VolunteerRemoteSubmissionCard(
 
             if (!project?.history.isNullOrEmpty()) {
                 HorizontalDivider(color = VolunteerLinkBorderColour)
-                Text("Submission history", fontWeight = FontWeight.Bold, color = VolunteerLinkTextPrimary)
-                project?.history?.forEachIndexed { index, record ->
+                TextButton(onClick = { showHistory = !showHistory }) { Text(if (showHistory) "Hide previous submissions" else "View previous submissions") }
+                project?.history?.take(if (showHistory) Int.MAX_VALUE else 1)?.forEachIndexed { index, record ->
                     Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                         Text((if (index == 0) "Latest · " else "Earlier · ") + when (record.status) {
                             "PENDING_REVIEW" -> "Awaiting review"
@@ -162,7 +169,10 @@ fun VolunteerRemoteSubmissionCard(
                         record.filePath?.takeIf(String::isNotBlank)?.let { path ->
                             Text(path.substringAfterLast('/'), color = VolunteerLinkTextSecondary)
                             TextButton(onClick = {
-                                model.openFile(path) { url -> androidContext.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+                                model.openFile(path) { url ->
+                                    runCatching { androidContext.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+                                        .onFailure { connectionMessage = "No app could open this file. Install a compatible viewer and try again." }
+                                }
                             }, enabled = !state.busy,
                                 colors = ButtonDefaults.textButtonColors(contentColor = VolunteerLinkPrimaryGreen)) { Text("Open file (online)") }
                         }

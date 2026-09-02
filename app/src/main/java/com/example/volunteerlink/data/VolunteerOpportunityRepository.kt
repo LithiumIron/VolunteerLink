@@ -167,7 +167,7 @@ object VolunteerOpportunityRepository {
                     eventIsSaved = event.eventDatabaseId in savedPostIds
                 )
             }.filter { event ->
-                event.eventStatus == "PUBLISHED" || event.eventIsSaved
+                event.eventStatus in setOf("PUBLISHED", "CLOSED", "COMPLETED", "CANCELLED") || event.eventIsSaved
             },
             applications =
                 rpcApplications
@@ -464,7 +464,8 @@ object VolunteerOpportunityRepository {
                 post.status in setOf(
                     "PUBLISHED",
                     "COMPLETED",
-                    "CLOSED"
+                    "CLOSED",
+                    "CANCELLED"
                 )
             }
             .sortedBy { it.postId }
@@ -511,6 +512,7 @@ object VolunteerOpportunityRepository {
                                         ].orEmpty()
                                     item.postId == post.postId &&
                                             item.scheduleType != "TRAINING" &&
+                                            (item.scheduleType.isNullOrBlank() || item.scheduleType == template?.roleMode) &&
                                             (
                                                     targetRoleIds.isEmpty() ||
                                                             postRole.roleTemplateId in
@@ -531,12 +533,17 @@ object VolunteerOpportunityRepository {
                                                 item.scheduleDate
                                             ),
                                         scheduleTime =
-                                            item.startTime
-                                                ?.let(::formatDatabaseTime)
-                                                ?: formatDatabaseDate(
-                                                    item.scheduleDate
-                                                ),
-                                        scheduleActivity = item.title
+                                            listOfNotNull(item.startTime?.let(::formatDatabaseTime),
+                                                item.endTime?.let(::formatDatabaseTime)).joinToString(" - ")
+                                                .ifBlank { "Time not specified" },
+                                        scheduleActivity = item.title,
+                                        rawDate = item.scheduleDate,
+                                        startTime = item.startTime.orEmpty(),
+                                        endTime = item.endTime.orEmpty(),
+                                        scheduleType = item.scheduleType.orEmpty(),
+                                        location = item.location.orEmpty(),
+                                        notes = item.notes.orEmpty(),
+                                        assignedToRole = postRole.roleTemplateId in targetRoleIdsByScheduleId[item.scheduleItemId].orEmpty()
                                     )
                                 }
 
@@ -600,15 +607,8 @@ object VolunteerOpportunityRepository {
                                     },
                             roleExtraApplicationQuestions =
                                 normalizedQuestions,
-                            roleSpecificAssignment =
-                                postRole.individualSubmissionRequirement
-                                    .orEmpty()
-                                    .ifBlank {
-                                        postRole.roleNotes.orEmpty()
-                                    }
-                                    .ifBlank {
-                                        template?.description.orEmpty()
-                                    },
+                            roleSpecificAssignment = postRole.roleNotes.orEmpty()
+                                .ifBlank { template?.description.orEmpty() },
                             roleResponsibilities =
                                 normalizedResponsibilities,
                             roleScheduleItems = roleScheduleItems,
@@ -637,6 +637,13 @@ object VolunteerOpportunityRepository {
                                         .REVIEW_APPLICANTS
                                 },
                             roleMode = template?.roleMode.orEmpty(),
+                            roleSubmissionRequirement = if (template?.roleMode == "REMOTE" && remote?.submissionMode == "SHARED_TEAM")
+                                remote.sharedDeliverable.orEmpty() else postRole.individualSubmissionRequirement.orEmpty(),
+                            roleSubmissionInstruction = if (template?.roleMode != "REMOTE") "" else if (remote?.submissionMode == "SHARED_TEAM")
+                                "Shared team submission. The ${remote.responsibleRoleId?.let { roleTemplatesById[it]?.roleName } ?: "designated responsible"} role uploads the team's file. " +
+                                    (if (remote.responsibleRoleId == postRole.roleTemplateId) "This is the responsible role." else "Other team members do not upload a separate file.")
+                                else if (remote?.submissionMode == "INDIVIDUAL") "Individual submission: each accepted volunteer submits their own file."
+                                else "Submission arrangements are unavailable. Sync or contact the organisation.",
                             roleDatabaseId = postRole.databaseId
                         )
                     }
@@ -644,7 +651,7 @@ object VolunteerOpportunityRepository {
                 val opportunityType =
                     post.mode.toDisplayWords()
                 val startDate =
-                    physical?.startDate ?: remote?.startDate.orEmpty()
+                    listOfNotNull(physical?.startDate, remote?.startDate).filter(String::isNotBlank).minOrNull().orEmpty()
                 val remainingRoleSpots =
                     roles.sumOf { role ->
                         role.roleVacancies
@@ -680,8 +687,15 @@ object VolunteerOpportunityRepository {
                     // after Android provides the volunteer's device location.
                     eventDistanceKm = null,
                     eventDate = formatDatabaseDate(startDate),
+                    eventPhysicalEndDate = physical?.endDate.orEmpty(),
+                    eventPhysicalStartTime = physical?.startTime.orEmpty(),
+                    eventPhysicalEndTime = physical?.endTime.orEmpty(),
+                    eventTimeZone = physical?.timeZone?.takeIf { it.isNotBlank() } ?: "Asia/Kuala_Lumpur",
+                    eventRemoteEndDate = (remote?.newEndDate ?: remote?.endDate).orEmpty(),
+                    eventRemoteOriginalEndDate = remote?.endDate.orEmpty(),
+                    eventMeetingPoint = physical?.meetingPoint.orEmpty(),
                     eventEndDate = formatDatabaseDate(
-                        remote?.newEndDate ?: remote?.endDate ?: startDate
+                        listOfNotNull(physical?.endDate, remote?.newEndDate ?: remote?.endDate).maxOrNull() ?: startDate
                     ),
                     eventTime =
                         if (physical != null) {
@@ -700,9 +714,8 @@ object VolunteerOpportunityRepository {
                         },
                     eventDescription = post.description,
                     eventIsLongTerm =
-                        remote?.let {
-                            it.startDate != (it.newEndDate ?: it.endDate)
-                        } ?: false,
+                        listOfNotNull(physical?.endDate, remote?.newEndDate ?: remote?.endDate)
+                            .any { it != startDate },
                     eventVolunteerRoles = roles,
                     eventIsGovernmentApproved =
                         false,
@@ -814,9 +827,10 @@ object VolunteerOpportunityRepository {
                             participation.createdAt
                         ),
                     applicationStatus = status,
+                    applicationCreatedAtRaw = participation.createdAt,
                     applicationRoleId = role.roleId,
                     applicationStatusMessage =
-                        statusMessage(status),
+                        statusMessage(status, participation.decisionNote),
                     applicationRejectionReason =
                         participation.decisionNote,
                     applicationVerifiedHours =
@@ -885,9 +899,10 @@ object VolunteerOpportunityRepository {
                     applicationSubmittedDate =
                         formatSubmittedDate(row.createdAt),
                     applicationStatus = status,
+                    applicationCreatedAtRaw = row.createdAt,
                     applicationRoleId =
                         stableNavigationId(row.postRoleId),
-                    applicationStatusMessage = statusMessage(status),
+                    applicationStatusMessage = statusMessage(status, row.decisionNote),
                     applicationRejectionReason = row.decisionNote,
                     applicationVerifiedHours =
                         row.verifiedMinutes?.let { minutes ->
@@ -1026,17 +1041,19 @@ private fun formatSubmittedDate(timestamp: String): String {
 }
 
 private fun statusMessage(
-    status: VolunteerApplicationStatus
+    status: VolunteerApplicationStatus,
+    decisionNote: String? = null
 ): String =
     when (status) {
         VolunteerApplicationStatus.PENDING ->
-            "Your application is being reviewed."
+            "Application received. Awaiting organisation review; your place is not confirmed yet."
 
         VolunteerApplicationStatus.ACCEPTED ->
-            "Your place has been confirmed by the organisation."
+            "Your place is confirmed. You are accepted for this role."
 
         VolunteerApplicationStatus.REJECTED ->
-            "The organisation did not select this application."
+            decisionNote?.takeIf { it.isNotBlank() }
+                ?: "This application was not accepted. You may choose another open role, but cannot reapply to this same role."
 
         VolunteerApplicationStatus.COMPLETED ->
             "This volunteer role has been completed."
@@ -1045,7 +1062,7 @@ private fun statusMessage(
             "The organisation did not verify this role as completed."
 
         VolunteerApplicationStatus.CANCELLED ->
-            "You cancelled this application."
+            decisionNote?.takeIf { it.isNotBlank() } ?: "This application was cancelled. No place is reserved."
     }
 
 @Serializable
@@ -1087,7 +1104,11 @@ private data class PhysicalDetailRow(
     @SerialName("start_date")
     val startDate: String,
     @SerialName("end_date")
-    val endDate: String,
+    val endDate: String = "",
+    @SerialName("time_zone")
+    val timeZone: String? = null,
+    @SerialName("meeting_point")
+    val meetingPoint: String? = null,
     @SerialName("start_time")
     val startTime: String,
     @SerialName("end_time")
@@ -1112,6 +1133,9 @@ private data class RemoteDetailRow(
     val endDate: String,
     @SerialName("new_end_date")
     val newEndDate: String? = null,
+    @SerialName("submission_mode") val submissionMode: String? = null,
+    @SerialName("shared_deliverable") val sharedDeliverable: String? = null,
+    @SerialName("responsible_role_template_id") val responsibleRoleId: String? = null,
     @SerialName("volunteer_capacity")
     val volunteerCapacity: Int
 )
@@ -1248,7 +1272,10 @@ private data class ScheduleItemRow(
     val scheduleType: String? = null,
     val title: String,
     @SerialName("start_time")
-    val startTime: String? = null
+    val startTime: String? = null,
+    @SerialName("end_time") val endTime: String? = null,
+    val location: String? = null,
+    val notes: String? = null
 )
 
 @Serializable

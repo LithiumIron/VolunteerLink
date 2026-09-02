@@ -40,6 +40,15 @@ private data class DismissedNotificationKeyRow(
     @SerialName("notification_key") val notificationKey: String
 )
 
+@Serializable
+private data class VolunteerApplicationReceipt(
+    @SerialName("request_id") val requestId: String,
+    @SerialName("post_id") val postId: String,
+    @SerialName("role_id") val roleId: String,
+    val result: VolunteerApplicationActionResult,
+    @SerialName("created_at") val createdAt: String
+)
+
 object VolunteerNotificationRepository {
     suspend fun load(): List<VolunteerNotification> {
         val cloudNotifications = runCatching {
@@ -48,11 +57,11 @@ object VolunteerNotificationRepository {
                 .decodeList<VolunteerNotification>()
         }.getOrDefault(emptyList())
 
-        val notifications = if (cloudNotifications.isNotEmpty()) {
-            cloudNotifications
-        } else VolunteerOpportunitySessionStore.volunteerApplications
+        val currentApplications = runCatching { VolunteerOpportunityRepository.loadDashboard().applications }
+            .getOrElse { VolunteerOpportunitySessionStore.volunteerApplications.toList() }
+        val applicationNotifications = currentApplications
             .map { application ->
-                val type = when (application.applicationStatus) {
+                val type = if (application.applicationDatabaseId.startsWith("offline|")) "APPLICATION_WAITING_SYNC" else when (application.applicationStatus) {
                     com.example.volunteerlink.model.VolunteerApplicationStatus.PENDING ->
                         "APPLICATION_SUBMITTED"
                     com.example.volunteerlink.model.VolunteerApplicationStatus.ACCEPTED ->
@@ -73,6 +82,7 @@ object VolunteerNotificationRepository {
                             .toLong().absoluteValue,
                     notificationType = type,
                     title = when (type) {
+                        "APPLICATION_WAITING_SYNC" -> "Waiting to sync — no place reserved"
                         "APPLICATION_SUBMITTED" -> "Application submitted"
                         "APPLICATION_ACCEPTED" -> "Place confirmed"
                         "APPLICATION_REJECTED" -> "Application update"
@@ -93,6 +103,24 @@ object VolunteerNotificationRepository {
                     createdAt = application.applicationSubmittedDate
                 )
             }
+        val receipts = supabase.from("volunteer_application_receipts_v1")
+            .select(columns = io.github.jan.supabase.postgrest.query.Columns.raw("request_id,post_id,role_id,result,created_at"))
+            .decodeList<VolunteerApplicationReceipt>()
+        val receiptNotifications = receipts.map { receipt ->
+            val event = VolunteerOpportunitySessionStore.volunteerOpportunityEvents.firstOrNull { it.eventDatabaseId == receipt.postId }
+            val role = event?.eventVolunteerRoles?.firstOrNull { it.roleTemplateId == receipt.roleId }
+            val application = currentApplications.firstOrNull { it.applicationEventId == event?.eventId && it.applicationRoleId == role?.roleId }
+            VolunteerNotification(
+                notificationId = receipt.requestId.hashCode().toLong().absoluteValue,
+                notificationType = "APPLICATION_REQUEST_${receipt.requestId}",
+                title = if (receipt.result.success) "Application request confirmed" else "Application request not completed",
+                message = "${event?.eventTitle ?: receipt.postId} · ${role?.roleTitle ?: receipt.roleId}\n${receipt.result.message}",
+                relatedPostId = receipt.postId,
+                relatedParticipationId = application?.applicationDatabaseId,
+                isRead = true, createdAt = receipt.createdAt
+            )
+        }
+        val notifications = (receiptNotifications + cloudNotifications + applicationNotifications).distinctBy { it.stableKey }
         val dismissedKeys = runCatching {
             supabase.postgrest
                 .rpc("get_my_dismissed_notification_keys")

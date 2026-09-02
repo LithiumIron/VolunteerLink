@@ -137,36 +137,30 @@ fun VolunteerApplicationScreen(
             application.applicationRoleId != volunteerRoleId
         }
 
-    val acceptedOtherRole = activeApplicationInPost?.takeIf { application ->
-        application.applicationStatus == VolunteerApplicationStatus.ACCEPTED &&
-            application.applicationRoleId != volunteerRoleId
-    }
-
-    val pendingBlocksReviewApplication =
-        otherPendingApplication != null &&
-            volunteerOpportunityRole.roleApplicationMethod ==
-                VolunteerRoleApplicationMethod.REVIEW_APPLICANTS
-
-    val applicationBlockedMessage = when {
-        acceptedOtherRole != null ->
-            "You already joined ${acceptedOtherRole.applicationRoleTitle} in this opportunity. " +
-                "A volunteer can only hold one accepted role per post."
-
-        pendingBlocksReviewApplication ->
-            "You already have a pending application for " +
-                "${otherPendingApplication?.applicationRoleTitle}. " +
-                "You can only keep one pending application in the same opportunity."
-
+    val otherActiveApplication = activeApplicationInPost?.takeIf { it.applicationRoleId != volunteerRoleId }
+    val applicationBlockedMessage: String? = when {
+        otherActiveApplication?.applicationDatabaseId?.startsWith("offline|") == true -> "Sync your earlier request before changing roles."
+        VolunteerOpportunitySessionStore.volunteerApplications.any {
+            it.applicationEventId == volunteerEventId && it.applicationStatus in setOf(
+                VolunteerApplicationStatus.COMPLETED, VolunteerApplicationStatus.NOT_COMPLETED)
+        } -> "Your participation is finalized. You cannot take a second role in this event."
         else -> null
     }
 
     var pendingInstantSwitchAnswers by rememberSaveable {
         mutableStateOf<List<String>?>(null)
     }
+    var confirmedPrevious by androidx.compose.runtime.remember {
+        mutableStateOf<VolunteerOpportunityApplication?>(null)
+    }
+    var previewAnswers by rememberSaveable(volunteerEventId, volunteerRoleId) {
+        mutableStateOf<List<String>?>(null)
+    }
 
     when {
         applicationWasSubmitted -> {
             VolunteerApplicationSuccessScreen(
+                resultMessage = opportunityUiState.lastApplicationResult,
                 volunteerOpportunityEvent =
                     volunteerOpportunityEvent,
                 volunteerOpportunityRole =
@@ -176,7 +170,7 @@ fun VolunteerApplicationScreen(
             )
         }
 
-        existingApplication != null -> {
+        existingApplication != null && existingApplication.applicationStatus != VolunteerApplicationStatus.CANCELLED -> {
             VolunteerExistingApplicationScreen(
                 volunteerOpportunityEvent =
                     volunteerOpportunityEvent,
@@ -215,11 +209,12 @@ fun VolunteerApplicationScreen(
                         ) else null,
                 submissionAllowed = applicationBlockedMessage == null,
                 onApplicationSubmitted = { submittedAnswers ->
-                    if (
-                        volunteerOpportunityRole.roleApplicationMethod ==
-                            VolunteerRoleApplicationMethod.INSTANT_JOIN &&
-                        otherPendingApplication != null
+                    if (volunteerOpportunityRole.roleApplicationMethod == VolunteerRoleApplicationMethod.REVIEW_APPLICANTS) {
+                        previewAnswers = submittedAnswers
+                    } else if (
+                        otherActiveApplication != null
                     ) {
+                        confirmedPrevious = otherActiveApplication
                         pendingInstantSwitchAnswers = submittedAnswers
                     } else {
                         volunteerOpportunityViewModel.submitApplication(
@@ -236,8 +231,25 @@ fun VolunteerApplicationScreen(
         }
     }
 
+    previewAnswers?.let { answers ->
+        VolunteerApplicationPreviewDialog(volunteerOpportunityEvent, volunteerOpportunityRole, answers,
+            opportunityUiState.isApplicationActionRunning, opportunityUiState.applicationActionError,
+            onBack = { previewAnswers = null }, onConfirm = {
+                if (otherActiveApplication != null) {
+                    confirmedPrevious = otherActiveApplication
+                    pendingInstantSwitchAnswers = answers
+                    previewAnswers = null
+                } else {
+                    volunteerOpportunityViewModel.submitApplication(volunteerEventId, volunteerRoleId, answers) {
+                        previewAnswers = null
+                        applicationWasSubmitted = true
+                    }
+                }
+            })
+    }
+
     val switchAnswers = pendingInstantSwitchAnswers
-    if (switchAnswers != null && otherPendingApplication != null) {
+    if (switchAnswers != null && confirmedPrevious != null) {
         AlertDialog(
             titleContentColor = VolunteerLinkTextPrimary,
             textContentColor = VolunteerLinkTextSecondary,
@@ -247,17 +259,18 @@ fun VolunteerApplicationScreen(
             },
             title = {
                 Text(
-                    text = "Join this role instead?"
+                    text = "Change your role?"
                 )
             },
             text = {
                 Text(
                     text =
-                        "You already have a pending application for " +
-                                otherPendingApplication.applicationRoleTitle +
-                                ". Joining " +
-                                volunteerOpportunityRole.roleTitle +
-                                " will cancel that pending application."
+                        "Your current role is ${confirmedPrevious?.applicationRoleTitle}. " +
+                            "Changing to ${volunteerOpportunityRole.roleTitle} cancels that application and gives up any accepted place. " +
+                            (if (volunteerOpportunityRole.roleApplicationMethod == VolunteerRoleApplicationMethod.REVIEW_APPLICANTS)
+                                "The new role needs a fresh organisation review; acceptance is not guaranteed. "
+                            else "The new role is confirmed only if a place is still available. ") +
+                            "If this change fails, this request will not cancel your previous role. Internet connection is required."
                 )
             },
             confirmButton = {
@@ -269,13 +282,14 @@ fun VolunteerApplicationScreen(
                                 eventId = volunteerEventId,
                                 roleId = volunteerRoleId,
                                 answers = switchAnswers,
+                                confirmedPrevious = confirmedPrevious,
                                 onSuccess = {
                                     applicationWasSubmitted = true
                                 }
                             )
                     }
                 ) {
-                    Text("Join role")
+                    Text("Confirm change")
                 }
             },
             dismissButton = {
@@ -284,7 +298,7 @@ fun VolunteerApplicationScreen(
                         pendingInstantSwitchAnswers = null
                     }
                 ) {
-                    Text("Keep application")
+                    Text("Keep current role")
                 }
             }
         )
@@ -743,7 +757,7 @@ private fun VolunteerApplicationFormScreen(
                         } else if (applicationIsInstantJoin) {
                             "Join Role"
                         } else {
-                            "Submit Application"
+                            "Review Application"
                         },
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold
@@ -951,6 +965,7 @@ private fun VolunteerApplicationRoleSummary(
 
 @Composable
 private fun VolunteerApplicationSuccessScreen(
+    resultMessage: String?,
     volunteerOpportunityEvent:
     VolunteerOpportunityEvent,
     volunteerOpportunityRole:
@@ -992,7 +1007,9 @@ private fun VolunteerApplicationSuccessScreen(
                     imageVector =
                         Icons.Filled.CheckCircle,
                     contentDescription =
-                        if (applicationIsInstantJoin) {
+                        if (resultMessage?.startsWith("Waiting to sync") == true) {
+                            "Saved on device, waiting to sync"
+                        } else if (applicationIsInstantJoin) {
                             "Role joined"
                         } else {
                             "Application submitted"
@@ -1010,7 +1027,9 @@ private fun VolunteerApplicationSuccessScreen(
 
         Text(
             text =
-                if (applicationIsInstantJoin) {
+                if (resultMessage?.startsWith("Waiting to sync") == true) {
+                    "Waiting to sync"
+                } else if (applicationIsInstantJoin) {
                     "Role Joined"
                 } else {
                     "Application Submitted"
@@ -1026,7 +1045,9 @@ private fun VolunteerApplicationSuccessScreen(
 
         Text(
             text =
-                if (applicationIsInstantJoin) {
+                if (resultMessage != null) {
+                    resultMessage
+                } else if (applicationIsInstantJoin) {
                     "Your place for " +
                             volunteerOpportunityRole
                                 .roleTitle +
@@ -1098,8 +1119,9 @@ private fun VolunteerExistingApplicationScreen(
     onBackSelected: () -> Unit,
     onReturnHomeSelected: () -> Unit
 ) {
+    val waitingToSync = volunteerApplication.applicationDatabaseId.startsWith("offline|")
     val statusText =
-        when (
+        if (waitingToSync) "Waiting to sync" else when (
             volunteerApplication.applicationStatus
         ) {
             VolunteerApplicationStatus.PENDING ->
@@ -1207,7 +1229,7 @@ private fun VolunteerExistingApplicationScreen(
             )
 
             Text(
-                text = "Already Applied",
+                text = if (waitingToSync) "Waiting to sync" else "Already Applied",
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
                 color = VolunteerLinkTextPrimary
@@ -1219,7 +1241,8 @@ private fun VolunteerExistingApplicationScreen(
 
             Text(
                 text =
-                    "You already submitted an application " +
+                    if (waitingToSync) "This request is saved on your device. No place is reserved. Connect and Sync to receive the server result."
+                    else "You already submitted an application " +
                             "for ${volunteerOpportunityRole.roleTitle}.",
                 fontSize = 13.sp,
                 lineHeight = 20.sp,

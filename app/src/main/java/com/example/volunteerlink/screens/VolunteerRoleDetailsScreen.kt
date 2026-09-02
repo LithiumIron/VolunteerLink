@@ -72,6 +72,7 @@ fun VolunteerRoleDetailsScreen(
     skillPathViewModel:
         VolunteerSkillPathViewModel = viewModel()
 ) {
+    val businessNow = volunteerBusinessTime()
     val volunteerOpportunityEvent =
         VolunteerOpportunitySessionStore.findEventById(
             volunteerEventId
@@ -179,6 +180,7 @@ fun VolunteerRoleDetailsScreen(
             item(
                 key = "role_assignment"
             ) {
+                VolunteerRoleInformationCard(volunteerOpportunityEvent, volunteerOpportunityRole)
                 VolunteerRoleAssignmentSection(
                     volunteerOpportunityEvent =
                         volunteerOpportunityEvent,
@@ -256,10 +258,15 @@ fun VolunteerRoleDetailsScreen(
         }
 
         VolunteerRoleJoinSection(
-            applicationWindowMessage = if (
+            applicationWindowMessage = if (VolunteerOpportunitySessionStore.volunteerApplications.any {
+                it.applicationEventId == volunteerEventId && it.applicationStatus in setOf(
+                    com.example.volunteerlink.model.VolunteerApplicationStatus.COMPLETED,
+                    com.example.volunteerlink.model.VolunteerApplicationStatus.NOT_COMPLETED)
+            }) "Your participation in this event is finalized. You cannot take a second role." else if (
                 com.example.volunteerlink.data.VolunteerApplicationWindow.canApply(
                     volunteerOpportunityEvent,
-                    volunteerOpportunityRole
+                    volunteerOpportunityRole,
+                    businessNow
                 )
             ) null else com.example.volunteerlink.data.VolunteerApplicationWindow.reason(
                 volunteerOpportunityEvent,
@@ -275,6 +282,10 @@ fun VolunteerRoleDetailsScreen(
                 eligibilityIsAvailable,
             volunteerHasApplied =
                 volunteerHasApplied,
+            waitingToSync = VolunteerOpportunitySessionStore.volunteerApplications.any {
+                it.applicationEventId == volunteerEventId && it.applicationRoleId == volunteerRoleId &&
+                    it.applicationDatabaseId.startsWith("offline|")
+            },
             volunteerCanReapply = volunteerCanReapply,
             volunteerWasRejected = volunteerWasRejected,
             activeOtherApplication = activeOtherApplication,
@@ -623,11 +634,7 @@ private fun VolunteerRoleScheduleSection(
                     scheduleIndex,
                     scheduleItem ->
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment =
-                        Alignment.Top
-                ) {
+                Column(modifier = Modifier.fillMaxWidth()) {
                     Text(
                         text =
                             listOf(
@@ -644,8 +651,9 @@ private fun VolunteerRoleScheduleSection(
 
                     Text(
                         text =
-                            scheduleItem.scheduleActivity,
-                        modifier = Modifier.weight(1f),
+                            listOf(scheduleItem.scheduleActivity, scheduleItem.location, scheduleItem.notes)
+                                .filter { it.isNotBlank() }.joinToString("\n"),
+                        modifier = Modifier.fillMaxWidth(),
                         fontSize = 12.sp,
                         lineHeight = 18.sp,
                         color = VolunteerLinkTextPrimary
@@ -887,6 +895,7 @@ private fun VolunteerRoleJoinSection(
     eligibilityIsLoading: Boolean,
     eligibilityIsAvailable: Boolean,
     volunteerHasApplied: Boolean,
+    waitingToSync: Boolean,
     volunteerCanReapply: Boolean,
     volunteerWasRejected: Boolean,
     activeOtherApplication: com.example.volunteerlink.model.VolunteerOpportunityApplication?,
@@ -921,16 +930,14 @@ private fun VolunteerRoleJoinSection(
         ) {
             Text(
                 text =
-                    if (volunteerHasApplied) {
+                    if (waitingToSync) {
+                        "Waiting to sync. This request has not been confirmed. No place is reserved; connect and Sync."
+                    } else if (volunteerHasApplied) {
                         "Already registered — track status in My Applications."
                     } else if (volunteerWasRejected) {
                         "You were not selected for this role. You may choose another open role in this opportunity."
-                    } else if (hasAcceptedOtherRole) {
-                        "You already joined ${activeOtherApplication?.applicationRoleTitle} in this opportunity."
-                    } else if (pendingBlocksThisRole) {
-                        "You already have a pending application for ${activeOtherApplication?.applicationRoleTitle}."
-                    } else if (canSwitchPendingToInstantJoin) {
-                        "Joining this Instant Join role will cancel your pending application for ${activeOtherApplication?.applicationRoleTitle}."
+                    } else if (activeOtherApplication != null) {
+                        "Your current role is ${activeOtherApplication.applicationRoleTitle}. Changing roles gives up that role. You will review and confirm the change before anything is cancelled. Online only."
                     } else when (
                         volunteerOpportunityRole
                             .roleApplicationMethod
@@ -987,8 +994,7 @@ private fun VolunteerRoleJoinSection(
                             !eligibilityIsLoading &&
                             !volunteerHasApplied &&
                             !volunteerWasRejected &&
-                            !hasAcceptedOtherRole &&
-                            !pendingBlocksThisRole,
+                            activeOtherApplication?.applicationDatabaseId?.startsWith("offline|") != true,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp),
@@ -1005,7 +1011,9 @@ private fun VolunteerRoleJoinSection(
             ) {
                 Text(
                     text =
-                        if (applicationWindowMessage != null) {
+                        if (waitingToSync) {
+                            "Waiting to Sync"
+                        } else if (applicationWindowMessage != null) {
                             "Applications unavailable"
                         } else if (volunteerOpportunityRole.roleVacancies <= 0) {
                             "Role full"
@@ -1013,12 +1021,8 @@ private fun VolunteerRoleJoinSection(
                             "Already Registered"
                         } else if (volunteerWasRejected) {
                             "Not Selected for This Role"
-                        } else if (hasAcceptedOtherRole) {
-                            "Already Joined Another Role"
-                        } else if (pendingBlocksThisRole) {
-                            "Pending Application Exists"
-                        } else if (canSwitchPendingToInstantJoin) {
-                            "Join This Role Instead"
+                        } else if (activeOtherApplication != null) {
+                            "Review Role Change"
                         } else if (volunteerCanReapply) {
                             "Apply Again"
                         } else if (eligibilityIsLoading) {

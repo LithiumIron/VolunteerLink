@@ -1,6 +1,7 @@
 package com.example.volunteerlink.screens
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.volunteerlink.data.VolunteerNotification
 import com.example.volunteerlink.data.VolunteerNotificationRepository
@@ -21,7 +22,7 @@ data class VolunteerNotificationUiState(
         get() = notifications.count { !it.isRead }
 }
 
-class VolunteerNotificationViewModel : ViewModel() {
+class VolunteerNotificationViewModel(application: Application) : AndroidViewModel(application) {
     private val mutableUiState =
         MutableStateFlow(VolunteerNotificationUiState())
 
@@ -33,6 +34,7 @@ class VolunteerNotificationViewModel : ViewModel() {
     }
 
     fun refresh() {
+        if (!checkOnline()) return
         viewModelScope.launch {
             mutableUiState.update {
                 it.copy(
@@ -66,6 +68,7 @@ class VolunteerNotificationViewModel : ViewModel() {
     }
 
     fun markAllRead() {
+        if (!checkOnline()) return
         if (mutableUiState.value.unreadCount == 0) return
 
         viewModelScope.launch {
@@ -102,6 +105,7 @@ class VolunteerNotificationViewModel : ViewModel() {
     }
 
     fun dismiss(notification: VolunteerNotification) {
+        if (!checkOnline()) return
         if (mutableUiState.value.isClearing) return
         viewModelScope.launch {
             mutableUiState.update { it.copy(isClearing = true, errorMessage = null) }
@@ -129,6 +133,7 @@ class VolunteerNotificationViewModel : ViewModel() {
     }
 
     fun dismissAll() {
+        if (!checkOnline()) return
         if (mutableUiState.value.isClearing) return
         val current = mutableUiState.value.notifications
         if (current.isEmpty()) return
@@ -154,5 +159,12 @@ class VolunteerNotificationViewModel : ViewModel() {
                 }
             }
         }
+    }
+
+    private fun checkOnline(): Boolean {
+        if (com.example.volunteerlink.data.VolunteerOnline.available(getApplication<Application>())) return true
+        mutableUiState.update { it.copy(isLoading = false, errorMessage =
+            "Internet connection is required to refresh or clear notifications. Connect and try again.") }
+        return false
     }
 }

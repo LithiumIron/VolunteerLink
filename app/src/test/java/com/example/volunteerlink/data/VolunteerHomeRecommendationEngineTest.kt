@@ -241,7 +241,7 @@ class VolunteerHomeRecommendationEngineTest {
     }
 
     @Test
-    fun eligibleRoleRanksAboveOtherwiseEqualIneligibleRole() {
+    fun rolesAboveCurrentSkillLevelAreNotRecommended() {
         val eligibleEvent = event(
             id = 6,
             path = "Communication & Guest Services",
@@ -273,18 +273,71 @@ class VolunteerHomeRecommendationEngineTest {
             6,
             recommendations.first().event.eventId
         )
-        assertTrue(
-            recommendations
-                .first { recommendation ->
-                    recommendation.event.eventId == 7
-                }
-                .factors
-                .any { factor ->
-                    factor.title == "Level eligibility" &&
-                        factor.status ==
-                            VolunteerMatchFactorStatus.ATTENTION
-                }
+        assertFalse(recommendations.any { it.event.eventId == 7 })
+    }
+
+    @Test
+    fun hybridRecommendationDoesNotChooseClosedPhysicalRole() {
+        val physical = role(101, "Physical", "Path", emptyList(), 1).copy(roleMode = "PHYSICAL")
+        val remote = physical.copy(roleId = 102, roleMode = "REMOTE", roleTitle = "Remote")
+        val hybrid = event(10, "Path", emptyList()).copy(
+            eventOpportunityType = "Hybrid",
+            eventVolunteerRoles = listOf(physical, remote),
+            eventPhysicalStartDate = "2026-09-10",
+            eventRemoteStartDate = "2026-09-15"
         )
+        val now = java.time.Instant.parse("2026-09-12T12:00:00Z").toEpochMilli()
+        val result = VolunteerHomeRecommendationEngine.recommend(
+            listOf(hybrid), emptyList(), nowMillis = now
+        )
+        assertEquals(102, result.single().bestRoleId)
+        assertEquals(2, result.single().event.eventVolunteerRoles.size)
+        assertTrue(VolunteerHomeRecommendationEngine.recommend(
+            listOf(hybrid.copy(eventVolunteerRoles = listOf(physical, remote.copy(roleVacancies = 0)))),
+            emptyList(), nowMillis = now
+        ).isEmpty())
+    }
+
+    @Test
+    fun hybridMissingPhaseDateNeverFallsBackToGeneralDate() {
+        val remote = role(102, "Remote", "Path", emptyList(), 1).copy(roleMode = "REMOTE")
+        val hybrid = event(10, "Path", emptyList()).copy(
+            eventOpportunityType = "Hybrid", eventVolunteerRoles = listOf(remote),
+            eventApplicationStartDate = "2099-09-20", eventRemoteStartDate = ""
+        )
+        val now = java.time.Instant.parse("2026-09-12T12:00:00Z").toEpochMilli()
+        assertFalse(VolunteerApplicationWindow.canApply(hybrid, remote, now))
+        assertTrue(VolunteerApplicationWindow.reason(hybrid, remote).contains("no valid start date"))
+        assertTrue(VolunteerApplicationWindow.reason(
+            hybrid.copy(eventRemoteStartDate = "2026-02-30"), remote
+        ).contains("no valid start date"))
+    }
+
+    @Test
+    fun homeHidesActiveParticipationButAllowsCancelledPostAgain() {
+        val opportunity = event(1, "Path", emptyList())
+        for (status in listOf(VolunteerApplicationStatus.PENDING, VolunteerApplicationStatus.ACCEPTED)) {
+            val application = completedApplication(1).copy(applicationStatus = status)
+            assertTrue(VolunteerHomeFeedEngine.filter(
+                listOf(opportunity), VolunteerHomeFeedFilter.ALL, listOf(application)
+            ).isEmpty())
+        }
+        val cancelled = completedApplication(1).copy(applicationStatus = VolunteerApplicationStatus.CANCELLED)
+        assertEquals(1, VolunteerHomeFeedEngine.filter(
+            listOf(opportunity), VolunteerHomeFeedFilter.ALL, listOf(cancelled)
+        ).size)
+    }
+
+    @Test
+    fun rejectionBlocksOnlyThatRoleForDiscovery() {
+        val opportunity = event(1, "Path", emptyList())
+        val rejected = completedApplication(1).copy(
+            applicationStatus = VolunteerApplicationStatus.REJECTED, applicationRoleId = 1
+        )
+        assertTrue(VolunteerHomeRecommendationEngine.recommend(listOf(opportunity), listOf(rejected)).isEmpty())
+        val alternative = opportunity.copy(eventVolunteerRoles = opportunity.eventVolunteerRoles +
+            opportunity.eventVolunteerRoles.single().copy(roleId = 2))
+        assertEquals(2, VolunteerHomeRecommendationEngine.recommend(listOf(alternative), listOf(rejected)).single().bestRoleId)
     }
 
     @Test

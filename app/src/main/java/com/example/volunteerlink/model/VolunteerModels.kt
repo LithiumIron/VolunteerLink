@@ -19,7 +19,14 @@ enum class VolunteerRoleApplicationMethod {
 data class VolunteerRoleScheduleItem(
     val scheduleDate: String = "",
     val scheduleTime: String,
-    val scheduleActivity: String
+    val scheduleActivity: String,
+    val rawDate: String = "",
+    val startTime: String = "",
+    val endTime: String = "",
+    val scheduleType: String = "",
+    val location: String = "",
+    val notes: String = "",
+    val assignedToRole: Boolean = false
 )
 
 @Serializable
@@ -43,6 +50,8 @@ data class VolunteerOpportunityRole(
     val roleApplicationMethod: VolunteerRoleApplicationMethod =
         VolunteerRoleApplicationMethod.REVIEW_APPLICANTS,
     val roleMode: String = "",
+    val roleSubmissionRequirement: String = "",
+    val roleSubmissionInstruction: String = "",
     // Composite/normalized role identity used by application RPC calls.
     val roleDatabaseId: String = ""
 )
@@ -94,6 +103,13 @@ data class VolunteerOpportunityEvent(
     // Hybrid PHYSICAL roles use eventPhysicalStartDate; REMOTE roles use eventRemoteStartDate.
     val eventPhysicalStartDate: String = "",
     val eventRemoteStartDate: String = "",
+    val eventPhysicalEndDate: String = "",
+    val eventPhysicalStartTime: String = "",
+    val eventPhysicalEndTime: String = "",
+    val eventTimeZone: String = "Asia/Kuala_Lumpur",
+    val eventRemoteEndDate: String = "",
+    val eventRemoteOriginalEndDate: String = "",
+    val eventMeetingPoint: String = "",
     // Retained for older cached payload compatibility. New application checks are role-specific.
     val eventApplicationStartDate: String = ""
 )
@@ -135,7 +151,8 @@ data class VolunteerOpportunityApplication(
     val applicationPrimarySkillPath: String? = null,
     val applicationPractisedSkills: List<String> = emptyList(),
     val applicationRoleMode: String = "",
-    val applicationDatabaseId: String = ""
+    val applicationDatabaseId: String = "",
+    val applicationCreatedAtRaw: String = ""
 )
 
 @Serializable

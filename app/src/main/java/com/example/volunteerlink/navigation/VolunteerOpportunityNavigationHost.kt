@@ -231,6 +231,7 @@ fun VolunteerOpportunityNavigationHost() {
 
                         isShowingCachedData =
                             opportunityUiState.isShowingCachedData,
+                        syncWarning = opportunityUiState.syncWarning,
 
                         lastSyncedAtEpochMillis =
                             opportunityUiState.lastSyncedAtEpochMillis,
