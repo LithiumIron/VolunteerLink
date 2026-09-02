@@ -1,6 +1,5 @@
 package com.example.volunteerlink.screens
 
-import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -33,7 +32,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import io.github.jan.supabase.postgrest.from
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -47,12 +45,10 @@ import coil.compose.AsyncImage
 import com.example.volunteerlink.R
 import com.example.volunteerlink.data.VolunteerProfileRepository
 import com.example.volunteerlink.data.saveProfileImage
-import com.example.volunteerlink.data.supabase
 import com.example.volunteerlink.ui.theme.DeepGreen
 import com.example.volunteerlink.ui.theme.VolunteerLinkPrimaryGreen
 import com.example.volunteerlink.ui.theme.VolunteerLinkSoftGreenSurface
 import com.example.volunteerlink.ui.theme.VolunteerLinkTheme
-import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.launch
 
 

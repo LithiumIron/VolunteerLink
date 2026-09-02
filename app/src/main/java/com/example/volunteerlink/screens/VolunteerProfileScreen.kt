@@ -6,7 +6,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -69,7 +68,6 @@ fun VolunteerProfileScreen(
     val name = profileData?.fullName ?: "Loading..."
     val email = profileData?.email ?: "Loading..."
     val bio = profileData?.bio ?: ""
-    val availability = profileData?.availability ?: emptyList()
     val memberSince = profileData?.memberSince ?: "Loading..."
     val profileImageUrl = profileData?.profileImageUrl
     val verifiedHours = profileData?.verifiedHours ?: 0
