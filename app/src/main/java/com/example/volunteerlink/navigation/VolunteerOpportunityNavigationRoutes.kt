@@ -138,4 +138,18 @@ object VolunteerOpportunityNavigationRoutes {
         return "volunteer_skill_path_details/" +
                 volunteerSkillPathId
     }
+
+    const val VOLUNTEER_CHAT_ID_ARGUMENT = "chatId"
+
+    const val VOLUNTEER_CHAT_ROOM_ROUTE =
+        "volunteer_chat_room/{$VOLUNTEER_CHAT_ID_ARGUMENT}"
+
+    const val VOLUNTEER_GROUP_INFO_ROUTE =
+        "volunteer_group_info/{$VOLUNTEER_CHAT_ID_ARGUMENT}"
+
+    fun createVolunteerChatRoomRoute(chatId: String) =
+        "volunteer_chat_room/$chatId"
+
+    fun createVolunteerGroupInfoRoute(chatId: String) =
+        "volunteer_group_info/$chatId"
 }

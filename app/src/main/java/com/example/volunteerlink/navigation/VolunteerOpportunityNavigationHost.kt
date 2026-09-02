@@ -53,6 +53,13 @@ import com.example.volunteerlink.ui.theme.VolunteerLinkBackground
 import com.example.volunteerlink.ui.theme.VolunteerLinkPrimaryGreen
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextPrimary
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextSecondary
+import androidx.compose.runtime.LaunchedEffect
+import com.example.volunteerlink.chat.data.ChatData
+import com.example.volunteerlink.chat.data.Role
+import com.example.volunteerlink.chat.repository.SupabaseChatRepository
+import com.example.volunteerlink.screens.chat.VolunteerChatListScreen
+import com.example.volunteerlink.screens.chat.VolunteerChatRoomScreen
+import com.example.volunteerlink.screens.chat.VolunteerGroupInfoScreen
 import kotlinx.coroutines.launch
 
 @Composable
@@ -778,8 +785,109 @@ fun VolunteerOpportunityNavigationHost(
                         VolunteerOpportunityNavigationRoutes
                             .VOLUNTEER_CHAT_ROUTE
                 ) {
-                    VolunteerTemporaryModuleScreen(
-                        moduleTitle = "Chats"
+                    LaunchedEffect(Unit) {
+                        ChatData.currentRole.value = Role.APPLICANT
+
+                        // Removes VolunteerApp's temporary Alex Tan / Organisation A chats
+                        // before the real VolunteerLink chats arrive.
+                        ChatData.replaceChats(emptyList())
+
+                        runCatching {
+                            SupabaseChatRepository.loadForSignedInUser(
+                                viewerRole = Role.APPLICANT
+                            )
+                        }.onSuccess { loaded ->
+                            ChatData.updateSignedInProfile(
+                                role = Role.APPLICANT,
+                                profile = loaded.profile
+                            )
+                            ChatData.replaceChats(loaded.chats)
+                        }.onFailure { error ->
+                            error.printStackTrace()
+                        }
+                    }
+
+                    VolunteerChatListScreen(
+                        role = Role.APPLICANT,
+                        onOpenChat = { chatId ->
+                            volunteerNavigationController.navigate(
+                                VolunteerOpportunityNavigationRoutes
+                                    .createVolunteerChatRoomRoute(chatId)
+                            )
+                        }
+                    )
+                }
+
+                composable(
+                    route = VolunteerOpportunityNavigationRoutes.VOLUNTEER_CHAT_ROOM_ROUTE,
+                    arguments = listOf(
+                        navArgument(
+                            VolunteerOpportunityNavigationRoutes.VOLUNTEER_CHAT_ID_ARGUMENT
+                        ) {
+                            type = NavType.StringType
+                        }
+                    )
+                ) { entry ->
+                    val chatId = entry.arguments
+                        ?.getString(
+                            VolunteerOpportunityNavigationRoutes.VOLUNTEER_CHAT_ID_ARGUMENT
+                        )
+                        .orEmpty()
+
+                    LaunchedEffect(Unit) {
+                        ChatData.currentRole.value = Role.APPLICANT
+                    }
+
+                    VolunteerChatRoomScreen(
+                        chatId = chatId,
+                        onBack = {
+                            volunteerNavigationController.popBackStack()
+                        },
+                        onOpenGroupInfo = {
+                            volunteerNavigationController.navigate(
+                                VolunteerOpportunityNavigationRoutes
+                                    .createVolunteerGroupInfoRoute(chatId)
+                            )
+                        }
+                    )
+                }
+
+                composable(
+                    route = VolunteerOpportunityNavigationRoutes.VOLUNTEER_GROUP_INFO_ROUTE,
+                    arguments = listOf(
+                        navArgument(
+                            VolunteerOpportunityNavigationRoutes.VOLUNTEER_CHAT_ID_ARGUMENT
+                        ) {
+                            type = NavType.StringType
+                        }
+                    )
+                ) { entry ->
+                    val chatId = entry.arguments
+                        ?.getString(
+                            VolunteerOpportunityNavigationRoutes.VOLUNTEER_CHAT_ID_ARGUMENT
+                        )
+                        .orEmpty()
+
+                    LaunchedEffect(Unit) {
+                        ChatData.currentRole.value = Role.APPLICANT
+                    }
+
+                    VolunteerGroupInfoScreen(
+                        chatId = chatId,
+                        onBack = {
+                            volunteerNavigationController.popBackStack()
+                        },
+                        onOpenChat = { openedChatId ->
+                            volunteerNavigationController.popBackStack(
+                                VolunteerOpportunityNavigationRoutes.VOLUNTEER_CHAT_ROUTE,
+                                inclusive = false
+                            )
+
+                            volunteerNavigationController.navigate(
+                                VolunteerOpportunityNavigationRoutes
+                                    .createVolunteerChatRoomRoute(openedChatId)
+                            )
+                        }
                     )
                 }
 

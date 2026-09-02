@@ -104,6 +104,8 @@ dependencies {
     implementation("io.ktor:ktor-client-android:3.3.1")
     // Native OpenStreetMap display; no Google billing or API key required.
     implementation("org.osmdroid:osmdroid-android:6.1.20")
+    // Chat Emoji purpose
+    implementation("androidx.emoji2:emoji2-emojipicker:1.5.0")
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

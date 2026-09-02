@@ -38,7 +38,6 @@ import com.example.volunteerlink.ui.theme.VolunteerLinkSurface
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextPrimary
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextSecondary
 import com.example.volunteerlink.organisation.repository.OrganisationProfileRepository
-import com.example.volunteerlink.organisation.screens.OrganisationChatsScreen
 import com.example.volunteerlink.organisation.screens.OrganisationApplicantReviewScreen
 import com.example.volunteerlink.organisation.screens.OrganisationCreateScreen
 import com.example.volunteerlink.organisation.screens.EditOrganisationProfileScreen
@@ -51,12 +50,24 @@ import com.example.volunteerlink.organisation.screens.OrganisationProfileScreen
 import com.example.volunteerlink.organisation.screens.OrganisationPromotionScreen
 import com.example.volunteerlink.organisation.home.model.HomeAttentionType
 import com.example.volunteerlink.organisation.screens.OrganisationSettingScreen
+import com.example.volunteerlink.chat.repository.SupabaseChatRepository
+import androidx.compose.runtime.LaunchedEffect
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
+
+import com.example.volunteerlink.chat.data.ChatData
+import com.example.volunteerlink.chat.data.Role
+
+import com.example.volunteerlink.organisation.screens.chat.OrganisationChatListScreen
+import com.example.volunteerlink.organisation.screens.chat.OrganisationChatRoomScreen
+import com.example.volunteerlink.organisation.screens.chat.OrganisationGroupInfoScreen
 import kotlinx.coroutines.launch
 
 private const val RETURN_TO_PEOPLE_AFTER_APPLICANT_REVIEW =
     "returnToPeopleAfterApplicantReview"
 private const val OPEN_PEOPLE_FROM_HOME = "openPeopleFromHome"
 private const val OPEN_REVIEW_FROM_HOME = "openReviewFromHome"
+
 
 /**
  * Navigation host for the Organisation side only.
@@ -146,7 +157,9 @@ fun OrganisationNavigationHost(
                 currentRoute != OrganisationNavigationRoutes.MANAGE_APPLICANT_REVIEW &&
                 currentRoute != OrganisationNavigationRoutes.MANAGE_PROMOTIONS &&
                 currentRoute != OrganisationNavigationRoutes.EDIT_PROFILE &&
-                currentRoute != OrganisationNavigationRoutes.SETTINGS
+                currentRoute != OrganisationNavigationRoutes.SETTINGS &&
+                currentRoute != OrganisationNavigationRoutes.CHAT_ROOM &&
+                currentRoute != OrganisationNavigationRoutes.GROUP_INFO
             ) {
                 AppBottomNavigationBar(
                     items = organisationBottomNavigationItems,
@@ -171,8 +184,15 @@ fun OrganisationNavigationHost(
             navController = navController,
             startDestination = OrganisationNavigationRoutes.HOME,
             route = "organisation_root_navigation_graph",
-            modifier = Modifier.padding(innerPadding)
-
+            modifier = Modifier
+                .fillMaxSize()
+                .then(
+                    if (currentRoute == OrganisationNavigationRoutes.CHATS) {
+                        Modifier
+                    } else {
+                        Modifier.padding(innerPadding)
+                    }
+                )
         ) {
             composable(OrganisationNavigationRoutes.HOME) {
                 OrganisationHomeScreen(
@@ -352,7 +372,98 @@ fun OrganisationNavigationHost(
             }
 
             composable(OrganisationNavigationRoutes.CHATS) {
-                OrganisationChatsScreen()
+                LaunchedEffect(Unit) {
+                    ChatData.currentRole.value = Role.ORGANISATION
+
+                    // Clears the temporary VolunteerApp dummy chats.
+                    ChatData.replaceChats(emptyList())
+
+                    runCatching {
+                        SupabaseChatRepository.loadForSignedInUser(
+                            viewerRole = Role.ORGANISATION
+                        )
+                    }.onSuccess { loaded ->
+                        ChatData.updateSignedInProfile(
+                            role = Role.ORGANISATION,
+                            profile = loaded.profile
+                        )
+                        ChatData.replaceChats(loaded.chats)
+                    }.onFailure { error ->
+                        error.printStackTrace()
+                    }
+                }
+
+                OrganisationChatListScreen(
+                    role = Role.ORGANISATION,
+                    onOpenChat = { chatId ->
+                        navController.navigate(
+                            OrganisationNavigationRoutes.chatRoom(chatId)
+                        )
+                    }
+                )
+            }
+
+            composable(
+                route = OrganisationNavigationRoutes.CHAT_ROOM,
+                arguments = listOf(
+                    navArgument(OrganisationNavigationRoutes.CHAT_ID_ARGUMENT) {
+                        type = NavType.StringType
+                    }
+                )
+            ) { entry ->
+                val chatId = entry.arguments
+                    ?.getString(OrganisationNavigationRoutes.CHAT_ID_ARGUMENT)
+                    .orEmpty()
+
+                LaunchedEffect(Unit) {
+                    ChatData.currentRole.value = Role.ORGANISATION
+                }
+
+                OrganisationChatRoomScreen(
+                    chatId = chatId,
+                    onBack = {
+                        navController.popBackStack()
+                    },
+                    onOpenGroupInfo = {
+                        navController.navigate(
+                            OrganisationNavigationRoutes.groupInfo(chatId)
+                        )
+                    }
+                )
+            }
+
+            composable(
+                route = OrganisationNavigationRoutes.GROUP_INFO,
+                arguments = listOf(
+                    navArgument(OrganisationNavigationRoutes.CHAT_ID_ARGUMENT) {
+                        type = NavType.StringType
+                    }
+                )
+            ) { entry ->
+                val chatId = entry.arguments
+                    ?.getString(OrganisationNavigationRoutes.CHAT_ID_ARGUMENT)
+                    .orEmpty()
+
+                LaunchedEffect(Unit) {
+                    ChatData.currentRole.value = Role.ORGANISATION
+                }
+
+                OrganisationGroupInfoScreen(
+                    chatId = chatId,
+                    onBack = {
+                        navController.popBackStack()
+                    },
+                    onOpenChat = { openedChatId ->
+                        navController.popBackStack(
+                            OrganisationNavigationRoutes.CHATS,
+                            inclusive = false
+                        )
+
+                        navController.navigate(
+                            OrganisationNavigationRoutes.chatRoom(openedChatId)
+                        )
+                    }
+                )
             }
 
             composable(OrganisationNavigationRoutes.PROFILE) {
@@ -457,6 +568,7 @@ fun OrganisationNavigationHost(
         )
     }
 }
+
 
 /** Returns the Activity even when Compose is using a ContextWrapper. */
 private tailrec fun Context.findActivity(): Activity? = when (this) {

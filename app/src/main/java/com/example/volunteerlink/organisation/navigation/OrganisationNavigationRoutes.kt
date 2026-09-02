@@ -13,6 +13,13 @@ object OrganisationNavigationRoutes {
     const val MANAGE_PROMOTIONS = "organisation_manage_promotions"
     const val CREATE = "organisation_create"
     const val CHATS = "organisation_chats"
+    const val CHAT_ID_ARGUMENT = "chatId"
+
+    const val CHAT_ROOM =
+        "organisation_chat_room/{$CHAT_ID_ARGUMENT}"
+
+    const val GROUP_INFO =
+        "organisation_group_info/{$CHAT_ID_ARGUMENT}"
     const val PROFILE = "organisation_profile"
     const val EDIT_PROFILE = "organisation_edit_profile"
     const val SETTINGS = "organisation_settings"
@@ -29,4 +36,10 @@ object OrganisationNavigationRoutes {
         userId: String
     ): String =
         "organisation_manage_post/$postId/applicant/$roleTemplateId/$userId"
+
+    fun chatRoom(chatId: String): String =
+        "organisation_chat_room/$chatId"
+
+    fun groupInfo(chatId: String): String =
+        "organisation_group_info/$chatId"
 }

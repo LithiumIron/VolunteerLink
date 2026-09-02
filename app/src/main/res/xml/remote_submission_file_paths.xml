@@ -3,4 +3,12 @@
     <cache-path
         name="remote_submissions"
         path="remote_submissions/" />
+
+    <cache-path
+        name="chat_images"
+        path="images/" />
+
+    <cache-path
+        name="chat_videos"
+        path="videos/" />
 </paths>
