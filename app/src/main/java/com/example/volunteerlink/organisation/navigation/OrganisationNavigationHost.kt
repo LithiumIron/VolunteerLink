@@ -27,12 +27,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.view.WindowCompat
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.volunteerlink.navigation.AppBottomNavigationBar
 import com.example.volunteerlink.organisation.auth.OrganisationSessionStore
+import com.example.volunteerlink.organisation.impactweave.ImpactWeaveViewModel
 import com.example.volunteerlink.ui.theme.VolunteerLinkPrimaryGreen
 import com.example.volunteerlink.ui.theme.VolunteerLinkSurface
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextPrimary
@@ -42,7 +44,7 @@ import com.example.volunteerlink.organisation.screens.OrganisationApplicantRevie
 import com.example.volunteerlink.organisation.screens.OrganisationCreateScreen
 import com.example.volunteerlink.organisation.screens.EditOrganisationProfileScreen
 import com.example.volunteerlink.organisation.screens.OrganisationHomeScreen
-import com.example.volunteerlink.organisation.screens.OrganisationManageEmptyModuleScreen
+import com.example.volunteerlink.organisation.screens.OrganisationImpactWeaveScreen
 import com.example.volunteerlink.organisation.screens.OrganisationManageScreen
 import com.example.volunteerlink.organisation.screens.OrganisationPostManagementScreen
 import com.example.volunteerlink.organisation.screens.OrganisationVolunteerPostsScreen
@@ -81,6 +83,7 @@ fun OrganisationNavigationHost(
 ) {
     val navController = rememberNavController()
     val context = LocalContext.current
+    val impactWeaveViewModel: ImpactWeaveViewModel = viewModel()
 
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
@@ -155,6 +158,7 @@ fun OrganisationNavigationHost(
         bottomBar = {
             if (
                 currentRoute != OrganisationNavigationRoutes.MANAGE_APPLICANT_REVIEW &&
+                currentRoute != OrganisationNavigationRoutes.MANAGE_IMPACT_WEAVE &&
                 currentRoute != OrganisationNavigationRoutes.MANAGE_PROMOTIONS &&
                 currentRoute != OrganisationNavigationRoutes.EDIT_PROFILE &&
                 currentRoute != OrganisationNavigationRoutes.SETTINGS &&
@@ -346,10 +350,9 @@ fun OrganisationNavigationHost(
             }
 
             composable(OrganisationNavigationRoutes.MANAGE_IMPACT_WEAVE) {
-                OrganisationManageEmptyModuleScreen(
-                    title = "Impact Weave",
-                    message = "No Impact Weave projects to manage yet. This section will use its own collaboration lifecycle when we implement it.",
-                    onBack = { navController.popBackStack() }
+                OrganisationImpactWeaveScreen(
+                    onBack = { navController.popBackStack() },
+                    viewModel = impactWeaveViewModel
                 )
             }
 

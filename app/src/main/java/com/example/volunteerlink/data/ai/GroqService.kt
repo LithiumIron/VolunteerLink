@@ -29,12 +29,8 @@ class GroqService {
     }
 
     suspend fun analyseOrganisationSupport(text: String): OrganisationSupportAnalysis {
-        if (BuildConfig.GROQ_API_KEY.isBlank()) {
-            throw IllegalStateException("GROQ_API_KEY is missing from local.properties.")
-        }
-
         val systemPrompt = """
-            You classify ONE physical partnership resource for VolunteerLink Impact Weave.
+            You classify ONE physical partnership resource that an organisation CAN PROVIDE for VolunteerLink Impact Weave.
 
             Allowed support types are exactly:
             VENUE, EQUIPMENT, FURNITURE, TRANSPORT, SUPPLIES, REFRESHMENTS, SPECIALIST.
@@ -81,6 +77,68 @@ class GroqService {
               "reason": "Short helpful explanation"
             }
         """.trimIndent()
+
+        return requestAnalysis(text, systemPrompt)
+    }
+
+    suspend fun analyseImpactWeaveNeed(text: String): OrganisationSupportAnalysis {
+        val systemPrompt = """
+            You classify ONE physical partnership resource that an organisation NEEDS for VolunteerLink Impact Weave.
+
+            Allowed support types are exactly:
+            VENUE, EQUIPMENT, FURNITURE, TRANSPORT, SUPPLIES, REFRESHMENTS, SPECIALIST.
+
+            Rules:
+            - The user must describe only one kind of support need at a time.
+            - VENUE uses capacity and quantity must be null.
+            - Every other allowed type uses quantity and capacity must be null.
+            - Quantity/capacity must be a positive whole number stated or clearly implied by the text.
+            - SPECIALIST means a person needed because of specific professional, technical, academic, certified, or specialist expertise.
+              Valid examples include lecturers, teachers, doctors, nurses, first aid officers, trainers, technicians, engineers, interpreters, counsellors, photographers, and legal advisers.
+            - Reject GENERAL volunteer manpower or ordinary helpers such as "10 volunteers", "5 helpers", "event crew", "registration volunteers", or "people to help". Those belong in Volunteer Post roles, not Impact Weave support.
+            - Also reject promotion/social-media advertising, money/funding, vague requests, remote-only digital promotion, or anything outside the seven support types.
+            - If multiple different resources are included, reject it and ask the user to add one need at a time.
+            - Keep resource_name short and singular where natural, for example "Passenger van", "Folding chair", "PA speaker", or "English lecturer".
+            - For VENUE, resource_name must describe the GENERAL TYPE of place needed, not a specific proper place name, organisation name, campus name, branch name, or building name.
+            - Do not limit VENUE to a fixed list. Infer the most useful broad venue type from the description, usually in 1 to 3 words.
+              Examples can include Hall, Community Hall, Multipurpose Hall, Conference Hall, Banquet Hall, Ballroom, Auditorium, Lecture Hall, Meeting Room, Function Room, Classroom, Training Room, Workshop Space, Exhibition Hall, Event Space, Sports Hall, Stadium, Court, Field, Pavilion, Park, Garden, Outdoor Space, Library, or another sensible physical venue type.
+            - Examples:
+              "Need a hall for around 150 people" -> VENUE, resource_name "Hall", capacity 150.
+              "We need 2 passenger vans" -> TRANSPORT, resource_name "Passenger van", quantity 2.
+              "Need 2 English lecturers" -> SPECIALIST, resource_name "English lecturer", quantity 2.
+              "Need 100 bottles of water" -> REFRESHMENTS, resource_name "Bottled water", quantity 100.
+
+            Return JSON only in exactly this shape:
+            {
+              "valid": true,
+              "support_type": "TRANSPORT",
+              "resource_name": "Passenger van",
+              "quantity": 2,
+              "capacity": null,
+              "reason": null
+            }
+
+            For invalid input, return:
+            {
+              "valid": false,
+              "support_type": null,
+              "resource_name": "",
+              "quantity": null,
+              "capacity": null,
+              "reason": "Short helpful explanation"
+            }
+        """.trimIndent()
+
+        return requestAnalysis(text, systemPrompt)
+    }
+
+    private suspend fun requestAnalysis(
+        text: String,
+        systemPrompt: String
+    ): OrganisationSupportAnalysis {
+        if (BuildConfig.GROQ_API_KEY.isBlank()) {
+            throw IllegalStateException("GROQ_API_KEY is missing from local.properties.")
+        }
 
         val messages = JSONArray().apply {
             put(
@@ -165,7 +223,7 @@ class GroqService {
                 return invalidAnalysis("Include how many people the venue can hold.")
             }
         } else if (quantity == null) {
-            return invalidAnalysis("Include how many of this resource your organisation can provide.")
+            return invalidAnalysis("Include a quantity greater than 0 for this resource.")
         }
 
         return OrganisationSupportAnalysis(
