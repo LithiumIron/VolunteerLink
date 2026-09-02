@@ -222,7 +222,7 @@ private fun buildManageAttentionSummary(uiState: OrganisationManageUiState): Str
 private fun postWord(count: Int): String = if (count == 1) "post" else "posts"
 
 @Composable
-internal fun ManageLoadingState() {
+fun ManageLoadingState() {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -242,7 +242,7 @@ internal fun ManageLoadingState() {
 }
 
 @Composable
-internal fun ManageErrorState(
+fun ManageErrorState(
     message: String?,
     onRetry: () -> Unit
 ) {

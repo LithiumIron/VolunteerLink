@@ -237,7 +237,7 @@ fun OrganisationSignInScreen(
 }
 
 @Composable
-internal fun organisationFieldColours() =
+fun organisationFieldColours() =
     OutlinedTextFieldDefaults.colors(
         focusedContainerColor = MaterialTheme.colorScheme.surface,
         unfocusedContainerColor = MaterialTheme.colorScheme.surface,

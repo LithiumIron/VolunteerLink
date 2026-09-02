@@ -83,7 +83,7 @@ private val ReviewPillShape = RoundedCornerShape(50)
  * feedback remain local to the ViewModel until Finalize Event is pressed.
  */
 @Composable
-internal fun PostManagementPhysicalReviewContent(
+fun PostManagementPhysicalReviewContent(
     review: PostManagementPhysicalReview,
     session: PostManagementPhysicalReviewSession,
     isUpdatingReview: Boolean,
@@ -2139,7 +2139,7 @@ private fun roleSummary(entries: List<PostManagementPhysicalReviewEntry>): Strin
     .joinToString(" · ") { (role, people) -> "$role ${people.size}" }
     .ifBlank { "No volunteers" }
 
-private fun formatMinutesForReview(minutes: Int): String {
+fun formatMinutesForReview(minutes: Int): String {
     val safe = minutes.coerceAtLeast(0)
     val hours = safe / 60
     val remainder = safe % 60
@@ -2150,7 +2150,7 @@ private fun formatMinutesForReview(minutes: Int): String {
     }
 }
 
-private fun formatReviewDate(value: String): String {
+fun formatReviewDate(value: String): String {
     return runCatching {
         val parser = SimpleDateFormat("yyyy-MM-dd", Locale.US)
         val formatter = SimpleDateFormat("d MMM yyyy", Locale.US)

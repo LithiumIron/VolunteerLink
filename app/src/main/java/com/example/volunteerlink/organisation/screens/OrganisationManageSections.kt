@@ -51,7 +51,7 @@ import java.util.Locale
 
 /** Green Manage header retained exactly as the Organisation visual anchor. */
 @Composable
-internal fun OrganisationManageHeader(
+fun OrganisationManageHeader(
     title: String,
     subtitle: String? = null
 ) {
@@ -79,7 +79,7 @@ internal fun OrganisationManageHeader(
 }
 
 @Composable
-internal fun OrganisationManageSubHeader(
+fun OrganisationManageSubHeader(
     title: String,
     onBack: () -> Unit
 ) {
@@ -119,7 +119,7 @@ internal fun OrganisationManageSubHeader(
  * as a native management row instead of a large module card.
  */
 @Composable
-internal fun ManageModuleChoiceCard(
+fun ManageModuleChoiceCard(
     @DrawableRes iconRes: Int,
     title: String,
     description: String,
@@ -151,7 +151,7 @@ internal fun ManageModuleChoiceCard(
 }
 
 @Composable
-internal fun ManagePostSectionSelector(
+fun ManagePostSectionSelector(
     selected: ManagePostSection,
     activeCount: Int,
     draftCount: Int,
@@ -229,7 +229,7 @@ internal fun ManagePostSectionSelector(
 }
 
 @Composable
-internal fun ManageActiveGroupHeader(
+fun ManageActiveGroupHeader(
     title: String,
     count: Int,
     subtitle: String,
@@ -253,7 +253,7 @@ internal fun ManageActiveGroupHeader(
 }
 
 @Composable
-internal fun ManageSectionOverview(
+fun ManageSectionOverview(
     title: String,
     detail: String? = null,
     hasAttention: Boolean = false,
@@ -277,7 +277,7 @@ internal fun ManageSectionOverview(
 
 /** Flat post row used throughout the lifecycle list. */
 @Composable
-internal fun ManageVolunteerPostCard(
+fun ManageVolunteerPostCard(
     post: ManagePostItem,
     section: ManagePostSection,
     onClick: () -> Unit,
@@ -437,7 +437,7 @@ internal fun ManageVolunteerPostCard(
 }
 
 @Composable
-internal fun ManageEmptySectionMessage(
+fun ManageEmptySectionMessage(
     title: String,
     message: String,
     modifier: Modifier = Modifier
@@ -535,7 +535,7 @@ private fun manageDateRange(start: String?, end: String?): String {
     }
 }
 
-private fun manageShortDate(value: String?): String {
+fun manageShortDate(value: String?): String {
     if (value.isNullOrBlank()) return ""
     return runCatching {
         val date = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply { isLenient = false }.parse(value)

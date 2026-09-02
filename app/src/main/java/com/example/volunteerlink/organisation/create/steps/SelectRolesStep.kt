@@ -56,9 +56,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.volunteerlink.R
-import com.example.volunteerlink.organisation.create.components.CreateCardBackground
-import com.example.volunteerlink.organisation.create.components.CreateGreen
-import com.example.volunteerlink.organisation.create.components.CreateLightGreen
+import com.example.volunteerlink.ui.theme.RoleSelectionBorder
+import com.example.volunteerlink.ui.theme.CreateGreen
+import com.example.volunteerlink.ui.theme.CreateLightGreen
+import com.example.volunteerlink.ui.theme.CreateCardBackground
+import com.example.volunteerlink.ui.theme.RoleSelectionBorder
+import com.example.volunteerlink.ui.theme.CreateGreen
+import com.example.volunteerlink.ui.theme.CreateLightGreen
 import com.example.volunteerlink.organisation.create.components.EditRestrictionNotice
 import com.example.volunteerlink.organisation.create.model.CreatePostDraft
 import com.example.volunteerlink.organisation.create.model.CreatePostUiState
@@ -70,7 +74,6 @@ import com.example.volunteerlink.organisation.create.model.VolunteerRoleMode
 import com.example.volunteerlink.organisation.viewmodel.CreatePostViewModel
 import kotlinx.coroutines.delay
 
-val RoleSelectionBorder = Color(0xFFC8D4C4)
 
 /**
  * Step 2 follows the prototype flow:

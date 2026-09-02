@@ -76,18 +76,18 @@ import com.example.volunteerlink.ui.theme.VolunteerLinkTextSecondary
 import com.example.volunteerlink.ui.theme.VolunteerLinkWarning
 import java.util.Locale
 
-internal enum class PostManagementTab {
+enum class PostManagementTab {
     OVERVIEW,
     PEOPLE,
     REVIEW
 }
 
-internal enum class PostManagementPeopleTab {
+enum class PostManagementPeopleTab {
     APPLICANTS,
     VOLUNTEERS
 }
 
-internal enum class PostManagementHybridReviewSide {
+enum class PostManagementHybridReviewSide {
     PHYSICAL,
     REMOTE
 }
@@ -104,7 +104,7 @@ private val PostManagementSmallShape = RoundedCornerShape(10.dp)
 private val PostManagementPillShape = RoundedCornerShape(50)
 
 @Composable
-internal fun PostManagementTopBar(
+fun PostManagementTopBar(
     onBack: () -> Unit,
     onEdit: () -> Unit,
     showEdit: Boolean
@@ -162,7 +162,7 @@ internal fun PostManagementTopBar(
 }
 
 @Composable
-internal fun PostManagementSummaryCard(
+fun PostManagementSummaryCard(
     post: PostManagementPost,
     modifier: Modifier = Modifier
 ) {
@@ -301,7 +301,7 @@ internal fun PostManagementSummaryCard(
 }
 
 @Composable
-internal fun PostManagementHybridReviewSelector(
+fun PostManagementHybridReviewSelector(
     selected: PostManagementHybridReviewSide,
     showPhysical: Boolean,
     showRemote: Boolean,
@@ -366,7 +366,7 @@ internal fun PostManagementHybridReviewSelector(
 }
 
 @Composable
-internal fun PostManagementMainTabs(
+fun PostManagementMainTabs(
     selected: PostManagementTab,
     pendingApplicantCount: Int,
     showPeopleTab: Boolean,
@@ -445,7 +445,7 @@ private fun PostManagementMainTabItem(
 }
 
 @Composable
-internal fun PostManagementOverview(
+fun PostManagementOverview(
     post: PostManagementPost,
     modifier: Modifier = Modifier
 ) {
@@ -815,7 +815,7 @@ private fun PostManagementScheduleRow(schedule: PostManagementScheduleItem) {
 }
 
 @Composable
-internal fun PostManagementTodayAttendanceCard(
+fun PostManagementTodayAttendanceCard(
     attendance: PostManagementPhysicalAttendance,
     selectedDate: String,
     selectedSession: PostManagementAttendanceDay?,
@@ -957,7 +957,7 @@ internal fun PostManagementTodayAttendanceCard(
 }
 
 @Composable
-internal fun PostManagementRemoteTeamSubmissionCard(
+fun PostManagementRemoteTeamSubmissionCard(
     deliverable: String?,
     responsibleRoleName: String?,
     dueDate: String,
@@ -1144,7 +1144,7 @@ private fun PostManagementRemoteSubmissionBlock(
 }
 
 @Composable
-internal fun PostManagementRemoteSubmissionDialog(
+fun PostManagementRemoteSubmissionDialog(
     submission: PostManagementRemoteSubmission,
     personName: String?,
     roleName: String?,
@@ -1386,7 +1386,7 @@ private fun SubmissionDecisionRow(
 }
 
 @Composable
-internal fun PostManagementRequestRevisionDialog(
+fun PostManagementRequestRevisionDialog(
     isShared: Boolean,
     dueDate: String,
     feedback: String,
@@ -1503,7 +1503,7 @@ internal fun PostManagementRequestRevisionDialog(
 }
 
 @Composable
-internal fun PostManagementAcceptSubmissionDialog(
+fun PostManagementAcceptSubmissionDialog(
     isShared: Boolean,
     isSaving: Boolean,
     errorMessage: String?,
@@ -1573,7 +1573,7 @@ internal fun PostManagementAcceptSubmissionDialog(
 }
 
 @Composable
-internal fun PostManagementNotAcceptSubmissionDialog(
+fun PostManagementNotAcceptSubmissionDialog(
     isShared: Boolean,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
@@ -1724,7 +1724,7 @@ private fun PostManagementResubmittedPill(
 }
 
 @Composable
-internal fun PostManagementAttendanceDaySelector(
+fun PostManagementAttendanceDaySelector(
     dates: List<String>,
     selectedDate: String?,
     actionMessage: String?,
@@ -1888,7 +1888,7 @@ private fun PostManagementVolunteerAttendanceBlock(
 }
 
 @Composable
-internal fun PostManagementMarkAbsentDialog(
+fun PostManagementMarkAbsentDialog(
     person: PostManagementPerson,
     eventDate: String,
     onDismiss: () -> Unit,
@@ -1931,7 +1931,7 @@ internal fun PostManagementMarkAbsentDialog(
 }
 
 @Composable
-internal fun PostManagementPeopleControls(
+fun PostManagementPeopleControls(
     selectedTab: PostManagementPeopleTab,
     showApplicantsTab: Boolean,
     applicantCount: Int,
@@ -2105,7 +2105,7 @@ private fun PostManagementRoleFilterChip(
 }
 
 @Composable
-internal fun PostManagementPeopleRoleHeader(
+fun PostManagementPeopleRoleHeader(
     role: PostManagementRole,
     selectedTab: PostManagementPeopleTab,
     applicantCount: Int,
@@ -2200,7 +2200,7 @@ private fun PostManagementApplicationWindowPill(
 }
 
 @Composable
-internal fun PostManagementPersonCard(
+fun PostManagementPersonCard(
     person: PostManagementPerson,
     isApplicant: Boolean,
     isApplicationOpen: Boolean,
@@ -2392,7 +2392,7 @@ internal fun PostManagementPersonCard(
 }
 
 @Composable
-internal fun PostManagementPeopleEmptyState(
+fun PostManagementPeopleEmptyState(
     selectedTab: PostManagementPeopleTab,
     hasFilters: Boolean,
     modifier: Modifier = Modifier
@@ -2419,7 +2419,7 @@ internal fun PostManagementPeopleEmptyState(
 }
 
 @Composable
-internal fun PostManagementProfilePreviewDialog(
+fun PostManagementProfilePreviewDialog(
     person: PostManagementPerson,
     onDismiss: () -> Unit
 ) {

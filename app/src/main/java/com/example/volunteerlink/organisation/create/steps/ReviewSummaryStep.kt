@@ -28,7 +28,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.volunteerlink.R
-import com.example.volunteerlink.organisation.create.components.CreateGreen
+import com.example.volunteerlink.ui.theme.CreateGreen
 import com.example.volunteerlink.organisation.create.model.CreatePostUiState
 
 /**

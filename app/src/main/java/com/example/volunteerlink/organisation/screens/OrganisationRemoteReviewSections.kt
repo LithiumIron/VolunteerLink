@@ -79,7 +79,7 @@ import java.util.Locale
 private val RemoteReviewPillShape = RoundedCornerShape(50)
 
 @Composable
-internal fun PostManagementRemoteReviewContent(
+fun PostManagementRemoteReviewContent(
     review: PostManagementRemoteReview,
     session: PostManagementRemoteReviewSession,
     evaluations: List<PostManagementEvaluation>,
@@ -1065,16 +1065,16 @@ private fun RemoteReviewDialogTitle(text: String) {
     Text(text, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = VolunteerLinkTextPrimary)
 }
 
-private fun parseRemoteDate(value: String): Date? = runCatching {
+fun parseRemoteDate(value: String): Date? = runCatching {
     SimpleDateFormat("yyyy-MM-dd", Locale.US).apply { isLenient = false }.parse(value)
 }.getOrNull()
 
-private fun formatRemoteDate(value: String): String {
+fun formatRemoteDate(value: String): String {
     val date = parseRemoteDate(value) ?: return value
     return SimpleDateFormat("d MMM yyyy", Locale.getDefault()).format(date)
 }
 
-private fun formatRemoteDateTime(value: String): String {
+fun formatRemoteDateTime(value: String): String {
     val patterns = listOf(
         "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
         "yyyy-MM-dd'T'HH:mm:ssXXX",

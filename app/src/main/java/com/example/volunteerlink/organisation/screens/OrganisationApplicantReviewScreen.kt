@@ -556,7 +556,7 @@ private fun OrganisationApplicationRoleSummary(
     }
 }
 
-private fun formatApplicationDate(raw: String): String {
+fun formatApplicationDate(raw: String): String {
     if (raw.isBlank()) return "Date unavailable"
     return runCatching {
         val parser = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {

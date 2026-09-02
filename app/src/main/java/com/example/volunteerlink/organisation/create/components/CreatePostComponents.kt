@@ -39,12 +39,12 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.volunteerlink.R
+import com.example.volunteerlink.ui.theme.CreateGreen
+import com.example.volunteerlink.ui.theme.CreateLightGreen
+import com.example.volunteerlink.ui.theme.CreateCardBackground
 import com.example.volunteerlink.organisation.create.model.VolunteerPostCategory
 import com.example.volunteerlink.organisation.create.model.VolunteerPostType
 
-val CreateGreen = Color(0xFF2A4A1E)
-val CreateLightGreen = Color(0xFFE5EFE1)
-val CreateCardBackground = Color(0xFFFBFCF9)
 
 @Composable
 fun EditRestrictionNotice(
