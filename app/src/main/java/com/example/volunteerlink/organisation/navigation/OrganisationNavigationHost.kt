@@ -44,6 +44,7 @@ import com.example.volunteerlink.organisation.screens.OrganisationManageScreen
 import com.example.volunteerlink.organisation.screens.OrganisationPostManagementScreen
 import com.example.volunteerlink.organisation.screens.OrganisationVolunteerPostsScreen
 import com.example.volunteerlink.organisation.screens.OrganisationProfileScreen
+import com.example.volunteerlink.organisation.screens.OrganisationPromotionScreen
 import com.example.volunteerlink.organisation.home.model.HomeAttentionType
 
 private const val RETURN_TO_PEOPLE_AFTER_APPLICANT_REVIEW =
@@ -133,7 +134,10 @@ fun OrganisationNavigationHost() {
             WindowInsetsSides.Horizontal
         ),
         bottomBar = {
-            if (currentRoute != OrganisationNavigationRoutes.MANAGE_APPLICANT_REVIEW) {
+            if (
+                currentRoute != OrganisationNavigationRoutes.MANAGE_APPLICANT_REVIEW &&
+                currentRoute != OrganisationNavigationRoutes.MANAGE_PROMOTIONS
+            ) {
                 AppBottomNavigationBar(
                     items = organisationBottomNavigationItems,
                     currentRoute = bottomBarRoute,
@@ -319,9 +323,7 @@ fun OrganisationNavigationHost() {
             }
 
             composable(OrganisationNavigationRoutes.MANAGE_PROMOTIONS) {
-                OrganisationManageEmptyModuleScreen(
-                    title = "Promotions",
-                    message = "No promotions to manage here yet.",
+                OrganisationPromotionScreen(
                     onBack = { navController.popBackStack() }
                 )
             }
