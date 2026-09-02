@@ -293,7 +293,6 @@ fun OrganisationPartnershipSection(
                             locationName = venueLocation?.address
                                 ?.takeIf { it.isNotBlank() }
                                 ?: venueLocation?.displayName,
-                            stateRegion = venueLocation?.state,
                             country = venueLocation?.country,
                             latitude = venueLocation?.latitude,
                             longitude = venueLocation?.longitude
@@ -308,7 +307,6 @@ fun OrganisationPartnershipSection(
                             locationName = venueLocation?.address
                                 ?.takeIf { it.isNotBlank() }
                                 ?: venueLocation?.displayName,
-                            stateRegion = venueLocation?.state,
                             country = venueLocation?.country,
                             latitude = venueLocation?.latitude,
                             longitude = venueLocation?.longitude
@@ -916,7 +914,7 @@ private fun OrganisationSupportData.toPartnershipSupportItem(): PartnershipSuppo
             name = locationName,
             address = locationName,
             city = null,
-            state = stateRegion,
+            state = null,
             country = country,
             latitude = latitude,
             longitude = longitude

@@ -80,8 +80,6 @@ private data class OrganisationSupportRow(
     val capacity: Int? = null,
     @SerialName("location_name")
     val locationName: String? = null,
-    @SerialName("state_region")
-    val stateRegion: String? = null,
     @SerialName("country")
     val country: String? = null,
     @SerialName("latitude")
@@ -106,8 +104,6 @@ private data class OrganisationSupportInsert(
     val capacity: Int? = null,
     @SerialName("location_name")
     val locationName: String? = null,
-    @SerialName("state_region")
-    val stateRegion: String? = null,
     @SerialName("country")
     val country: String? = null,
     @SerialName("latitude")
@@ -130,7 +126,6 @@ data class OrganisationSupportData(
     val quantity: Int?,
     val capacity: Int?,
     val locationName: String?,
-    val stateRegion: String?,
     val country: String?,
     val latitude: Double?,
     val longitude: Double?
@@ -274,7 +269,6 @@ object OrganisationProfileRepository {
         resourceName: String,
         amount: Int,
         locationName: String? = null,
-        stateRegion: String? = null,
         country: String? = null,
         latitude: Double? = null,
         longitude: Double? = null
@@ -294,7 +288,6 @@ object OrganisationProfileRepository {
                         quantity = if (isVenue) null else amount,
                         capacity = if (isVenue) amount else null,
                         locationName = if (isVenue) locationName else null,
-                        stateRegion = if (isVenue) stateRegion else null,
                         country = if (isVenue) country else null,
                         latitude = if (isVenue) latitude else null,
                         longitude = if (isVenue) longitude else null
@@ -318,7 +311,6 @@ object OrganisationProfileRepository {
         resourceName: String,
         amount: Int,
         locationName: String? = null,
-        stateRegion: String? = null,
         country: String? = null,
         latitude: Double? = null,
         longitude: Double? = null
@@ -336,7 +328,6 @@ object OrganisationProfileRepository {
                     set("quantity", if (isVenue) null else amount)
                     set("capacity", if (isVenue) amount else null)
                     set("location_name", if (isVenue) locationName else null)
-                    set("state_region", if (isVenue) stateRegion else null)
                     set("country", if (isVenue) country else null)
                     set("latitude", if (isVenue) latitude else null)
                     set("longitude", if (isVenue) longitude else null)
@@ -431,7 +422,6 @@ private fun OrganisationSupportRow.toData(): OrganisationSupportData {
         quantity = quantity,
         capacity = capacity,
         locationName = locationName,
-        stateRegion = stateRegion,
         country = country,
         latitude = latitude,
         longitude = longitude

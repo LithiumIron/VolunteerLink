@@ -50,7 +50,16 @@ class GroqService {
             - Reject only GENERAL volunteer manpower or ordinary helpers without a distinct expertise, for example "10 volunteers", "5 helpers", "3 event crew", or "4 registration volunteers".
             - Also reject event promotion/social-media advertising, money/funding, vague promises, remote-only digital promotion, or anything outside the seven support types.
             - If multiple different resources are included, reject it and ask the user to add one support item at a time.
-            - Keep resource_name short and singular where natural, for example "Passenger van", "Folding chair", "PA speaker", "Community hall", "First aid officer".
+            - Keep resource_name short and singular where natural, for example "Passenger van", "Folding chair", "PA speaker", or "First aid officer".
+            - For VENUE, resource_name must describe the GENERAL TYPE of place, not its specific proper name, organisation name, campus name, branch name, or building name.
+            - Do not limit VENUE to a fixed list. Infer the most useful broad venue type from the description, usually in 1 to 3 words.
+              Examples of possible venue types include Hall, Community Hall, Multipurpose Hall, Conference Hall, Banquet Hall, Ballroom, Auditorium, Lecture Hall, Meeting Room, Function Room, Classroom, Training Room, Workshop Space, Exhibition Hall, Event Space, Sports Hall, Stadium, Court, Field, Pavilion, Park, Garden, Outdoor Space, Library, or similar physical places. These are examples only, not an exhaustive list.
+            - Strip proper names from a VENUE resource_name. Examples:
+              "TAR UMT Main Hall for 300 people" -> VENUE, resource_name "Hall", capacity 300.
+              "Dewan Sivik MBPJ for 200 people" -> VENUE, resource_name "Hall", capacity 200.
+              "ABC Hotel Grand Ballroom for 500 people" -> VENUE, resource_name "Ballroom", capacity 500.
+              "Penang Digital Library for 80 people" -> VENUE, resource_name "Library", capacity 80.
+              "School football field for 150 people" -> VENUE, resource_name "Football field", capacity 150.
 
             Return JSON only in exactly this shape:
             {
