@@ -60,8 +60,9 @@ import androidx.navigation.navArgument
 import com.example.volunteerlink.chat.data.ChatData
 import com.example.volunteerlink.chat.data.Role
 
-import com.example.volunteerlink.organisation.screens.chat.OrganisationChatListScreen
+import com.example.volunteerlink.organisation.screens.chat.OrganisationChatsHubScreen
 import com.example.volunteerlink.organisation.screens.chat.OrganisationChatRoomScreen
+import com.example.volunteerlink.organisation.screens.chat.OrganisationPartnershipChatRoomScreen
 import com.example.volunteerlink.organisation.screens.chat.OrganisationGroupInfoScreen
 import kotlinx.coroutines.launch
 
@@ -163,6 +164,7 @@ fun OrganisationNavigationHost(
                 currentRoute != OrganisationNavigationRoutes.EDIT_PROFILE &&
                 currentRoute != OrganisationNavigationRoutes.SETTINGS &&
                 currentRoute != OrganisationNavigationRoutes.CHAT_ROOM &&
+                currentRoute != OrganisationNavigationRoutes.PARTNERSHIP_CHAT_ROOM &&
                 currentRoute != OrganisationNavigationRoutes.GROUP_INFO
             ) {
                 AppBottomNavigationBar(
@@ -396,13 +398,36 @@ fun OrganisationNavigationHost(
                     }
                 }
 
-                OrganisationChatListScreen(
+                OrganisationChatsHubScreen(
                     role = Role.ORGANISATION,
-                    onOpenChat = { chatId ->
+                    onOpenEventChat = { chatId ->
                         navController.navigate(
                             OrganisationNavigationRoutes.chatRoom(chatId)
                         )
+                    },
+                    onOpenPartnershipChat = { conversationId ->
+                        navController.navigate(
+                            OrganisationNavigationRoutes.partnershipChatRoom(conversationId)
+                        )
                     }
+                )
+            }
+
+            composable(
+                route = OrganisationNavigationRoutes.PARTNERSHIP_CHAT_ROOM,
+                arguments = listOf(
+                    navArgument(OrganisationNavigationRoutes.CHAT_ID_ARGUMENT) {
+                        type = NavType.StringType
+                    }
+                )
+            ) { entry ->
+                val conversationId = entry.arguments
+                    ?.getString(OrganisationNavigationRoutes.CHAT_ID_ARGUMENT)
+                    .orEmpty()
+
+                OrganisationPartnershipChatRoomScreen(
+                    conversationId = conversationId,
+                    onBack = { navController.popBackStack() }
                 )
             }
 

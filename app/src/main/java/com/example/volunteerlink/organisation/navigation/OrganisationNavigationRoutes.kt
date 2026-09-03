@@ -18,6 +18,9 @@ object OrganisationNavigationRoutes {
     const val CHAT_ROOM =
         "organisation_chat_room/{$CHAT_ID_ARGUMENT}"
 
+    const val PARTNERSHIP_CHAT_ROOM =
+        "organisation_partnership_chat_room/{$CHAT_ID_ARGUMENT}"
+
     const val GROUP_INFO =
         "organisation_group_info/{$CHAT_ID_ARGUMENT}"
     const val PROFILE = "organisation_profile"
@@ -39,6 +42,9 @@ object OrganisationNavigationRoutes {
 
     fun chatRoom(chatId: String): String =
         "organisation_chat_room/$chatId"
+
+    fun partnershipChatRoom(chatId: String): String =
+        "organisation_partnership_chat_room/$chatId"
 
     fun groupInfo(chatId: String): String =
         "organisation_group_info/$chatId"

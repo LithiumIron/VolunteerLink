@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -24,15 +25,18 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -44,6 +48,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -51,6 +56,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.Icon
 import androidx.compose.ui.text.font.FontWeight
@@ -59,6 +65,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.volunteerlink.R
 import com.example.volunteerlink.data.ai.GroqService
 import com.example.volunteerlink.data.ai.OrganisationSupportAnalysis
@@ -69,13 +77,21 @@ import com.example.volunteerlink.organisation.components.OrganisationSectionHead
 import com.example.volunteerlink.organisation.components.OrganisationSectionSurface
 import com.example.volunteerlink.organisation.components.OrganisationStatusPill
 import com.example.volunteerlink.organisation.create.components.CreateSectionCard
+import com.example.volunteerlink.organisation.create.components.CategoryPicker
 import com.example.volunteerlink.organisation.create.components.DateSelectionField
 import com.example.volunteerlink.organisation.create.components.TimeSelectionField
 import com.example.volunteerlink.organisation.create.components.formatTime
+import com.example.volunteerlink.organisation.create.model.VolunteerPostCategory
+import com.example.volunteerlink.organisation.impactweave.model.ImpactWeaveActivePlan
 import com.example.volunteerlink.organisation.impactweave.model.ImpactWeaveDraft
 import com.example.volunteerlink.organisation.impactweave.model.ImpactWeaveDuration
+import com.example.volunteerlink.organisation.impactweave.model.ImpactWeaveMatchResults
 import com.example.volunteerlink.organisation.impactweave.model.ImpactWeaveMode
+import com.example.volunteerlink.organisation.impactweave.model.ImpactWeaveNeedMatchResult
 import com.example.volunteerlink.organisation.impactweave.model.ImpactWeaveNeedDraft
+import com.example.volunteerlink.organisation.impactweave.model.ImpactWeavePartnershipState
+import com.example.volunteerlink.organisation.impactweave.model.ImpactWeaveSupportCandidate
+import com.example.volunteerlink.organisation.repository.PartnershipRequestItem
 import com.example.volunteerlink.ui.theme.CreateGreen
 import com.example.volunteerlink.ui.theme.VolunteerLinkBackground
 import com.example.volunteerlink.ui.theme.VolunteerLinkBorderColour
@@ -89,14 +105,17 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.roundToInt
 
 @Composable
-fun ImpactWeaveDraftListScreen(
-    drafts: List<ImpactWeaveDraft>,
+fun ImpactWeaveLandingScreen(
+    activePlans: List<ImpactWeaveActivePlan>,
+    isLoadingActivePlans: Boolean,
+    activePlansError: String?,
     onBack: () -> Unit,
     onStart: () -> Unit,
-    onDraftClick: (Int) -> Unit,
-    planningDeadlineFor: (Long?) -> Long?
+    onOpenPlan: (ImpactWeaveActivePlan) -> Unit,
+    onRetryLoad: () -> Unit
 ) {
     LazyColumn(
         modifier = Modifier
@@ -104,7 +123,8 @@ fun ImpactWeaveDraftListScreen(
             .background(VolunteerLinkBackground)
             .statusBarsPadding()
             .navigationBarsPadding(),
-        contentPadding = PaddingValues(bottom = 32.dp)
+        contentPadding = PaddingValues(bottom = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item(key = "impact_header") {
             OrganisationManageSubHeader(
@@ -118,7 +138,7 @@ fun ImpactWeaveDraftListScreen(
                 modifier = Modifier.padding(
                     start = 16.dp,
                     end = 16.dp,
-                    top = 18.dp
+                    top = 4.dp
                 )
             ) {
                 Text(
@@ -128,7 +148,7 @@ fun ImpactWeaveDraftListScreen(
                     color = VolunteerLinkTextPrimary
                 )
                 Text(
-                    text = "Describe the activity and support you need before finding partner organisations.",
+                    text = "Describe the activity and support you need, review it, then find organisations that may be able to help.",
                     modifier = Modifier.padding(top = 6.dp),
                     fontSize = 13.sp,
                     lineHeight = 18.sp,
@@ -149,142 +169,130 @@ fun ImpactWeaveDraftListScreen(
             }
         }
 
-        if (drafts.isEmpty()) {
-            item(key = "impact_empty") {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 28.dp, vertical = 48.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
+        item(key = "active_plans_header") {
+            OrganisationSectionHeader(
+                title = "Active Plans",
+                subtitle = "Reopen a plan to view its current partner matches.",
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp)
+            )
+        }
+
+        when {
+            isLoadingActivePlans && activePlans.isEmpty() -> {
+                item(key = "active_plans_loading") {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 20.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            color = CreateGreen,
+                            strokeWidth = 2.5.dp
+                        )
+                    }
+                }
+            }
+
+            activePlansError != null && activePlans.isEmpty() -> {
+                item(key = "active_plans_error") {
+                    OrganisationSectionSurface(
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    ) {
+                        Text(
+                            text = activePlansError,
+                            fontSize = 13.sp,
+                            lineHeight = 18.sp,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                        TextButton(
+                            onClick = onRetryLoad,
+                            modifier = Modifier.align(Alignment.End)
+                        ) {
+                            Text("Retry")
+                        }
+                    }
+                }
+            }
+
+            activePlans.isEmpty() -> {
+                item(key = "active_plans_empty") {
                     Text(
-                        text = "No Impact Weave drafts yet",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = VolunteerLinkTextPrimary
-                    )
-                    Text(
-                        text = "Your activity plans will appear here after you complete the first step.",
-                        modifier = Modifier.padding(top = 7.dp),
+                        text = "No active Impact Weave plans yet.",
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
                         fontSize = 13.sp,
-                        lineHeight = 18.sp,
-                        color = VolunteerLinkTextSecondary,
-                        textAlign = TextAlign.Center
+                        color = VolunteerLinkTextSecondary
                     )
                 }
             }
-        } else {
-            item(key = "impact_draft_heading") {
-                OrganisationSectionHeader(
-                    title = "Drafts",
-                    subtitle = "Continue planning before partner matching",
-                    modifier = Modifier.padding(
-                        start = 16.dp,
-                        end = 16.dp,
-                        top = 24.dp,
-                        bottom = 4.dp
-                    )
-                )
-            }
 
-            items(drafts, key = { it.draftId }) { draft ->
-                ImpactWeaveDraftRow(
-                    draft = draft,
-                    planningDeadlineMillis = planningDeadlineFor(draft.startDateMillis),
-                    onClick = { onDraftClick(draft.draftId) },
-                    modifier = Modifier.padding(horizontal = 16.dp)
-                )
+            else -> {
+                items(
+                    items = activePlans,
+                    key = { it.draftId }
+                ) { plan ->
+                    ImpactWeaveActivePlanCard(
+                        plan = plan,
+                        onClick = { onOpenPlan(plan) }
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun ImpactWeaveDraftRow(
-    draft: ImpactWeaveDraft,
-    planningDeadlineMillis: Long?,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
+private fun ImpactWeaveActivePlanCard(
+    plan: ImpactWeaveActivePlan,
+    onClick: () -> Unit
 ) {
     OrganisationSectionSurface(
-        modifier = modifier.padding(top = 10.dp),
-        contentPadding = 0.dp
+        modifier = Modifier
+            .padding(horizontal = 16.dp)
+            .clickable(onClick = onClick)
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onClick)
-                .padding(14.dp),
-            verticalAlignment = Alignment.Top
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Surface(
-                modifier = Modifier.size(42.dp),
-                shape = RoundedCornerShape(12.dp),
-                color = VolunteerLinkSoftGreenSurface
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        painter = painterResource(R.drawable.group),
-                        contentDescription = null,
-                        modifier = Modifier.size(22.dp),
-                        tint = VolunteerLinkPrimaryGreen
-                    )
-                }
-            }
-
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(start = 12.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = draft.title,
-                        modifier = Modifier.weight(1f),
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = VolunteerLinkTextPrimary,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    OrganisationStatusPill(
-                        text = "DRAFT",
-                        color = VolunteerLinkPrimaryGreen,
-                        modifier = Modifier.padding(start = 8.dp)
-                    )
-                }
-
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = buildString {
-                        append(draft.mode?.displayName ?: "Activity")
-                        draft.startDateMillis?.let {
-                            append(" · ")
-                            append(formatDate(it))
-                        }
-                    },
+                    text = plan.title,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = VolunteerLinkTextPrimary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = "${plan.mode.displayName} · ${formatDate(plan.startDateMillis)}",
                     modifier = Modifier.padding(top = 4.dp),
                     fontSize = 13.sp,
                     color = VolunteerLinkTextSecondary
                 )
-
-                Text(
-                    text = "${draft.needs.size} support ${if (draft.needs.size == 1) "need" else "needs"}",
-                    modifier = Modifier.padding(top = 3.dp),
-                    fontSize = 12.sp,
-                    color = VolunteerLinkTextSecondary
-                )
-
-                if (planningDeadlineMillis != null) {
-                    Text(
-                        text = "Partnership planning target: ${formatDate(planningDeadlineMillis)}",
-                        modifier = Modifier.padding(top = 4.dp),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = VolunteerLinkPrimaryGreen
-                    )
-                }
             }
+            OrganisationStatusPill(
+                text = plan.status.lowercase().replaceFirstChar { it.titlecase() },
+                color = CreateGreen
+            )
         }
+
+        Text(
+            text = if (plan.needsCount == 1) "1 support need" else "${plan.needsCount} support needs",
+            modifier = Modifier.padding(top = 10.dp),
+            fontSize = 13.sp,
+            color = VolunteerLinkTextSecondary
+        )
+        Text(
+            text = "Tap to view current partner matches",
+            modifier = Modifier.padding(top = 5.dp),
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+            color = CreateGreen
+        )
     }
 }
 
@@ -294,7 +302,9 @@ fun ImpactWeaveActivityPlanScreen(
     minimumStartDateMillis: Long,
     planningDeadlineMillis: Long?,
     onBack: () -> Unit,
+    onCategorySelected: (VolunteerPostCategory) -> Unit,
     onTitleChanged: (String) -> Unit,
+    onDescriptionChanged: (String) -> Unit,
     onModeSelected: (ImpactWeaveMode) -> Unit,
     onDurationSelected: (ImpactWeaveDuration) -> Unit,
     onStartDateSelected: (Long) -> Unit,
@@ -442,20 +452,43 @@ fun ImpactWeaveActivityPlanScreen(
         item(key = "plan_activity") {
             CreateSectionCard(
                 title = "Activity Information",
-                subtitle = "Give the partnership plan a clear name and choose its activity mode."
+                subtitle = "Give partner organisations the same clear introduction that volunteers will later see in Create Post."
             ) {
+                CategoryPicker(
+                    selectedCategory = draft.category,
+                    onCategorySelected = onCategorySelected,
+                    errorMessage = errors["category"]
+                )
+
                 Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     OutlinedTextField(
                         value = draft.title,
                         onValueChange = onTitleChanged,
                         modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Activity title") },
+                        label = { Text("Title") },
                         placeholder = { Text("Example: Community Health Day") },
                         singleLine = true,
                         shape = RoundedCornerShape(14.dp),
                         isError = errors["title"] != null
                     )
                     FormErrorText(errors["title"])
+                }
+
+                Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    OutlinedTextField(
+                        value = draft.description,
+                        onValueChange = onDescriptionChanged,
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Description") },
+                        placeholder = {
+                            Text("Explain the activity purpose, who it supports, what will happen, and why partnership support is needed.")
+                        },
+                        minLines = 4,
+                        maxLines = 7,
+                        shape = RoundedCornerShape(14.dp),
+                        isError = errors["description"] != null
+                    )
+                    FormErrorText(errors["description"])
                 }
 
                 Text(
@@ -1016,7 +1049,16 @@ fun ImpactWeaveSupportNeededScreen(
 
     val venueRequired = draft.hasExistingVenue == false
     val hasVenueNeed = draft.needs.any { it.supportType == "VENUE" }
-    val canReview = draft.needs.isNotEmpty() && (!venueRequired || hasVenueNeed)
+    val incompleteQuantityNeed = draft.needs.firstOrNull { need ->
+        need.supportType != "VENUE" && (need.quantityRequired == null || need.quantityRequired <= 0)
+    }
+    val invalidVenueNeed = draft.needs.firstOrNull { need ->
+        need.supportType == "VENUE" && need.capacityRequired != null && need.capacityRequired <= 0
+    }
+    val canReview = draft.needs.isNotEmpty() &&
+        (!venueRequired || hasVenueNeed) &&
+        incompleteQuantityNeed == null &&
+        invalidVenueNeed == null
 
     LazyColumn(
         modifier = Modifier
@@ -1165,7 +1207,13 @@ fun ImpactWeaveSupportNeededScreen(
                             "Add at least one support need before continuing."
 
                         venueRequired && !hasVenueNeed ->
-                            "Add a venue requirement before reviewing this Impact Weave draft."
+                            "Add a venue requirement before reviewing this Impact Weave plan."
+
+                        incompleteQuantityNeed != null ->
+                            "Add a quantity for ${incompleteQuantityNeed.resourceName.ifBlank { supportTypeLabel(incompleteQuantityNeed.supportType) }} before reviewing."
+
+                        invalidVenueNeed != null ->
+                            "Check the venue capacity. Leave it blank if unknown, or enter a value greater than 0."
 
                         else -> "Complete the required support details."
                     }
@@ -1236,7 +1284,7 @@ fun ImpactWeaveSupportNeededScreen(
                     if (venueRequired && need.supportType == "VENUE") {
                         "${need.resourceName} will be removed. You will need another venue requirement before you can continue."
                     } else {
-                        "${need.resourceName} will be removed from this draft."
+                        "${need.resourceName} will be removed from this plan."
                     }
                 )
             },
@@ -1504,7 +1552,7 @@ private fun AddEditImpactWeaveNeedSheet(
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "Check the details below before adding it to the draft.",
+                    text = "Check the details below before adding it to the plan.",
                     modifier = Modifier.padding(top = 6.dp),
                     fontSize = 13.sp,
                     lineHeight = 18.sp,
@@ -1608,7 +1656,7 @@ private fun AddEditImpactWeaveNeedSheet(
                         .fillMaxWidth()
                         .padding(top = 8.dp)
                 ) {
-                    Text(if (need == null) "Add to draft" else "Save changes")
+                    Text(if (need == null) "Add Support" else "Save changes")
                 }
             }
         }
@@ -1622,7 +1670,9 @@ fun ImpactWeaveReviewScreen(
     onBack: () -> Unit,
     onEditActivity: () -> Unit,
     onEditNeeds: () -> Unit,
-    onSaveDraft: () -> Unit
+    isFindingPartners: Boolean,
+    findPartnersError: String?,
+    onFindPartners: () -> Unit
 ) {
     LazyColumn(
         modifier = Modifier
@@ -1649,7 +1699,7 @@ fun ImpactWeaveReviewScreen(
         item(key = "review_activity") {
             CreateSectionCard(
                 title = "Activity Summary",
-                subtitle = "Check the activity details before saving this draft."
+                subtitle = "Check the activity details before finding partner organisations."
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(modifier = Modifier.weight(1f)) {
@@ -1659,14 +1709,29 @@ fun ImpactWeaveReviewScreen(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = draft.mode?.displayName.orEmpty(),
+                            text = listOfNotNull(
+                                draft.category?.displayName,
+                                draft.mode?.displayName
+                            ).joinToString(" · "),
                             modifier = Modifier.padding(top = 2.dp),
                             style = MaterialTheme.typography.bodySmall,
                             color = CreateGreen,
                             fontWeight = FontWeight.SemiBold
                         )
+                        if (draft.description.isNotBlank()) {
+                            Text(
+                                text = draft.description,
+                                modifier = Modifier.padding(top = 7.dp),
+                                style = MaterialTheme.typography.bodySmall,
+                                lineHeight = 18.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
-                    TextButton(onClick = onEditActivity) {
+                    TextButton(
+                        onClick = onEditActivity,
+                        enabled = !isFindingPartners
+                    ) {
                         Text("Edit")
                     }
                 }
@@ -1725,7 +1790,10 @@ fun ImpactWeaveReviewScreen(
             ) {
                 Row(modifier = Modifier.fillMaxWidth()) {
                     Spacer(modifier = Modifier.weight(1f))
-                    TextButton(onClick = onEditNeeds) {
+                    TextButton(
+                        onClick = onEditNeeds,
+                        enabled = !isFindingPartners
+                    ) {
                         Text("Edit Support")
                     }
                 }
@@ -1762,32 +1830,1653 @@ fun ImpactWeaveReviewScreen(
         }
 
         item(key = "review_note") {
-            Text(
-                text = "Partner matching and invitations are not connected yet. This currently saves only the prototype draft in the app session.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-
-        item(key = "review_save") {
-            Button(
-                onClick = onSaveDraft,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = CreateGreen),
-                shape = RoundedCornerShape(14.dp)
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                color = Color(0xFFF1F7EE)
             ) {
                 Text(
-                    text = "Save Draft",
-                    fontWeight = FontWeight.SemiBold
+                    text = "Find Partners saves this plan as Matching and searches real support records from organisations that are open to partnership. No invitation or acceptance is sent yet.",
+                    modifier = Modifier.padding(12.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    lineHeight = 17.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+        }
+
+        item(key = "review_find") {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                findPartnersError?.let { error ->
+                    Text(
+                        text = error,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+
+                Button(
+                    onClick = onFindPartners,
+                    enabled = !isFindingPartners,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = CreateGreen),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    if (isFindingPartners) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Starting matching...",
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    } else {
+                        Text(
+                            text = "Find Partners",
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
             }
         }
 
         item(key = "review_end_space") {
             Spacer(modifier = Modifier.height(8.dp))
         }
+    }
+}
+
+@Composable
+fun ImpactWeaveMatchResultsScreen(
+    draft: ImpactWeaveDraft,
+    results: ImpactWeaveMatchResults?,
+    isLoading: Boolean,
+    errorMessage: String?,
+    sentOrganisationIds: Set<String>,
+    partnershipStates: Map<String, ImpactWeavePartnershipState>,
+    sendingOrganisationId: String?,
+    requestError: String?,
+    requestSuccess: String?,
+    onBack: () -> Unit,
+    onRetry: () -> Unit,
+    onSendRequest: (String, String, List<PartnershipRequestItem>) -> Unit,
+    onClearRequestFeedback: () -> Unit
+) {
+    var requestCandidate by remember { mutableStateOf<ImpactWeaveSupportCandidate?>(null) }
+
+    LaunchedEffect(sentOrganisationIds, requestCandidate?.organisationId) {
+        val organisationId = requestCandidate?.organisationId ?: return@LaunchedEffect
+        if (organisationId in sentOrganisationIds) {
+            requestCandidate = null
+        }
+    }
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(VolunteerLinkBackground)
+            .statusBarsPadding()
+            .navigationBarsPadding(),
+        contentPadding = PaddingValues(
+            start = 20.dp,
+            top = 12.dp,
+            end = 20.dp,
+            bottom = 32.dp
+        ),
+        verticalArrangement = Arrangement.spacedBy(18.dp)
+    ) {
+        item(key = "match_header") {
+            ImpactWeaveWizardHeader(
+                title = "Partner Matches",
+                subtitle = "Suitable partner options for ${draft.title}",
+                onBack = onBack
+            )
+        }
+
+        if (isLoading && results == null) {
+            item(key = "match_loading") {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 52.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    CircularProgressIndicator(color = CreateGreen)
+                    Text(
+                        text = "Checking partner support...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "Groq checks resource compatibility while VolunteerLink verifies quantities, capacities and location.",
+                        style = MaterialTheme.typography.bodySmall,
+                        lineHeight = 17.sp,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        } else if (errorMessage != null && results == null) {
+            item(key = "match_error") {
+                CreateSectionCard(
+                    title = "Could not load partner matches",
+                    subtitle = errorMessage
+                ) {
+                    Button(
+                        onClick = onRetry,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = CreateGreen),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Try Again")
+                    }
+                }
+            }
+        } else if (results != null) {
+            val recommendedPartners = buildPartnerOrganisationGroups(results)
+            val recommendedOrganisationIds = recommendedPartners
+                .mapTo(mutableSetOf()) { it.organisationId }
+            val contactedOrganisationIds = partnershipStates.keys
+            val alternativePartners = buildAlternativePartnerOrganisationGroups(
+                results = results,
+                excludedOrganisationIds = recommendedOrganisationIds + contactedOrganisationIds
+            )
+            val availableRecommendedPartners = recommendedPartners.filterNot {
+                it.organisationId in contactedOrganisationIds
+            }
+            val partnershipRequests = partnershipStates.values.sortedWith(
+                compareBy<ImpactWeavePartnershipState> { partnershipStatusSortOrder(it.status) }
+                    .thenBy { it.organisationName.lowercase() }
+            )
+
+            item(key = "match_overall") {
+                PartnerMatchingSummaryCard(
+                    results = results,
+                    organisationCount = recommendedPartners.size
+                )
+            }
+
+            item(key = "confirmed_progress_heading") {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = "Support Progress",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = VolunteerLinkTextPrimary
+                    )
+                    Text(
+                        text = "Accepted partnership support increases each countable requirement from 0 toward its target. Unmatched needs stay here at 0 instead of being separated into another section.",
+                        style = MaterialTheme.typography.bodySmall,
+                        lineHeight = 17.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            items(
+                items = results.needResults,
+                key = { "confirmed_${it.need.needId}" }
+            ) { needResult ->
+                ConfirmedSupportProgressCard(needResult)
+            }
+
+            if (results.needResults.any { it.need.supportType == "VENUE" && it.usesWiderVenueArea }) {
+                item(key = "wider_venue_notice") {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color(0xFFFFF7E8),
+                        border = BorderStroke(1.dp, Color(0xFFE3C472))
+                    ) {
+                        Text(
+                            text = draft.areaLocation?.generalAreaName
+                                ?.takeIf { it.isNotBlank() }
+                                ?.let { "No suitable venue was found near $it, so wider-area venue options are included." }
+                                ?: "No suitable venue was found near the preferred area, so wider-area venue options are included.",
+                            modifier = Modifier.padding(12.dp),
+                            style = MaterialTheme.typography.bodySmall,
+                            lineHeight = 17.sp,
+                            color = Color(0xFF5F4815)
+                        )
+                    }
+                }
+            }
+
+            if (partnershipRequests.isNotEmpty()) {
+                item(key = "partnership_request_heading") {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            text = "Partnership requests",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = VolunteerLinkTextPrimary
+                        )
+                        Text(
+                            text = "Live invitation status and the exact support currently requested or confirmed.",
+                            style = MaterialTheme.typography.bodySmall,
+                            lineHeight = 17.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                items(
+                    items = partnershipRequests,
+                    key = { "partnership_state_${it.invitationId}" }
+                ) { request ->
+                    ImpactWeavePartnershipStateCard(request)
+                }
+            }
+
+            requestSuccess?.let { message ->
+                item(key = "request_success") {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color(0xFFEAF4E6),
+                        border = BorderStroke(1.dp, Color(0xFFC5DABC))
+                    ) {
+                        Text(
+                            text = message,
+                            modifier = Modifier.padding(12.dp),
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = CreateGreen
+                        )
+                    }
+                }
+            }
+
+            if (recommendedPartners.isEmpty()) {
+                item(key = "no_recommended_partners") {
+                    CreateSectionCard(
+                        title = "No suitable partners yet",
+                        subtitle = "VolunteerLink could not find a verified organisation that is currently open to partnership and directly matches these needs."
+                    ) {
+                        Text(
+                            text = "You can reopen this plan later to check again when partnership profiles change.",
+                            style = MaterialTheme.typography.bodySmall,
+                            lineHeight = 17.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            } else if (availableRecommendedPartners.isNotEmpty()) {
+                item(key = "recommended_partner_heading") {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            text = "Recommended partners",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = VolunteerLinkTextPrimary
+                        )
+                        Text(
+                            text = "Partners you have not contacted yet. Each organisation appears once.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                items(
+                    items = availableRecommendedPartners,
+                    key = { "recommended_${it.organisationId}" }
+                ) { partner ->
+                    PartnerOrganisationMatchCard(
+                        partner = partner,
+                        requestSent = false,
+                        isSending = sendingOrganisationId == partner.organisationId,
+                        onRequestSupport = {
+                            onClearRequestFeedback()
+                            requestCandidate = partner.representativeCandidate
+                        }
+                    )
+                }
+            }
+
+            if (alternativePartners.isNotEmpty()) {
+                item(key = "alternative_partner_heading") {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            text = "Possible alternatives",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = VolunteerLinkTextPrimary
+                        )
+                        Text(
+                            text = "Related options that do not fully meet the current requirement.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                items(
+                    items = alternativePartners,
+                    key = { "alternative_${it.organisationId}" }
+                ) { partner ->
+                    AlternativePartnerOrganisationCard(partner)
+                }
+            }
+        }
+    }
+
+    val selectedCandidate = requestCandidate
+    if (selectedCandidate != null && results != null) {
+        val options = remember(results, selectedCandidate.supportId) {
+            buildPartnerRequestOptions(results, selectedCandidate)
+        }
+
+        PartnershipRequestDialog(
+            draft = draft,
+            organisationName = selectedCandidate.organisationName,
+            options = options,
+            isSending = sendingOrganisationId == selectedCandidate.organisationId,
+            errorMessage = requestError,
+            onDismiss = {
+                if (sendingOrganisationId == null) {
+                    requestCandidate = null
+                    onClearRequestFeedback()
+                }
+            },
+            onSend = { requestItems ->
+                onSendRequest(
+                    selectedCandidate.organisationId,
+                    selectedCandidate.organisationName,
+                    requestItems
+                )
+            }
+        )
+    }
+}
+
+@Composable
+private fun ConfirmedSupportProgressCard(
+    result: ImpactWeaveNeedMatchResult
+) {
+    val need = result.need
+    val complete = need.isFulfilled
+    val hasSuitableProvider = result.directMatches.isNotEmpty()
+    val hasRelatedAlternative = result.alternativeMatches.isNotEmpty()
+    val isVenue = need.supportType == "VENUE"
+    val total = (need.quantityRequired ?: 0).coerceAtLeast(0)
+    val confirmed = need.confirmedQuantity.coerceIn(0, total.coerceAtLeast(0))
+    val remaining = (total - confirmed).coerceAtLeast(0)
+
+    val statusText = when {
+        complete -> if (isVenue) "Venue secured" else "Fulfilled"
+        isVenue && hasSuitableProvider -> "Venue available"
+        isVenue -> "No venue match yet"
+        confirmed > 0 -> "In progress"
+        hasSuitableProvider -> "Partner available"
+        else -> "No match yet"
+    }
+
+    val statusBackground = when {
+        complete -> Color(0xFFEAF4E6)
+        !hasSuitableProvider && confirmed == 0 -> Color(0xFFFFF3E8)
+        else -> Color(0xFFF3F4F1)
+    }
+    val statusColor = when {
+        complete -> CreateGreen
+        !hasSuitableProvider && confirmed == 0 -> Color(0xFF8A4B14)
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        color = Color.White,
+        border = BorderStroke(
+            1.dp,
+            when {
+                complete -> Color(0xFFBBD6B2)
+                !hasSuitableProvider && confirmed == 0 -> Color(0xFFE9C9A7)
+                else -> Color(0xFFDDE2DA)
+            }
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Top
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text(
+                        text = need.resourceName,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = VolunteerLinkTextPrimary
+                    )
+                    Text(
+                        text = need.supportType.lowercase(Locale.ROOT)
+                            .replaceFirstChar { it.titlecase(Locale.ROOT) },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = statusBackground
+                ) {
+                    Text(
+                        text = statusText,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = statusColor
+                    )
+                }
+            }
+
+            if (isVenue) {
+                val venueMessage = when {
+                    complete -> "A partner venue has been confirmed for this activity."
+                    hasSuitableProvider -> "Suitable venue option${if (result.directMatches.size == 1) "" else "s"} found. Confirmation will happen after a partner accepts the request."
+                    hasRelatedAlternative -> "No suitable direct venue match yet. Related venue options are shown below for review."
+                    else -> "No verified organisation that is currently open to partnership provides a suitable venue yet."
+                }
+
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    color = when {
+                        complete -> Color(0xFFF1F7EE)
+                        hasSuitableProvider -> Color(0xFFF7F8F5)
+                        else -> Color(0xFFFFF6EC)
+                    }
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = when {
+                                complete -> "Venue secured"
+                                hasSuitableProvider -> "Suitable venue available"
+                                else -> "No suitable venue found yet"
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = when {
+                                complete -> CreateGreen
+                                hasSuitableProvider -> VolunteerLinkTextPrimary
+                                else -> Color(0xFF8A4B14)
+                            }
+                        )
+                        Text(
+                            text = venueMessage,
+                            style = MaterialTheme.typography.bodySmall,
+                            lineHeight = 17.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = need.capacityRequired?.let { "Required capacity: $it people" }
+                                ?: "No minimum capacity specified",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            } else {
+                val fraction = if (total > 0) confirmed.toFloat() / total.toFloat() else 0f
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    Text(
+                        text = "$confirmed / $total confirmed",
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = CreateGreen
+                    )
+                    if (!complete) {
+                        Text(
+                            text = "$remaining remaining",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                LinearProgressIndicator(
+                    progress = { fraction.coerceIn(0f, 1f) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(9.dp)
+                        .clip(RoundedCornerShape(50)),
+                    color = CreateGreen,
+                    trackColor = Color(0xFFE7EDE3)
+                )
+
+                if (!complete) {
+                    val matchingMessage = when {
+                        hasSuitableProvider && result.directMatches.size == 1 ->
+                            "1 suitable partner is currently available for this requirement."
+                        hasSuitableProvider ->
+                            "${result.directMatches.size} suitable partners are currently available for this requirement."
+                        hasRelatedAlternative ->
+                            "No direct match yet. Related alternatives are shown below for review."
+                        confirmed > 0 ->
+                            "No additional suitable partner is currently available for the remaining $remaining."
+                        else ->
+                            "No suitable partner found yet. This requirement remains at 0 until a partner accepts support."
+                    }
+
+                    Text(
+                        text = matchingMessage,
+                        style = MaterialTheme.typography.bodySmall,
+                        lineHeight = 16.sp,
+                        color = if (hasSuitableProvider) {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        } else {
+                            Color(0xFF8A4B14)
+                        }
+                    )
+                }
+
+                Text(
+                    text = need.originalText,
+                    style = MaterialTheme.typography.bodySmall,
+                    lineHeight = 16.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PartnerMatchingSummaryCard(
+    results: ImpactWeaveMatchResults,
+    organisationCount: Int
+) {
+    CreateSectionCard(
+        title = "Partner Matching",
+        subtitle = if (organisationCount == 1) {
+            "1 partner organisation matches ${results.needsWithPotentialSupport} of ${results.needResults.size} needs."
+        } else {
+            "$organisationCount partner organisations match ${results.needsWithPotentialSupport} of ${results.needResults.size} needs."
+        }
+    ) {
+        Text(
+            text = "Only verified organisations that are currently open to partnership are recommended. Matching is not confirmed support; progress starts after an invitation is accepted.",
+            style = MaterialTheme.typography.bodySmall,
+            lineHeight = 17.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+private data class PartnerOrganisationMatchGroup(
+    val organisationId: String,
+    val organisationName: String,
+    val options: List<PartnerRequestOption>,
+    val representativeCandidate: ImpactWeaveSupportCandidate,
+    val nearestDistanceKm: Double?
+)
+
+private fun buildPartnerOrganisationGroups(
+    results: ImpactWeaveMatchResults
+): List<PartnerOrganisationMatchGroup> {
+    val representatives = results.needResults
+        .flatMap { it.directMatches }
+        .distinctBy { it.organisationId }
+
+    return representatives.mapNotNull { representative ->
+        val options = buildPartnerRequestOptions(results, representative)
+        if (options.isEmpty()) return@mapNotNull null
+
+        PartnerOrganisationMatchGroup(
+            organisationId = representative.organisationId,
+            organisationName = representative.organisationName,
+            options = options,
+            representativeCandidate = representative,
+            nearestDistanceKm = options.mapNotNull { it.candidate.distanceKm }.minOrNull()
+        )
+    }.sortedWith(
+        compareByDescending<PartnerOrganisationMatchGroup> { it.options.size }
+            .thenBy { it.nearestDistanceKm ?: Double.MAX_VALUE }
+            .thenBy { it.organisationName.lowercase() }
+    )
+}
+
+private fun buildAlternativePartnerOrganisationGroups(
+    results: ImpactWeaveMatchResults,
+    excludedOrganisationIds: Set<String>
+): List<PartnerOrganisationMatchGroup> {
+    val alternativeCandidates = results.needResults
+        .flatMap { result -> result.alternativeMatches.map { result to it } }
+        .filterNot { (_, candidate) -> candidate.organisationId in excludedOrganisationIds }
+
+    return alternativeCandidates
+        .groupBy { (_, candidate) -> candidate.organisationId }
+        .mapNotNull { (_, entries) ->
+            val representative = entries.firstOrNull()?.second ?: return@mapNotNull null
+            val options = entries
+                .groupBy { (result, _) -> result.need.needId }
+                .values
+                .mapNotNull { sameNeed ->
+                    val best = sameNeed.minWithOrNull(
+                        compareBy<Pair<ImpactWeaveNeedMatchResult, ImpactWeaveSupportCandidate>> {
+                            it.second.distanceKm ?: Double.MAX_VALUE
+                        }.thenByDescending { it.second.quantity ?: it.second.capacity ?: 0 }
+                    ) ?: return@mapNotNull null
+                    PartnerRequestOption(best.first, best.second)
+                }
+
+            PartnerOrganisationMatchGroup(
+                organisationId = representative.organisationId,
+                organisationName = representative.organisationName,
+                options = options,
+                representativeCandidate = representative,
+                nearestDistanceKm = options.mapNotNull { it.candidate.distanceKm }.minOrNull()
+            )
+        }
+        .sortedWith(
+            compareByDescending<PartnerOrganisationMatchGroup> { it.options.size }
+                .thenBy { it.nearestDistanceKm ?: Double.MAX_VALUE }
+                .thenBy { it.organisationName.lowercase() }
+        )
+}
+
+private fun partnershipStatusSortOrder(status: String): Int = when (status.uppercase(Locale.ROOT)) {
+    "RECONFIRMATION_REQUIRED" -> 0
+    "PENDING" -> 1
+    "ACCEPTED" -> 2
+    "DECLINED" -> 3
+    "FULFILLED_ELSEWHERE" -> 4
+    "CANCELLED" -> 5
+    else -> 6
+}
+
+@Composable
+private fun ImpactWeavePartnershipStateCard(
+    request: ImpactWeavePartnershipState
+) {
+    var showAllItems by remember(request.invitationId) { mutableStateOf(false) }
+    val status = request.status.uppercase(Locale.ROOT)
+    val accepted = status == "ACCEPTED"
+    val pending = status == "PENDING"
+    val title = when {
+        accepted -> "Accepted partnership"
+        pending && request.revisionNumber > 1 -> "Updated request awaiting response"
+        pending -> "Awaiting response"
+        status == "DECLINED" -> "Request declined"
+        status == "FULFILLED_ELSEWHERE" -> "Support fulfilled elsewhere"
+        status == "RECONFIRMATION_REQUIRED" -> "Reconfirmation required"
+        status == "CANCELLED" -> "Request cancelled"
+        else -> request.status.replace('_', ' ').lowercase().replaceFirstChar { it.titlecase() }
+    }
+    val badgeBackground = when (status) {
+        "ACCEPTED" -> Color(0xFFE5F1E1)
+        "PENDING" -> Color(0xFFF4F0DB)
+        "RECONFIRMATION_REQUIRED" -> Color(0xFFFFF2D8)
+        "DECLINED", "CANCELLED", "FULFILLED_ELSEWHERE" -> Color(0xFFF5E9E6)
+        else -> Color(0xFFF0F1EE)
+    }
+    val borderColor = when (status) {
+        "ACCEPTED" -> Color(0xFFBFD7B7)
+        "PENDING" -> Color(0xFFE0D6A9)
+        "RECONFIRMATION_REQUIRED" -> Color(0xFFE8C778)
+        else -> Color(0xFFDDE1DA)
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White,
+        border = BorderStroke(1.dp, borderColor)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    modifier = Modifier.size(44.dp),
+                    shape = CircleShape,
+                    color = Color(0xFFE7F1E3)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = request.organisationName.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "O",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = CreateGreen
+                        )
+                    }
+                }
+
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text(
+                        text = request.organisationName,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = VolunteerLinkTextPrimary
+                    )
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = if (accepted) FontWeight.SemiBold else FontWeight.Normal,
+                        color = if (accepted) CreateGreen else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = badgeBackground
+                ) {
+                    Text(
+                        text = when (status) {
+                            "ACCEPTED" -> "Accepted"
+                            "PENDING" -> if (request.revisionNumber > 1) "Updated" else "Pending"
+                            "RECONFIRMATION_REQUIRED" -> "Reconfirm"
+                            "FULFILLED_ELSEWHERE" -> "No longer needed"
+                            else -> request.status.replace('_', ' ').lowercase().replaceFirstChar { it.titlecase() }
+                        },
+                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = if (accepted) CreateGreen else VolunteerLinkTextPrimary
+                    )
+                }
+            }
+
+            HorizontalDivider(color = Color(0xFFE6EAE4))
+
+            Text(
+                text = when {
+                    accepted -> "Confirmed support"
+                    pending -> "Current request"
+                    else -> "Request details"
+                },
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = VolunteerLinkTextPrimary
+            )
+
+            if (request.items.isEmpty()) {
+                Text(
+                    text = when (status) {
+                        "FULFILLED_ELSEWHERE" -> "No active support remains because these needs were fulfilled by another partner."
+                        "DECLINED" -> "This invitation was declined and does not contribute to support progress."
+                        else -> "No active support items remain on this invitation."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    lineHeight = 17.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                val visibleItems = if (showAllItems) request.items else request.items.take(3)
+
+                Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                    visibleItems.forEach { item ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            Surface(
+                                modifier = Modifier
+                                    .padding(top = 5.dp)
+                                    .size(7.dp),
+                                shape = CircleShape,
+                                color = if (accepted) CreateGreen else Color(0xFF8B7A38)
+                            ) {}
+
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(start = 10.dp),
+                                verticalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                Text(
+                                    text = item.resourceName,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = VolunteerLinkTextPrimary
+                                )
+                                val providerName = item.providerResourceName
+                                    ?.takeIf { it.isNotBlank() }
+                                    ?: item.resourceName
+                                val amount = if (item.supportType.equals("VENUE", ignoreCase = true)) {
+                                    item.capacityProvided?.let { "Capacity $it" } ?: "Venue"
+                                } else {
+                                    item.quantityProvided?.toString() ?: "Support"
+                                }
+                                Text(
+                                    text = if (accepted) {
+                                        "$providerName · Confirmed $amount"
+                                    } else {
+                                        "$providerName · Requested $amount"
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    if (request.items.size > 3) {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { showAllItems = !showAllItems },
+                            shape = RoundedCornerShape(11.dp),
+                            color = Color(0xFFF2F7EF)
+                        ) {
+                            Text(
+                                text = if (showAllItems) {
+                                    "Show fewer support items"
+                                } else {
+                                    val hiddenCount = request.items.size - 3
+                                    "View $hiddenCount more support ${if (hiddenCount == 1) "item" else "items"}"
+                                },
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = CreateGreen,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (pending && request.revisionNumber > 1) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(11.dp),
+                    color = Color(0xFFFFF7E8)
+                ) {
+                    Text(
+                        text = "VolunteerLink reduced this request to what is still needed. The partner must accept the updated request before it counts toward progress.",
+                        modifier = Modifier.padding(11.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        lineHeight = 16.sp,
+                        color = Color(0xFF6F5417)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PartnerOrganisationMatchCard(
+    partner: PartnerOrganisationMatchGroup,
+    requestSent: Boolean,
+    isSending: Boolean,
+    onRequestSupport: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White,
+        border = BorderStroke(1.dp, Color(0xFFD7E3D2))
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    modifier = Modifier.size(44.dp),
+                    shape = CircleShape,
+                    color = Color(0xFFE7F1E3)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = partner.organisationName
+                                .trim()
+                                .firstOrNull()
+                                ?.uppercaseChar()
+                                ?.toString()
+                                ?: "O",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = CreateGreen
+                        )
+                    }
+                }
+
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text(
+                        text = partner.organisationName,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = VolunteerLinkTextPrimary
+                    )
+                    Text(
+                        text = if (partner.options.size == 1) {
+                            "Can support 1 requirement"
+                        } else {
+                            "Can support ${partner.options.size} requirements"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = Color(0xFFEAF4E6)
+                ) {
+                    Text(
+                        text = "Eligible",
+                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = CreateGreen
+                    )
+                }
+            }
+
+            partner.nearestDistanceKm?.let { distance ->
+                Text(
+                    text = if (distance < 1.0) "Nearest support <1 km away" else "Nearest support ${distance.roundToInt()} km away",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            HorizontalDivider(color = Color(0xFFE6EAE4))
+
+            Text(
+                text = "Can provide",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = VolunteerLinkTextPrimary
+            )
+
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                partner.options.forEach { option ->
+                    PartnerOrganisationSupportLine(option)
+                }
+            }
+
+            when {
+                requestSent -> Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFFEAF4E6)
+                ) {
+                    Text(
+                        text = "Partnership request sent",
+                        modifier = Modifier.padding(vertical = 12.dp),
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = CreateGreen
+                    )
+                }
+
+                isSending -> Button(
+                    onClick = {},
+                    enabled = false,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("Sending request...")
+                }
+
+                else -> Button(
+                    onClick = onRequestSupport,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = CreateGreen),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        text = "Request Support",
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PartnerOrganisationSupportLine(option: PartnerRequestOption) {
+    val result = option.needResult
+    val candidate = option.candidate
+    val need = result.need
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.Top
+    ) {
+        Surface(
+            modifier = Modifier
+                .padding(top = 5.dp)
+                .size(7.dp),
+            shape = CircleShape,
+            color = CreateGreen
+        ) {}
+
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            Text(
+                text = need.resourceName,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = VolunteerLinkTextPrimary
+            )
+            Text(
+                text = "${candidate.resourceName} · ${candidateAvailabilityLabel(candidate, result)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            if (need.supportType != "VENUE") {
+                val required = need.quantityRequired ?: 0
+                val remaining = (required - need.confirmedQuantity).coerceAtLeast(0)
+                val available = candidate.quantity ?: 0
+                val usable = minOf(remaining, available).coerceAtLeast(0)
+                if (remaining > 0 && available > 0) {
+                    Text(
+                        text = if (available >= remaining) {
+                            "Can cover the full $remaining currently remaining"
+                        } else {
+                            "Can contribute $usable of $remaining currently remaining"
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Medium,
+                        color = if (available >= remaining) CreateGreen else Color(0xFF7A5A16)
+                    )
+                }
+            }
+
+            candidate.locationName
+                ?.takeIf { it.isNotBlank() && need.supportType == "VENUE" }
+                ?.let { location ->
+                    Text(
+                        text = location,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+        }
+    }
+}
+
+@Composable
+private fun AlternativePartnerOrganisationCard(
+    partner: PartnerOrganisationMatchGroup
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        color = Color(0xFFF8F8F8),
+        border = BorderStroke(1.dp, Color(0xFFE1E1E1))
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = partner.organisationName,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold
+            )
+            partner.options.forEach { option ->
+                Text(
+                    text = "• ${option.needResult.need.resourceName}: ${option.candidate.resourceName} (${candidateAvailabilityLabel(option.candidate, option.needResult)})",
+                    style = MaterialTheme.typography.bodySmall,
+                    lineHeight = 17.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+private data class PartnerRequestOption(
+    val needResult: ImpactWeaveNeedMatchResult,
+    val candidate: ImpactWeaveSupportCandidate
+)
+
+private fun buildPartnerRequestOptions(
+    results: ImpactWeaveMatchResults,
+    selectedCandidate: ImpactWeaveSupportCandidate
+): List<PartnerRequestOption> {
+    return results.needResults.mapNotNull { needResult ->
+        if (needResult.need.isFulfilled) return@mapNotNull null
+        val candidates = needResult.directMatches.filter {
+            it.organisationId == selectedCandidate.organisationId
+        }
+        if (candidates.isEmpty()) return@mapNotNull null
+
+        val candidate = if (candidates.any { it.supportId == selectedCandidate.supportId }) {
+            candidates.first { it.supportId == selectedCandidate.supportId }
+        } else if (needResult.need.supportType == "VENUE") {
+            candidates.first()
+        } else {
+            candidates.maxWithOrNull(
+                compareBy<ImpactWeaveSupportCandidate> { it.quantity ?: 0 }
+                    .thenBy { -(it.distanceKm ?: Double.MAX_VALUE) }
+            ) ?: candidates.first()
+        }
+
+        PartnerRequestOption(
+            needResult = needResult,
+            candidate = candidate
+        )
+    }
+}
+
+@Composable
+private fun PartnershipRequestDialog(
+    draft: ImpactWeaveDraft,
+    organisationName: String,
+    options: List<PartnerRequestOption>,
+    isSending: Boolean,
+    errorMessage: String?,
+    onDismiss: () -> Unit,
+    onSend: (List<PartnershipRequestItem>) -> Unit
+) {
+    val selected = remember(options) {
+        mutableStateMapOf<String, Boolean>().apply {
+            options.forEach { option -> put(option.needResult.need.needId, true) }
+        }
+    }
+    val amounts = remember(options) {
+        mutableStateMapOf<String, String>().apply {
+            options.forEach { option ->
+                val need = option.needResult.need
+                if (need.supportType != "VENUE") {
+                    val required = need.quantityRequired ?: 0
+                    val remaining = (required - need.confirmedQuantity).coerceAtLeast(0)
+                    val available = option.candidate.quantity ?: 0
+                    put(need.needId, minOf(remaining, available).coerceAtLeast(0).toString())
+                }
+            }
+        }
+    }
+
+    val requestItems = options.mapNotNull { option ->
+        val need = option.needResult.need
+        if (selected[need.needId] != true) return@mapNotNull null
+
+        if (need.supportType == "VENUE") {
+            PartnershipRequestItem(
+                needId = need.needId,
+                supportId = option.candidate.supportId,
+                requestedAmount = null
+            )
+        } else {
+            val requested = amounts[need.needId]?.toIntOrNull() ?: return@mapNotNull null
+            PartnershipRequestItem(
+                needId = need.needId,
+                supportId = option.candidate.supportId,
+                requestedAmount = requested
+            )
+        }
+    }
+
+    val hasInvalidAmount = options.any { option ->
+        val need = option.needResult.need
+        if (selected[need.needId] != true || need.supportType == "VENUE") {
+            false
+        } else {
+            val amount = amounts[need.needId]?.toIntOrNull()
+            val required = need.quantityRequired ?: 0
+            val remaining = (required - need.confirmedQuantity).coerceAtLeast(0)
+            val available = option.candidate.quantity ?: 0
+            amount == null || amount <= 0 || amount > remaining || amount > available
+        }
+    }
+
+    Dialog(
+        onDismissRequest = {
+            if (!isSending) onDismiss()
+        },
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.94f)
+                .heightIn(max = 720.dp),
+            shape = RoundedCornerShape(26.dp),
+            color = VolunteerLinkBackground,
+            shadowElevation = 10.dp
+        ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color.White)
+                        .padding(horizontal = 20.dp, vertical = 18.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = "Request Partnership",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = CreateGreen
+                    )
+                    Text(
+                        text = "To $organisationName",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = VolunteerLinkTextPrimary
+                    )
+                    Text(
+                        text = "Review the activity and the exact support proposal before sending.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Column(
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    RequestActivityOverviewCard(draft)
+
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            text = "Support Proposal",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = VolunteerLinkTextPrimary
+                        )
+                        Text(
+                            text = "Select the requirements to include. One invitation can contain several support items from the same organisation.",
+                            style = MaterialTheme.typography.bodySmall,
+                            lineHeight = 17.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    options.forEach { option ->
+                        val need = option.needResult.need
+                        val checked = selected[need.needId] == true
+                        val amount = amounts[need.needId].orEmpty()
+                        val required = need.quantityRequired ?: 0
+                        val confirmed = need.confirmedQuantity.coerceAtLeast(0)
+                        val remaining = (required - confirmed).coerceAtLeast(0)
+                        val available = option.candidate.quantity ?: 0
+                        val amountNumber = amount.toIntOrNull()
+                        val amountInvalid = checked && need.supportType != "VENUE" &&
+                            (amountNumber == null || amountNumber <= 0 ||
+                                amountNumber > remaining || amountNumber > available)
+
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(18.dp),
+                            color = Color.White,
+                            border = BorderStroke(
+                                1.dp,
+                                if (checked) Color(0xFFBFD5B8) else Color(0xFFDDE2DA)
+                            )
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(14.dp),
+                                verticalArrangement = Arrangement.spacedBy(11.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Checkbox(
+                                        checked = checked,
+                                        enabled = !isSending && !need.isFulfilled,
+                                        onCheckedChange = { selected[need.needId] = it }
+                                    )
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = need.resourceName,
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = VolunteerLinkTextPrimary
+                                        )
+                                        Text(
+                                            text = need.supportType.lowercase(Locale.ROOT)
+                                                .replaceFirstChar { it.titlecase(Locale.ROOT) },
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+
+                                if (need.supportType != "VENUE") {
+                                    val progress = if (required > 0) {
+                                        confirmed.toFloat() / required.toFloat()
+                                    } else 0f
+                                    Row(modifier = Modifier.fillMaxWidth()) {
+                                        Text(
+                                            text = "$confirmed / $required confirmed",
+                                            modifier = Modifier.weight(1f),
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = CreateGreen
+                                        )
+                                        Text(
+                                            text = "$remaining remaining",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    LinearProgressIndicator(
+                                        progress = { progress.coerceIn(0f, 1f) },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(7.dp)
+                                            .clip(RoundedCornerShape(50)),
+                                        color = CreateGreen,
+                                        trackColor = Color(0xFFE7EDE3)
+                                    )
+                                }
+
+                                ProposalDetailBlock(
+                                    label = "Requirement",
+                                    primary = need.originalText,
+                                    secondary = if (need.supportType == "VENUE") {
+                                        need.capacityRequired?.let { "Target capacity: $it people" }
+                                            ?: "No minimum capacity specified"
+                                    } else {
+                                        "Target: ${need.quantityRequired ?: 0}"
+                                    }
+                                )
+
+                                if (need.supportType == "VENUE") {
+                                    ProposalDetailBlock(
+                                        label = "What we propose",
+                                        primary = "Use ${option.candidate.resourceName} as the activity venue",
+                                        secondary = option.candidate.capacity?.let { "Listed capacity: $it people" }
+                                            ?: "Capacity not listed"
+                                    )
+                                } else if (checked) {
+                                    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                                        Text(
+                                            text = "What we propose",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = CreateGreen
+                                        )
+                                        OutlinedTextField(
+                                            value = amount,
+                                            enabled = !isSending,
+                                            onValueChange = { value ->
+                                                amounts[need.needId] = value.filter { it.isDigit() }
+                                            },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            label = { Text("Requested quantity") },
+                                            supportingText = {
+                                                Text("Up to ${minOf(remaining, available)} can be requested now")
+                                            },
+                                            isError = amountInvalid,
+                                            singleLine = true,
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                            shape = RoundedCornerShape(12.dp)
+                                        )
+                                    }
+                                }
+
+                                ProposalDetailBlock(
+                                    label = "What they can provide",
+                                    primary = option.candidate.supportDescription,
+                                    secondary = buildString {
+                                        append(option.candidate.resourceName)
+                                        if (need.supportType == "VENUE") {
+                                            option.candidate.capacity?.let { append(" · Capacity $it") }
+                                            option.candidate.locationName?.takeIf { it.isNotBlank() }
+                                                ?.let { append(" · $it") }
+                                        } else {
+                                            append(" · Available ${option.candidate.quantity ?: 0}")
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    errorMessage?.let { message ->
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.errorContainer
+                        ) {
+                            Text(
+                                text = message,
+                                modifier = Modifier.padding(12.dp),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color.White)
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedButton(
+                        enabled = !isSending,
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(13.dp)
+                    ) {
+                        Text("Cancel")
+                    }
+
+                    Button(
+                        enabled = !isSending && requestItems.isNotEmpty() && !hasInvalidAmount,
+                        onClick = { onSend(requestItems) },
+                        modifier = Modifier.weight(1.35f),
+                        colors = ButtonDefaults.buttonColors(containerColor = CreateGreen),
+                        shape = RoundedCornerShape(13.dp)
+                    ) {
+                        if (isSending) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                            Spacer(Modifier.width(7.dp))
+                            Text("Sending...")
+                        } else {
+                            Text("Send Request", fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RequestActivityOverviewCard(draft: ImpactWeaveDraft) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        color = Color(0xFFF1F7EE),
+        border = BorderStroke(1.dp, Color(0xFFC9DCC3))
+    ) {
+        Column(
+            modifier = Modifier.padding(15.dp),
+            verticalArrangement = Arrangement.spacedBy(9.dp)
+        ) {
+            Text(
+                text = "About the Activity",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = CreateGreen
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = draft.title,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = VolunteerLinkTextPrimary
+                )
+                draft.category?.let { category ->
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = Color.White
+                    ) {
+                        Text(
+                            text = category.displayName,
+                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = CreateGreen
+                        )
+                    }
+                }
+            }
+
+            if (draft.description.isNotBlank()) {
+                Text(
+                    text = draft.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    lineHeight = 18.sp,
+                    color = VolunteerLinkTextPrimary
+                )
+            }
+
+            HorizontalDivider(color = Color(0xFFD8E4D4))
+
+            Text(
+                text = "${draft.mode?.displayName.orEmpty()} · ${formatDraftSchedule(draft)}",
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.SemiBold,
+                color = VolunteerLinkTextPrimary
+            )
+            Text(
+                text = requestActivityLocationLabel(draft),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProposalDetailBlock(
+    label: String,
+    primary: String,
+    secondary: String
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = Color(0xFFF7F9F6)
+    ) {
+        Column(
+            modifier = Modifier.padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = CreateGreen
+            )
+            Text(
+                text = primary,
+                style = MaterialTheme.typography.bodySmall,
+                lineHeight = 17.sp,
+                fontWeight = FontWeight.Medium,
+                color = VolunteerLinkTextPrimary
+            )
+            if (secondary.isNotBlank()) {
+                Text(
+                    text = secondary,
+                    style = MaterialTheme.typography.bodySmall,
+                    lineHeight = 16.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+private fun requestActivityLocationLabel(draft: ImpactWeaveDraft): String {
+    return if (draft.hasExistingVenue == true) {
+        draft.existingVenueLocation?.let { location ->
+            location.address.takeIf { it.isNotBlank() } ?: location.displayName
+        }.orEmpty().ifBlank { draft.areaLocation?.generalAreaName.orEmpty() }
+    } else {
+        draft.areaLocation?.generalAreaName.orEmpty().let { area ->
+            if (area.isBlank()) "Preferred area not available" else "Preferred activity area: $area"
+        }
+    }
+}
+
+private fun matchingNeedAmountLabel(need: com.example.volunteerlink.organisation.impactweave.model.ImpactWeaveDatabaseNeed): String {
+    return if (need.supportType == "VENUE") {
+        need.capacityRequired?.let { "Capacity $it" } ?: "Capacity not specified"
+    } else {
+        "${need.quantityRequired ?: 0} needed"
+    }
+}
+
+private fun candidateAvailabilityLabel(
+    candidate: ImpactWeaveSupportCandidate,
+    result: ImpactWeaveNeedMatchResult
+): String {
+    return if (result.need.supportType == "VENUE") {
+        when {
+            candidate.capacity != null && result.need.capacityRequired != null &&
+                candidate.capacity < result.need.capacityRequired ->
+                "Capacity ${candidate.capacity} · below required ${result.need.capacityRequired}"
+            candidate.capacity != null -> "Capacity ${candidate.capacity}"
+            result.need.capacityRequired != null -> "Capacity not listed"
+            else -> "Venue available · capacity not listed"
+        }
+    } else {
+        "Can provide ${candidate.quantity ?: 0}"
     }
 }
 

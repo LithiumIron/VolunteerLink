@@ -1,25 +1,119 @@
 package com.example.volunteerlink.organisation.impactweave
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.volunteerlink.data.ai.GroqImpactWeaveCandidate
+import com.example.volunteerlink.data.ai.GroqImpactWeaveNeed
+import com.example.volunteerlink.data.ai.GroqService
+import com.example.volunteerlink.data.ai.ImpactWeaveSemanticMatch
 import com.example.volunteerlink.data.location.LocationSuggestion
 import com.example.volunteerlink.data.time.AppClock
+import com.example.volunteerlink.organisation.impactweave.model.ImpactWeaveActivePlan
+import com.example.volunteerlink.organisation.impactweave.model.ImpactWeaveDatabaseNeed
 import com.example.volunteerlink.organisation.impactweave.model.ImpactWeaveDraft
+import com.example.volunteerlink.organisation.impactweave.model.ImpactWeaveMatchResults
+import com.example.volunteerlink.organisation.impactweave.model.ImpactWeaveMatchingInput
 import com.example.volunteerlink.organisation.impactweave.model.ImpactWeaveDuration
 import com.example.volunteerlink.organisation.impactweave.model.ImpactWeaveMode
+import com.example.volunteerlink.organisation.impactweave.model.ImpactWeaveNeedMatchResult
 import com.example.volunteerlink.organisation.impactweave.model.ImpactWeaveNeedDraft
 import com.example.volunteerlink.organisation.impactweave.model.ImpactWeavePage
+import com.example.volunteerlink.organisation.impactweave.model.ImpactWeavePartnershipState
+import com.example.volunteerlink.organisation.impactweave.model.ImpactWeaveSupportCandidate
 import com.example.volunteerlink.organisation.impactweave.model.ImpactWeaveUiState
+import com.example.volunteerlink.organisation.create.model.VolunteerPostCategory
+import com.example.volunteerlink.organisation.repository.ImpactWeaveRepository
+import com.example.volunteerlink.organisation.repository.PartnershipRequestItem
+import com.example.volunteerlink.organisation.repository.SupabaseImpactWeaveRepository
+import com.example.volunteerlink.organisation.repository.SupabasePartnershipRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import java.util.Calendar
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.math.sqrt
 
 class ImpactWeaveViewModel : ViewModel() {
+
+    private val impactWeaveRepository: ImpactWeaveRepository =
+        SupabaseImpactWeaveRepository()
+    private val matchingService = GroqService()
+    private val partnershipRepository = SupabasePartnershipRepository
 
     private val _uiState = MutableStateFlow(ImpactWeaveUiState())
     val uiState = _uiState.asStateFlow()
 
     private var nextDraftId = 1
     private var nextNeedId = 1
+
+    fun loadActivePlans() {
+        if (_uiState.value.isLoadingActivePlans) return
+
+        _uiState.value = _uiState.value.copy(
+            isLoadingActivePlans = true,
+            activePlansError = null
+        )
+
+        viewModelScope.launch {
+            try {
+                val plans = impactWeaveRepository.loadActivePlans()
+                _uiState.value = _uiState.value.copy(
+                    activePlans = plans,
+                    isLoadingActivePlans = false,
+                    activePlansError = null
+                )
+            } catch (exception: Exception) {
+                if (exception is CancellationException) throw exception
+                _uiState.value = _uiState.value.copy(
+                    isLoadingActivePlans = false,
+                    activePlansError = safeDatabaseError(exception.message.orEmpty())
+                )
+            }
+        }
+    }
+
+    fun reopenActivePlan(plan: ImpactWeaveActivePlan) {
+        if (_uiState.value.isFindingPartners) return
+
+        val now = AppClock.nowMillis()
+        val reopenedDraft = ImpactWeaveDraft(
+            draftId = nextDraftId++,
+            databaseDraftId = plan.draftId,
+            category = plan.category,
+            title = plan.title,
+            description = plan.description,
+            mode = plan.mode,
+            duration = if (plan.startDateMillis == plan.endDateMillis) {
+                ImpactWeaveDuration.ONE_DAY
+            } else {
+                ImpactWeaveDuration.MULTIPLE_DAYS
+            },
+            startDateMillis = plan.startDateMillis,
+            endDateMillis = plan.endDateMillis,
+            startTimeMinutes = plan.startTimeMinutes,
+            endTimeMinutes = plan.endTimeMinutes,
+            areaQuery = plan.areaName,
+            areaLocation = plan.areaLocation,
+            hasExistingVenue = plan.hasExistingVenue,
+            createdAtMillis = now,
+            updatedAtMillis = now
+        )
+
+        _uiState.value = _uiState.value.copy(
+            page = ImpactWeavePage.MATCH_RESULTS,
+            workingDraft = reopenedDraft,
+            isFindingPartners = true,
+            matchResults = null,
+            matchResultsError = null
+        )
+
+        viewModelScope.launch {
+            loadMatchingResults(plan.draftId, reopenedDraft)
+        }
+    }
 
     fun startNewDraft() {
         val now = AppClock.nowMillis()
@@ -29,23 +123,33 @@ class ImpactWeaveViewModel : ViewModel() {
                 draftId = nextDraftId++,
                 createdAtMillis = now,
                 updatedAtMillis = now
-            )
-        )
-    }
-
-    fun openDraft(draftId: Int) {
-        val draft = _uiState.value.drafts.firstOrNull { it.draftId == draftId } ?: return
-        _uiState.value = _uiState.value.copy(
-            page = ImpactWeavePage.REVIEW,
-            workingDraft = draft
+            ),
+            findPartnersError = null,
+            matchResults = null,
+            matchResultsError = null,
+            sentPartnershipOrganisationIds = emptySet(),
+            partnershipStates = emptyMap(),
+            sendingPartnershipOrganisationId = null,
+            partnershipRequestError = null,
+            partnershipRequestSuccess = null
         )
     }
 
     fun returnToList() {
         _uiState.value = _uiState.value.copy(
             page = ImpactWeavePage.LIST,
-            workingDraft = null
+            workingDraft = null,
+            isFindingPartners = false,
+            findPartnersError = null,
+            matchResults = null,
+            matchResultsError = null,
+            sentPartnershipOrganisationIds = emptySet(),
+            partnershipStates = emptyMap(),
+            sendingPartnershipOrganisationId = null,
+            partnershipRequestError = null,
+            partnershipRequestSuccess = null
         )
+        loadActivePlans()
     }
 
     fun goToActivityPlan() {
@@ -56,7 +160,6 @@ class ImpactWeaveViewModel : ViewModel() {
 
     fun continueToSupportNeeded(): Boolean {
         if (activityPlanErrors().isNotEmpty()) return false
-        saveWorkingCopy()
         _uiState.value = _uiState.value.copy(page = ImpactWeavePage.SUPPORT_NEEDED)
         return true
     }
@@ -67,21 +170,424 @@ class ImpactWeaveViewModel : ViewModel() {
         if (draft.hasExistingVenue == false && draft.needs.none { it.supportType == "VENUE" }) {
             return false
         }
-        saveWorkingCopy()
+        if (firstIncompleteNeed(draft) != null) return false
+
         _uiState.value = _uiState.value.copy(page = ImpactWeavePage.REVIEW)
         return true
     }
 
     fun goBackFromReview() {
-        _uiState.value = _uiState.value.copy(page = ImpactWeavePage.SUPPORT_NEEDED)
+        _uiState.value = _uiState.value.copy(
+            page = ImpactWeavePage.SUPPORT_NEEDED,
+            findPartnersError = null
+        )
     }
 
-    fun saveDraftAndReturnToList() {
-        saveWorkingCopy()
-        returnToList()
+    fun findPartners() {
+        if (_uiState.value.isFindingPartners) return
+
+        val draft = _uiState.value.workingDraft ?: return
+        if (activityPlanErrors().isNotEmpty()) {
+            _uiState.value = _uiState.value.copy(
+                findPartnersError = "Review the activity details before finding partners."
+            )
+            return
+        }
+        if (draft.needs.isEmpty()) {
+            _uiState.value = _uiState.value.copy(
+                findPartnersError = "Add at least one support need before finding partners."
+            )
+            return
+        }
+        if (draft.hasExistingVenue == false && draft.needs.none { it.supportType == "VENUE" }) {
+            _uiState.value = _uiState.value.copy(
+                findPartnersError = "Add a venue requirement before finding partners."
+            )
+            return
+        }
+
+        firstIncompleteNeed(draft)?.let { need ->
+            _uiState.value = _uiState.value.copy(
+                findPartnersError = if (need.supportType == "VENUE") {
+                    "Check the venue requirement before finding partners."
+                } else {
+                    "Add a quantity for ${need.resourceName.ifBlank { supportTypeLabelForError(need.supportType) }} before finding partners."
+                }
+            )
+            return
+        }
+
+        _uiState.value = _uiState.value.copy(
+            isFindingPartners = true,
+            findPartnersError = null,
+            matchResults = null,
+            matchResultsError = null
+        )
+
+        viewModelScope.launch {
+            try {
+                // A plan is persisted only here. It enters MATCHING immediately; there
+                // is no user-facing Save Draft stage anymore.
+                val started = impactWeaveRepository.startMatching(draft)
+                val persistedDraft = draft.copy(
+                    databaseDraftId = started.draftId,
+                    updatedAtMillis = AppClock.nowMillis()
+                )
+
+                _uiState.value = _uiState.value.copy(
+                    page = ImpactWeavePage.MATCH_RESULTS,
+                    workingDraft = persistedDraft,
+                    isFindingPartners = true,
+                    findPartnersError = null,
+                    matchResults = null,
+                    matchResultsError = null
+                )
+
+                loadMatchingResults(started.draftId, persistedDraft)
+            } catch (exception: Exception) {
+                if (exception is CancellationException) throw exception
+                _uiState.value = _uiState.value.copy(
+                    isFindingPartners = false,
+                    findPartnersError = friendlyMatchingError(exception)
+                )
+            }
+        }
     }
+
+    fun retryMatchingResults() {
+        if (_uiState.value.isFindingPartners) return
+        val draft = _uiState.value.workingDraft ?: return
+        val draftId = draft.databaseDraftId ?: return
+
+        _uiState.value = _uiState.value.copy(
+            page = ImpactWeavePage.MATCH_RESULTS,
+            isFindingPartners = true,
+            matchResultsError = null
+        )
+
+        viewModelScope.launch {
+            loadMatchingResults(draftId, draft)
+        }
+    }
+
+    private suspend fun loadMatchingResults(
+        draftId: String,
+        draft: ImpactWeaveDraft
+    ) {
+        try {
+            val rawInput = impactWeaveRepository.loadMatchingInput(draftId)
+            val input = rawInput.copy(
+                candidates = rawInput.candidates.map { candidate ->
+                    candidate.copy(
+                        distanceKm = distanceKmFromActivity(draft, candidate)
+                    )
+                }
+            )
+
+            val semanticMatches = if (input.candidates.isEmpty()) {
+                emptyList()
+            } else {
+                try {
+                    matchingService.rankImpactWeaveCandidates(
+                        needs = input.needs.map { need ->
+                            GroqImpactWeaveNeed(
+                                needId = need.needId,
+                                supportType = need.supportType,
+                                resourceName = need.resourceName,
+                                originalText = need.originalText
+                            )
+                        },
+                        candidates = input.candidates.map { candidate ->
+                            GroqImpactWeaveCandidate(
+                                supportId = candidate.supportId,
+                                supportType = candidate.supportType,
+                                resourceName = candidate.resourceName,
+                                supportDescription = candidate.supportDescription
+                            )
+                        }
+                    )
+                } catch (exception: Exception) {
+                    if (exception is CancellationException) throw exception
+                    // Matching must remain usable if Groq is temporarily unavailable.
+                    // This conservative fallback accepts only clear name equivalence;
+                    // it never invents candidates or quantities.
+                    fallbackSemanticMatches(input)
+                }
+            }
+
+            val partnershipStates = loadPartnershipStates(draftId)
+
+            _uiState.value = _uiState.value.copy(
+                isFindingPartners = false,
+                matchResults = buildMatchResults(draftId, input, semanticMatches),
+                matchResultsError = null,
+                sentPartnershipOrganisationIds = partnershipStates.keys,
+                partnershipStates = partnershipStates
+            )
+        } catch (exception: Exception) {
+            if (exception is CancellationException) throw exception
+            _uiState.value = _uiState.value.copy(
+                isFindingPartners = false,
+                matchResultsError = friendlyMatchingError(exception)
+            )
+        }
+    }
+
+    private suspend fun loadPartnershipStates(
+        draftId: String
+    ): Map<String, ImpactWeavePartnershipState> {
+        return runCatching {
+            partnershipRepository.loadImpactWeavePartnershipStates(draftId)
+                .associateBy { it.organisationId }
+        }.getOrElse {
+            // Backward-safe fallback: still prevent duplicate requests if the richer
+            // read RPC has not been applied yet. Item details appear after the SQL
+            // migration is installed.
+            runCatching {
+                partnershipRepository.loadInvitations()
+                    .filter { it.direction == "SENT" && it.draftId == draftId }
+                    .associate { invitation ->
+                        invitation.otherOrganisationId to ImpactWeavePartnershipState(
+                            invitationId = invitation.invitationId,
+                            organisationId = invitation.otherOrganisationId,
+                            organisationName = invitation.otherOrganisationName,
+                            status = invitation.status,
+                            revisionNumber = invitation.revisionNumber
+                        )
+                    }
+            }.getOrDefault(emptyMap())
+        }
+    }
+
+    /**
+     * Refreshes confirmed quantities and live invitation states without rerunning Groq.
+     * This is used when returning from partnership chat after Accept / Decline.
+     */
+    fun refreshCurrentMatchState() {
+        val snapshot = _uiState.value
+        if (snapshot.page != ImpactWeavePage.MATCH_RESULTS || snapshot.isFindingPartners) return
+
+        val draftId = snapshot.workingDraft?.databaseDraftId ?: return
+        val currentResults = snapshot.matchResults ?: return
+
+        viewModelScope.launch {
+            try {
+                val latestInput = impactWeaveRepository.loadMatchingInput(draftId)
+                val latestNeeds = latestInput.needs.associateBy { it.needId }
+                val partnershipStates = loadPartnershipStates(draftId)
+
+                val refreshedResults = currentResults.copy(
+                    needResults = currentResults.needResults.map { result ->
+                        val latestNeed = latestNeeds[result.need.needId]
+                        if (latestNeed == null) result else result.copy(need = latestNeed)
+                    }
+                )
+
+                _uiState.value = _uiState.value.copy(
+                    matchResults = refreshedResults,
+                    sentPartnershipOrganisationIds = partnershipStates.keys,
+                    partnershipStates = partnershipStates,
+                    matchResultsError = null
+                )
+
+                runCatching { impactWeaveRepository.loadActivePlans() }
+                    .onSuccess { plans ->
+                        _uiState.value = _uiState.value.copy(activePlans = plans)
+                    }
+            } catch (exception: Exception) {
+                if (exception is CancellationException) throw exception
+                _uiState.value = _uiState.value.copy(
+                    matchResultsError = friendlyMatchingError(exception)
+                )
+            }
+        }
+    }
+
+    private fun buildMatchResults(
+        draftId: String,
+        input: ImpactWeaveMatchingInput,
+        semanticMatches: List<ImpactWeaveSemanticMatch>
+    ): ImpactWeaveMatchResults {
+        val levelByPair = mutableMapOf<Pair<String, String>, String>()
+        semanticMatches.forEach { match ->
+            val key = match.needId to match.supportId
+            if (levelByPair[key] != "DIRECT") {
+                levelByPair[key] = match.level
+            }
+        }
+
+        val needResults = input.needs.map { need ->
+            val candidates = input.candidates
+            val directSemantic = candidates.filter {
+                levelByPair[need.needId to it.supportId] == "DIRECT"
+            }
+            val semanticAlternatives = candidates.filter {
+                levelByPair[need.needId to it.supportId] == "ALTERNATIVE"
+            }
+
+            if (need.supportType == "VENUE") {
+                buildVenueMatchResult(
+                    need = need,
+                    directSemantic = directSemantic,
+                    semanticAlternatives = semanticAlternatives
+                )
+            } else {
+                buildQuantityMatchResult(
+                    need = need,
+                    directSemantic = directSemantic,
+                    semanticAlternatives = semanticAlternatives
+                )
+            }
+        }
+
+        val overall = if (needResults.isEmpty()) {
+            0f
+        } else {
+            needResults.map { it.potentialFraction }.average().toFloat().coerceIn(0f, 1f)
+        }
+
+        return ImpactWeaveMatchResults(
+            draftId = draftId,
+            needResults = needResults,
+            overallPotentialFraction = overall
+        )
+    }
+
+    private fun buildVenueMatchResult(
+        need: ImpactWeaveDatabaseNeed,
+        directSemantic: List<ImpactWeaveSupportCandidate>,
+        semanticAlternatives: List<ImpactWeaveSupportCandidate>
+    ): ImpactWeaveNeedMatchResult {
+        val requiredCapacity = need.capacityRequired
+        val suitable = directSemantic.filter { candidate ->
+            requiredCapacity == null ||
+                (candidate.capacity != null && candidate.capacity >= requiredCapacity)
+        }
+
+        val localSuitable = suitable.filter { candidate ->
+            candidate.distanceKm?.let { it <= LOCAL_VENUE_RADIUS_KM } == true
+        }
+        val selectedSuitable = (if (localSuitable.isNotEmpty()) localSuitable else suitable)
+            .sortedWith(candidateDistanceComparator())
+
+        // Direct venue types with unknown/insufficient capacity remain useful to show,
+        // but do not count toward a known capacity target.
+        val capacityAlternatives = directSemantic.filterNot { it in suitable }
+        val alternatives = (semanticAlternatives + capacityAlternatives)
+            .distinctBy { it.supportId }
+            .sortedWith(candidateDistanceComparator())
+
+        return ImpactWeaveNeedMatchResult(
+            need = need,
+            directMatches = selectedSuitable,
+            alternativeMatches = alternatives,
+            potentialFraction = if (suitable.isNotEmpty()) 1f else 0f,
+            potentialCoveredAmount = requiredCapacity?.takeIf { suitable.isNotEmpty() },
+            usesWiderVenueArea = suitable.isNotEmpty() && localSuitable.isEmpty()
+        )
+    }
+
+    private fun buildQuantityMatchResult(
+        need: ImpactWeaveDatabaseNeed,
+        directSemantic: List<ImpactWeaveSupportCandidate>,
+        semanticAlternatives: List<ImpactWeaveSupportCandidate>
+    ): ImpactWeaveNeedMatchResult {
+        val required = need.quantityRequired ?: 0
+        val direct = directSemantic
+            .filter { (it.quantity ?: 0) > 0 }
+            .distinctBy { it.supportId }
+            .sortedWith(candidateDistanceComparator())
+        val available = direct.sumOf { it.quantity ?: 0 }
+        val covered = if (required > 0) available.coerceAtMost(required) else 0
+        val fraction = if (required > 0) {
+            covered.toFloat() / required.toFloat()
+        } else {
+            0f
+        }
+
+        return ImpactWeaveNeedMatchResult(
+            need = need,
+            directMatches = direct,
+            alternativeMatches = semanticAlternatives
+                .distinctBy { it.supportId }
+                .sortedWith(candidateDistanceComparator()),
+            potentialFraction = fraction.coerceIn(0f, 1f),
+            potentialCoveredAmount = covered
+        )
+    }
+
+    private fun fallbackSemanticMatches(
+        input: ImpactWeaveMatchingInput
+    ): List<ImpactWeaveSemanticMatch> {
+        return input.needs.flatMap { need ->
+            input.candidates.mapNotNull { candidate ->
+                val level = fallbackMatchLevel(need.resourceName, candidate.resourceName)
+                if (level == "NONE") null else ImpactWeaveSemanticMatch(
+                    needId = need.needId,
+                    supportId = candidate.supportId,
+                    level = level
+                )
+            }
+        }
+    }
+
+    private fun fallbackMatchLevel(needName: String, candidateName: String): String {
+        val need = matchingTokens(needName)
+        val candidate = matchingTokens(candidateName)
+        if (need.isEmpty() || candidate.isEmpty()) return "NONE"
+        if (need == candidate || need.containsAll(candidate) || candidate.containsAll(need)) {
+            return "DIRECT"
+        }
+        return if (need.intersect(candidate).isNotEmpty()) "ALTERNATIVE" else "NONE"
+    }
+
+    private fun matchingTokens(value: String): Set<String> = value
+        .lowercase()
+        .split(Regex("[^a-z0-9]+"))
+        .filter { it.length >= 2 }
+        .toSet()
+
+    private fun distanceKmFromActivity(
+        draft: ImpactWeaveDraft,
+        candidate: ImpactWeaveSupportCandidate
+    ): Double? {
+        val area = draft.areaLocation ?: return null
+        val candidateLat = candidate.latitude ?: return null
+        val candidateLong = candidate.longitude ?: return null
+        return haversineKm(
+            area.latitude,
+            area.longitude,
+            candidateLat,
+            candidateLong
+        )
+    }
+
+    private fun haversineKm(
+        latitude1: Double,
+        longitude1: Double,
+        latitude2: Double,
+        longitude2: Double
+    ): Double {
+        val earthRadiusKm = 6371.0
+        val lat1 = Math.toRadians(latitude1)
+        val lat2 = Math.toRadians(latitude2)
+        val deltaLat = Math.toRadians(latitude2 - latitude1)
+        val deltaLong = Math.toRadians(longitude2 - longitude1)
+        val a = sin(deltaLat / 2) * sin(deltaLat / 2) +
+            cos(lat1) * cos(lat2) *
+            sin(deltaLong / 2) * sin(deltaLong / 2)
+        return earthRadiusKm * 2 * atan2(sqrt(a), sqrt(1 - a))
+    }
+
+    private fun candidateDistanceComparator() =
+        compareBy<ImpactWeaveSupportCandidate> { it.distanceKm ?: Double.MAX_VALUE }
+            .thenBy { it.organisationName.lowercase() }
+
+    fun updateCategory(value: VolunteerPostCategory) = updateDraft { copy(category = value) }
 
     fun updateTitle(value: String) = updateDraft { copy(title = value) }
+
+    fun updateDescription(value: String) = updateDraft { copy(description = value) }
 
     fun updateMode(value: ImpactWeaveMode) = updateDraft { copy(mode = value) }
 
@@ -224,19 +730,19 @@ class ImpactWeaveViewModel : ViewModel() {
         resourceName: String,
         amount: Int?
     ) {
+        val normalizedSupportType = supportType.trim().uppercase()
         val need = ImpactWeaveNeedDraft(
             needId = nextNeedId++,
             originalText = originalText.trim(),
-            supportType = supportType,
+            supportType = normalizedSupportType,
             resourceName = resourceName.trim(),
-            quantityRequired = if (supportType == "VENUE") null else amount,
-            capacityRequired = if (supportType == "VENUE") amount else null
+            quantityRequired = if (normalizedSupportType == "VENUE") null else amount,
+            capacityRequired = if (normalizedSupportType == "VENUE") amount else null
         )
 
         updateDraft {
             copy(needs = needs + need)
         }
-        saveWorkingCopy()
     }
 
     fun updateNeed(
@@ -246,6 +752,7 @@ class ImpactWeaveViewModel : ViewModel() {
         resourceName: String,
         amount: Int?
     ) {
+        val normalizedSupportType = supportType.trim().uppercase()
         updateDraft {
             copy(
                 needs = needs.map { need ->
@@ -254,23 +761,21 @@ class ImpactWeaveViewModel : ViewModel() {
                     } else {
                         need.copy(
                             originalText = originalText.trim(),
-                            supportType = supportType,
+                            supportType = normalizedSupportType,
                             resourceName = resourceName.trim(),
-                            quantityRequired = if (supportType == "VENUE") null else amount,
-                            capacityRequired = if (supportType == "VENUE") amount else null
+                            quantityRequired = if (normalizedSupportType == "VENUE") null else amount,
+                            capacityRequired = if (normalizedSupportType == "VENUE") amount else null
                         )
                     }
                 }
             )
         }
-        saveWorkingCopy()
     }
 
     fun removeNeed(needId: Int) {
         updateDraft {
             copy(needs = needs.filterNot { it.needId == needId })
         }
-        saveWorkingCopy()
     }
 
     fun activityPlanErrors(): Map<String, String> {
@@ -278,8 +783,14 @@ class ImpactWeaveViewModel : ViewModel() {
         val errors = linkedMapOf<String, String>()
         val minimumStartDate = minimumImpactWeaveStartDateMillis()
 
+        if (draft.category == null) {
+            errors["category"] = "Select an activity category."
+        }
         if (draft.title.trim().length < 3) {
             errors["title"] = "Enter an activity title."
+        }
+        if (draft.description.isBlank()) {
+            errors["description"] = "Enter an activity description."
         }
         if (draft.mode == null) {
             errors["mode"] = "Choose Physical or Hybrid."
@@ -343,28 +854,134 @@ class ImpactWeaveViewModel : ViewModel() {
         }.timeInMillis
     }
 
-    private fun saveWorkingCopy() {
-        val working = _uiState.value.workingDraft ?: return
-        val saved = working.copy(updatedAtMillis = AppClock.nowMillis())
-        val existing = _uiState.value.drafts.any { it.draftId == saved.draftId }
-        val drafts = if (existing) {
-            _uiState.value.drafts.map { draft ->
-                if (draft.draftId == saved.draftId) saved else draft
-            }
-        } else {
-            _uiState.value.drafts + saved
-        }
+    fun sendPartnershipRequest(
+        organisationId: String,
+        organisationName: String,
+        items: List<PartnershipRequestItem>
+    ) {
+        val draftId = _uiState.value.workingDraft?.databaseDraftId ?: return
+        if (_uiState.value.sendingPartnershipOrganisationId != null) return
+        if (organisationId in _uiState.value.sentPartnershipOrganisationIds) return
 
         _uiState.value = _uiState.value.copy(
-            drafts = drafts,
-            workingDraft = saved
+            sendingPartnershipOrganisationId = organisationId,
+            partnershipRequestError = null,
+            partnershipRequestSuccess = null
         )
+
+        viewModelScope.launch {
+            try {
+                partnershipRepository.sendPartnershipRequest(
+                    draftId = draftId,
+                    receiverOrganisationId = organisationId,
+                    items = items
+                )
+
+                val partnershipStates = loadPartnershipStates(draftId)
+
+                _uiState.value = _uiState.value.copy(
+                    sendingPartnershipOrganisationId = null,
+                    sentPartnershipOrganisationIds = partnershipStates.keys,
+                    partnershipStates = partnershipStates,
+                    partnershipRequestError = null,
+                    partnershipRequestSuccess =
+                        "Partnership request sent to $organisationName."
+                )
+
+                // The first request changes MATCHING -> WAITING in Supabase. Refresh the
+                // landing data quietly so the status is correct when the user goes back.
+                runCatching { impactWeaveRepository.loadActivePlans() }
+                    .onSuccess { plans ->
+                        _uiState.value = _uiState.value.copy(activePlans = plans)
+                    }
+            } catch (exception: Exception) {
+                if (exception is CancellationException) throw exception
+                _uiState.value = _uiState.value.copy(
+                    sendingPartnershipOrganisationId = null,
+                    partnershipRequestError = safePartnershipRequestError(exception.message.orEmpty()),
+                    partnershipRequestSuccess = null
+                )
+            }
+        }
+    }
+
+    fun clearPartnershipRequestFeedback() {
+        _uiState.value = _uiState.value.copy(
+            partnershipRequestError = null,
+            partnershipRequestSuccess = null
+        )
+    }
+
+    private fun firstIncompleteNeed(draft: ImpactWeaveDraft): ImpactWeaveNeedDraft? =
+        draft.needs.firstOrNull { need ->
+            when (need.supportType.trim().uppercase()) {
+                "VENUE" -> need.capacityRequired != null && need.capacityRequired <= 0
+                else -> need.quantityRequired == null || need.quantityRequired <= 0
+            }
+        }
+
+    private fun supportTypeLabelForError(supportType: String): String =
+        supportType.lowercase().replaceFirstChar { it.titlecase() }
+
+    private fun friendlyMatchingError(exception: Exception): String {
+        val message = exception.message.orEmpty()
+        return when {
+            message.contains("at least 10 days", ignoreCase = true) ->
+                "The activity must start at least 10 days from today."
+            message.contains("venue requirement", ignoreCase = true) ->
+                "Add a venue requirement before finding partners."
+            message.contains("must be verified", ignoreCase = true) ->
+                "Your organisation must be verified before finding partners."
+            message.contains("401", ignoreCase = true) ||
+                message.contains("JWT", ignoreCase = true) ||
+                message.contains("token", ignoreCase = true) ->
+                "Your session could not be verified. Sign in again and try Find Partners."
+            else -> safeDatabaseError(message)
+        }
+    }
+
+    private fun safePartnershipRequestError(rawMessage: String): String {
+        val safe = safeDatabaseError(rawMessage)
+        return if (safe.startsWith("Unable to start Impact Weave", ignoreCase = true)) {
+            "Unable to send the partnership request right now. Please try again."
+        } else {
+            safe
+        }
+    }
+
+    /**
+     * Keep request headers/tokens out of the UI, but preserve the useful first
+     * PostgREST/PostgreSQL error line so matching failures are actually diagnosable.
+     */
+    private fun safeDatabaseError(rawMessage: String): String {
+        val safeHead = rawMessage
+            .substringBefore("\nCode:")
+            .substringBefore("\nHint:")
+            .substringBefore("\nDetails:")
+            .substringBefore("\nURL:")
+            .substringBefore("\nHeaders:")
+            .lineSequence()
+            .map { it.trim() }
+            .firstOrNull { it.isNotBlank() }
+            .orEmpty()
+
+        val containsSecret = safeHead.contains("Bearer ", ignoreCase = true) ||
+            safeHead.contains("apikey", ignoreCase = true) ||
+            safeHead.contains("Authorization", ignoreCase = true) ||
+            safeHead.contains("https://", ignoreCase = true)
+
+        return if (safeHead.isNotBlank() && !containsSecret) {
+            safeHead.take(220)
+        } else {
+            "Unable to start Impact Weave matching right now. Please try again."
+        }
     }
 
     private fun updateDraft(change: ImpactWeaveDraft.() -> ImpactWeaveDraft) {
         val draft = _uiState.value.workingDraft ?: return
         _uiState.value = _uiState.value.copy(
-            workingDraft = draft.change().copy(updatedAtMillis = AppClock.nowMillis())
+            workingDraft = draft.change().copy(updatedAtMillis = AppClock.nowMillis()),
+            findPartnersError = null
         )
     }
 
@@ -376,5 +993,9 @@ class ImpactWeaveViewModel : ViewModel() {
             set(Calendar.SECOND, 0)
             set(Calendar.MILLISECOND, 0)
         }.timeInMillis
+    }
+
+    companion object {
+        private const val LOCAL_VENUE_RADIUS_KM = 25.0
     }
 }

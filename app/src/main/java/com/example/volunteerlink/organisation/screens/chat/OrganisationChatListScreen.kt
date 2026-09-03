@@ -34,7 +34,12 @@ import com.example.volunteerlink.chat.data.unreadCountFor
 import com.example.volunteerlink.ui.theme.*
 
 @Composable
-fun OrganisationChatListScreen(role: Role, onOpenChat: (String) -> Unit) {
+fun OrganisationChatListScreen(
+    role: Role,
+    onOpenChat: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    showHeader: Boolean = true
+) {
     val chats = ChatData.chatsForCurrentRole()
     var showNotifications by remember { mutableStateOf(false) }
     val unreadChats = chats.filter { it.unreadCountFor(role) > 0 }
@@ -45,9 +50,10 @@ fun OrganisationChatListScreen(role: Role, onOpenChat: (String) -> Unit) {
     var showDeleteConfirmation by remember { mutableStateOf(false) }
     var chatToDelete by remember { mutableStateOf<ChatRoom?>(null) }
 
-    Column(modifier = Modifier.fillMaxSize().background(CreamBackground)) {
-        // Top bar with notifications
-        Row(
+    Column(modifier = modifier.fillMaxSize().background(CreamBackground)) {
+        // Top bar with notifications. The Hub screen can hide only this header while
+        // preserving the teammate-owned event-chat list/actions below it.
+        if (showHeader) Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(DeepGreen)
