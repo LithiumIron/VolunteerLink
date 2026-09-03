@@ -61,6 +61,31 @@ class VolunteerPromotionEngineTest {
         assertEquals(before, VolunteerHomeRecommendationEngine.recommend(events, emptyList(), nowMillis = now))
     }
 
+    @Test fun hybridPlacementRequiresAnOpenRoleInTheSelectedMode() {
+        val physical = event(1).eventVolunteerRoles.single()
+        val remote = physical.copy(roleId = 99, roleMode = "REMOTE")
+        val hybrid = event(1).copy(eventOpportunityType = "Hybrid",
+            eventPhysicalStartDate = "2026-09-01", eventRemoteStartDate = "2026-09-18",
+            eventVolunteerRoles = listOf(physical, remote))
+        fun feed(mode: VolunteerHomeFeedFilter, source: VolunteerOpportunityEvent = hybrid) =
+            VolunteerHomeFeedEngine.filter(listOf(source), mode, emptyList(), now)
+        assertTrue(feed(VolunteerHomeFeedFilter.PHYSICAL).isEmpty())
+        assertEquals(listOf(1), feed(VolunteerHomeFeedFilter.REMOTE).map { it.eventId })
+        assertEquals(listOf(1), feed(VolunteerHomeFeedFilter.ALL).map { it.eventId })
+        assertTrue(feed(VolunteerHomeFeedFilter.REMOTE,
+            hybrid.copy(eventVolunteerRoles = listOf(physical, remote.copy(roleVacancies = 0)))).isEmpty())
+    }
+
+    @Test fun promotionCannotBypassDistanceLongTermOrExpiryFilters() {
+        val source = listOf(event(1).copy(eventDistanceKm = 15.0),
+            event(2).copy(eventDistanceKm = null), event(3).copy(eventIsLongTerm = true))
+        val nearby = VolunteerHomeFeedEngine.filter(source, VolunteerHomeFeedFilter.NEAR_ME, emptyList(), now)
+        val longTerm = VolunteerHomeFeedEngine.filter(source, VolunteerHomeFeedFilter.LONG_TERM, emptyList(), now)
+        assertEquals(listOf(3), nearby.map { it.eventId })
+        assertEquals(listOf(3), longTerm.map { it.eventId })
+        assertTrue(VolunteerPromotionEngine.activeByPost(listOf(promo(3).copy(segmentEndMillis = now)), now).isEmpty())
+    }
+
     private fun order(ids: List<Int>, promotions: List<VolunteerPromotion>) =
         VolunteerPromotionEngine.prioritize(ids.map(::event), promotions, now).map { it.eventId }
 

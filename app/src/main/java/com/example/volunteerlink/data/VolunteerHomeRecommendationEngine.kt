@@ -73,10 +73,10 @@ object VolunteerHomeFeedEngine {
                     VolunteerHomeFeedFilter.ALL -> true
 
                     VolunteerHomeFeedFilter.PHYSICAL ->
-                        event.eventOpportunityType.equals(
-                            other = "Physical",
-                            ignoreCase = true
-                        )
+                        event.eventVolunteerRoles.any { role ->
+                            role.roleMode.ifBlank { event.eventOpportunityType }.equals("Physical", true) &&
+                                VolunteerDiscoveryEligibility.canRecommendRole(event, role, applications, nowMillis)
+                        }
 
                     VolunteerHomeFeedFilter.NEAR_ME ->
                         event.eventDistanceKm?.let { distanceKm ->
@@ -84,10 +84,10 @@ object VolunteerHomeFeedEngine {
                         } == true
 
                     VolunteerHomeFeedFilter.REMOTE ->
-                        event.eventOpportunityType.equals(
-                            other = "Remote",
-                            ignoreCase = true
-                        )
+                        event.eventVolunteerRoles.any { role ->
+                            role.roleMode.ifBlank { event.eventOpportunityType }.equals("Remote", true) &&
+                                VolunteerDiscoveryEligibility.canRecommendRole(event, role, applications, nowMillis)
+                        }
 
                     VolunteerHomeFeedFilter.LONG_TERM ->
                         event.eventIsLongTerm

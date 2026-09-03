@@ -2,6 +2,8 @@ package com.example.volunteerlink.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
@@ -18,7 +20,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -32,6 +33,7 @@ import com.example.volunteerlink.data.VolunteerPromotionRepository
 import com.example.volunteerlink.data.supabase
 import com.example.volunteerlink.model.VolunteerOpportunityEvent
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextPrimary
+import com.example.volunteerlink.ui.theme.VolunteerLinkScreenHorizontalPadding
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextSecondary
 import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.CancellationException
@@ -83,20 +85,23 @@ internal fun rememberVolunteerPromotionFeed(usingCachedDashboard: Boolean): Volu
 
 @Composable
 internal fun VolunteerPromotionSection(events: List<VolunteerOpportunityEvent>, onSelected: (Int) -> Unit) {
-    // Keep the existing event-card visual language; allow space for a swipe hint on small phones.
-    val cardWidth = (LocalConfiguration.current.screenWidthDp - 48).coerceIn(240, 380).dp
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Column(Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    // Match the ordinary Home list's actual container width and shared side margins.
+    // Do not narrow cards to expose the next card, or cap tablet widths at 380dp.
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+      val cardWidth = (maxWidth - VolunteerLinkScreenHorizontalPadding * 2).coerceAtLeast(0.dp)
+      Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(Modifier.padding(horizontal = VolunteerLinkScreenHorizontalPadding), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("Featured opportunities", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = VolunteerLinkTextPrimary)
             Text("Paid promotion · Swipe to explore", fontSize = 12.sp, color = VolunteerLinkTextSecondary)
         }
-        LazyRow(contentPadding = PaddingValues(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        LazyRow(contentPadding = PaddingValues(horizontal = VolunteerLinkScreenHorizontalPadding), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             items(events, key = { it.eventDatabaseId }) { event ->
                 Box(Modifier.width(cardWidth)) {
                     VolunteerHomeCompactCard(event, isPromoted = true, onVolunteerOpportunitySelected = { onSelected(event.eventId) })
                 }
             }
         }
+      }
     }
 }
 

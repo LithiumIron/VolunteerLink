@@ -364,7 +364,7 @@ fun VolunteerHomeScreen(
         if (promotionFeed.failed) {
             item(key = "promotion_load_notice") { VolunteerPromotionLoadNotice(promotionFeed.retry) }
         }
-        if (selectedHomeFilter == VolunteerHomeFeedFilter.FOR_YOU && featuredVolunteerOpportunityEvents.isNotEmpty()) {
+        if (featuredVolunteerOpportunityEvents.isNotEmpty()) {
             item(key = "volunteer_promoted_opportunities") {
                 Column(Modifier.padding(top = 16.dp, bottom = 8.dp)) {
                     VolunteerPromotionSection(featuredVolunteerOpportunityEvents, onVolunteerOpportunitySelected)
