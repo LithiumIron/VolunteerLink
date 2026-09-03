@@ -171,8 +171,8 @@ fun ImpactWeaveLandingScreen(
 
         item(key = "active_plans_header") {
             OrganisationSectionHeader(
-                title = "Active Plans",
-                subtitle = "Reopen a plan to view its current partner matches.",
+                title = "Plans & history",
+                subtitle = "Active, converted and disposed plans remain available here.",
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp)
             )
         }
@@ -220,7 +220,7 @@ fun ImpactWeaveLandingScreen(
             activePlans.isEmpty() -> {
                 item(key = "active_plans_empty") {
                     Text(
-                        text = "No active Impact Weave plans yet.",
+                        text = "No Impact Weave plans yet.",
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
                         fontSize = 13.sp,
                         color = VolunteerLinkTextSecondary
@@ -287,7 +287,11 @@ private fun ImpactWeaveActivePlanCard(
             color = VolunteerLinkTextSecondary
         )
         Text(
-            text = "Tap to view current partner matches",
+            text = if (plan.status.equals("DISPOSED", true) || plan.status.equals("CONVERTED", true)) {
+                "Tap to view read-only history"
+            } else {
+                "Tap to view current partner matches"
+            },
             modifier = Modifier.padding(top = 5.dp),
             fontSize = 13.sp,
             fontWeight = FontWeight.Medium,
@@ -1902,12 +1906,25 @@ fun ImpactWeaveMatchResultsScreen(
     sendingOrganisationId: String?,
     requestError: String?,
     requestSuccess: String?,
+    isSavingPlanChange: Boolean,
+    planChangeError: String?,
+    planChangeSuccess: String?,
     onBack: () -> Unit,
     onRetry: () -> Unit,
     onSendRequest: (String, String, List<PartnershipRequestItem>) -> Unit,
-    onClearRequestFeedback: () -> Unit
+    onClearRequestFeedback: () -> Unit,
+    onUpdateDetails: (VolunteerPostCategory, String, String) -> Unit,
+    onReschedule: (Long, Long, Int, Int) -> Unit,
+    onDispose: () -> Unit,
+    onCreatePost: (String) -> Unit,
+    onClearPlanFeedback: () -> Unit,
+    minimumStartDateMillis: Long,
+    minimumPostDateMillis: Long
 ) {
     var requestCandidate by remember { mutableStateOf<ImpactWeaveSupportCandidate?>(null) }
+    var showEditDetails by remember { mutableStateOf(false) }
+    var showReschedule by remember { mutableStateOf(false) }
+    var showDispose by remember { mutableStateOf(false) }
 
     LaunchedEffect(sentOrganisationIds, requestCandidate?.organisationId) {
         val organisationId = requestCandidate?.organisationId ?: return@LaunchedEffect
@@ -1979,6 +1996,8 @@ fun ImpactWeaveMatchResultsScreen(
                 }
             }
         } else if (results != null) {
+            val isReadOnlyPlan = draft.persistedStatus.equals("DISPOSED", true) ||
+                draft.persistedStatus.equals("CONVERTED", true)
             val recommendedPartners = buildPartnerOrganisationGroups(results)
             val recommendedOrganisationIds = recommendedPartners
                 .mapTo(mutableSetOf()) { it.organisationId }
@@ -1990,15 +2009,51 @@ fun ImpactWeaveMatchResultsScreen(
             val availableRecommendedPartners = recommendedPartners.filterNot {
                 it.organisationId in contactedOrganisationIds
             }
-            val partnershipRequests = partnershipStates.values.sortedWith(
-                compareBy<ImpactWeavePartnershipState> { partnershipStatusSortOrder(it.status) }
-                    .thenBy { it.organisationName.lowercase() }
-            )
+            val partnershipRequests = partnershipStates.values
+                .filter { state ->
+                    !isReadOnlyPlan || state.status.equals("ACCEPTED", ignoreCase = true)
+                }
+                .sortedWith(
+                    compareBy<ImpactWeavePartnershipState> { partnershipStatusSortOrder(it.status) }
+                        .thenBy { it.organisationName.lowercase() }
+                )
 
             item(key = "match_overall") {
                 PartnerMatchingSummaryCard(
                     results = results,
-                    organisationCount = recommendedPartners.size
+                    organisationCount = recommendedPartners.size,
+                    isReadOnly = isReadOnlyPlan,
+                    persistedStatus = draft.persistedStatus.orEmpty(),
+                    acceptedPartnerCount = partnershipRequests.count {
+                        it.status.equals("ACCEPTED", ignoreCase = true)
+                    }
+                )
+            }
+
+            item(key = "plan_actions") {
+                ImpactWeavePlanActionsCard(
+                    status = draft.persistedStatus.orEmpty(),
+                    startDateMillis = draft.startDateMillis,
+                    hasConfirmedVenue = draft.hasExistingVenue == true ||
+                        results.needResults.any {
+                            it.need.supportType.equals("VENUE", true) && it.need.isFulfilled
+                        },
+                    minimumPostDateMillis = minimumPostDateMillis,
+                    isSaving = isSavingPlanChange,
+                    errorMessage = planChangeError,
+                    successMessage = planChangeSuccess,
+                    onEditDetails = {
+                        onClearPlanFeedback()
+                        showEditDetails = true
+                    },
+                    onReschedule = {
+                        onClearPlanFeedback()
+                        showReschedule = true
+                    },
+                    onDispose = { showDispose = true },
+                    onCreatePost = {
+                        draft.databaseDraftId?.let(onCreatePost)
+                    }
                 )
             }
 
@@ -2023,7 +2078,10 @@ fun ImpactWeaveMatchResultsScreen(
                 items = results.needResults,
                 key = { "confirmed_${it.need.needId}" }
             ) { needResult ->
-                ConfirmedSupportProgressCard(needResult)
+                ConfirmedSupportProgressCard(
+                    result = needResult,
+                    isReadOnly = isReadOnlyPlan
+                )
             }
 
             if (results.needResults.any { it.need.supportType == "VENUE" && it.usesWiderVenueArea }) {
@@ -2058,7 +2116,11 @@ fun ImpactWeaveMatchResultsScreen(
                             color = VolunteerLinkTextPrimary
                         )
                         Text(
-                            text = "Live invitation status and the exact support currently requested or confirmed.",
+                            text = if (isReadOnlyPlan) {
+                                "Accepted partner organisations and the support recorded when this Impact Weave became read-only."
+                            } else {
+                                "Live invitation status and the exact support currently requested or confirmed."
+                            },
                             style = MaterialTheme.typography.bodySmall,
                             lineHeight = 17.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -2093,7 +2155,7 @@ fun ImpactWeaveMatchResultsScreen(
                 }
             }
 
-            if (recommendedPartners.isEmpty()) {
+            if (!isReadOnlyPlan && recommendedPartners.isEmpty()) {
                 item(key = "no_recommended_partners") {
                     CreateSectionCard(
                         title = "No suitable partners yet",
@@ -2107,7 +2169,7 @@ fun ImpactWeaveMatchResultsScreen(
                         )
                     }
                 }
-            } else if (availableRecommendedPartners.isNotEmpty()) {
+            } else if (!isReadOnlyPlan && availableRecommendedPartners.isNotEmpty()) {
                 item(key = "recommended_partner_heading") {
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(
@@ -2140,7 +2202,7 @@ fun ImpactWeaveMatchResultsScreen(
                 }
             }
 
-            if (alternativePartners.isNotEmpty()) {
+            if (!isReadOnlyPlan && alternativePartners.isNotEmpty()) {
                 item(key = "alternative_partner_heading") {
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(
@@ -2165,6 +2227,56 @@ fun ImpactWeaveMatchResultsScreen(
                 }
             }
         }
+    }
+
+    if (showEditDetails) {
+        ImpactWeaveDetailsDialog(
+            draft = draft,
+            isSaving = isSavingPlanChange,
+            errorMessage = planChangeError,
+            onDismiss = { if (!isSavingPlanChange) showEditDetails = false },
+            onSave = { category, title, description ->
+                onUpdateDetails(category, title, description)
+            }
+        )
+    }
+
+    if (showReschedule) {
+        ImpactWeaveRescheduleDialog(
+            draft = draft,
+            minimumStartDateMillis = minimumStartDateMillis,
+            isSaving = isSavingPlanChange,
+            errorMessage = planChangeError,
+            onDismiss = { if (!isSavingPlanChange) showReschedule = false },
+            onSave = { startDate, endDate, startTime, endTime ->
+                onReschedule(startDate, endDate, startTime, endTime)
+            }
+        )
+    }
+
+    if (showDispose) {
+        AlertDialog(
+            onDismissRequest = { if (!isSavingPlanChange) showDispose = false },
+            title = { Text("Dispose Impact Weave plan?") },
+            text = {
+                Text("All pending and accepted partnerships will be cancelled and each partner will be notified. The conversation history is kept.")
+            },
+            confirmButton = {
+                Button(
+                    enabled = !isSavingPlanChange,
+                    onClick = {
+                        showDispose = false
+                        onDispose()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) { Text("Dispose plan") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDispose = false }) { Text("Keep plan") }
+            }
+        )
     }
 
     val selectedCandidate = requestCandidate
@@ -2197,8 +2309,259 @@ fun ImpactWeaveMatchResultsScreen(
 }
 
 @Composable
+private fun ImpactWeavePlanActionsCard(
+    status: String,
+    startDateMillis: Long?,
+    hasConfirmedVenue: Boolean,
+    minimumPostDateMillis: Long,
+    isSaving: Boolean,
+    errorMessage: String?,
+    successMessage: String?,
+    onEditDetails: () -> Unit,
+    onReschedule: () -> Unit,
+    onDispose: () -> Unit,
+    onCreatePost: () -> Unit
+) {
+    val normalizedStatus = status.uppercase(Locale.ROOT)
+    val terminal = normalizedStatus == "DISPOSED" || normalizedStatus == "CONVERTED"
+    val supportAllowsPost = normalizedStatus == "PARTIAL" || normalizedStatus == "READY"
+    val dateAllowsPost = startDateMillis != null && startDateMillis >= minimumPostDateMillis
+    val canCreatePost = supportAllowsPost && hasConfirmedVenue && dateAllowsPost && !terminal
+    CreateSectionCard(
+        title = when {
+            normalizedStatus == "DISPOSED" -> "Disposed plan"
+            normalizedStatus == "CONVERTED" -> "Volunteer Post created"
+            canCreatePost -> "Ready for volunteers"
+            else -> "Manage activity plan"
+        },
+        subtitle = when {
+            terminal -> "This plan is kept as read-only history, including its partnership record."
+            canCreatePost -> "Confirmed support can be partial. Continue to add volunteer roles and capacity; the agreed activity details stay locked."
+            supportAllowsPost && !hasConfirmedVenue -> "A confirmed physical venue is required before this plan can become a Volunteer Post."
+            supportAllowsPost && !dateAllowsPost -> "Create Post is locked because the activity starts in less than 7 days. Reschedule it before continuing."
+            else -> "You can change text details or the schedule. Location and support requirements stay locked after matching."
+        }
+    ) {
+        if (supportAllowsPost && !terminal) {
+            Button(
+                onClick = onCreatePost,
+                enabled = !isSaving && canCreatePost,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = CreateGreen),
+                shape = RoundedCornerShape(13.dp)
+            ) { Text("Create Volunteer Post", fontWeight = FontWeight.Bold) }
+        }
+        if (!terminal) Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            OutlinedButton(
+                onClick = onEditDetails,
+                enabled = !isSaving,
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(12.dp)
+            ) { Text("Edit details") }
+            OutlinedButton(
+                onClick = onReschedule,
+                enabled = !isSaving,
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(12.dp)
+            ) { Text("Reschedule") }
+        }
+        if (!terminal) Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End
+        ) {
+            TextButton(
+                onClick = onDispose,
+                enabled = !isSaving
+            ) {
+                Text("Dispose plan", color = MaterialTheme.colorScheme.error)
+            }
+        }
+        successMessage?.let {
+            Text(it, style = MaterialTheme.typography.bodySmall, color = CreateGreen)
+        }
+        errorMessage?.let {
+            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+        }
+    }
+}
+
+@Composable
+private fun ImpactWeaveDetailsDialog(
+    draft: ImpactWeaveDraft,
+    isSaving: Boolean,
+    errorMessage: String?,
+    onDismiss: () -> Unit,
+    onSave: (VolunteerPostCategory, String, String) -> Unit
+) {
+    var category by remember(draft.databaseDraftId) { mutableStateOf(draft.category) }
+    var title by remember(draft.databaseDraftId) { mutableStateOf(draft.title) }
+    var description by remember(draft.databaseDraftId) { mutableStateOf(draft.description) }
+    Dialog(
+        onDismissRequest = { if (!isSaving) onDismiss() },
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .imePadding(),
+            shape = RoundedCornerShape(28.dp),
+            color = VolunteerLinkSurface,
+            tonalElevation = 6.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(22.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Text("Edit activity details", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text(
+                    "These text changes do not affect confirmed support.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = VolunteerLinkTextSecondary
+                )
+                CategoryPicker(category, { category = it }, null, !isSaving)
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Title") },
+                    enabled = !isSaving,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("Description") },
+                    minLines = 3,
+                    enabled = !isSaving,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                errorMessage?.let {
+                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(onClick = onDismiss, enabled = !isSaving) { Text("Cancel") }
+                    Button(
+                        enabled = !isSaving && category != null && title.trim().length >= 3 && description.isNotBlank(),
+                        onClick = { category?.let { onSave(it, title, description) } },
+                        colors = ButtonDefaults.buttonColors(containerColor = CreateGreen),
+                        shape = RoundedCornerShape(14.dp)
+                    ) { Text(if (isSaving) "Saving..." else "Save") }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ImpactWeaveRescheduleDialog(
+    draft: ImpactWeaveDraft,
+    minimumStartDateMillis: Long,
+    isSaving: Boolean,
+    errorMessage: String?,
+    onDismiss: () -> Unit,
+    onSave: (Long, Long, Int, Int) -> Unit
+) {
+    var startDate by remember(draft.databaseDraftId) { mutableStateOf(draft.startDateMillis) }
+    var endDate by remember(draft.databaseDraftId) { mutableStateOf(draft.endDateMillis) }
+    var startTime by remember(draft.databaseDraftId) { mutableStateOf(draft.startTimeMinutes) }
+    var endTime by remember(draft.databaseDraftId) { mutableStateOf(draft.endTimeMinutes) }
+    val validationError = when {
+        startDate == null || endDate == null || startTime == null || endTime == null ->
+            "Complete every schedule field."
+        startDate!! < minimumStartDateMillis ->
+            "The new start date must be at least 10 days from today."
+        endDate!! < startDate!! -> "End date cannot be before the start date."
+        endDate == startDate && endTime!! <= startTime!! ->
+            "End time must be later than the start time for a one-day activity."
+        draft.startDateMillis == startDate && draft.endDateMillis == endDate &&
+            draft.startTimeMinutes == startTime && draft.endTimeMinutes == endTime ->
+            "Change at least one date or time before updating."
+        else -> null
+    }
+    Dialog(
+        onDismissRequest = { if (!isSaving) onDismiss() },
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
+            shape = RoundedCornerShape(28.dp),
+            color = VolunteerLinkSurface,
+            tonalElevation = 6.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(22.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Text("Change activity schedule", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Surface(shape = RoundedCornerShape(14.dp), color = Color(0xFFFFF7E8)) {
+                Text(
+                    "Accepted partners will need to reconfirm. Their support pauses until they respond.",
+                    modifier = Modifier.padding(12.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFF6D5318)
+                )
+                }
+                DateSelectionField("Start date", startDate, minimumStartDateMillis, onDateSelected = {
+                    startDate = it
+                    if (endDate == null || endDate!! < it) endDate = it
+                }, enabled = !isSaving)
+                DateSelectionField("End date", endDate, startDate ?: minimumStartDateMillis, onDateSelected = {
+                    endDate = it
+                }, enabled = !isSaving)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TimeSelectionField("Start time", startTime, onTimeSelected = { hour, minute ->
+                        startTime = hour * 60 + minute
+                        if (endDate == startDate && endTime != null && endTime!! <= startTime!!) {
+                            endTime = null
+                        }
+                        null
+                    }, modifier = Modifier.weight(1f), enabled = !isSaving)
+                    TimeSelectionField("End time", endTime, onTimeSelected = { hour, minute ->
+                        endTime = hour * 60 + minute
+                        null
+                    }, modifier = Modifier.weight(1f), enabled = !isSaving)
+                }
+                validationError?.let {
+                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
+                errorMessage?.let {
+                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(onClick = onDismiss, enabled = !isSaving) { Text("Cancel") }
+                    Button(
+                        enabled = !isSaving && validationError == null,
+                        onClick = { onSave(startDate!!, endDate!!, startTime!!, endTime!!) },
+                        colors = ButtonDefaults.buttonColors(containerColor = CreateGreen),
+                        shape = RoundedCornerShape(14.dp)
+                    ) { Text(if (isSaving) "Saving..." else "Update schedule") }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun ConfirmedSupportProgressCard(
-    result: ImpactWeaveNeedMatchResult
+    result: ImpactWeaveNeedMatchResult,
+    isReadOnly: Boolean = false
 ) {
     val need = result.need
     val complete = need.isFulfilled
@@ -2211,6 +2574,9 @@ private fun ConfirmedSupportProgressCard(
 
     val statusText = when {
         complete -> if (isVenue) "Venue secured" else "Fulfilled"
+        isReadOnly && isVenue -> "Not secured"
+        isReadOnly && confirmed > 0 -> "Partially confirmed"
+        isReadOnly -> "Not confirmed"
         isVenue && hasSuitableProvider -> "Venue available"
         isVenue -> "No venue match yet"
         confirmed > 0 -> "In progress"
@@ -2220,11 +2586,13 @@ private fun ConfirmedSupportProgressCard(
 
     val statusBackground = when {
         complete -> Color(0xFFEAF4E6)
+        isReadOnly -> Color(0xFFF3F4F1)
         !hasSuitableProvider && confirmed == 0 -> Color(0xFFFFF3E8)
         else -> Color(0xFFF3F4F1)
     }
     val statusColor = when {
         complete -> CreateGreen
+        isReadOnly -> MaterialTheme.colorScheme.onSurfaceVariant
         !hasSuitableProvider && confirmed == 0 -> Color(0xFF8A4B14)
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
@@ -2284,7 +2652,8 @@ private fun ConfirmedSupportProgressCard(
 
             if (isVenue) {
                 val venueMessage = when {
-                    complete -> "A partner venue has been confirmed for this activity."
+                    complete -> "A partner venue was confirmed for this activity."
+                    isReadOnly -> "No venue was confirmed before this Impact Weave became read-only."
                     hasSuitableProvider -> "Suitable venue option${if (result.directMatches.size == 1) "" else "s"} found. Confirmation will happen after a partner accepts the request."
                     hasRelatedAlternative -> "No suitable direct venue match yet. Related venue options are shown below for review."
                     else -> "No verified organisation that is currently open to partnership provides a suitable venue yet."
@@ -2306,6 +2675,7 @@ private fun ConfirmedSupportProgressCard(
                         Text(
                             text = when {
                                 complete -> "Venue secured"
+                                isReadOnly -> "Venue not secured"
                                 hasSuitableProvider -> "Suitable venue available"
                                 else -> "No suitable venue found yet"
                             },
@@ -2367,6 +2737,8 @@ private fun ConfirmedSupportProgressCard(
 
                 if (!complete) {
                     val matchingMessage = when {
+                        isReadOnly ->
+                            "Locked history: $confirmed of $total was confirmed when this Impact Weave became read-only."
                         hasSuitableProvider && result.directMatches.size == 1 ->
                             "1 suitable partner is currently available for this requirement."
                         hasSuitableProvider ->
@@ -2405,18 +2777,39 @@ private fun ConfirmedSupportProgressCard(
 @Composable
 private fun PartnerMatchingSummaryCard(
     results: ImpactWeaveMatchResults,
-    organisationCount: Int
+    organisationCount: Int,
+    isReadOnly: Boolean = false,
+    persistedStatus: String = "",
+    acceptedPartnerCount: Int = 0
 ) {
+    val normalizedStatus = persistedStatus.uppercase(Locale.ROOT)
     CreateSectionCard(
-        title = "Partner Matching",
-        subtitle = if (organisationCount == 1) {
+        title = if (isReadOnly) "Partnership history" else "Partner Matching",
+        subtitle = if (isReadOnly) {
+            when (normalizedStatus) {
+                "CONVERTED" ->
+                    "This Impact Weave has already created a Volunteer Post. The support progress and accepted partners below are locked as read-only history."
+                "DISPOSED" ->
+                    "This Impact Weave was disposed. Its partnership record is kept as read-only history."
+                else ->
+                    "This Impact Weave is read-only. Its confirmed support record is shown below."
+            }
+        } else if (organisationCount == 1) {
             "1 partner organisation matches ${results.needsWithPotentialSupport} of ${results.needResults.size} needs."
         } else {
             "$organisationCount partner organisations match ${results.needsWithPotentialSupport} of ${results.needResults.size} needs."
         }
     ) {
         Text(
-            text = "Only verified organisations that are currently open to partnership are recommended. Matching is not confirmed support; progress starts after an invitation is accepted.",
+            text = if (isReadOnly) {
+                if (acceptedPartnerCount == 1) {
+                    "1 organisation accepted partnership support for this activity."
+                } else {
+                    "$acceptedPartnerCount organisations accepted partnership support for this activity."
+                }
+            } else {
+                "Only verified organisations that are currently open to partnership are recommended. Matching is not confirmed support; progress starts after an invitation is accepted."
+            },
             style = MaterialTheme.typography.bodySmall,
             lineHeight = 17.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant

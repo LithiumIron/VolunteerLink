@@ -198,16 +198,22 @@ object SupabasePartnershipRepository {
         expectedRevision: Int
     ): PartnershipResponseResult {
         val normalizedAction = action.trim().uppercase(Locale.ROOT)
-        require(normalizedAction == "ACCEPT" || normalizedAction == "DECLINE") {
-            "Choose Accept or Decline."
+        require(normalizedAction in setOf("ACCEPT", "DECLINE", "RECONFIRM", "DECLINE_RECONFIRMATION")) {
+            "Choose Accept, Reconfirm or Decline."
         }
 
         val response = supabase.postgrest.rpc(
-            function = "organisation_respond_partnership_invitation",
+            function = when (normalizedAction) {
+                "RECONFIRM" -> "organisation_reconfirm_partnership_invitation"
+                "DECLINE_RECONFIRMATION" -> "organisation_decline_partnership_reconfirmation"
+                else -> "organisation_respond_partnership_invitation"
+            },
             parameters = buildJsonObject {
                 put("p_invitation_id", invitationId)
-                put("p_action", normalizedAction)
                 put("p_expected_revision", expectedRevision)
+                if (normalizedAction !in setOf("RECONFIRM", "DECLINE_RECONFIRMATION")) {
+                    put("p_action", normalizedAction)
+                }
             }
         )
 

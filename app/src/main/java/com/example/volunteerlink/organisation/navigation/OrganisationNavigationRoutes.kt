@@ -12,6 +12,8 @@ object OrganisationNavigationRoutes {
     const val MANAGE_IMPACT_WEAVE = "organisation_manage_impact_weave"
     const val MANAGE_PROMOTIONS = "organisation_manage_promotions"
     const val CREATE = "organisation_create"
+    const val CREATE_FROM_IMPACT_WEAVE =
+        "organisation_create_from_impact_weave/{impactWeaveDraftId}"
     const val CHATS = "organisation_chats"
     const val CHAT_ID_ARGUMENT = "chatId"
 
@@ -45,6 +47,9 @@ object OrganisationNavigationRoutes {
 
     fun partnershipChatRoom(chatId: String): String =
         "organisation_partnership_chat_room/$chatId"
+
+    fun createFromImpactWeave(draftId: String): String =
+        "organisation_create_from_impact_weave/$draftId"
 
     fun groupInfo(chatId: String): String =
         "organisation_group_info/$chatId"

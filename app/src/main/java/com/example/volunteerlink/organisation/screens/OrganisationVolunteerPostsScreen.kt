@@ -87,6 +87,7 @@ private fun OrganisationVolunteerPostsContent(
         ManagePostSection.DRAFTS -> uiState.draftPosts
         ManagePostSection.REVIEW -> uiState.reviewPosts
         ManagePostSection.COMPLETED -> uiState.completedPosts
+        ManagePostSection.PARTNERSHIPS -> uiState.partnerPosts
     }
 
     val emptyCopy = when (selectedSection) {
@@ -98,6 +99,8 @@ private fun OrganisationVolunteerPostsContent(
             "Nothing waiting for review" to "Posts move here after the activity ends until close-out work is finished."
         ManagePostSection.COMPLETED ->
             "No completed posts" to "Completed posts remain available here as history."
+        ManagePostSection.PARTNERSHIPS ->
+            "No partnership posts" to "Posts created from partnerships you accepted will appear here."
     }
 
     val sectionOverview = when (selectedSection) {
@@ -127,6 +130,11 @@ private fun OrganisationVolunteerPostsContent(
         ManagePostSection.COMPLETED -> Triple(
             "${uiState.completedPosts.size} completed posts",
             "Completed posts are kept here as history.",
+            false
+        )
+        ManagePostSection.PARTNERSHIPS -> Triple(
+            "${uiState.partnerPosts.size} partnership posts",
+            "Read-only activity details and the support your organisation confirmed.",
             false
         )
     }
@@ -160,6 +168,7 @@ private fun OrganisationVolunteerPostsContent(
             draftCount = uiState.draftPosts.size,
             reviewCount = uiState.reviewPosts.size,
             completedCount = uiState.completedPosts.size,
+            partnerCount = uiState.partnerPosts.size,
             activeHasAttention = uiState.activeAttentionPostCount > 0,
             draftsHaveAttention = uiState.draftAttentionPostCount > 0,
             reviewHasAttention = uiState.reviewPosts.isNotEmpty(),
@@ -248,7 +257,11 @@ private fun OrganisationVolunteerPostsContent(
                     ManageVolunteerPostCard(
                         post = visiblePosts[index],
                         section = selectedSection,
-                        onClick = { onPostClick(visiblePosts[index].postId) }
+                        onClick = {
+                            if (!visiblePosts[index].isPartnerPost) {
+                                onPostClick(visiblePosts[index].postId)
+                            }
+                        }
                     )
                 }
             }

@@ -6,6 +6,8 @@ import com.example.volunteerlink.organisation.manage.model.PostManagementAttenda
 import com.example.volunteerlink.organisation.manage.model.PostManagementAttendanceRecord
 import com.example.volunteerlink.organisation.manage.model.PostManagementAttendanceSnapshot
 import com.example.volunteerlink.organisation.manage.model.PostManagementEvaluation
+import com.example.volunteerlink.organisation.manage.model.PostManagementImpactWeavePartner
+import com.example.volunteerlink.organisation.manage.model.PostManagementImpactWeaveContribution
 import com.example.volunteerlink.organisation.manage.model.PostManagementPerson
 import com.example.volunteerlink.organisation.manage.model.PostManagementPhysicalDetails
 import com.example.volunteerlink.organisation.manage.model.PostManagementPost
@@ -20,6 +22,8 @@ import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.storage.storage
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -32,6 +36,18 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import java.util.Locale
+
+@Serializable
+private data class ImpactWeavePostContributionRow(
+    @SerialName("impact_weave_draft_id") val impactWeaveDraftId: String,
+    @SerialName("partner_organisation_id") val partnerOrganisationId: String,
+    @SerialName("partner_organisation_name") val partnerOrganisationName: String,
+    @SerialName("support_type") val supportType: String,
+    @SerialName("need_resource_name") val needResourceName: String,
+    @SerialName("provider_resource_name") val providerResourceName: String? = null,
+    @SerialName("quantity_provided") val quantityProvided: Int? = null,
+    @SerialName("capacity_provided") val capacityProvided: Int? = null
+)
 
 /** Supabase reader for the Organisation Post Management detail screen. */
 class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementRepository {
@@ -55,7 +71,7 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
             .from("volunteer_posts")
             .select(
                 columns = Columns.raw(
-                    "post_id,organisation_id,title,description,mode,status,category"
+                    "post_id,organisation_id,title,description,mode,status,category,impact_weave_draft_id"
                 )
             ) {
                 filter {
@@ -66,6 +82,35 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
             .decodeList<JsonObject>()
             .firstOrNull()
             ?: error("Volunteer post $postId does not belong to this organisation.")
+
+        val impactWeaveDraftId = postRow.optionalText("impact_weave_draft_id")
+        val impactWeavePartners = if (impactWeaveDraftId.isNullOrBlank()) {
+            emptyList()
+        } else {
+            runCatching {
+                supabase.postgrest.rpc(
+                    function = "organisation_get_post_impact_weave_partners",
+                    parameters = buildJsonObject { put("p_post_id", postId) }
+                ).decodeList<ImpactWeavePostContributionRow>()
+                    .groupBy { it.partnerOrganisationId }
+                    .map { (partnerId, rows) ->
+                        PostManagementImpactWeavePartner(
+                            organisationId = partnerId,
+                            organisationName = rows.first().partnerOrganisationName,
+                            contributions = rows.map { row ->
+                                PostManagementImpactWeaveContribution(
+                                    supportType = row.supportType,
+                                    needResourceName = row.needResourceName,
+                                    providerResourceName = row.providerResourceName,
+                                    quantityProvided = row.quantityProvided,
+                                    capacityProvided = row.capacityProvided
+                                )
+                            }
+                        )
+                    }
+                    .sortedBy { it.organisationName.lowercase(Locale.ROOT) }
+            }.getOrDefault(emptyList())
+        }
 
         val physicalRow = supabase
             .from("physical_details")
@@ -321,6 +366,8 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
             mode = postRow.requiredText("mode"),
             databaseStatus = postRow.requiredText("status"),
             category = postRow.optionalText("category"),
+            impactWeaveDraftId = impactWeaveDraftId,
+            impactWeavePartners = impactWeavePartners,
             physical = physicalRow?.let {
                 PostManagementPhysicalDetails(
                     startDate = it.requiredText("start_date"),

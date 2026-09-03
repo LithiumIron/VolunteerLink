@@ -23,10 +23,12 @@ import com.example.volunteerlink.organisation.create.model.VolunteerPostCategory
 import com.example.volunteerlink.organisation.create.model.VolunteerPostType
 import com.example.volunteerlink.organisation.create.model.VolunteerRoleLevel
 import com.example.volunteerlink.organisation.create.model.VolunteerRoleMode
+import com.example.volunteerlink.organisation.impactweave.model.ImpactWeaveMode
 import com.example.volunteerlink.organisation.repository.CreatePostRepository
 import com.example.volunteerlink.organisation.repository.ExistingPostEditData
 import com.example.volunteerlink.organisation.repository.PublishThumbnail
 import com.example.volunteerlink.organisation.repository.SupabaseCreatePostRepository
+import com.example.volunteerlink.organisation.repository.SupabaseImpactWeaveRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -51,6 +53,7 @@ class CreatePostViewModel : ViewModel() {
     private val locationService = GeoapifyLocationService()
     private val createPostRepository: CreatePostRepository =
         SupabaseCreatePostRepository()
+    private val impactWeaveRepository = SupabaseImpactWeaveRepository()
 
     private val _uiState = MutableStateFlow(CreatePostUiState())
     val uiState = _uiState.asStateFlow()
@@ -63,6 +66,55 @@ class CreatePostViewModel : ViewModel() {
     // snapshot privately so unsaved-change checks and final conflict checks do
     // not become UI responsibilities.
     private var originalExistingPost: ExistingPostEditData? = null
+
+    fun loadImpactWeaveForCreate(draftId: String) {
+        if (_uiState.value.impactWeaveDraftId == draftId ||
+            _uiState.value.isLoadingImpactWeave
+        ) return
+
+        _uiState.value = CreatePostUiState(
+            impactWeaveDraftId = draftId,
+            isLoadingImpactWeave = true
+        )
+        viewModelScope.launch {
+            try {
+                val prefill = impactWeaveRepository.loadPostPrefill(draftId)
+                _uiState.value = CreatePostUiState(
+                    draft = CreatePostDraft(
+                        postType = when (prefill.mode) {
+                            ImpactWeaveMode.PHYSICAL ->
+                                VolunteerPostType.PHYSICAL
+                            ImpactWeaveMode.HYBRID ->
+                                VolunteerPostType.HYBRID
+                        },
+                        category = prefill.category,
+                        title = prefill.title,
+                        description = prefill.description,
+                        isMultiDayPhysicalEvent = prefill.startDateMillis != prefill.endDateMillis,
+                        physicalStartDateMillis = prefill.startDateMillis,
+                        physicalEndDateMillis = prefill.endDateMillis,
+                        physicalStartTimeMinutes = prefill.startTimeMinutes,
+                        physicalEndTimeMinutes = prefill.endTimeMinutes,
+                        physicalLocationQuery = prefill.location.displayName,
+                        physicalLocation = prefill.location,
+                        remoteStartDateMillis = prefill.startDateMillis,
+                        remoteDueDateMillis = prefill.endDateMillis
+                    ),
+                    impactWeaveDraftId = draftId,
+                    impactWeavePartners = prefill.partners,
+                    isLoadingImpactWeave = false,
+                    isPostTypeCommitted = true
+                )
+            } catch (exception: Exception) {
+                if (exception is CancellationException) throw exception
+                _uiState.value = CreatePostUiState(
+                    impactWeaveDraftId = draftId,
+                    isLoadingImpactWeave = false,
+                    impactWeaveLoadError = safeImpactWeaveLoadError(exception.message.orEmpty())
+                )
+            }
+        }
+    }
 
     fun loadExistingPostForEdit(postId: String) {
         val currentMode = _uiState.value.editorMode
@@ -121,6 +173,22 @@ class CreatePostViewModel : ViewModel() {
         if (!_uiState.value.isExistingPostEdit || allowed) return true
         _uiState.update { it.copy(editRestrictionMessage = message) }
         return false
+    }
+
+    private fun allowImpactWeaveFieldEdit(message: String): Boolean {
+        if (_uiState.value.impactWeaveDraftId == null) return true
+        _uiState.update { it.copy(editRestrictionMessage = message) }
+        return false
+    }
+
+    private fun safeImpactWeaveLoadError(raw: String): String = when {
+        raw.contains("POST_REQUIRES_7_DAYS", true) ->
+            "This activity starts in less than 7 days. Reschedule it in Impact Weave before creating a post."
+        raw.contains("CONFIRMED_VENUE_REQUIRED", true) ->
+            "A partner venue must be confirmed before creating this post."
+        raw.contains("PARTNER_RECONFIRMATION_REQUIRED", true) ->
+            "A partner must reconfirm the changed schedule before creating this post."
+        else -> "Could not prepare this Impact Weave plan for Create Post. Please return and try again."
     }
 
     private fun rolePolicy(roleTemplateId: String) =
@@ -211,6 +279,7 @@ class CreatePostViewModel : ViewModel() {
     }
 
     fun updateCategory(category: VolunteerPostCategory) {
+        if (!allowImpactWeaveFieldEdit("Impact Weave activity details are final here. Edit them from the Impact Weave plan.")) return
         if (!allowEdit(
                 _uiState.value.editPolicy?.canEditSharedPostInfo != false,
                 "Category is locked because this opportunity has already started."
@@ -220,6 +289,7 @@ class CreatePostViewModel : ViewModel() {
     }
 
     fun updateTitle(title: String) {
+        if (!allowImpactWeaveFieldEdit("Impact Weave activity details are final here. Edit them from the Impact Weave plan.")) return
         if (!allowEdit(
                 _uiState.value.editPolicy?.canEditSharedPostInfo != false,
                 "Title is locked because this opportunity has already started."
@@ -229,6 +299,7 @@ class CreatePostViewModel : ViewModel() {
     }
 
     fun updateDescription(description: String) {
+        if (!allowImpactWeaveFieldEdit("Impact Weave activity details are final here. Edit them from the Impact Weave plan.")) return
         if (!allowEdit(
                 _uiState.value.editPolicy?.canEditSharedPostInfo != false,
                 "Description is locked because this opportunity has already started."
@@ -251,6 +322,7 @@ class CreatePostViewModel : ViewModel() {
     // ---------------------------------------------------------------------
 
     fun updateIsMultiDay(isMultiDay: Boolean) {
+        if (!allowImpactWeaveFieldEdit("The agreed Impact Weave schedule is final and cannot be changed in Create Post.")) return
         if (!allowEdit(
                 _uiState.value.editPolicy?.canEditPhysicalCore != false,
                 "Physical schedule dates are locked for this post."
@@ -281,6 +353,7 @@ class CreatePostViewModel : ViewModel() {
     }
 
     fun updatePhysicalStartDate(dateMillis: Long) {
+        if (!allowImpactWeaveFieldEdit("The agreed Impact Weave schedule is final and cannot be changed in Create Post.")) return
         if (!allowEdit(
                 _uiState.value.editPolicy?.canEditPhysicalCore != false,
                 "Physical start date is locked because volunteers already depend on it or the activity has started."
@@ -305,6 +378,7 @@ class CreatePostViewModel : ViewModel() {
     }
 
     fun updatePhysicalEndDate(dateMillis: Long) {
+        if (!allowImpactWeaveFieldEdit("The agreed Impact Weave schedule is final and cannot be changed in Create Post.")) return
         if (!allowEdit(
                 _uiState.value.editPolicy?.canEditPhysicalCore != false,
                 "Physical end date is locked because volunteers already depend on it or the activity has started."
@@ -319,6 +393,7 @@ class CreatePostViewModel : ViewModel() {
     }
 
     fun updatePhysicalStartTime(hour: Int, minute: Int) {
+        if (!allowImpactWeaveFieldEdit("The agreed Impact Weave schedule is final and cannot be changed in Create Post.")) return
         if (!allowEdit(
                 _uiState.value.editPolicy?.canEditPhysicalCore != false,
                 "Physical event time is locked for this post."
@@ -341,6 +416,9 @@ class CreatePostViewModel : ViewModel() {
      * Returns an error for the time dialog. Invalid end times are not saved.
      */
     fun updatePhysicalEndTime(hour: Int, minute: Int): String? {
+        if (!allowImpactWeaveFieldEdit("The agreed Impact Weave schedule is final and cannot be changed in Create Post.")) {
+            return "The agreed Impact Weave schedule is final."
+        }
         if (!allowEdit(
                 _uiState.value.editPolicy?.canEditPhysicalCore != false,
                 "Physical event time is locked for this post."
@@ -411,6 +489,7 @@ class CreatePostViewModel : ViewModel() {
     }
 
     fun onLocationQueryChanged(query: String) {
+        if (!allowImpactWeaveFieldEdit("The confirmed partnership venue is locked for this post.")) return
         if (!allowEdit(
                 _uiState.value.editPolicy?.canEditPhysicalCore != false,
                 "Physical location is locked for this post."
@@ -499,6 +578,7 @@ class CreatePostViewModel : ViewModel() {
     }
 
     fun onLocationSelected(location: LocationSuggestion) {
+        if (!allowImpactWeaveFieldEdit("The confirmed partnership venue is locked for this post.")) return
         if (!allowEdit(
                 _uiState.value.editPolicy?.canEditPhysicalCore != false,
                 "Physical location is locked for this post."
@@ -525,6 +605,7 @@ class CreatePostViewModel : ViewModel() {
     }
 
     fun clearLocation() {
+        if (!allowImpactWeaveFieldEdit("The confirmed partnership venue is locked for this post.")) return
         if (!allowEdit(
                 _uiState.value.editPolicy?.canEditPhysicalCore != false,
                 "Physical location is locked for this post."
@@ -3012,6 +3093,12 @@ class CreatePostViewModel : ViewModel() {
     ) {
         val current = _uiState.value
         if (current.isSavingDraft || current.isPublishing) return
+        if (current.impactWeaveDraftId != null) {
+            _uiState.update {
+                it.copy(saveDraftError = "Impact Weave plans publish directly and cannot create a separate post draft.")
+            }
+            return
+        }
         if (!validateScheduleForContinue()) return
 
         val dateWarning = CreatePostValidator
@@ -3171,7 +3258,8 @@ class CreatePostViewModel : ViewModel() {
                 val result = createPostRepository.publishPost(
                     draft = snapshot.draft,
                     roleCatalogue = snapshot.roleCatalogue,
-                    thumbnail = thumbnail
+                    thumbnail = thumbnail,
+                    impactWeaveDraftId = snapshot.impactWeaveDraftId
                 )
 
                 // Publishing is complete, so the editable draft is cleared.

@@ -162,7 +162,14 @@ private fun ManageLandingContent(
             ManageModuleChoiceCard(
                 iconRes = R.drawable.group,
                 title = "Impact Weave",
-                description = "Manage collaboration drafts, needs and partner organisations.",
+                description = "Partnership planning, confirmed support and collaboration history.",
+                summary = if (uiState.impactWeaveAttentionCount > 0) {
+                    "${uiState.impactWeaveAttentionCount} Impact Weave ${if (uiState.impactWeaveAttentionCount == 1) "item needs" else "items need"} attention"
+                } else {
+                    null
+                },
+                attentionText = buildImpactWeaveAttentionSummary(uiState),
+                hasAttention = uiState.impactWeaveAttentionCount > 0,
                 onClick = onImpactWeaveClick,
                 modifier = Modifier.padding(horizontal = VolunteerLinkScreenHorizontalPadding)
             )
@@ -220,6 +227,18 @@ private fun buildManageAttentionSummary(uiState: OrganisationManageUiState): Str
 }
 
 private fun postWord(count: Int): String = if (count == 1) "post" else "posts"
+
+private fun buildImpactWeaveAttentionSummary(
+    uiState: OrganisationManageUiState
+): String? {
+    val first = uiState.impactWeaveAttention.firstOrNull() ?: return null
+    val prefix = "Impact Weave · ${first.title}"
+    return if (uiState.impactWeaveAttention.size > 1) {
+        "$prefix — ${first.message}  +${uiState.impactWeaveAttention.size - 1} more"
+    } else {
+        "$prefix — ${first.message}"
+    }
+}
 
 @Composable
 fun ManageLoadingState() {

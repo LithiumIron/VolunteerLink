@@ -454,9 +454,117 @@ fun PostManagementOverview(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         OrganisationSectionSurface { PostManagementDetailsCard(post) }
+        if (!post.impactWeaveDraftId.isNullOrBlank()) {
+            OrganisationSectionSurface { PostManagementImpactWeaveCard(post) }
+        }
         OrganisationSectionSurface { PostManagementParticipationCard(post) }
         OrganisationSectionSurface { PostManagementRoleSection(post) }
         OrganisationSectionSurface { PostManagementScheduleSection(post) }
+    }
+}
+
+@Composable
+private fun PostManagementImpactWeaveCard(post: PostManagementPost) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        OrganisationSectionHeader(
+            title = "Impact Weave partnership",
+            subtitle = "This Volunteer Post was created from an Impact Weave collaboration."
+        )
+
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 10.dp),
+            shape = RoundedCornerShape(14.dp),
+            color = VolunteerLinkSoftGreenSurface
+        ) {
+            Column(
+                modifier = Modifier.padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "Created from Impact Weave",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = VolunteerLinkPrimaryGreen
+                )
+                Text(
+                    text = if (post.impactWeavePartners.isEmpty()) {
+                        "No accepted partner contribution is linked to this post."
+                    } else {
+                        "${post.impactWeavePartners.size} partner ${if (post.impactWeavePartners.size == 1) "organisation is" else "organisations are"} supporting this activity."
+                    },
+                    fontSize = 12.sp,
+                    lineHeight = 17.sp,
+                    color = VolunteerLinkTextSecondary
+                )
+            }
+        }
+
+        if (post.impactWeavePartners.isNotEmpty()) {
+            Column(
+                modifier = Modifier.padding(top = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                post.impactWeavePartners.forEachIndexed { index, partner ->
+                    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                        Text(
+                            text = partner.organisationName,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = VolunteerLinkTextPrimary
+                        )
+                        partner.contributions.forEach { contribution ->
+                            val amount = if (contribution.supportType.equals("VENUE", true)) {
+                                contribution.capacityProvided?.let { "Capacity $it" }
+                            } else {
+                                contribution.quantityProvided?.let { "×$it" }
+                            }
+                            val provider = contribution.providerResourceName
+                                ?.takeIf { it.isNotBlank() }
+                                ?: contribution.needResourceName
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.Top
+                            ) {
+                                Surface(
+                                    modifier = Modifier
+                                        .padding(top = 6.dp)
+                                        .size(6.dp),
+                                    shape = CircleShape,
+                                    color = VolunteerLinkPrimaryGreen
+                                ) {}
+                                Column(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .padding(start = 9.dp)
+                                ) {
+                                    Text(
+                                        text = contribution.needResourceName,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = VolunteerLinkTextPrimary
+                                    )
+                                    Text(
+                                        text = listOfNotNull(provider, amount)
+                                            .distinct()
+                                            .joinToString(" · "),
+                                        modifier = Modifier.padding(top = 2.dp),
+                                        fontSize = 12.sp,
+                                        lineHeight = 17.sp,
+                                        color = VolunteerLinkTextSecondary
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    if (index != post.impactWeavePartners.lastIndex) {
+                        OrganisationDivider()
+                    }
+                }
+            }
+        }
     }
 }
 

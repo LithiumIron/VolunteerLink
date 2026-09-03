@@ -48,6 +48,8 @@ class OrganisationManageViewModel : ViewModel() {
     val uiState = _uiState.asStateFlow()
 
     private var cachedSnapshot: OrganisationHomeSnapshot? = null
+    private var partnerPosts: List<ManagePostItem> = emptyList()
+    private var ownerPartnershipSummaries: Map<String, String> = emptyMap()
     private var refreshInProgress = false
 
     init {
@@ -83,7 +85,44 @@ class OrganisationManageViewModel : ViewModel() {
 
             try {
                 val organisationId = resolveCurrentOrganisationId()
+
+                // The organisation's own Volunteer Posts are the primary Manage data.
+                // Partnership-post loading is deliberately isolated below: a missing or
+                // temporarily failing partnership RPC must not make the whole Manage
+                // screen pretend it is offline when this live snapshot succeeded.
                 val snapshot = repository.loadHomeSnapshot(organisationId)
+
+                runCatching { repository.loadPartnerPosts() }
+                    .onSuccess { partnershipPosts ->
+                        ownerPartnershipSummaries = partnershipPosts
+                            .filter { it.isOwner }
+                            .associate { it.postId to it.contributionSummary }
+                        partnerPosts = partnershipPosts
+                            .filterNot { it.isOwner }
+                            .map { post ->
+                                ManagePostItem(
+                                    postId = post.postId,
+                                    title = post.title,
+                                    description = post.description,
+                                    mode = post.mode,
+                                    databaseStatus = post.status,
+                                    startDate = post.startDate,
+                                    endDate = post.endDate,
+                                    locationName = post.locationName,
+                                    isPartnerPost = true,
+                                    ownerOrganisationName = post.ownerOrganisationName,
+                                    contributionSummary = post.contributionSummary
+                                )
+                            }
+                    }
+                    .onFailure { partnershipException ->
+                        Log.w(
+                            TAG,
+                            "Could not refresh partnership-post data; keeping the last partnership list.",
+                            partnershipException
+                        )
+                    }
+
                 val syncedAt = System.currentTimeMillis()
 
                 runCatching {
@@ -302,6 +341,10 @@ class OrganisationManageViewModel : ViewModel() {
                 compareByDescending<ManagePostItem> { it.endDate.orEmpty() }
                     .thenBy { it.title }
             ),
+            partnerPosts = partnerPosts.sortedWith(
+                compareBy<ManagePostItem> { it.startDate.orEmpty() }.thenBy { it.title }
+            ),
+            impactWeaveAttention = snapshot.impactWeaveAttention,
             isShowingCachedData = currentState.isShowingCachedData,
             lastSyncedAtEpochMillis = currentState.lastSyncedAtEpochMillis,
             isRefreshing = currentState.isRefreshing,
@@ -454,7 +497,11 @@ class OrganisationManageViewModel : ViewModel() {
                 effectiveRemoteEndDate,
                 nowMillis
             ),
-            attentionItems = attentionItems.sortedBySeverity()
+            attentionItems = attentionItems.sortedBySeverity(),
+            contributionSummary = ownerPartnershipSummaries[postId],
+            ownerOrganisationName = if (ownerPartnershipSummaries.containsKey(postId)) {
+                "Your organisation"
+            } else null
         )
     }
 
@@ -542,4 +589,3 @@ class OrganisationManageViewModel : ViewModel() {
         private const val TAG = "OrganisationManageVM"
     }
 }
-

@@ -1,5 +1,6 @@
 package com.example.volunteerlink.organisation.screens.chat
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -79,7 +80,7 @@ fun OrganisationPartnershipChatRoomScreen(
     var respondingInvitationId by remember { mutableStateOf<String?>(null) }
     var responseNotice by remember { mutableStateOf<String?>(null) }
     var updatedRequest by remember { mutableStateOf<Pair<String, PartnershipResponseResult>?>(null) }
-    var declineTarget by remember { mutableStateOf<Pair<String, Int>?>(null) }
+    var declineTarget by remember { mutableStateOf<Triple<String, Int, Boolean>?>(null) }
     var refreshVersion by remember { mutableIntStateOf(0) }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -209,10 +210,26 @@ fun OrganisationPartnershipChatRoomScreen(
                             chat = currentChat,
                             respondingInvitationId = respondingInvitationId,
                             onAccept = { invitationId, revision ->
-                                respondToInvitation(invitationId, revision, "ACCEPT")
+                                val currentStatus = message.invitation?.status.orEmpty()
+                                respondToInvitation(
+                                    invitationId,
+                                    revision,
+                                    if (currentStatus.equals("RECONFIRMATION_REQUIRED", true)) {
+                                        "RECONFIRM"
+                                    } else {
+                                        "ACCEPT"
+                                    }
+                                )
                             },
                             onDecline = { invitationId, revision ->
-                                declineTarget = invitationId to revision
+                                declineTarget = Triple(
+                                    invitationId,
+                                    revision,
+                                    message.invitation?.status.equals(
+                                        "RECONFIRMATION_REQUIRED",
+                                        true
+                                    )
+                                )
                             }
                         )
                     }
@@ -304,7 +321,11 @@ fun OrganisationPartnershipChatRoomScreen(
                 Button(
                     onClick = {
                         declineTarget = null
-                        respondToInvitation(target.first, target.second, "DECLINE")
+                        respondToInvitation(
+                            target.first,
+                            target.second,
+                            if (target.third) "DECLINE_RECONFIRMATION" else "DECLINE"
+                        )
                     },
                     enabled = respondingInvitationId == null,
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9A3F36))
@@ -376,7 +397,7 @@ fun OrganisationPartnershipChatRoomScreen(
                 TextButton(
                     onClick = {
                         updatedRequest = null
-                        declineTarget = pending.first to result.revisionNumber
+                        declineTarget = Triple(pending.first, result.revisionNumber, false)
                     },
                     enabled = respondingInvitationId == null
                 ) {
@@ -551,14 +572,15 @@ private fun PartnershipInvitationMessageCard(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 6.dp),
-        shape = RoundedCornerShape(20.dp),
+            .padding(horizontal = 2.dp),
+        shape = RoundedCornerShape(18.dp),
         color = Color.White,
-        shadowElevation = 2.dp
+        shadowElevation = 1.dp,
+        border = BorderStroke(1.dp, Color(0xFFDDE5D9))
     ) {
         Column(
-            modifier = Modifier.padding(15.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -701,14 +723,21 @@ private fun PartnershipInvitationMessageCard(
 
                 val canRespond = invitation.direction == "RECEIVED" &&
                     invitation.isCurrentRevision &&
-                    invitation.status.equals("PENDING", ignoreCase = true) &&
+                    invitation.status.uppercase(Locale.ROOT) in setOf(
+                        "PENDING",
+                        "RECONFIRMATION_REQUIRED"
+                    ) &&
                     !message.invitationId.isNullOrBlank()
 
                 if (canRespond) {
                     HorizontalDivider(color = Color(0xFFE1E6DE))
 
                     Text(
-                        text = "Confirm whether your organisation can provide the support shown above.",
+                            text = if (invitation.status.equals("RECONFIRMATION_REQUIRED", true)) {
+                                "The activity schedule changed. Reconfirm that your organisation can still provide this support."
+                            } else {
+                                "Confirm whether your organisation can provide the support shown above."
+                            },
                         color = TextMuted,
                         fontSize = 10.sp,
                         lineHeight = 14.sp
@@ -753,7 +782,9 @@ private fun PartnershipInvitationMessageCard(
                                 Spacer(Modifier.width(7.dp))
                             }
                             Text(
-                                if ((message.invitationRevision ?: 1) > 1) {
+                                if (invitation.status.equals("RECONFIRMATION_REQUIRED", true)) {
+                                    "Reconfirm"
+                                } else if ((message.invitationRevision ?: 1) > 1) {
                                     "Accept Updated"
                                 } else {
                                     "Accept"
@@ -795,12 +826,12 @@ private fun PartnershipActivitySummary(
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(12.dp),
         color = BubbleGreen.copy(alpha = 0.42f)
     ) {
         Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(7.dp)
+            modifier = Modifier.padding(11.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Text(
                 text = categoryMode,
@@ -905,13 +936,13 @@ private fun PartnershipInvitationItemCard(
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(12.dp),
         color = Color(0xFFF8F9F7),
         border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE1E6DE))
     ) {
         Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(7.dp)
+            modifier = Modifier.padding(11.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),

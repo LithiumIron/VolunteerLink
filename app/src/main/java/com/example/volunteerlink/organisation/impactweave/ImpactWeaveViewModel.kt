@@ -82,6 +82,7 @@ class ImpactWeaveViewModel : ViewModel() {
         val reopenedDraft = ImpactWeaveDraft(
             draftId = nextDraftId++,
             databaseDraftId = plan.draftId,
+            persistedStatus = plan.status,
             category = plan.category,
             title = plan.title,
             description = plan.description,
@@ -107,7 +108,10 @@ class ImpactWeaveViewModel : ViewModel() {
             workingDraft = reopenedDraft,
             isFindingPartners = true,
             matchResults = null,
-            matchResultsError = null
+            matchResultsError = null,
+            isSavingPlanChange = false,
+            planChangeError = null,
+            planChangeSuccess = null
         )
 
         viewModelScope.launch {
@@ -131,7 +135,10 @@ class ImpactWeaveViewModel : ViewModel() {
             partnershipStates = emptyMap(),
             sendingPartnershipOrganisationId = null,
             partnershipRequestError = null,
-            partnershipRequestSuccess = null
+            partnershipRequestSuccess = null,
+            isSavingPlanChange = false,
+            planChangeError = null,
+            planChangeSuccess = null
         )
     }
 
@@ -147,7 +154,10 @@ class ImpactWeaveViewModel : ViewModel() {
             partnershipStates = emptyMap(),
             sendingPartnershipOrganisationId = null,
             partnershipRequestError = null,
-            partnershipRequestSuccess = null
+            partnershipRequestSuccess = null,
+            isSavingPlanChange = false,
+            planChangeError = null,
+            planChangeSuccess = null
         )
         loadActivePlans()
     }
@@ -231,6 +241,7 @@ class ImpactWeaveViewModel : ViewModel() {
                 val started = impactWeaveRepository.startMatching(draft)
                 val persistedDraft = draft.copy(
                     databaseDraftId = started.draftId,
+                    persistedStatus = "MATCHING",
                     updatedAtMillis = AppClock.nowMillis()
                 )
 
@@ -392,7 +403,14 @@ class ImpactWeaveViewModel : ViewModel() {
 
                 runCatching { impactWeaveRepository.loadActivePlans() }
                     .onSuccess { plans ->
-                        _uiState.value = _uiState.value.copy(activePlans = plans)
+                        val latestStatus = plans.firstOrNull { it.draftId == draftId }?.status
+                        _uiState.value = _uiState.value.copy(
+                            activePlans = plans,
+                            workingDraft = _uiState.value.workingDraft?.copy(
+                                persistedStatus = latestStatus
+                                    ?: _uiState.value.workingDraft?.persistedStatus
+                            )
+                        )
                     }
             } catch (exception: Exception) {
                 if (exception is CancellationException) throw exception
@@ -910,6 +928,149 @@ class ImpactWeaveViewModel : ViewModel() {
             partnershipRequestError = null,
             partnershipRequestSuccess = null
         )
+    }
+
+    fun updateActivePlanDetails(
+        category: VolunteerPostCategory,
+        title: String,
+        description: String
+    ) {
+        val draft = _uiState.value.workingDraft ?: return
+        val draftId = draft.databaseDraftId ?: return
+        if (_uiState.value.isSavingPlanChange) return
+        if (title.trim().length < 3 || description.isBlank()) {
+            _uiState.value = _uiState.value.copy(
+                planChangeError = "Enter a title and activity description before saving."
+            )
+            return
+        }
+
+        runPlanChange {
+            impactWeaveRepository.updateBasicDetails(
+                draftId = draftId,
+                title = title,
+                category = category.databaseValue,
+                description = description
+            )
+            _uiState.value = _uiState.value.copy(
+                workingDraft = draft.copy(
+                    category = category,
+                    title = title.trim(),
+                    description = description.trim(),
+                    updatedAtMillis = AppClock.nowMillis()
+                ),
+                planChangeSuccess = "Activity details updated. Existing support remains confirmed."
+            )
+        }
+    }
+
+    fun rescheduleActivePlan(
+        startDateMillis: Long,
+        endDateMillis: Long,
+        startTimeMinutes: Int,
+        endTimeMinutes: Int
+    ) {
+        val draft = _uiState.value.workingDraft ?: return
+        val draftId = draft.databaseDraftId ?: return
+        if (_uiState.value.isSavingPlanChange) return
+        if (draft.startDateMillis == startDateMillis &&
+            draft.endDateMillis == endDateMillis &&
+            draft.startTimeMinutes == startTimeMinutes &&
+            draft.endTimeMinutes == endTimeMinutes
+        ) {
+            _uiState.value = _uiState.value.copy(
+                planChangeError = "Choose a different date or time before updating."
+            )
+            return
+        }
+        if (startDateMillis < minimumImpactWeaveStartDateMillis()) {
+            _uiState.value = _uiState.value.copy(
+                planChangeError = "The new start date must be at least 10 days from today."
+            )
+            return
+        }
+        if (endDateMillis < startDateMillis ||
+            (endDateMillis == startDateMillis && endTimeMinutes <= startTimeMinutes)
+        ) {
+            _uiState.value = _uiState.value.copy(
+                planChangeError = "The activity must end after it starts."
+            )
+            return
+        }
+
+        runPlanChange {
+            impactWeaveRepository.reschedule(
+                draftId,
+                startDateMillis,
+                endDateMillis,
+                startTimeMinutes,
+                endTimeMinutes
+            )
+            _uiState.value = _uiState.value.copy(
+                workingDraft = draft.copy(
+                    duration = if (startDateMillis == endDateMillis) {
+                        ImpactWeaveDuration.ONE_DAY
+                    } else {
+                        ImpactWeaveDuration.MULTIPLE_DAYS
+                    },
+                    startDateMillis = startDateMillis,
+                    endDateMillis = endDateMillis,
+                    startTimeMinutes = startTimeMinutes,
+                    endTimeMinutes = endTimeMinutes,
+                    persistedStatus = "WAITING",
+                    updatedAtMillis = AppClock.nowMillis()
+                ),
+                planChangeSuccess = "Schedule updated. Accepted partners must reconfirm before their support counts again."
+            )
+            refreshCurrentMatchState()
+        }
+    }
+
+    fun disposeActivePlan() {
+        val draft = _uiState.value.workingDraft ?: return
+        val draftId = draft.databaseDraftId ?: return
+        if (_uiState.value.isSavingPlanChange) return
+        runPlanChange {
+            impactWeaveRepository.dispose(draftId)
+            _uiState.value = _uiState.value.copy(
+                workingDraft = draft.copy(
+                    persistedStatus = "DISPOSED",
+                    updatedAtMillis = AppClock.nowMillis()
+                ),
+                planChangeSuccess = "Plan disposed. Its details and conversation history remain available as read-only history."
+            )
+            runCatching { impactWeaveRepository.loadActivePlans() }
+                .onSuccess { plans ->
+                    _uiState.value = _uiState.value.copy(activePlans = plans)
+                }
+        }
+    }
+
+    fun clearPlanChangeFeedback() {
+        _uiState.value = _uiState.value.copy(
+            planChangeError = null,
+            planChangeSuccess = null
+        )
+    }
+
+    private fun runPlanChange(action: suspend () -> Unit) {
+        _uiState.value = _uiState.value.copy(
+            isSavingPlanChange = true,
+            planChangeError = null,
+            planChangeSuccess = null
+        )
+        viewModelScope.launch {
+            try {
+                action()
+                _uiState.value = _uiState.value.copy(isSavingPlanChange = false)
+            } catch (exception: Exception) {
+                if (exception is CancellationException) throw exception
+                _uiState.value = _uiState.value.copy(
+                    isSavingPlanChange = false,
+                    planChangeError = safeDatabaseError(exception.message.orEmpty())
+                )
+            }
+        }
     }
 
     private fun firstIncompleteNeed(draft: ImpactWeaveDraft): ImpactWeaveNeedDraft? =

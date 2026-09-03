@@ -55,6 +55,7 @@ data class ImpactWeaveNeedDraft(
 data class ImpactWeaveDraft(
     val draftId: Int,
     val databaseDraftId: String? = null,
+    val persistedStatus: String? = null,
     val category: VolunteerPostCategory? = null,
     val title: String = "",
     val description: String = "",
@@ -188,5 +189,27 @@ data class ImpactWeaveUiState(
     val partnershipStates: Map<String, ImpactWeavePartnershipState> = emptyMap(),
     val sendingPartnershipOrganisationId: String? = null,
     val partnershipRequestError: String? = null,
-    val partnershipRequestSuccess: String? = null
+    val partnershipRequestSuccess: String? = null,
+    val isSavingPlanChange: Boolean = false,
+    val planChangeError: String? = null,
+    val planChangeSuccess: String? = null
+)
+
+data class ImpactWeavePostPrefill(
+    val draftId: String,
+    val category: VolunteerPostCategory,
+    val title: String,
+    val description: String,
+    val mode: ImpactWeaveMode,
+    val startDateMillis: Long,
+    val endDateMillis: Long,
+    val startTimeMinutes: Int,
+    val endTimeMinutes: Int,
+    val location: LocationSuggestion,
+    val partners: List<ImpactWeavePostPartner> = emptyList()
+)
+
+data class ImpactWeavePostPartner(
+    val organisationName: String,
+    val contributionSummary: String
 )

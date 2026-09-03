@@ -3,6 +3,7 @@ package com.example.volunteerlink.organisation.repository
 import com.example.volunteerlink.organisation.impactweave.model.ImpactWeaveActivePlan
 import com.example.volunteerlink.organisation.impactweave.model.ImpactWeaveDraft
 import com.example.volunteerlink.organisation.impactweave.model.ImpactWeaveMatchingInput
+import com.example.volunteerlink.organisation.impactweave.model.ImpactWeavePostPrefill
 
 data class StartedImpactWeaveMatchingResult(
     val draftId: String
@@ -18,4 +19,25 @@ interface ImpactWeaveRepository {
 
     /** Returns real partner support rows that Groq is allowed to rank. */
     suspend fun loadMatchingInput(draftId: String): ImpactWeaveMatchingInput
+
+    suspend fun updateBasicDetails(
+        draftId: String,
+        title: String,
+        category: String,
+        description: String
+    )
+
+    suspend fun reschedule(
+        draftId: String,
+        startDateMillis: Long,
+        endDateMillis: Long,
+        startTimeMinutes: Int,
+        endTimeMinutes: Int
+    )
+
+    suspend fun dispose(draftId: String)
+
+    suspend fun loadPostPrefill(draftId: String): ImpactWeavePostPrefill
+
+    suspend fun completeConversion(draftId: String, postId: String)
 }

@@ -12,18 +12,23 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.volunteerlink.data.time.AppClock
+import com.example.volunteerlink.organisation.create.CreatePostValidator
 import com.example.volunteerlink.organisation.impactweave.ImpactWeaveViewModel
 import com.example.volunteerlink.organisation.impactweave.model.ImpactWeavePage
 
 @Composable
 fun OrganisationImpactWeaveScreen(
     onBack: () -> Unit,
+    onCreatePost: (String) -> Unit,
     viewModel: ImpactWeaveViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val clockState by AppClock.state.collectAsStateWithLifecycle()
     val minimumStartDateMillis = remember(clockState.refreshVersion) {
         viewModel.minimumImpactWeaveStartDateMillis()
+    }
+    val minimumPostDateMillis = remember(clockState.refreshVersion) {
+        CreatePostValidator.minimumStartDateMillis()
     }
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -135,10 +140,20 @@ fun OrganisationImpactWeaveScreen(
                 sendingOrganisationId = uiState.sendingPartnershipOrganisationId,
                 requestError = uiState.partnershipRequestError,
                 requestSuccess = uiState.partnershipRequestSuccess,
+                isSavingPlanChange = uiState.isSavingPlanChange,
+                planChangeError = uiState.planChangeError,
+                planChangeSuccess = uiState.planChangeSuccess,
                 onBack = viewModel::returnToList,
                 onRetry = viewModel::retryMatchingResults,
                 onSendRequest = viewModel::sendPartnershipRequest,
-                onClearRequestFeedback = viewModel::clearPartnershipRequestFeedback
+                onClearRequestFeedback = viewModel::clearPartnershipRequestFeedback,
+                onUpdateDetails = viewModel::updateActivePlanDetails,
+                onReschedule = viewModel::rescheduleActivePlan,
+                onDispose = viewModel::disposeActivePlan,
+                onCreatePost = onCreatePost,
+                onClearPlanFeedback = viewModel::clearPlanChangeFeedback,
+                minimumStartDateMillis = minimumStartDateMillis,
+                minimumPostDateMillis = minimumPostDateMillis
             )
         }
     }

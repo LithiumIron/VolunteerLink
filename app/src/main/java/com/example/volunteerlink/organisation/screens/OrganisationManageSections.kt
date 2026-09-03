@@ -157,6 +157,7 @@ fun ManagePostSectionSelector(
     draftCount: Int,
     reviewCount: Int,
     completedCount: Int,
+    partnerCount: Int,
     activeHasAttention: Boolean,
     draftsHaveAttention: Boolean,
     reviewHasAttention: Boolean,
@@ -174,7 +175,8 @@ fun ManagePostSectionSelector(
         TabItem(ManagePostSection.ACTIVE, "Active", activeCount, activeHasAttention),
         TabItem(ManagePostSection.DRAFTS, "Drafts", draftCount, draftsHaveAttention),
         TabItem(ManagePostSection.REVIEW, "Needs Review", reviewCount, reviewHasAttention),
-        TabItem(ManagePostSection.COMPLETED, "Completed", completedCount, false)
+        TabItem(ManagePostSection.COMPLETED, "Completed", completedCount, false),
+        TabItem(ManagePostSection.PARTNERSHIPS, "Partnerships", partnerCount, false)
     )
 
     LazyRow(
@@ -297,7 +299,9 @@ fun ManageVolunteerPostCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable(onClick = onClick)
+                .then(
+                    if (post.isPartnerPost) Modifier else Modifier.clickable(onClick = onClick)
+                )
                 .padding(horizontal = 12.dp, vertical = 14.dp),
             verticalAlignment = Alignment.Top
         ) {
@@ -336,6 +340,36 @@ fun ManageVolunteerPostCard(
                         text = lifecycle,
                         color = lifecycleColor,
                         modifier = Modifier.padding(start = 8.dp)
+                    )
+                }
+
+                if (post.isPartnerPost) {
+                    Text(
+                        text = "Impact Weave partner · ${post.ownerOrganisationName.orEmpty()}",
+                        modifier = Modifier.padding(top = 5.dp),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = VolunteerLinkPrimaryGreen
+                    )
+                    if (post.description.isNotBlank()) {
+                        Text(
+                            text = post.description,
+                            modifier = Modifier.padding(top = 4.dp),
+                            fontSize = 12.sp,
+                            lineHeight = 17.sp,
+                            color = VolunteerLinkTextSecondary,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+                if (!post.isPartnerPost && !post.contributionSummary.isNullOrBlank()) {
+                    Text(
+                        text = "Created from Impact Weave",
+                        modifier = Modifier.padding(top = 5.dp),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = VolunteerLinkPrimaryGreen
                     )
                 }
 
@@ -420,17 +454,43 @@ fun ManageVolunteerPostCard(
                         )
                     }
                 }
+                post.contributionSummary?.takeIf { it.isNotBlank() }?.let { summary ->
+                    Text(
+                        text = if (post.isPartnerPost) {
+                            "Your contribution: $summary"
+                        } else {
+                            "Partner support: $summary"
+                        },
+                        modifier = Modifier.padding(top = 6.dp),
+                        fontSize = 12.sp,
+                        lineHeight = 17.sp,
+                        color = VolunteerLinkTextSecondary,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (post.isPartnerPost) {
+                        Text(
+                            text = "Read-only partner view",
+                            modifier = Modifier.padding(top = 3.dp),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = VolunteerLinkTextSecondary
+                        )
+                    }
+                }
             }
 
-            Icon(
-                painter = painterResource(R.drawable.back),
-                contentDescription = null,
-                modifier = Modifier
-                    .padding(start = 8.dp, top = 3.dp)
-                    .size(17.dp)
-                    .rotate(180f),
-                tint = VolunteerLinkTextSecondary.copy(alpha = 0.7f)
-            )
+            if (!post.isPartnerPost) {
+                Icon(
+                    painter = painterResource(R.drawable.back),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .padding(start = 8.dp, top = 3.dp)
+                        .size(17.dp)
+                        .rotate(180f),
+                    tint = VolunteerLinkTextSecondary.copy(alpha = 0.7f)
+                )
+            }
         }
         OrganisationDivider(modifier = Modifier.padding(start = 66.dp, end = 12.dp))
     }
@@ -496,6 +556,7 @@ private fun manageLifecycleLabel(post: ManagePostItem, section: ManagePostSectio
     ManagePostSection.DRAFTS -> "DRAFT"
     ManagePostSection.REVIEW -> "REVIEW"
     ManagePostSection.COMPLETED -> "COMPLETED"
+    ManagePostSection.PARTNERSHIPS -> post.databaseStatus
     ManagePostSection.ACTIVE -> when (post.timingState) {
         PostTimingState.ONGOING -> "ONGOING"
         PostTimingState.UPCOMING -> "UPCOMING"
@@ -508,6 +569,7 @@ private fun manageLifecycleColor(post: ManagePostItem, section: ManagePostSectio
     ManagePostSection.REVIEW -> VolunteerLinkInformation
     ManagePostSection.COMPLETED -> VolunteerLinkPrimaryGreen
     ManagePostSection.DRAFTS -> VolunteerLinkTextSecondary
+    ManagePostSection.PARTNERSHIPS -> VolunteerLinkPrimaryGreen
     ManagePostSection.ACTIVE -> when (post.timingState) {
         PostTimingState.PAST -> VolunteerLinkWarning
         else -> VolunteerLinkPrimaryGreen

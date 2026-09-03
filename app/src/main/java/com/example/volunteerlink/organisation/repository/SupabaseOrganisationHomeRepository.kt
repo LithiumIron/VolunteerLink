@@ -6,6 +6,7 @@ import com.example.volunteerlink.organisation.home.model.OrganisationHomePost
 import com.example.volunteerlink.organisation.home.model.OrganisationHomeRole
 import com.example.volunteerlink.organisation.home.model.OrganisationHomeSchedule
 import com.example.volunteerlink.organisation.home.model.OrganisationHomeSnapshot
+import com.example.volunteerlink.organisation.home.model.OrganisationImpactWeaveAttention
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
@@ -15,6 +16,37 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.Json
+
+@Serializable
+data class PartnerPostSummaryRow(
+    @SerialName("post_id") val postId: String,
+    @SerialName("owner_organisation_name") val ownerOrganisationName: String,
+    val title: String,
+    val description: String,
+    val mode: String,
+    val status: String,
+    @SerialName("start_date") val startDate: String? = null,
+    @SerialName("end_date") val endDate: String? = null,
+    @SerialName("location_name") val locationName: String? = null,
+    @SerialName("contribution_summary") val contributionSummary: String = "",
+    @SerialName("is_owner") val isOwner: Boolean = false
+)
+
+@Serializable
+private data class ImpactWeaveAttentionRow(
+    @SerialName("draft_id") val draftId: String,
+    val title: String,
+    val status: String,
+    @SerialName("attention_type") val attentionType: String,
+    val severity: String,
+    val message: String,
+    @SerialName("planning_deadline") val planningDeadline: String? = null,
+    @SerialName("days_remaining") val daysRemaining: Int? = null
+)
 
 /**
  * Supabase implementation for Organisation Home.
@@ -24,6 +56,27 @@ import kotlinx.serialization.json.jsonPrimitive
  * avoids an N+1 query for every post.
  */
 class SupabaseOrganisationHomeRepository : OrganisationHomeRepository {
+
+    override suspend fun loadPartnerPosts(): List<PartnerPostSummary> {
+        val response = supabase.postgrest.rpc("organisation_list_partner_posts")
+        return Json { ignoreUnknownKeys = true }
+            .decodeFromString<List<PartnerPostSummaryRow>>(response.data)
+            .map { row ->
+                PartnerPostSummary(
+                    postId = row.postId,
+                    ownerOrganisationName = row.ownerOrganisationName,
+                    title = row.title,
+                    description = row.description,
+                    mode = row.mode,
+                    status = row.status,
+                    startDate = row.startDate,
+                    endDate = row.endDate,
+                    locationName = row.locationName,
+                    contributionSummary = row.contributionSummary,
+                    isOwner = row.isOwner
+                )
+            }
+    }
 
     override suspend fun loadHomeSnapshot(
         organisationId: String
@@ -225,10 +278,29 @@ class SupabaseOrganisationHomeRepository : OrganisationHomeRepository {
             post.copy(roles = rolesByPost[post.postId].orEmpty())
         }
 
+        val impactWeaveAttention = runCatching {
+            supabase.postgrest
+                .rpc("organisation_list_impact_weave_attention")
+                .decodeList<ImpactWeaveAttentionRow>()
+                .map { row ->
+                    OrganisationImpactWeaveAttention(
+                        draftId = row.draftId,
+                        title = row.title,
+                        status = row.status,
+                        attentionType = row.attentionType,
+                        severity = row.severity,
+                        message = row.message,
+                        planningDeadline = row.planningDeadline,
+                        daysRemaining = row.daysRemaining
+                    )
+                }
+        }.getOrDefault(emptyList())
+
         return OrganisationHomeSnapshot(
             organisationId = organisationId,
             organisationName = organisationRow.requiredText("organisation_name"),
-            posts = postsWithApplications
+            posts = postsWithApplications,
+            impactWeaveAttention = impactWeaveAttention
         )
     }
 

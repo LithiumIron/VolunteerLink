@@ -1,6 +1,7 @@
 package com.example.volunteerlink.organisation.manage.model
 
 import com.example.volunteerlink.data.post.PostTimingState
+import com.example.volunteerlink.organisation.home.model.OrganisationImpactWeaveAttention
 
 /** Top-level state shared by the Manage landing page and Volunteer Posts list. */
 data class OrganisationManageUiState(
@@ -10,6 +11,8 @@ data class OrganisationManageUiState(
     val draftPosts: List<ManagePostItem> = emptyList(),
     val reviewPosts: List<ManagePostItem> = emptyList(),
     val completedPosts: List<ManagePostItem> = emptyList(),
+    val partnerPosts: List<ManagePostItem> = emptyList(),
+    val impactWeaveAttention: List<OrganisationImpactWeaveAttention> = emptyList(),
     val isShowingCachedData: Boolean = false,
     val lastSyncedAtEpochMillis: Long? = null,
     val isRefreshing: Boolean = false,
@@ -46,6 +49,9 @@ data class OrganisationManageUiState(
     val reviewAttentionPostCount: Int
         get() = reviewPosts.size
 
+    val impactWeaveAttentionCount: Int
+        get() = impactWeaveAttention.size
+
     /**
      * Manage treats unfinished post-event close-out as attention too. It is
      * deliberately labelled Needs Review rather than ordinary Review.
@@ -61,12 +67,14 @@ enum class ManagePostSection {
     ACTIVE,
     DRAFTS,
     REVIEW,
-    COMPLETED
+    COMPLETED,
+    PARTNERSHIPS
 }
 
 data class ManagePostItem(
     val postId: String,
     val title: String,
+    val description: String = "",
     val mode: String,
     val databaseStatus: String,
     val timingState: PostTimingState? = null,
@@ -80,7 +88,10 @@ data class ManagePostItem(
     val remoteStartDate: String? = null,
     val remoteEndDate: String? = null,
     val remoteTimingState: PostTimingState? = null,
-    val attentionItems: List<ManageAttentionItem> = emptyList()
+    val attentionItems: List<ManageAttentionItem> = emptyList(),
+    val isPartnerPost: Boolean = false,
+    val ownerOrganisationName: String? = null,
+    val contributionSummary: String? = null
 )
 
 enum class ManageAttentionSeverity {

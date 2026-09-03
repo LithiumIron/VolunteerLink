@@ -12,7 +12,8 @@ import kotlinx.serialization.Serializable
 data class OrganisationHomeSnapshot(
     val organisationId: String,
     val organisationName: String,
-    val posts: List<OrganisationHomePost>
+    val posts: List<OrganisationHomePost>,
+    val impactWeaveAttention: List<OrganisationImpactWeaveAttention> = emptyList()
 )
 
 @Serializable
@@ -62,4 +63,17 @@ data class OrganisationHomeRole(
 data class OrganisationHomeParticipation(
     val userId: String,
     val applicationStatus: String
+)
+
+
+@Serializable
+data class OrganisationImpactWeaveAttention(
+    val draftId: String,
+    val title: String,
+    val status: String,
+    val attentionType: String,
+    val severity: String,
+    val message: String,
+    val planningDeadline: String? = null,
+    val daysRemaining: Int? = null
 )

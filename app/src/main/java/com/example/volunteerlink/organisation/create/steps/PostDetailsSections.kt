@@ -45,7 +45,8 @@ fun PhysicalEventDetailsSection(
     val draft = uiState.draft
     val errors = uiState.visibleErrors
     val editPolicy = uiState.editPolicy
-    val canEditPhysicalCore = !uiState.isExistingPostEdit || editPolicy?.canEditPhysicalCore != false
+    val canEditPhysicalCore = uiState.impactWeaveDraftId == null &&
+        (!uiState.isExistingPostEdit || editPolicy?.canEditPhysicalCore != false)
     val canEditMeetingPoint = !uiState.isExistingPostEdit || editPolicy?.canEditPhysicalMeetingPoint != false
     val canEditPhysicalCapacity = !uiState.isExistingPostEdit || editPolicy?.canEditPhysicalCapacity != false
 
@@ -71,7 +72,9 @@ fun PhysicalEventDetailsSection(
 
     CreateSectionCard(
         title = "Event Schedule",
-        subtitle = if (uiState.isExistingPostEdit && !canEditPhysicalCore) {
+        subtitle = if (uiState.impactWeaveDraftId != null) {
+            "Final schedule from Impact Weave. Reschedule from the partnership plan before entering Create Post."
+        } else if (uiState.isExistingPostEdit && !canEditPhysicalCore) {
             "Current event dates and times are fixed for this post."
         } else {
             "Choose when the physical event will take place. Start dates must be at least 7 days from today."
@@ -83,7 +86,12 @@ fun PhysicalEventDetailsSection(
                 message = physicalDraftDateAttention
             )
         }
-        if (uiState.isExistingPostEdit && !canEditPhysicalCore) {
+        if (uiState.impactWeaveDraftId != null) {
+            EditRestrictionNotice(
+                title = "Final partnership schedule",
+                message = "Dates and times are locked to the schedule accepted by partner organisations."
+            )
+        } else if (uiState.isExistingPostEdit && !canEditPhysicalCore) {
             EditRestrictionNotice(
                 title = "Schedule locked",
                 message = "Dates and times are fixed because volunteers or the event lifecycle already depend on them."
@@ -201,7 +209,11 @@ fun PhysicalEventDetailsSection(
 
     CreateSectionCard(
         title = "Event Location",
-        subtitle = "Select a real location from Geoapify so its address and coordinates can be saved later."
+        subtitle = if (uiState.impactWeaveDraftId != null) {
+            "Confirmed partnership venue. This location is locked."
+        } else {
+            "Select a real location from Geoapify so its address and coordinates can be saved later."
+        }
     ) {
         if (uiState.isExistingPostEdit && (!canEditPhysicalCore || !canEditMeetingPoint)) {
             EditRestrictionNotice(

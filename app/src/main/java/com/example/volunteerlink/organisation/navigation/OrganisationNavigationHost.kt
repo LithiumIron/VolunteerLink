@@ -242,6 +242,16 @@ fun OrganisationNavigationHost(
                                     ?.savedStateHandle
                                     ?.set(OPEN_REVIEW_FROM_HOME, true)
                             }
+
+                            HomeAttentionType.IMPACT_WEAVE_READY,
+                            HomeAttentionType.IMPACT_WEAVE_DEADLINE_SOON,
+                            HomeAttentionType.IMPACT_WEAVE_DEADLINE_PASSED,
+                            HomeAttentionType.IMPACT_WEAVE_ACTIVITY_PASSED,
+                            HomeAttentionType.IMPACT_WEAVE_PROGRESS -> {
+                                navController.navigate(
+                                    OrganisationNavigationRoutes.MANAGE_IMPACT_WEAVE
+                                )
+                            }
                         }
                     }
                 )
@@ -354,7 +364,20 @@ fun OrganisationNavigationHost(
             composable(OrganisationNavigationRoutes.MANAGE_IMPACT_WEAVE) {
                 OrganisationImpactWeaveScreen(
                     onBack = { navController.popBackStack() },
+                    onCreatePost = { draftId ->
+                        navController.navigate(
+                            OrganisationNavigationRoutes.createFromImpactWeave(draftId)
+                        )
+                    },
                     viewModel = impactWeaveViewModel
+                )
+            }
+
+            composable(OrganisationNavigationRoutes.CREATE_FROM_IMPACT_WEAVE) { backStackEntry ->
+                OrganisationCreateScreen(
+                    impactWeaveDraftId = backStackEntry.arguments
+                        ?.getString("impactWeaveDraftId"),
+                    onExitCreate = { navController.popBackStack() }
                 )
             }
 

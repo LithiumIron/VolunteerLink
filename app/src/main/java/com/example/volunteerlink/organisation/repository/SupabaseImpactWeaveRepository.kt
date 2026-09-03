@@ -8,6 +8,8 @@ import com.example.volunteerlink.organisation.impactweave.model.ImpactWeaveDatab
 import com.example.volunteerlink.organisation.impactweave.model.ImpactWeaveDraft
 import com.example.volunteerlink.organisation.impactweave.model.ImpactWeaveMatchingInput
 import com.example.volunteerlink.organisation.impactweave.model.ImpactWeaveMode
+import com.example.volunteerlink.organisation.impactweave.model.ImpactWeavePostPrefill
+import com.example.volunteerlink.organisation.impactweave.model.ImpactWeavePostPartner
 import com.example.volunteerlink.organisation.impactweave.model.ImpactWeaveSupportCandidate
 import com.example.volunteerlink.organisation.create.model.VolunteerPostCategory
 import io.github.jan.supabase.postgrest.postgrest
@@ -86,6 +88,31 @@ private data class MatchingCandidateRow(
     val longitude: Double? = null,
     @SerialName("open_to_partnership") val openToPartnership: Boolean = false,
     @SerialName("verification_status") val verificationStatus: String = ""
+)
+
+@Serializable
+private data class ImpactWeavePostPrefillRow(
+    @SerialName("draft_id") val draftId: String,
+    val category: String,
+    val title: String,
+    val description: String,
+    val mode: String,
+    @SerialName("start_date") val startDate: String,
+    @SerialName("end_date") val endDate: String,
+    @SerialName("start_time") val startTime: String,
+    @SerialName("end_time") val endTime: String,
+    @SerialName("location_name") val locationName: String,
+    @SerialName("location_address") val locationAddress: String,
+    val country: String,
+    val latitude: Double,
+    val longitude: Double,
+    val partners: List<ImpactWeavePostPartnerRow> = emptyList()
+)
+
+@Serializable
+private data class ImpactWeavePostPartnerRow(
+    @SerialName("organisation_name") val organisationName: String,
+    @SerialName("contribution_summary") val contributionSummary: String
 )
 
 private data class PreparedImpactWeavePlan(
@@ -210,6 +237,93 @@ class SupabaseImpactWeaveRepository : ImpactWeaveRepository {
                         longitude = row.longitude
                     )
                 }
+        )
+    }
+
+    override suspend fun updateBasicDetails(
+        draftId: String,
+        title: String,
+        category: String,
+        description: String
+    ) {
+        supabase.postgrest.rpc(
+            function = "organisation_update_impact_weave_basic",
+            parameters = buildJsonObject {
+                put("p_draft_id", draftId)
+                put("p_title", title.trim())
+                put("p_category", category)
+                put("p_description", description.trim())
+            }
+        )
+    }
+
+    override suspend fun reschedule(
+        draftId: String,
+        startDateMillis: Long,
+        endDateMillis: Long,
+        startTimeMinutes: Int,
+        endTimeMinutes: Int
+    ) {
+        supabase.postgrest.rpc(
+            function = "organisation_reschedule_impact_weave",
+            parameters = buildJsonObject {
+                put("p_draft_id", draftId)
+                put("p_start_date", formatDate(startDateMillis))
+                put("p_end_date", formatDate(endDateMillis))
+                put("p_start_time", formatTime(startTimeMinutes))
+                put("p_end_time", formatTime(endTimeMinutes))
+            }
+        )
+    }
+
+    override suspend fun dispose(draftId: String) {
+        supabase.postgrest.rpc(
+            function = "organisation_dispose_impact_weave",
+            parameters = buildJsonObject { put("p_draft_id", draftId) }
+        )
+    }
+
+    override suspend fun loadPostPrefill(draftId: String): ImpactWeavePostPrefill {
+        val response = supabase.postgrest.rpc(
+            function = "organisation_get_impact_weave_post_prefill",
+            parameters = buildJsonObject { put("p_draft_id", draftId) }
+        )
+        val row = Json { ignoreUnknownKeys = true }
+            .decodeFromString<ImpactWeavePostPrefillRow>(response.data)
+        return ImpactWeavePostPrefill(
+            draftId = row.draftId,
+            category = VolunteerPostCategory.valueOf(row.category.uppercase(Locale.ROOT)),
+            title = row.title,
+            description = row.description,
+            mode = ImpactWeaveMode.valueOf(row.mode.uppercase(Locale.ROOT)),
+            startDateMillis = parseSqlDate(row.startDate),
+            endDateMillis = parseSqlDate(row.endDate),
+            startTimeMinutes = parseSqlTime(row.startTime),
+            endTimeMinutes = parseSqlTime(row.endTime),
+            location = LocationSuggestion(
+                placeId = "impact-weave-post:${row.draftId}",
+                name = row.locationName,
+                address = row.locationAddress,
+                city = row.locationName,
+                state = null,
+                country = row.country,
+                latitude = row.latitude,
+                longitude = row.longitude,
+                resultType = "impact_weave_location"
+            ),
+            partners = row.partners.map {
+                ImpactWeavePostPartner(it.organisationName, it.contributionSummary)
+            }
+        )
+    }
+
+    override suspend fun completeConversion(draftId: String, postId: String) {
+        supabase.postgrest.rpc(
+            function = "organisation_complete_impact_weave_conversion",
+            parameters = buildJsonObject {
+                put("p_draft_id", draftId)
+                put("p_post_id", postId)
+            }
         )
     }
 
