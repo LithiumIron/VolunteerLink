@@ -14,7 +14,7 @@ val localProperties = Properties().apply {
 val geoapifyApiKey =
     localProperties.getProperty(
         "GEOAPIFY_API_KEY",
-        ""
+        "d75f585541c9459889f57b22a4539cc2"
     )
 
 val groqApiKey =
