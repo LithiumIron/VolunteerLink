@@ -4,7 +4,7 @@ create extension if not exists pgcrypto;
 
 -- One chat group for each VolunteerLink event/post.
 create table if not exists v1_erd_test.event_chat_groups (
-    chat_id uuid primary key default gen_random_uuid(),
+    chat_id text primary key,
     post_id text not null unique
         references v1_erd_test.volunteer_posts(post_id)
         on delete cascade,
@@ -17,7 +17,7 @@ create table if not exists v1_erd_test.event_chat_groups (
 );
 
 create table if not exists v1_erd_test.event_chat_members (
-    chat_id uuid not null
+    chat_id text not null
         references v1_erd_test.event_chat_groups(chat_id)
         on delete cascade,
     user_id text not null
@@ -32,7 +32,7 @@ create table if not exists v1_erd_test.event_chat_members (
 -- Organisation sends an invitation; a volunteer chooses whether to accept.
 create table if not exists v1_erd_test.event_chat_invitations (
     invitation_id uuid primary key default gen_random_uuid(),
-    chat_id uuid not null
+    chat_id text not null
         references v1_erd_test.event_chat_groups(chat_id)
         on delete cascade,
     user_id text not null
@@ -49,7 +49,7 @@ create table if not exists v1_erd_test.event_chat_invitations (
 
 create table if not exists v1_erd_test.event_chat_messages (
     message_id uuid primary key default gen_random_uuid(),
-    chat_id uuid not null
+    chat_id text not null
         references v1_erd_test.event_chat_groups(chat_id)
         on delete cascade,
     sender_user_id text not null
@@ -102,13 +102,13 @@ $$;
 create or replace function v1_erd_test.ensure_event_chat_group(
     p_post_id text
 )
-returns uuid
+returns text
 language plpgsql
 security definer
 set search_path = v1_erd_test, pg_temp
 as $$
 declare
-    v_chat_id uuid;
+    v_chat_id text;
     v_organisation_user_id text;
     v_title text;
 begin
@@ -134,11 +134,13 @@ begin
 
     if v_chat_id is null then
         insert into v1_erd_test.event_chat_groups (
+            chat_id,
             post_id,
             title,
             created_by_user_id
         )
         values (
+            'CHAT_' || p_post_id,
             p_post_id,
             v_title,
             v_organisation_user_id
@@ -191,14 +193,14 @@ from v1_erd_test.volunteer_posts;
 create or replace function v1_erd_test.join_my_accepted_event_chat(
     p_post_id text
 )
-returns uuid
+returns text
 language plpgsql
 security definer
 set search_path = v1_erd_test, pg_temp
 as $$
 declare
     v_user_id text;
-    v_chat_id uuid;
+    v_chat_id text;
 begin
     v_user_id := v1_erd_test.current_chat_user_id();
 
@@ -242,7 +244,7 @@ set search_path = v1_erd_test, pg_temp
 as $$
 declare
     v_organisation_user_id text;
-    v_chat_id uuid;
+    v_chat_id text;
     v_invitation_id uuid;
 begin
     v_organisation_user_id := v1_erd_test.current_chat_user_id();
@@ -303,14 +305,14 @@ create or replace function v1_erd_test.respond_to_event_chat_invitation(
     p_invitation_id uuid,
     p_accept boolean
 )
-returns uuid
+returns text
 language plpgsql
 security definer
 set search_path = v1_erd_test, pg_temp
 as $$
 declare
     v_user_id text;
-    v_chat_id uuid;
+    v_chat_id text;
 begin
     v_user_id := v1_erd_test.current_chat_user_id();
 
@@ -351,7 +353,7 @@ $$;
 
 -- A member can send a message only to their own event chat.
 create or replace function v1_erd_test.send_event_chat_message(
-    p_chat_id uuid,
+    p_chat_id text,
     p_body text default '',
     p_message_type text default 'TEXT',
     p_attachment_path text default null,
@@ -412,7 +414,7 @@ $$;
 
 -- Only the event organisation can edit the group description.
 create or replace function v1_erd_test.update_event_chat_description(
-    p_chat_id uuid,
+    p_chat_id text,
     p_description text
 )
 returns void
@@ -448,7 +450,7 @@ $$;
 
 -- Row-level security: users can only read chats they belong to.
 create or replace function v1_erd_test.is_event_chat_member(
-    p_chat_id uuid
+    p_chat_id text
 )
 returns boolean
 language sql
@@ -516,17 +518,15 @@ grant execute on function
     v1_erd_test.join_my_accepted_event_chat(text),
     v1_erd_test.invite_accepted_volunteer_to_event_chat(text, text),
     v1_erd_test.respond_to_event_chat_invitation(uuid, boolean),
-    v1_erd_test.send_event_chat_message(uuid, text, text, text, text, text, uuid),
-    v1_erd_test.update_event_chat_description(uuid, text)
+    v1_erd_test.send_event_chat_message(text, text, text, text, text, text, uuid),
+    v1_erd_test.update_event_chat_description(text, text)
 to authenticated;
-
-commit;
 
 -- Returns every event chat the signed-in user belongs to,
 -- including real VolunteerLink names for every member.
 create or replace function v1_erd_test.get_my_event_chats()
 returns table(
-    chat_id uuid,
+    chat_id text,
     post_id text,
     title text,
     description text,
@@ -576,7 +576,7 @@ $$;
 
 -- Returns messages only when the current user is a group member.
 create or replace function v1_erd_test.get_event_chat_messages(
-    p_chat_id uuid
+    p_chat_id text
 )
 returns table(
     message_id uuid,
@@ -625,5 +625,95 @@ $$;
 
 grant execute on function
     v1_erd_test.get_my_event_chats(),
-    v1_erd_test.get_event_chat_messages(uuid)
+    v1_erd_test.get_event_chat_messages(text)
 to authenticated;
+
+create or replace function v1_erd_test.get_my_event_chat_previews()
+returns table(
+    chat_id text,
+    post_id text,
+    title text,
+    description text,
+    updated_at timestamptz,
+    member_user_id text,
+    member_name text,
+    member_role text,
+    member_initial text,
+    latest_message_id uuid,
+    latest_sender_user_id text,
+    latest_sender_name text,
+    latest_sender_initial text,
+    latest_body text,
+    latest_message_type text,
+    latest_attachment_path text,
+    latest_attachment_name text,
+    latest_attachment_mime_type text,
+    latest_sent_at timestamptz,
+    latest_edited_at timestamptz
+)
+language sql
+stable
+security definer
+set search_path = v1_erd_test, pg_temp
+as $$
+    with current_member as (
+        select v1_erd_test.current_chat_user_id() as user_id
+    )
+    select
+        chat.chat_id,
+        chat.post_id,
+        chat.title,
+        chat.description,
+        chat.updated_at,
+        member.user_id as member_user_id,
+        coalesce(member_profile.full_name, 'VolunteerLink user') as member_name,
+        member.member_role,
+        upper(left(coalesce(member_profile.full_name, 'V'), 1)) as member_initial,
+        latest.message_id as latest_message_id,
+        latest.sender_user_id as latest_sender_user_id,
+        latest.sender_name as latest_sender_name,
+        latest.sender_initial as latest_sender_initial,
+        latest.body as latest_body,
+        latest.message_type as latest_message_type,
+        latest.attachment_path as latest_attachment_path,
+        latest.attachment_name as latest_attachment_name,
+        latest.attachment_mime_type as latest_attachment_mime_type,
+        latest.sent_at as latest_sent_at,
+        latest.edited_at as latest_edited_at
+    from v1_erd_test.event_chat_groups chat
+    join v1_erd_test.event_chat_members current_chat_member
+        on current_chat_member.chat_id = chat.chat_id
+    join current_member
+        on current_member.user_id = current_chat_member.user_id
+    join v1_erd_test.event_chat_members member
+        on member.chat_id = chat.chat_id
+    join v1_erd_test.user_profiles member_profile
+        on member_profile.user_id = member.user_id
+    left join lateral (
+        select
+            message.message_id,
+            message.sender_user_id,
+            coalesce(sender_profile.full_name, 'VolunteerLink user') as sender_name,
+            upper(left(coalesce(sender_profile.full_name, 'V'), 1)) as sender_initial,
+            message.body,
+            message.message_type,
+            message.attachment_path,
+            message.attachment_name,
+            message.attachment_mime_type,
+            message.sent_at,
+            message.edited_at
+        from v1_erd_test.event_chat_messages message
+        join v1_erd_test.user_profiles sender_profile
+            on sender_profile.user_id = message.sender_user_id
+        where message.chat_id = chat.chat_id
+        order by message.sent_at desc
+        limit 1
+    ) latest on true
+    order by latest.sent_at desc nulls last, chat.updated_at desc;
+$$;
+
+grant execute on function
+    v1_erd_test.get_my_event_chat_previews()
+to authenticated;
+
+commit;

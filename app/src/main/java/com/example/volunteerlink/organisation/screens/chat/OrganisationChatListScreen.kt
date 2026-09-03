@@ -61,7 +61,7 @@ fun OrganisationChatListScreen(role: Role, onOpenChat: (String) -> Unit) {
             Box {
                 Icon(
                     Icons.Filled.Notifications,
-                    contentDescription = "Notifications",
+                    contentDescription = "Chat Notifications",
                     tint = CardBeige,
                     modifier = Modifier.clickable { showNotifications = true }
                 )
@@ -76,7 +76,7 @@ fun OrganisationChatListScreen(role: Role, onOpenChat: (String) -> Unit) {
 
                 DropdownMenu(expanded = showNotifications, onDismissRequest = { showNotifications = false }) {
                     Text(
-                        "Notifications",
+                        "Chat Notifications",
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)

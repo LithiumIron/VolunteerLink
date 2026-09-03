@@ -50,7 +50,7 @@ object SupabaseChatRepository {
         )
 
         val chatRows = supabase.postgrest
-            .rpc("get_my_event_chats")
+            .rpc("get_my_event_chat_previews")
             .decodeList<EventChatRow>()
 
         val chats = chatRows
@@ -67,19 +67,17 @@ object SupabaseChatRepository {
                     )
                 }
 
-                val messages = loadMessages(chatId)
+                val chatMessages = mutableStateListOf<ChatMessage>()
 
                 ChatRoom(
                     id = chatId,
                     title = first.title,
                     description = first.description,
                     members = members,
-                    messages = mutableStateListOf<ChatMessage>().apply {
-                        addAll(messages)
-                    },
+                    messages = chatMessages,
                     visibleTo = setOf(viewerRole),
                     readCounts = mutableStateMapOf(
-                        viewerRole to messages.size
+                        viewerRole to chatMessages.size
                     ),
                     isGroup = true
                 )
@@ -92,6 +90,12 @@ object SupabaseChatRepository {
             profile = profile,
             chats = chats
         )
+    }
+
+    suspend fun loadMessagesForChat(
+        chatId: String
+    ): List<ChatMessage> {
+        return loadMessages(chatId)
     }
 
     private suspend fun loadMessages(

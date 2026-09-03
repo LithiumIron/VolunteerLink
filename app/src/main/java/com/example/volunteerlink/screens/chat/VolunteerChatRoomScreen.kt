@@ -560,10 +560,12 @@ fun VolunteerChatRoomScreen(
             }
         }
 
-            // ---- Original input Row (exactly as it was, but now inside a Column) ----
+            // ---- Message input Row (Volunteer) ----
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .background(Color.White)
+                    .navigationBarsPadding()
                     .padding(horizontal = 10.dp, vertical = 8.dp),  // Note: background removed, moved to Column
                 verticalAlignment = Alignment.CenterVertically
             ) {

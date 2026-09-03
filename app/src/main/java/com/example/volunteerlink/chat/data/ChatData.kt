@@ -152,6 +152,17 @@ object ChatData {
         allChats.addAll(chats)
     }
 
+    fun replaceMessages(
+        chatId: String,
+        messages: List<ChatMessage>
+    ) {
+        val chat = chatById(chatId) ?: return
+
+        chat.messages.clear()
+        chat.messages.addAll(messages)
+        chat.readCounts[currentRole.value] = messages.size
+    }
+
     // Filters the chat with the newest message appears at the top of the list.
     // But Pinned chat always at the most top
     fun chatsForCurrentRole(): List<ChatRoom> {

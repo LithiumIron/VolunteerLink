@@ -418,8 +418,19 @@ fun OrganisationNavigationHost(
                     ?.getString(OrganisationNavigationRoutes.CHAT_ID_ARGUMENT)
                     .orEmpty()
 
-                LaunchedEffect(Unit) {
+                LaunchedEffect(chatId) {
                     ChatData.currentRole.value = Role.ORGANISATION
+
+                    runCatching {
+                        SupabaseChatRepository.loadMessagesForChat(chatId)
+                    }.onSuccess { messages ->
+                        ChatData.replaceMessages(
+                            chatId = chatId,
+                            messages = messages
+                        )
+                    }.onFailure { error ->
+                        error.printStackTrace()
+                    }
                 }
 
                 OrganisationChatRoomScreen(

@@ -834,8 +834,19 @@ fun VolunteerOpportunityNavigationHost(
                         )
                         .orEmpty()
 
-                    LaunchedEffect(Unit) {
+                    LaunchedEffect(chatId) {
                         ChatData.currentRole.value = Role.APPLICANT
+
+                        runCatching {
+                            SupabaseChatRepository.loadMessagesForChat(chatId)
+                        }.onSuccess { messages ->
+                            ChatData.replaceMessages(
+                                chatId = chatId,
+                                messages = messages
+                            )
+                        }.onFailure { error ->
+                            error.printStackTrace()
+                        }
                     }
 
                     VolunteerChatRoomScreen(
