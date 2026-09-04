@@ -1,24 +1,5 @@
 package com.example.volunteerlink.shared
 
-// ============================================================================
-// DETAILED FILE RESPONSIBILITY
-// ============================================================================
-// Centralises reusable Organisation authentication form data and validation rules that are shared by sign-in,
-// sign-up and profile-related flows.
-//
-// It contains country/phone metadata and small validation helpers so individual screens do not maintain different
-// copies of the same rules.
-//
-// The screen layer reads these values to build dropdowns and validate input, while authentication/network work
-// remains in the auth ViewModel or Supabase client.
-//
-// Keeping these rules in one source is important because a phone number or organisation type must be interpreted
-// consistently before it is sent to Supabase.
-//
-// Architectural layer: Authentication/session support layer.
-// ============================================================================
-
-
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -49,27 +30,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-// =====================================================================
-// Everything on this file is shared by BOTH VolunteerSignUpScreen and
-// OrganisationSignUpScreen. Each screen therefore reuses the shared
-// copy of the field colours and the OTP verification composable — those
-// copies were identical (or near-identical), so this is now the single
-// source of truth both screens import instead of duplicating.
-// =====================================================================
-
-
-// ---------------------------------------------------------------------
-// FIELD COLOURS
-// ---------------------------------------------------------------------
-// Replaces the old per-screen organisationFieldColours() /
-// volunteerFieldColours() — both had the exact same colour values.
-
 @Composable
-/**
- * DETAILED BEHAVIOUR — authFieldColours
- *
- * Implements the current VolunteerLink responsibility for auth field colours in this support/model layer.
- */
 fun authFieldColours() =
     OutlinedTextFieldDefaults.colors(
         focusedContainerColor = MaterialTheme.colorScheme.surface,
@@ -81,23 +42,11 @@ fun authFieldColours() =
 
 
 
-/**
- * DETAILED BEHAVIOUR — isValidAuthPhoneNumber
- *
- * Implements the current VolunteerLink responsibility for is valid auth phone number in this support/model
- * layer.
- */
 fun isValidAuthPhoneNumber(phone: String): Boolean {
     return phone.matches(Regex("^\\+\\d{1,3} \\d{1,2}-\\d{7,9}$"))
 }
 
 @Composable
-/**
- * DETAILED BEHAVIOUR — SharedOtpVerificationSection
- *
- * Implements the current VolunteerLink responsibility for shared otp verification section in this support/model
- * layer.
- */
 fun SharedOtpVerificationSection(
     email: String,
     otpCode: String,

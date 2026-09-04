@@ -139,6 +139,8 @@ fun VolunteerOpportunityDetailsScreen(
         return
     }
 
+    val eventGroupConversationId: String?
+
     // Arrange the following screen content vertically inside the available space.
     Column(
         modifier = Modifier

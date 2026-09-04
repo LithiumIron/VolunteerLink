@@ -99,11 +99,6 @@ fun VolunteerSignUpScreen(
     var fullName by rememberSaveable { mutableStateOf("") }
     var email by rememberSaveable { mutableStateOf("") }
 
-    // Holds ONLY the local number the user types (e.g. "12-1234567") —
-    // never the country calling code. The code is shown as a fixed,
-    // non-editable OutlinedTextField "prefix" instead of living inside
-    // this value, so there's nothing here for the user to backspace
-    // through or delete.
     var phone by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
     var otpCode by rememberSaveable { mutableStateOf("") }
@@ -540,15 +535,6 @@ fun VolunteerSignUpScreen(
                 }
 
                 Spacer(Modifier.height(13.dp))
-
-                // =================================================
-                // PHONE — the calling code is a fixed `prefix` on the
-                // field itself, not part of `value`. It still reads as
-                // one continuous "+60 12-1234567" field visually, but
-                // the user's cursor/selection/backspace can never reach
-                // the code, since `phone` only ever holds the local
-                // number.
-                // =================================================
 
                 OutlinedTextField(
                     value = phone,

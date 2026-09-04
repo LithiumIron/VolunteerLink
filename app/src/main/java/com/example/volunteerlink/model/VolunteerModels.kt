@@ -127,6 +127,7 @@ data class VolunteerOpportunityEvent(
     val eventThumbnailPath: String? = null,
     val eventIsSaved: Boolean = false,
     val eventDatabaseId: String = "",
+    val eventGroupConversationId: String? = null,
     val eventStatus: String = "PUBLISHED",
     // Raw ISO dates are kept for role-specific application rules.
     // Hybrid PHYSICAL roles use eventPhysicalStartDate; REMOTE roles use eventRemoteStartDate.

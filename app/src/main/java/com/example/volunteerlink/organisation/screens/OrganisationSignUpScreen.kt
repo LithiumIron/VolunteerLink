@@ -141,12 +141,6 @@ fun OrganisationSignUpScreen(
     var showLocationDialog by rememberSaveable {
         mutableStateOf(false)
     }
-
-
-    // ========================================================
-    // FORM VALUES
-    // ========================================================
-
     var organisationName by rememberSaveable {
         mutableStateOf("")
     }
@@ -751,7 +745,6 @@ fun OrganisationSignUpScreen(
                                 Column {
 
                                     // COUNTRY
-
                                     Text(
                                         text = "Country",
                                         fontWeight = FontWeight.Bold,
@@ -802,14 +795,6 @@ fun OrganisationSignUpScreen(
                                                     },
                                                     onClick = {
 
-                                                        // phone (the local
-                                                        // number) is left
-                                                        // untouched here —
-                                                        // only the fixed
-                                                        // prefix shown on
-                                                        // the field changes,
-                                                        // since it's derived
-                                                        // from `country`.
                                                         country = selectedCountry
                                                         stateRegion = ""
                                                         locationName = ""
@@ -828,7 +813,6 @@ fun OrganisationSignUpScreen(
 
 
                                     // STATE / REGION
-
                                     Text(
                                         text = "State / region",
                                         fontWeight = FontWeight.Bold,
@@ -905,7 +889,6 @@ fun OrganisationSignUpScreen(
 
 
                                     // LOCATION
-
                                     Text(
                                         text = "Location",
                                         fontWeight = FontWeight.Bold,
@@ -1014,10 +997,7 @@ fun OrganisationSignUpScreen(
                 )
 
 
-                // =================================================
                 // PASSWORD
-                // =================================================
-
                 OutlinedTextField(
                     value = password,
                     onValueChange = {
@@ -1046,10 +1026,7 @@ fun OrganisationSignUpScreen(
                 )
 
 
-                // =================================================
-                // ERROR MESSAGE (from an actual Supabase submit)
-                // =================================================
-
+                // Displays any authentication error returned by the ViewModel
                 uiState.errorMessage?.let { message ->
 
                     Spacer(
@@ -1070,15 +1047,7 @@ fun OrganisationSignUpScreen(
                 )
 
 
-                // =================================================
                 // CREATE ACCOUNT BUTTON
-                // =================================================
-                // Disabled until isFormValid is true — no separate
-                // validation-error message. This recomputes on every
-                // keystroke since isFormValid is derived state, so the
-                // button enables itself the moment the last required
-                // field becomes valid.
-
                 Button(
                     onClick = {
                         confirmPassword = ""
@@ -1108,11 +1077,6 @@ fun OrganisationSignUpScreen(
                         )
                     }
                 }
-
-
-                // =================================================
-                // BOTTOM SPACING
-                // =================================================
 
                 Spacer(
                     Modifier.height(24.dp)

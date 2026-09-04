@@ -47,47 +47,19 @@ data class CurrentLocationOutcome(
  */
 object CurrentLocationResolver {
 
-    /**
-     * DETAILED BEHAVIOUR — hasLocationPermission
-     *
-     * Implements the current VolunteerLink responsibility for has location permission in this support/model
-     * layer.
-     */
     fun hasLocationPermission(context: Context): Boolean =
         ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) ==
                 PackageManager.PERMISSION_GRANTED ||
                 ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
                 PackageManager.PERMISSION_GRANTED
 
-    /**
-     * DETAILED BEHAVIOUR — isLocationEnabled
-     *
-     * Implements the current VolunteerLink responsibility for is location enabled in this support/model layer.
-     */
+    // Checks whether location services are enabled on the device.
     fun isLocationEnabled(context: Context): Boolean {
         val manager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
         return LocationManagerCompat.isLocationEnabled(manager)
     }
 
-    /**
-     * Same GPS fetch as MapScreen (VolunteerMapLocationRequest), followed by
-     * a Geoapify reverse-geocode + countryStates match. onOutcome is always
-     * called exactly once — with a match, or null match + a message
-     * explaining why (permission/GPS/no-match), so the caller can fall back
-     * to manual selection. Returns a cancel function, same contract as
-     * VolunteerMapLocationRequest.start().
-     */
-    /**
-     * DETAILED BEHAVIOUR — resolve
-     *
-     * Implements the current VolunteerLink responsibility for resolve in this support/model layer.
-     *
-     * Works with structured location suggestions/coordinates so free-text search is separated from the final
-     * location fields saved with the post/plan.
-     *
-     * Runs asynchronous work in a lifecycle-aware coroutine and exposes progress/error state rather than
-     * blocking the UI thread.
-     */
+    // Resolves the current device location and matches it to a supported country, state and city
     fun resolve(
         context: Context,
         countryStates: Map<String, Map<String, List<String>>>,

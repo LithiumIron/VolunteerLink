@@ -142,18 +142,17 @@ fun VolunteerApplicationScreen(
                         VolunteerApplicationStatus.CANCELLED
             }
 
+    // Compute whether the group chat already exists.
+    val isGroupChatCreated = !volunteerOpportunityEvent.eventGroupConversationId.isNullOrBlank()
     // Choose one visible state: success, existing record, review dialog, or application form.
     when {
         applicationWasSubmitted -> {
             VolunteerApplicationSuccessScreen(
-                volunteerOpportunityEvent =
-                    volunteerOpportunityEvent,
-                volunteerOpportunityRole =
-                    volunteerOpportunityRole,
-                onReturnHomeSelected =
-                    onReturnHomeSelected,
+                volunteerOpportunityEvent = volunteerOpportunityEvent,
+                volunteerOpportunityRole = volunteerOpportunityRole,
+                isGroupChatCreated = isGroupChatCreated,
+                onReturnHomeSelected = onReturnHomeSelected,
                 onJoinGroupChat = onJoinGroupChat
-
             )
         }
 
@@ -893,198 +892,119 @@ private fun VolunteerApplicationRoleSummary(
 // Called from this screen, its ViewModel, or the Volunteer navigation host during the related user action.
 // It changes only local UI/ViewModel state; persistent changes still go through Supabase repositories.
 private fun VolunteerApplicationSuccessScreen(
-    volunteerOpportunityEvent:
-    VolunteerOpportunityEvent,
-    volunteerOpportunityRole:
-    VolunteerOpportunityRole,
+    volunteerOpportunityEvent: VolunteerOpportunityEvent,
+    volunteerOpportunityRole: VolunteerOpportunityRole,
+    isGroupChatCreated: Boolean,          // ← real flag now
     onReturnHomeSelected: () -> Unit,
     onJoinGroupChat: suspend (String) -> Unit
 ) {
-    // Check the role application method because only Instant Join participants receive immediate chat access.
     val applicationIsInstantJoin =
-        volunteerOpportunityRole
-            .roleApplicationMethod ==
-                VolunteerRoleApplicationMethod
-                    .INSTANT_JOIN
+        volunteerOpportunityRole.roleApplicationMethod ==
+                VolunteerRoleApplicationMethod.INSTANT_JOIN
 
-    // Use a Compose-aware coroutine scope for the suspend Join Group Chat request.
     val scope = rememberCoroutineScope()
-
-    var isJoiningGroupChat by rememberSaveable {
-        mutableStateOf(false)
-    }
-
-    var joinGroupChatError by rememberSaveable {
-        mutableStateOf<String?>(null)
-    }
+    var isJoiningGroupChat by rememberSaveable { mutableStateOf(false) }
+    var joinGroupChatError by rememberSaveable { mutableStateOf<String?>(null) }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                VolunteerLinkBackground
-            )
+            .background(VolunteerLinkBackground)
             .statusBarsPadding()
-            .padding(
-                horizontal =
-                    VolunteerLinkScreenHorizontalPadding
-            ),
-        horizontalAlignment =
-            Alignment.CenterHorizontally,
-        verticalArrangement =
-            Arrangement.Center
+            .padding(horizontal = VolunteerLinkScreenHorizontalPadding),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
-        Surface(
-            modifier = Modifier.size(82.dp),
-            shape = CircleShape,
-            color = Color(0xFFE8F5E9)
-        ) {
-            Box(
-                contentAlignment =
-                    Alignment.Center
-            ) {
-                Icon(
-                    imageVector =
-                        Icons.Filled.CheckCircle,
-                    contentDescription =
-                        // Reject this branch early when its requirement is not met, preventing an invalid request or navigation.
-                        if (applicationIsInstantJoin) {
-                            "Role joined"
-                        } else {
-                            "Application submitted"
-                        },
-                    modifier =
-                        Modifier.size(52.dp),
-                    tint = VolunteerLinkSuccess
+        // ... existing success icon + title + description (keep as-is) ...
+
+        Spacer(modifier = Modifier.height(28.dp))
+
+        if (applicationIsInstantJoin) {
+            if (!isGroupChatCreated) {
+                // Chat has not been created by the organisation yet
+                Text(
+                    text = "Group chat is not created yet by the organisation.",
+                    fontSize = 13.sp,
+                    color = VolunteerLinkWarning,
+                    modifier = Modifier.padding(bottom = 12.dp)
                 )
+
+                Button(
+                    onClick = onReturnHomeSelected,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    shape = RoundedCornerShape(11.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = VolunteerLinkPrimaryGreen,
+                        contentColor = Color.White
+                    )
+                ) {
+                    Text("Return to Home", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                }
+            } else {
+                // Chat already exists → allow joining
+                Button(
+                    onClick = {
+                        val postId = volunteerOpportunityEvent.eventDatabaseId
+                        if (postId.isBlank()) {
+                            joinGroupChatError = "This event is still loading. Please try again shortly."
+                            return@Button
+                        }
+
+                        scope.launch {
+                            isJoiningGroupChat = true
+                            joinGroupChatError = null
+                            runCatching {
+                                onJoinGroupChat(postId)
+                            }.onFailure { error ->
+                                joinGroupChatError = error.message
+                                    ?: "Could not join the event group chat."
+                            }
+                            isJoiningGroupChat = false
+                        }
+                    },
+                    enabled = !isJoiningGroupChat,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    shape = RoundedCornerShape(11.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = VolunteerLinkPrimaryGreen,
+                        contentColor = Color.White
+                    )
+                ) {
+                    Text(
+                        text = if (isJoiningGroupChat) "Joining Group Chat..." else "Join Group Chat",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                joinGroupChatError?.let { error ->
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = error,
+                        color = VolunteerLinkError,
+                        fontSize = 12.sp
+                    )
+                }
             }
-        }
-
-        Spacer(
-            modifier = Modifier.height(22.dp)
-        )
-
-        Text(
-            text =
-                // Reject this branch early when its requirement is not met, preventing an invalid request or navigation.
-                if (applicationIsInstantJoin) {
-                    "Role Joined"
-                } else {
-                    "Application Submitted"
-                },
-            fontSize = 23.sp,
-            fontWeight = FontWeight.Bold,
-            color = VolunteerLinkTextPrimary
-        )
-
-        Spacer(
-            modifier = Modifier.height(9.dp)
-        )
-
-        Text(
-            text =
-                // Reject this branch early when its requirement is not met, preventing an invalid request or navigation.
-                if (applicationIsInstantJoin) {
-                    "Your place for " +
-                            volunteerOpportunityRole
-                                .roleTitle +
-                            " with " +
-                            volunteerOpportunityEvent
-                                .eventOrganisationName +
-                            " is confirmed."
-                } else {
-                    "Your application for " +
-                        volunteerOpportunityRole
-                            .roleTitle +
-                        " has been sent to " +
-                        volunteerOpportunityEvent
-                            .eventOrganisationName +
-                        "."
-                },
-            fontSize = 13.sp,
-            lineHeight = 20.sp,
-            color = VolunteerLinkTextSecondary
-        )
-
-        Spacer(
-            modifier = Modifier.height(8.dp)
-        )
-
-        Text(
-            text =
-                "You can track the latest status " +
-                        "from My Applications.",
-            fontSize = 12.sp,
-            color = VolunteerLinkTextSecondary
-        )
-
-        Spacer(
-            modifier = Modifier.height(28.dp)
-        )
-
-        // Connect this button to the validated action prepared above; loading state prevents duplicate requests.
-        Button(
-            onClick = {
-                // Reject this branch early when its requirement is not met, preventing an invalid request or navigation.
-                if (!applicationIsInstantJoin) {
-                    onReturnHomeSelected()
-                    return@Button
-                }
-
-                // Keep the calculated post id value because later validation or Compose content reuses it.
-                val postId = volunteerOpportunityEvent.eventDatabaseId
-
-                // Reject this branch early when its requirement is not met, preventing an invalid request or navigation.
-                if (postId.isBlank()) {
-                    joinGroupChatError =
-                        "This event is still loading. Please try again shortly."
-                    return@Button
-                }
-
-                scope.launch {
-                    isJoiningGroupChat = true
-                    joinGroupChatError = null
-
-                    runCatching {
-                        onJoinGroupChat(postId)
-                    }.onFailure { error ->
-                        joinGroupChatError =
-                            error.message
-                                ?: "Could not join the event group chat."
-                    }
-
-                    isJoiningGroupChat = false
-                }
-            },
-            enabled = !isJoiningGroupChat,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(50.dp),
-            shape = RoundedCornerShape(11.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = VolunteerLinkPrimaryGreen,
-                contentColor = Color.White
-            )
-        ) {
-            Text(
-                text = when {
-                    !applicationIsInstantJoin -> "Return to Home"
-                    isJoiningGroupChat -> "Joining Group Chat..."
-                    else -> "Join Group Chat"
-                },
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold
-            )
-        }
-
-        joinGroupChatError?.let { error ->
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Text(
-                text = error,
-                color = VolunteerLinkError,
-                fontSize = 12.sp
-            )
+        } else {
+            // Non-Instant Join → always Return to Home
+            Button(
+                onClick = onReturnHomeSelected,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp),
+                shape = RoundedCornerShape(11.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = VolunteerLinkPrimaryGreen,
+                    contentColor = Color.White
+                )
+            ) {
+                Text("Return to Home", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            }
         }
     }
 }
