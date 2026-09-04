@@ -2,6 +2,7 @@ package com.example.volunteerlink.organisation.repository
 
 import com.example.volunteerlink.data.supabase
 import com.example.volunteerlink.organisation.auth.OrganisationSession
+import io.github.jan.supabase.auth.OtpType
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.query.Order
@@ -173,6 +174,21 @@ data class OrganisationProfileData(
 
 object OrganisationProfileRepository {
 
+    suspend fun verifyEmailChangeOtp(newEmail: String, token: String): Result<String> {
+        return try {
+            supabase.auth.verifyEmailOtp(
+                type = OtpType.Email.EMAIL_CHANGE,
+                email = newEmail,
+                token = token
+            )
+            val updatedEmail = supabase.auth.currentUserOrNull()?.email ?: newEmail
+            Result.success(updatedEmail)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Result.failure(e)
+        }
+    }
+
     suspend fun loadProfile(): OrganisationProfileData? {
         return try {
             val currentUser = supabase.auth.currentUserOrNull() ?: return null
@@ -282,15 +298,15 @@ object OrganisationProfileRepository {
         }
     }
 
-    suspend fun requestEmailChange(newEmail: String): Boolean {
+    suspend fun requestEmailChange(newEmail: String): Result<Unit> {
         return try {
             supabase.auth.updateUser {
                 email = newEmail.trim()
             }
-            true
+            Result.success(Unit)
         } catch (e: Exception) {
             e.printStackTrace()
-            false
+            Result.failure(e)
         }
     }
 

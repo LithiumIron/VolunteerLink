@@ -62,45 +62,29 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.volunteerlink.shared.OrganisationTypeOptions
+import com.example.volunteerlink.shared.SharedOtpVerificationSection
+import com.example.volunteerlink.shared.authFieldColours
+import com.example.volunteerlink.shared.countryCallingCodes
+import com.example.volunteerlink.shared.countryStates
+import com.example.volunteerlink.shared.isValidAuthPhoneNumber
 
-
-// Organisation type options and country/state/location data now live in
-// OrganisationSignUpOptions.kt (same package, no import needed).
-
-
-/**
- * Drives the Create Account button's enabled state directly — no error
- * message is shown for missing/invalid fields; the button simply stays
- * disabled until every required field passes. Location fields are
- * intentionally not required here — they're optional in signUp() too.
- */
 private fun isOrganisationSignUpFormValid(
     organisationName: String,
     organisationType: String,
     email: String,
-    phone: String,
+    combinedPhone: String,
     password: String
 ): Boolean {
     return organisationName.isNotBlank() &&
             organisationType.isNotBlank() &&
             email.isNotBlank() &&
-            isValidPhoneNumberLocal(phone.trim()) &&
+            isValidAuthPhoneNumber(combinedPhone.trim()) &&
             password.length >= 6
-}
-
-// Mirrors OrganisationAuthViewModel's private isValidPhoneNumber() exactly,
-// so this screen-level check never disagrees with what signUp() itself
-// will accept.
-private fun isValidPhoneNumberLocal(phone: String): Boolean {
-    val cleaned = phone.replace(Regex("[\\s\\-()]"), "")
-    val isLocalFormat = cleaned.matches(Regex("^0\\d{8,9}$"))
-    val isCountryCodeFormat = cleaned.matches(Regex("^\\+?60\\d{8,9}$"))
-    return isLocalFormat || isCountryCodeFormat
 }
 
 
@@ -109,7 +93,6 @@ private fun isValidPhoneNumberLocal(phone: String): Boolean {
 fun OrganisationSignUpScreen(
     onBackSelected: () -> Unit,
     onSignedUp: () -> Unit,
-    onBackToLoginSelected: () -> Unit = onBackSelected,
     organisationAuthViewModel: OrganisationAuthViewModel = viewModel()
 ) {
 
@@ -137,6 +120,11 @@ fun OrganisationSignUpScreen(
         mutableStateOf("")
     }
 
+    // Holds ONLY the local number the user types (e.g. "12-1234567") —
+    // never the country calling code. The code is shown as a fixed,
+    // non-editable OutlinedTextField "prefix" instead of living inside
+    // this value, so there's nothing here for the user to backspace
+    // through or delete.
     var phone by rememberSaveable {
         mutableStateOf("")
     }
@@ -172,6 +160,28 @@ fun OrganisationSignUpScreen(
     var confirmPasswordError by rememberSaveable {
         mutableStateOf<String?>(null)
     }
+
+    // Verification code entered on the OTP step below, once
+    // uiState.needsEmailConfirmation flips true after signUp().
+    var otpCode by rememberSaveable {
+        mutableStateOf("")
+    }
+
+    // The calling code for the selected country — rendered as the phone
+    // field's fixed prefix. Empty until a country is picked, same as
+    // before.
+    val phoneCallingCode = countryCallingCodes[country] ?: ""
+
+    // What's actually sent to sign-up / validated — the fixed code plus
+    // whatever local number the user typed. This is what the rest of the
+    // screen (validation, the submit call) cares about; `phone` itself
+    // never contains the code.
+    val combinedPhone = "$phoneCallingCode $phone".trim()
+
+    // Live phone validation — same rule signUp() itself enforces, shown
+    // as a red inline error once the user has typed something invalid
+    // (stays quiet while the local number is still empty).
+    val phoneError = phone.isNotBlank() && !isValidAuthPhoneNumber(combinedPhone)
 
 
     // ========================================================
@@ -253,7 +263,7 @@ fun OrganisationSignUpScreen(
         organisationName = organisationName,
         organisationType = organisationType,
         email = email,
-        phone = phone,
+        combinedPhone = combinedPhone,
         password = password
     )
 
@@ -287,13 +297,25 @@ fun OrganisationSignUpScreen(
         }
 
         if (uiState.needsEmailConfirmation) {
-            EmailVerificationPendingContent(
+            // Code entry instead of "click the link in your inbox" —
+            // matches VolunteerSignUpScreen's VolunteerOtpVerificationSection.
+            SharedOtpVerificationSection(
                 email = uiState.pendingVerificationEmail.orEmpty(),
+                otpCode = otpCode,
+                onOtpCodeChange = {
+                    otpCode = it
+                    organisationAuthViewModel.clearError()
+                },
+                isBusy = isBusy,
                 isResending = uiState.isResendingEmail,
                 errorMessage = uiState.errorMessage,
+                onVerify = { organisationAuthViewModel.verifySignUpOtp(otpCode) },
                 onResend = organisationAuthViewModel::resendVerificationEmail,
-                onChangeEmail = organisationAuthViewModel::changeEmail,
-                onBackToLogin = onBackToLoginSelected
+                onUseDifferentEmail = {
+                    otpCode = ""
+                    organisationAuthViewModel.changeEmail()
+                },
+                codeLength = 8
             )
         } else {
             Column(
@@ -353,7 +375,7 @@ fun OrganisationSignUpScreen(
                     singleLine = true,
                     enabled = !isBusy,
                     shape = RoundedCornerShape(12.dp),
-                    colors = organisationFieldColours()
+                    colors = authFieldColours()
                 )
 
 
@@ -390,7 +412,7 @@ fun OrganisationSignUpScreen(
                             Text("Select organisation type")
                         },
                         shape = RoundedCornerShape(12.dp),
-                        colors = organisationFieldColours()
+                        colors = authFieldColours()
                     )
 
                     if (showOrganisationTypeDialog) {
@@ -472,7 +494,7 @@ fun OrganisationSignUpScreen(
                         imeAction = ImeAction.Next
                     ),
                     shape = RoundedCornerShape(12.dp),
-                    colors = organisationFieldColours()
+                    colors = authFieldColours()
                 )
 
 
@@ -482,13 +504,19 @@ fun OrganisationSignUpScreen(
 
 
                 // =================================================
-                // PHONE
+                // PHONE — the calling code is a fixed `prefix` on the
+                // field itself, not part of `value`. That means it's
+                // rendered inside the field (so it still looks like one
+                // continuous "+60 12-1234567" field) but the user's
+                // cursor, selection and backspacing can never reach it —
+                // there's physically nothing to delete, since `phone`
+                // (the editable value) only ever holds the local number.
                 // =================================================
 
                 OutlinedTextField(
                     value = phone,
-                    onValueChange = {
-                        phone = it
+                    onValueChange = { input ->
+                        phone = input.filter { c -> c.isDigit() || c == '-' }
                         organisationAuthViewModel.clearError()
                     },
                     modifier = Modifier.fillMaxWidth(),
@@ -501,17 +529,35 @@ fun OrganisationSignUpScreen(
                             contentDescription = null
                         )
                     },
+                    prefix = if (phoneCallingCode.isNotEmpty()) {
+                        { Text("$phoneCallingCode ") }
+                    } else {
+                        null
+                    },
                     placeholder = {
-                        Text("e.g. 0123456789")
+                        Text("e.g. 12-456789")
                     },
                     singleLine = true,
                     enabled = !isBusy,
+                    isError = phoneError,
+                    supportingText = {
+                        Text(
+                            text = when {
+                                phoneCallingCode.isEmpty() ->
+                                    "Select a location below to set your country code."
+                                phoneError ->
+                                    "Enter a valid phone number (e.g. 12-456789)."
+                                else ->
+                                    "Country code is set from your selected location."
+                            }
+                        )
+                    },
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Phone,
                         imeAction = ImeAction.Next
                     ),
                     shape = RoundedCornerShape(12.dp),
-                    colors = organisationFieldColours()
+                    colors = authFieldColours()
                 )
 
 
@@ -643,7 +689,7 @@ fun OrganisationSignUpScreen(
                             Text("Select location")
                         },
                         shape = RoundedCornerShape(12.dp),
-                        colors = organisationFieldColours()
+                        colors = authFieldColours()
                     )
 
                     if (showLocationDialog) {
@@ -713,6 +759,14 @@ fun OrganisationSignUpScreen(
                                                     },
                                                     onClick = {
 
+                                                        // phone (the local
+                                                        // number) is left
+                                                        // untouched here —
+                                                        // only the fixed
+                                                        // prefix shown on
+                                                        // the field changes,
+                                                        // since it's derived
+                                                        // from `country`.
                                                         country = selectedCountry
                                                         stateRegion = ""
                                                         locationName = ""
@@ -945,7 +999,7 @@ fun OrganisationSignUpScreen(
                         imeAction = ImeAction.Done
                     ),
                     shape = RoundedCornerShape(12.dp),
-                    colors = organisationFieldColours()
+                    colors = authFieldColours()
                 )
 
 
@@ -1113,7 +1167,7 @@ fun OrganisationSignUpScreen(
                                         email = email,
                                         password = password,
                                         organisationName = organisationName,
-                                        contactPhone = phone,
+                                        contactPhone = combinedPhone,
                                         locationName = locationName,
                                         stateRegion = stateRegion,
                                         country = country,
@@ -1143,97 +1197,4 @@ fun OrganisationSignUpScreen(
 
 
     }
-}
-
-@Composable
-private fun EmailVerificationPendingContent(
-    email: String,
-    isResending: Boolean,
-    errorMessage: String?,
-    onResend: () -> Unit,
-    onChangeEmail: () -> Unit,
-    onBackToLogin: () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 28.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Icon(
-            imageVector = Icons.Filled.Mail,
-            contentDescription = null,
-            modifier = Modifier.height(48.dp),
-            tint = MaterialTheme.colorScheme.primary
-        )
-
-        Spacer(Modifier.height(20.dp))
-
-        Text(
-            text = "Verification email sent!",
-            fontSize = 22.sp,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-
-        Spacer(Modifier.height(8.dp))
-
-        Text(
-            text = "Check your inbox ($email) and click the confirmation " +
-                    "button to verify your email.",
-            fontSize = 14.sp,
-            lineHeight = 20.sp,
-            textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-
-        errorMessage?.let { message ->
-            Spacer(Modifier.height(16.dp))
-            Text(
-                text = message,
-                fontSize = 12.sp,
-                lineHeight = 17.sp,
-                textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.error
-            )
-        }
-
-        Spacer(Modifier.height(28.dp))
-
-        Button(
-            onClick = onResend,
-            enabled = !isResending,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp),
-            shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
-            )
-        ) {
-            if (isResending) {
-                CircularProgressIndicator(
-                    modifier = Modifier.height(22.dp),
-                    color = MaterialTheme.colorScheme.onPrimary,
-                    strokeWidth = 2.dp
-                )
-            } else {
-                Text("Resend email", fontWeight = FontWeight.Bold)
-            }
-        }
-
-        Spacer(Modifier.height(12.dp))
-
-        TextButton(onClick = onChangeEmail, enabled = !isResending) {
-            Text("Change email")
-        }
-
-        TextButton(onClick = onBackToLogin, enabled = !isResending) {
-            Text("Back to login")
-        }
-    }
-
 }

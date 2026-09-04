@@ -5,6 +5,7 @@ import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.volunteerlink.data.supabase
+import com.example.volunteerlink.shared.isValidAuthPhoneNumber
 import io.github.jan.supabase.auth.OtpType
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
@@ -163,6 +164,48 @@ class OrganisationAuthViewModel(
         mutableUiState.value = OrganisationAuthUiState(isCheckingSession = false)
     }
 
+    // Verifies the 6-digit code Supabase emailed after signUp() — the
+    // code-entry counterpart to VolunteerAuthViewModel's verifySignUpOtp,
+    // used by OrganisationSignUpScreen's OTP step instead of relying on
+    // the user tapping a link in their inbox.
+    fun verifySignUpOtp(token: String) {
+        val pendingEmail = mutableUiState.value.pendingVerificationEmail
+        if (pendingEmail.isNullOrBlank()) {
+            showError("No email is pending verification.")
+            return
+        }
+        if (token.isBlank()) {
+            showError("Enter the code sent to your email.")
+            return
+        }
+
+        viewModelScope.launch {
+            mutableUiState.update { it.copy(isSubmitting = true, errorMessage = null) }
+
+            try {
+                supabase.auth.verifyEmailOtp(
+                    type = OtpType.Email.SIGNUP,
+                    email = pendingEmail,
+                    token = token
+                )
+                confirmOrganisationProfile()
+                rememberVerifiedOrganisation()
+                mutableUiState.value = OrganisationAuthUiState(
+                    isCheckingSession = false,
+                    isAuthenticated = true
+                )
+            } catch (exception: Exception) {
+                exception.printStackTrace()
+                mutableUiState.update {
+                    it.copy(
+                        isSubmitting = false,
+                        errorMessage = authErrorMessage(exception)
+                    )
+                }
+            }
+        }
+    }
+
     fun signUp(
         email: String,
         password: String,
@@ -195,7 +238,7 @@ class OrganisationAuthViewModel(
                 showError("Enter a contact phone number.")
                 return
             }
-            !isValidPhoneNumber(normalizedPhone) -> {
+            !isValidAuthPhoneNumber(normalizedPhone) -> {
                 showError("Enter a valid phone number (eg. must start with 0, 9-10 digits).")
                 return
             }
@@ -265,6 +308,35 @@ class OrganisationAuthViewModel(
                 )
             } catch (exception: Exception) {
                 exception.printStackTrace()
+
+                // "Already registered" from Supabase most often means an
+                // unconfirmed account from an earlier abandoned signup —
+                // not a genuinely taken email. Resend the code instead of
+                // hard-blocking the user; if the email really is already
+                // confirmed, resendEmail() will fail and we fall through
+                // to the normal error message below.
+                val message = exception.message.orEmpty()
+                val isUnconfirmedDuplicate =
+                    message.contains("already registered", ignoreCase = true) ||
+                            message.contains("already exists", ignoreCase = true)
+
+                if (isUnconfirmedDuplicate) {
+                    try {
+                        supabase.auth.resendEmail(
+                            type = OtpType.Email.SIGNUP,
+                            email = normalizedEmail
+                        )
+                        mutableUiState.value = OrganisationAuthUiState(
+                            isCheckingSession = false,
+                            needsEmailConfirmation = true,
+                            pendingVerificationEmail = normalizedEmail
+                        )
+                        return@launch
+                    } catch (resendException: Exception) {
+                        resendException.printStackTrace()
+                    }
+                }
+
                 runCatching { supabase.auth.signOut() }
                 mutableUiState.value = OrganisationAuthUiState(
                     isCheckingSession = false,
@@ -403,17 +475,7 @@ private fun authErrorMessage(exception: Exception): String {
     }
 }
 
-private fun isValidPhoneNumber(phone: String): Boolean {
-    val cleaned = phone.replace(Regex("[\\s\\-()]"), "")
 
-    val isLocalFormat =
-        cleaned.matches(Regex("^0\\d{8,9}$"))
-
-    val isCountryCodeFormat =
-        cleaned.matches(Regex("^\\+?60\\d{8,9}$"))
-
-    return isLocalFormat || isCountryCodeFormat
-}
 
 @Serializable
 private data class OrganisationIdentityRow(

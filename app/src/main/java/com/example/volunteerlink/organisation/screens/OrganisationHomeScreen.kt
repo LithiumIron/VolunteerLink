@@ -51,6 +51,7 @@ fun OrganisationHomeScreen(
     onViewAllPosts: () -> Unit,
     onPostClick: (String) -> Unit,
     onAttentionClick: (HomeAttentionItem) -> Unit,
+    onOrganisationProfileSelected: () -> Unit = {},   // NEW
     viewModel: OrganisationHomeViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -76,7 +77,8 @@ fun OrganisationHomeScreen(
         onViewAllPosts = onViewAllPosts,
         onPostClick = onPostClick,
         onAttentionClick = onAttentionClick,
-        onRetry = viewModel::refresh
+        onRetry = viewModel::refresh,
+        onOrganisationProfileSelected = onOrganisationProfileSelected   // NEW
     )
 }
 
@@ -86,7 +88,8 @@ private fun OrganisationHomeContent(
     onViewAllPosts: () -> Unit,
     onPostClick: (String) -> Unit,
     onAttentionClick: (HomeAttentionItem) -> Unit,
-    onRetry: () -> Unit
+    onRetry: () -> Unit,
+    onOrganisationProfileSelected: () -> Unit   // NEW
 ) {
     when {
         uiState.isLoading -> {
@@ -154,7 +157,9 @@ private fun OrganisationHomeContent(
                 item(key = "home_header") {
                     OrganisationHomeHeader(
                         organisationName = uiState.organisationName,
-                        nowMillis = AppClock.nowMillis()
+                        nowMillis = AppClock.nowMillis(),
+                        profileImageUrl = com.example.volunteerlink.organisation.auth.OrganisationSessionStore.profileData?.profileImageUrl,
+                        onAvatarSelected = onOrganisationProfileSelected
                     )
                 }
 

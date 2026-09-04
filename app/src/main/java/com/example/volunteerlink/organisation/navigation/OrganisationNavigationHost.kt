@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
@@ -58,16 +59,19 @@ import com.example.volunteerlink.organisation.home.model.HomeAttentionType
 import com.example.volunteerlink.organisation.screens.OrganisationSettingScreen
 import com.example.volunteerlink.chat.repository.SupabaseChatRepository
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.graphics.Color
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
 
 import com.example.volunteerlink.chat.data.ChatData
 import com.example.volunteerlink.chat.data.Role
+import com.example.volunteerlink.data.supabase
 
 import com.example.volunteerlink.organisation.screens.chat.OrganisationChatsHubScreen
 import com.example.volunteerlink.organisation.screens.chat.OrganisationChatRoomScreen
 import com.example.volunteerlink.organisation.screens.chat.OrganisationPartnershipChatRoomScreen
 import com.example.volunteerlink.organisation.screens.chat.OrganisationGroupInfoScreen
+import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.launch
 
 private const val RETURN_TO_PEOPLE_AFTER_APPLICANT_REVIEW =
@@ -96,6 +100,15 @@ fun OrganisationNavigationHost(
     var reviewExitProtected by remember { mutableStateOf(false) }
     var discardReviewSession by remember { mutableStateOf<(() -> Unit)?>(null) }
     var pendingBottomRoute by remember { mutableStateOf<String?>(null) }
+    var showBackLogoutConfirmation by remember { mutableStateOf(false) }
+    var isLoggingOutFromBack by remember { mutableStateOf(false) }
+    val backLogoutScope = rememberCoroutineScope()
+
+    BackHandler(
+        enabled = currentRoute == OrganisationNavigationRoutes.HOME
+    ) {
+        showBackLogoutConfirmation = true
+    }
 
     fun navigateBottom(route: String) {
         navController.navigate(route) {
@@ -714,6 +727,43 @@ fun OrganisationNavigationHost(
                 TextButton(onClick = { pendingBottomRoute = null }) { Text("Stay") }
             },
             containerColor = VolunteerLinkSurface
+        )
+    }
+    if (showBackLogoutConfirmation) {
+        AlertDialog(
+            onDismissRequest = {
+                if (!isLoggingOutFromBack) showBackLogoutConfirmation = false
+            },
+            title = { Text("Log out?") },
+            text = {
+                Text("You'll need to sign in again to access your organisation profile.")
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !isLoggingOutFromBack,
+                    onClick = {
+                        backLogoutScope.launch {
+                            isLoggingOutFromBack = true
+                            try {
+                                supabase.auth.signOut()
+                                OrganisationSessionStore.clearProfileData()
+                                showBackLogoutConfirmation = false
+                                onLoggedOut()
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            } finally {
+                                isLoggingOutFromBack = false
+                            }
+                        }
+                    }
+                ) { Text("Log out", color = Color(0xFFC62828)) }
+            },
+            dismissButton = {
+                TextButton(
+                    enabled = !isLoggingOutFromBack,
+                    onClick = { showBackLogoutConfirmation = false }
+                ) { Text("Cancel", color = VolunteerLinkPrimaryGreen) }
+            }
         )
     }
 }

@@ -5,6 +5,9 @@ import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.volunteerlink.data.supabase
+import com.example.volunteerlink.shared.isValidAuthPhoneNumber
+import com.google.i18n.phonenumbers.PhoneNumberUtil
+import io.github.jan.supabase.auth.OtpType
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.auth.status.SessionStatus
@@ -26,6 +29,7 @@ data class VolunteerAuthUiState(
     val isSubmitting: Boolean = false,
     val isAuthenticated: Boolean = false,
     val needsEmailConfirmation: Boolean = false,
+    val pendingVerificationEmail: String? = null,
     val errorMessage: String? = null
 )
 
@@ -127,8 +131,8 @@ class VolunteerAuthViewModel(
                 showError("Enter a contact phone number.")
                 return
             }
-            !isValidVolunteerPhoneNumber(normalizedPhone) -> {
-                showError("Enter a valid phone number starting with 0.")
+            !isValidAuthPhoneNumber(normalizedPhone) -> {
+                showError("Enter a valid phone number with country code (e.g. +60123456789).")
                 return
             }
             password.length < 6 -> {
@@ -161,7 +165,8 @@ class VolunteerAuthViewModel(
                 if (authUserId == null) {
                     mutableUiState.value = VolunteerAuthUiState(
                         isCheckingSession = false,
-                        needsEmailConfirmation = true
+                        needsEmailConfirmation = true,
+                        pendingVerificationEmail = normalizedEmail
                     )
                     return@launch
                 }
@@ -182,6 +187,35 @@ class VolunteerAuthViewModel(
                 )
             } catch (exception: Exception) {
                 exception.printStackTrace()
+
+                // "Already registered" from Supabase most often means an
+                // unconfirmed account from an earlier abandoned signup —
+                // not a genuinely taken email. Resend the code instead of
+                // hard-blocking the user; if the email really is already
+                // confirmed, resendEmail() will fail and we fall through
+                // to the normal error message below.
+                val message = exception.message.orEmpty()
+                val isUnconfirmedDuplicate =
+                    message.contains("already registered", ignoreCase = true) ||
+                            message.contains("already exists", ignoreCase = true)
+
+                if (isUnconfirmedDuplicate) {
+                    try {
+                        supabase.auth.resendEmail(
+                            type = OtpType.Email.SIGNUP,
+                            email = normalizedEmail
+                        )
+                        mutableUiState.value = VolunteerAuthUiState(
+                            isCheckingSession = false,
+                            needsEmailConfirmation = true,
+                            pendingVerificationEmail = normalizedEmail
+                        )
+                        return@launch
+                    } catch (resendException: Exception) {
+                        resendException.printStackTrace()
+                    }
+                }
+
                 runCatching { supabase.auth.signOut() }
                 mutableUiState.value = VolunteerAuthUiState(
                     isCheckingSession = false,
@@ -191,11 +225,55 @@ class VolunteerAuthViewModel(
         }
     }
 
-    private fun isValidVolunteerPhoneNumber(phone: String): Boolean {
-        val cleaned = phone.replace(Regex("[\\s\\-()]"), "")
-        val isLocalFormat = cleaned.matches(Regex("^0\\d{8,9}$"))
-        return isLocalFormat
+    /**
+     * Verifies the 6-digit code sent to [VolunteerAuthUiState.pendingVerificationEmail]
+     * during signUp(). On success this completes signup the same way the
+     * immediate-session path in signUp() does — the SQL trigger already
+     * created the profile rows when auth.users was inserted.
+     */
+    fun verifySignUpOtp(token: String) {
+        val pendingEmail = mutableUiState.value.pendingVerificationEmail
+        if (pendingEmail.isNullOrBlank()) {
+            showError("No email is pending verification.")
+            return
+        }
+        if (token.isBlank()) {
+            showError("Enter the code sent to your email.")
+            return
+        }
+
+        viewModelScope.launch {
+            mutableUiState.update { it.copy(isSubmitting = true, errorMessage = null) }
+            try {
+                supabase.auth.verifyEmailOtp(
+                    type = OtpType.Email.SIGNUP,
+                    email = pendingEmail,
+                    token = token
+                )
+                confirmVolunteerProfile()
+                rememberVerifiedVolunteer()
+                mutableUiState.value = VolunteerAuthUiState(
+                    isCheckingSession = false,
+                    isAuthenticated = true
+                )
+            } catch (exception: Exception) {
+                exception.printStackTrace()
+                mutableUiState.update {
+                    it.copy(isSubmitting = false, errorMessage = authErrorMessage(exception))
+                }
+            }
+        }
     }
+
+    /** User tapped "Use a different email" on the OTP verification screen. */
+    fun cancelSignUpVerification() {
+        viewModelScope.launch {
+            runCatching { supabase.auth.signOut() }
+            mutableUiState.value = VolunteerAuthUiState(isCheckingSession = false)
+        }
+    }
+
+
 
     fun clearError() {
         mutableUiState.update {

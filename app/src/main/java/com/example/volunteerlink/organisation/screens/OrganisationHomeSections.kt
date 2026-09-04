@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -57,7 +58,9 @@ import java.util.Locale
 @Composable
 fun OrganisationHomeHeader(
     organisationName: String,
-    nowMillis: Long
+    nowMillis: Long,
+    profileImageUrl: String? = null,
+    onAvatarSelected: () -> Unit = {}
 ) {
     Row(
         modifier = Modifier
@@ -94,6 +97,7 @@ fun OrganisationHomeHeader(
 
         Spacer(modifier = Modifier.width(16.dp))
         Surface(
+            onClick = onAvatarSelected,
             modifier = Modifier.size(48.dp),
             shape = CircleShape,
             color = VolunteerLinkSurface
@@ -105,6 +109,18 @@ fun OrganisationHomeHeader(
                     fontWeight = FontWeight.Bold,
                     color = VolunteerLinkPrimaryGreen
                 )
+
+                profileImageUrl
+                    ?.trim()
+                    ?.takeIf { it.isNotEmpty() && !it.equals("null", ignoreCase = true) }
+                    ?.let { safeUrl ->
+                        coil.compose.AsyncImage(
+                            model = safeUrl,
+                            contentDescription = "Your organisation logo",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                        )
+                    }
             }
         }
     }

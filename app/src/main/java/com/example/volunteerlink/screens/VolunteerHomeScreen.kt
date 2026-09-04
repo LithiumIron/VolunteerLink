@@ -108,14 +108,14 @@ fun VolunteerHomeScreen(
     onViewAllApplicationsSelected: () -> Unit = {},
     onVolunteerNotificationsSelected: () -> Unit = {},
     onVolunteerFavouritesSelected: () -> Unit = {},
+    onVolunteerProfileSelected: () -> Unit = {},   // NEW
     unreadNotificationCount: Int = 0,
     onVolunteerSearchSelected: () -> Unit = {},
     isShowingCachedData: Boolean = false,
     syncWarning: String? = null,
     lastSyncedAtEpochMillis: Long? = null,
     onSyncSelected: () -> Unit = {},
-    skillPathViewModel:
-        VolunteerSkillPathViewModel = viewModel()
+    skillPathViewModel: VolunteerSkillPathViewModel = viewModel()
 ) {
     val context = LocalContext.current
     val businessNow = volunteerBusinessTime()
@@ -313,32 +313,16 @@ fun VolunteerHomeScreen(
         ) {
 
             VolunteerHomeCompactHeader(
-
-                onVolunteerSearchSelected =
-                    onVolunteerSearchSelected,
-
-                homeFilterOptions =
-                    homeFilterOptions,
-
-                selectedHomeFilter =
-                    selectedHomeFilter,
-
-                onHomeFilterSelected = {
-                        updatedHomeFilter ->
-
-                    selectedHomeFilter =
-                        updatedHomeFilter
-                },
-
+                onVolunteerSearchSelected = onVolunteerSearchSelected,
+                homeFilterOptions = homeFilterOptions,
+                selectedHomeFilter = selectedHomeFilter,
+                onHomeFilterSelected = { updatedHomeFilter -> selectedHomeFilter = updatedHomeFilter },
                 onVolunteerFavouritesSelected = onVolunteerFavouritesSelected,
-                onVolunteerNotificationsSelected =
-                    onVolunteerNotificationsSelected,
-
-                unreadNotificationCount =
-                    unreadNotificationCount,
-
-                volunteerInitials =
-                    currentVolunteerInitials
+                onVolunteerNotificationsSelected = onVolunteerNotificationsSelected,
+                unreadNotificationCount = unreadNotificationCount,
+                volunteerInitials = currentVolunteerInitials,
+                volunteerProfileImageUrl = VolunteerOpportunitySessionStore.profileData?.profileImageUrl,
+                onAvatarSelected = onVolunteerProfileSelected
             )
         }
 
@@ -525,12 +509,13 @@ private fun VolunteerHomeCompactHeader(
     onVolunteerSearchSelected: () -> Unit,
     homeFilterOptions: List<VolunteerHomeFeedFilter>,
     selectedHomeFilter: VolunteerHomeFeedFilter,
-    onHomeFilterSelected:
-        (VolunteerHomeFeedFilter) -> Unit,
+    onHomeFilterSelected: (VolunteerHomeFeedFilter) -> Unit,
     onVolunteerNotificationsSelected: () -> Unit,
     onVolunteerFavouritesSelected: () -> Unit,
     unreadNotificationCount: Int,
-    volunteerInitials: String
+    volunteerInitials: String,
+    volunteerProfileImageUrl: String?,
+    onAvatarSelected: () -> Unit
 ) {
 
     Column(
@@ -625,24 +610,30 @@ private fun VolunteerHomeCompactHeader(
 
 
                 Surface(
-                    modifier =
-                        Modifier.size(32.dp),
-
+                    onClick = onAvatarSelected,
+                    modifier = Modifier.size(32.dp),
                     shape = CircleShape,
-
                     color = Color.White
                 ) {
-
-                    Box(
-                        contentAlignment =
-                            Alignment.Center
-                    ) {
+                    Box(contentAlignment = Alignment.Center) {
                         Text(
                             text = volunteerInitials,
                             color = VolunteerLinkPrimaryGreen,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
+
+                        volunteerProfileImageUrl
+                            ?.trim()
+                            ?.takeIf { it.isNotEmpty() && !it.equals("null", ignoreCase = true) }
+                            ?.let { safeUrl ->
+                                coil.compose.AsyncImage(
+                                    model = safeUrl,
+                                    contentDescription = "Your profile",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                                )
+                            }
                     }
                 }
             }

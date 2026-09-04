@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.volunteerlink.shared.authFieldColours
 import com.example.volunteerlink.ui.theme.VolunteerLinkBackground
 import com.example.volunteerlink.ui.theme.VolunteerLinkError
 import com.example.volunteerlink.ui.theme.VolunteerLinkPrimaryGreen
@@ -136,7 +137,7 @@ fun VolunteerSignInScreen(
                     imeAction = ImeAction.Next
                 ),
                 shape = RoundedCornerShape(12.dp),
-                colors = volunteerFieldColours()
+                colors = authFieldColours()
             )
 
             Spacer(Modifier.height(13.dp))
@@ -164,7 +165,7 @@ fun VolunteerSignInScreen(
                     imeAction = ImeAction.Done
                 ),
                 shape = RoundedCornerShape(12.dp),
-                colors = volunteerFieldColours()
+                colors = authFieldColours()
             )
 
             uiState.errorMessage?.let { message ->

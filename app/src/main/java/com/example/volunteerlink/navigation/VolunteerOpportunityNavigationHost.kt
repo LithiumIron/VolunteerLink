@@ -272,7 +272,11 @@ fun VolunteerOpportunityNavigationHost(
                             opportunityUiState.lastSyncedAtEpochMillis,
 
                         onSyncSelected =
-                            volunteerOpportunityViewModel::refresh
+                            volunteerOpportunityViewModel::refresh,
+                        onVolunteerProfileSelected = {
+                            volunteerNavigationController.navigate(
+                                VolunteerOpportunityNavigationRoutes.VOLUNTEER_PROFILE_ROUTE)
+                        }
                     )
                 }
 
