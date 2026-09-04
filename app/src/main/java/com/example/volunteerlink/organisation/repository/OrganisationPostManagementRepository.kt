@@ -10,6 +10,9 @@ import com.example.volunteerlink.organisation.manage.model.PostManagementRemoteS
 interface OrganisationPostManagementRepository {
     suspend fun loadPost(postId: String): PostManagementPost
 
+    /** Publishes one complete saved Draft after server-side ownership and 7-day checks. */
+    suspend fun publishSavedDraft(postId: String, appNowMillis: Long)
+
     /**
      * Lightweight read used while Physical attendance is visible.
      * Only attendance_days and attendance_records are fetched.
@@ -63,12 +66,17 @@ interface OrganisationPostManagementRepository {
         isShortlisted: Boolean
     )
 
-    /** Accepts or declines one pending REVIEW_APPLICANTS application. */
+    /**
+     * Accepts or declines one pending REVIEW_APPLICANTS application.
+     * A manual decline must include the organisation's reason; it is saved to
+     * role_participations.decision_note and is visible to the volunteer.
+     */
     suspend fun reviewApplicant(
         postId: String,
         roleTemplateId: String,
         userId: String,
-        decision: String
+        decision: String,
+        decisionNote: String? = null
     )
 
     /**

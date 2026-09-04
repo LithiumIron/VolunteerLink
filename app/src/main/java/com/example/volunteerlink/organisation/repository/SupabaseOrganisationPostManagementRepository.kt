@@ -35,6 +35,8 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
 
@@ -59,6 +61,29 @@ private data class ImpactWeavePostContributionRow(
 
 /** Supabase reader for the Organisation Post Management detail screen. */
 class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementRepository {
+
+    override suspend fun publishSavedDraft(postId: String, appNowMillis: Long) {
+        val organisation = OrganisationSession.requireContext()
+        require(organisation.isVerified) {
+            "Your organisation must be verified before publishing volunteer posts."
+        }
+
+        val appTimestamp = SimpleDateFormat(
+            "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+            Locale.US
+        ).format(Date(appNowMillis))
+        val appToday = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+            .format(Date(appNowMillis))
+
+        supabase.postgrest.rpc(
+            function = "organisation_publish_saved_draft",
+            parameters = buildJsonObject {
+                put("p_post_id", postId)
+                put("p_app_now", appTimestamp)
+                put("p_app_today", appToday)
+            }
+        )
+    }
 
     companion object {
         private const val REMOTE_SUBMISSION_BUCKET = "remote-submissions"
@@ -706,12 +731,20 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
         postId: String,
         roleTemplateId: String,
         userId: String,
-        decision: String
+        decision: String,
+        decisionNote: String?
     ) {
         requireOwnedPost(postId)
         val normalizedDecision = decision.trim().uppercase(Locale.US)
         require(normalizedDecision in setOf("ACCEPT", "DECLINE")) {
             "Applicant decision must be ACCEPT or DECLINE."
+        }
+
+        val normalizedDecisionNote = decisionNote?.trim().orEmpty()
+        if (normalizedDecision == "DECLINE") {
+            require(normalizedDecisionNote.isNotBlank()) {
+                "Enter a reason before declining this application."
+            }
         }
 
         supabase.postgrest.rpc(
@@ -721,6 +754,10 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
                 put("p_role_template_id", roleTemplateId)
                 put("p_user_id", userId)
                 put("p_decision", normalizedDecision)
+                put(
+                    "p_decision_note",
+                    if (normalizedDecision == "DECLINE") normalizedDecisionNote else ""
+                )
             }
         )
     }

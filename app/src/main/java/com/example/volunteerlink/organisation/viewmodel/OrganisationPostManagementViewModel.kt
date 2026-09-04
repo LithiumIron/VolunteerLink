@@ -598,6 +598,7 @@ class OrganisationPostManagementViewModel : ViewModel() {
     fun reviewApplicant(
         person: PostManagementPerson,
         decision: String,
+        decisionNote: String? = null,
         onSuccess: () -> Unit = {}
     ) {
         val post = cachedPost ?: return
@@ -606,6 +607,14 @@ class OrganisationPostManagementViewModel : ViewModel() {
         if (!person.applicationStatus.equals("PENDING", ignoreCase = true)) {
             _uiState.value = _uiState.value.copy(
                 applicantActionMessage = "This application is no longer pending."
+            )
+            return
+        }
+
+        val normalizedDecisionNote = decisionNote?.trim().orEmpty()
+        if (normalizedDecision == "DECLINE" && normalizedDecisionNote.isBlank()) {
+            _uiState.value = _uiState.value.copy(
+                applicantActionMessage = "Enter a reason before declining this application."
             )
             return
         }
@@ -620,7 +629,8 @@ class OrganisationPostManagementViewModel : ViewModel() {
                     postId = post.postId,
                     roleTemplateId = person.roleTemplateId,
                     userId = person.userId,
-                    decision = normalizedDecision
+                    decision = normalizedDecision,
+                    decisionNote = normalizedDecisionNote.takeIf { normalizedDecision == "DECLINE" }
                 )
 
                 val refreshedPost = repository.loadPost(post.postId)
@@ -938,6 +948,95 @@ class OrganisationPostManagementViewModel : ViewModel() {
 
     private fun updateReviewSession(session: PostManagementPhysicalReviewSession) {
         _uiState.value = _uiState.value.copy(physicalReviewSession = session)
+    }
+
+    fun publishSavedDraft() {
+        val post = cachedPost ?: return
+        val state = _uiState.value
+
+        if (state.isPublishingDraft) return
+        if (post.databaseStatus.trim().uppercase(Locale.US) != "DRAFT") return
+
+        if (state.isShowingCachedData) {
+            _uiState.value = state.copy(
+                draftPublishMessage = null,
+                draftPublishError = "Reconnect to the internet before publishing this draft."
+            )
+            return
+        }
+
+        val mode = PostMode.fromDatabaseValue(post.mode)
+        if (mode == null) {
+            _uiState.value = state.copy(
+                draftPublishMessage = null,
+                draftPublishError = "This draft has an unsupported post type."
+            )
+            return
+        }
+
+        val appNowMillis = AppClock.nowMillis()
+        val attention = PostTimingEvaluator.evaluateDraftAttention(
+            input = PostTimingInput(
+                mode = mode,
+                physicalStartDate = post.physical?.startDate,
+                physicalEndDate = post.physical?.endDate,
+                remoteStartDate = post.remote?.startDate,
+                remoteEndDate = post.remote?.effectiveEndDate
+            ),
+            nowMillis = appNowMillis
+        )
+
+        if (attention.needsAttention) {
+            _uiState.value = state.copy(
+                draftPublishMessage = null,
+                draftPublishError = "Update the volunteering start date before publishing this draft."
+            )
+            return
+        }
+
+        _uiState.value = state.copy(
+            isPublishingDraft = true,
+            draftPublishMessage = null,
+            draftPublishError = null
+        )
+
+        viewModelScope.launch {
+            try {
+                repository.publishSavedDraft(post.postId, appNowMillis)
+
+                val refreshedPost = repository.loadPost(post.postId)
+                val syncedAt = System.currentTimeMillis()
+
+                runCatching {
+                    OrganisationLocalStorage.savePost(
+                        post = refreshedPost,
+                        syncedAtEpochMillis = syncedAt
+                    )
+                }
+
+                cachedPost = refreshedPost
+                _uiState.value = _uiState.value.copy(
+                    isShowingCachedData = false,
+                    lastSyncedAtEpochMillis = syncedAt,
+                    isRefreshing = false
+                )
+                applyTiming(refreshedPost)
+                _uiState.value = _uiState.value.copy(
+                    isPublishingDraft = false,
+                    draftPublishMessage = "Volunteer Post published successfully.",
+                    draftPublishError = null
+                )
+                refreshPostGroupStatus(post.postId)
+            } catch (exception: Exception) {
+                Log.e(TAG, "Could not publish saved draft.", exception)
+                _uiState.value = _uiState.value.copy(
+                    isPublishingDraft = false,
+                    draftPublishMessage = null,
+                    draftPublishError = exception.message
+                        ?: "Unable to publish this draft."
+                )
+            }
+        }
     }
 
     fun refresh() {
@@ -1395,6 +1494,9 @@ class OrganisationPostManagementViewModel : ViewModel() {
             isShowingCachedData = currentState.isShowingCachedData,
             lastSyncedAtEpochMillis = currentState.lastSyncedAtEpochMillis,
             isRefreshing = currentState.isRefreshing,
+            isPublishingDraft = currentState.isPublishingDraft,
+            draftPublishMessage = currentState.draftPublishMessage,
+            draftPublishError = currentState.draftPublishError,
             isStartingAttendance = isStartingAttendance,
             isUpdatingAttendance = isUpdatingAttendance,
             attendanceActionMessage = attendanceActionMessage,

@@ -45,6 +45,8 @@ fun PhysicalEventDetailsSection(
     val draft = uiState.draft
     val errors = uiState.visibleErrors
     val editPolicy = uiState.editPolicy
+    val canEditPhysicalDates = uiState.impactWeaveDraftId == null &&
+        (!uiState.isExistingPostEdit || editPolicy?.canEditPhysicalDates != false)
     val canEditPhysicalCore = uiState.impactWeaveDraftId == null &&
         (!uiState.isExistingPostEdit || editPolicy?.canEditPhysicalCore != false)
     val canEditMeetingPoint = !uiState.isExistingPostEdit || editPolicy?.canEditPhysicalMeetingPoint != false
@@ -74,8 +76,8 @@ fun PhysicalEventDetailsSection(
         title = "Event Schedule",
         subtitle = if (uiState.impactWeaveDraftId != null) {
             "Final schedule from Impact Weave. Reschedule from the partnership plan before entering Create Post."
-        } else if (uiState.isExistingPostEdit && !canEditPhysicalCore) {
-            "Current event dates and times are fixed for this post."
+        } else if (uiState.isExistingPostEdit && !canEditPhysicalDates) {
+            "Published event dates are final and cannot be changed."
         } else {
             "Choose when the physical event will take place. Start dates must be at least 7 days from today."
         }
@@ -91,10 +93,16 @@ fun PhysicalEventDetailsSection(
                 title = "Final partnership schedule",
                 message = "Dates and times are locked to the schedule accepted by partner organisations."
             )
-        } else if (uiState.isExistingPostEdit && !canEditPhysicalCore) {
+        } else if (uiState.isExistingPostEdit && !canEditPhysicalDates) {
             EditRestrictionNotice(
-                title = "Schedule locked",
-                message = "Dates and times are fixed because volunteers or the event lifecycle already depend on them."
+                title = "Event dates locked",
+                message = "Physical and Hybrid event dates become final once the post is published."
+            )
+        }
+        if (uiState.isExistingPostEdit && !canEditPhysicalCore) {
+            EditRestrictionNotice(
+                title = "Time editing locked",
+                message = "Event time can no longer be changed because volunteers or the event lifecycle already depend on it."
             )
         }
         Text(
@@ -111,7 +119,7 @@ fun PhysicalEventDetailsSection(
                 title = "One Day",
                 selected = !draft.isMultiDayPhysicalEvent,
                 onClick = { viewModel.updateIsMultiDay(false) },
-                enabled = canEditPhysicalCore,
+                enabled = canEditPhysicalDates,
                 modifier = Modifier.weight(1f)
             )
 
@@ -119,7 +127,7 @@ fun PhysicalEventDetailsSection(
                 title = "Multiple Days",
                 selected = draft.isMultiDayPhysicalEvent,
                 onClick = { viewModel.updateIsMultiDay(true) },
-                enabled = canEditPhysicalCore,
+                enabled = canEditPhysicalDates,
                 modifier = Modifier.weight(1f)
             )
         }
@@ -135,7 +143,7 @@ fun PhysicalEventDetailsSection(
                     minimumDateMillis = minimumStartDateMillis,
                     errorMessage = physicalStartDateError,
                     onDateSelected = viewModel::updatePhysicalStartDate,
-                    enabled = canEditPhysicalCore,
+                    enabled = canEditPhysicalDates,
                     modifier = Modifier.weight(1f)
                 )
 
@@ -149,7 +157,7 @@ fun PhysicalEventDetailsSection(
                     minimumDateMillis = minimumEndDate,
                     errorMessage = errors.physicalEndDate,
                     onDateSelected = viewModel::updatePhysicalEndDate,
-                    enabled = canEditPhysicalCore,
+                    enabled = canEditPhysicalDates,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -160,7 +168,7 @@ fun PhysicalEventDetailsSection(
                 minimumDateMillis = minimumStartDateMillis,
                 errorMessage = physicalStartDateError,
                 onDateSelected = viewModel::updatePhysicalStartDate,
-                enabled = canEditPhysicalCore
+                enabled = canEditPhysicalDates
             )
         }
 

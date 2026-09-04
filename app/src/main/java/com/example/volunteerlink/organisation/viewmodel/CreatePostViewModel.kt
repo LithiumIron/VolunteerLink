@@ -188,6 +188,8 @@ class CreatePostViewModel : ViewModel() {
             "A partner venue must be confirmed before creating this post."
         raw.contains("PARTNER_RECONFIRMATION_REQUIRED", true) ->
             "A partner must reconfirm the changed schedule before creating this post."
+        raw.contains("IMPACT_WEAVE_WAITING", true) ->
+            "This Impact Weave plan is still waiting for a partnership response or schedule reconfirmation."
         else -> "Could not prepare this Impact Weave plan for Create Post. Please return and try again."
     }
 
@@ -324,8 +326,8 @@ class CreatePostViewModel : ViewModel() {
     fun updateIsMultiDay(isMultiDay: Boolean) {
         if (!allowImpactWeaveFieldEdit("The agreed Impact Weave schedule is final and cannot be changed in Create Post.")) return
         if (!allowEdit(
-                _uiState.value.editPolicy?.canEditPhysicalCore != false,
-                "Physical schedule dates are locked for this post."
+                _uiState.value.editPolicy?.canEditPhysicalDates != false,
+                "Physical event dates are locked after publication."
             )
         ) return
         updateDraft { draft ->
@@ -355,19 +357,28 @@ class CreatePostViewModel : ViewModel() {
     fun updatePhysicalStartDate(dateMillis: Long) {
         if (!allowImpactWeaveFieldEdit("The agreed Impact Weave schedule is final and cannot be changed in Create Post.")) return
         if (!allowEdit(
-                _uiState.value.editPolicy?.canEditPhysicalCore != false,
-                "Physical start date is locked because volunteers already depend on it or the activity has started."
+                _uiState.value.editPolicy?.canEditPhysicalDates != false,
+                "Physical event dates are locked after publication."
             )
         ) return
         updateDraft { draft ->
             val normalizedDate = CreatePostValidator.startOfDayMillis(dateMillis)
+            val previousPhysicalDates = CreatePostValidator.physicalScheduleDates(draft)
 
             val endDate = if (!draft.isMultiDayPhysicalEvent) {
                 normalizedDate
             } else {
-                draft.physicalEndDateMillis?.takeIf {
-                    it > normalizedDate
-                } ?: CreatePostValidator.nextDayMillis(normalizedDate)
+                val currentEnd = draft.physicalEndDateMillis
+                    ?.let(CreatePostValidator::startOfDayMillis)
+
+                when {
+                    currentEnd != null && currentEnd > normalizedDate -> currentEnd
+                    previousPhysicalDates.size > 1 -> addCalendarDays(
+                        normalizedDate,
+                        previousPhysicalDates.size - 1
+                    )
+                    else -> CreatePostValidator.nextDayMillis(normalizedDate)
+                }
             }
 
             draft.copy(
@@ -380,8 +391,8 @@ class CreatePostViewModel : ViewModel() {
     fun updatePhysicalEndDate(dateMillis: Long) {
         if (!allowImpactWeaveFieldEdit("The agreed Impact Weave schedule is final and cannot be changed in Create Post.")) return
         if (!allowEdit(
-                _uiState.value.editPolicy?.canEditPhysicalCore != false,
-                "Physical end date is locked because volunteers already depend on it or the activity has started."
+                _uiState.value.editPolicy?.canEditPhysicalDates != false,
+                "Physical event dates are locked after publication."
             )
         ) return
         updateDraft { draft ->
@@ -641,11 +652,24 @@ class CreatePostViewModel : ViewModel() {
         ) return
         updateDraft { draft ->
             val normalizedDate = CreatePostValidator.startOfDayMillis(dateMillis)
+            val currentStart = draft.remoteStartDateMillis
+                ?.let(CreatePostValidator::startOfDayMillis)
+            val currentDue = draft.remoteDueDateMillis
+                ?.let(CreatePostValidator::startOfDayMillis)
+
+            val dueDate = when {
+                currentDue == null -> null
+                currentDue > normalizedDate -> currentDue
+                currentStart != null && currentDue > currentStart -> addCalendarDays(
+                    normalizedDate,
+                    calendarDayOffset(currentStart, currentDue).coerceAtLeast(1)
+                )
+                else -> null
+            }
 
             draft.copy(
                 remoteStartDateMillis = normalizedDate,
-                remoteDueDateMillis = draft.remoteDueDateMillis
-                    ?.takeIf { it > normalizedDate }
+                remoteDueDateMillis = dueDate
             )
         }
     }
@@ -3831,13 +3855,38 @@ class CreatePostViewModel : ViewModel() {
         _uiState.value = CreatePostUiState()
     }
 
+    /**
+     * Step 1 date changes must keep already-saved Step 4 schedule items inside
+     * the new event/project window. Without this, moving a post to satisfy the
+     * 7-day publish rule leaves the old schedule dates behind and Step 4 can no
+     * longer be completed.
+     */
     private fun updateDraft(
         change: (CreatePostDraft) -> CreatePostDraft
     ) {
         _uiState.update { current ->
-            val newDraft = change(current.draft)
+            val requestedDraft = change(current.draft)
+            val newDraft = rebaseSavedScheduleDates(
+                previous = current.draft,
+                updated = requestedDraft
+            )
+            val rebasedEditorDraft = current.scheduleEditorDraft?.let { item ->
+                rebaseScheduleItemDate(
+                    previous = current.draft,
+                    updated = newDraft,
+                    item = item
+                )
+            }
+            val rebasedSelectedPhysicalDate = rebaseSelectedPhysicalDate(
+                previous = current.draft,
+                updated = newDraft,
+                selectedDate = current.selectedPhysicalScheduleDateMillis
+            )
+
             current.copy(
                 draft = newDraft,
+                selectedPhysicalScheduleDateMillis = rebasedSelectedPhysicalDate,
+                scheduleEditorDraft = rebasedEditorDraft,
                 errors = if (current.showValidationErrors) {
                     validateStepOneForCurrentEditor(newDraft)
                 } else {
@@ -3854,6 +3903,192 @@ class CreatePostViewModel : ViewModel() {
                 publishError = null
             )
         }
+    }
+
+    private data class ScheduleDateWindow(
+        val start: Long,
+        val end: Long
+    )
+
+    private fun rebaseSavedScheduleDates(
+        previous: CreatePostDraft,
+        updated: CreatePostDraft
+    ): CreatePostDraft {
+        val physicalChanged = physicalScheduleWindowChanged(previous, updated)
+        val remoteChanged = remoteScheduleWindowChanged(previous, updated)
+
+        if (!physicalChanged && !remoteChanged) return updated
+
+        return updated.copy(
+            scheduleItems = updated.scheduleItems.map { item ->
+                rebaseScheduleItemDate(
+                    previous = previous,
+                    updated = updated,
+                    item = item
+                )
+            }
+        )
+    }
+
+    private fun rebaseScheduleItemDate(
+        previous: CreatePostDraft,
+        updated: CreatePostDraft,
+        item: ScheduleItemDraft
+    ): ScheduleItemDraft {
+        val changed = when (item.scheduleType) {
+            ScheduleType.PHYSICAL -> physicalScheduleWindowChanged(previous, updated)
+            ScheduleType.REMOTE -> remoteScheduleWindowChanged(previous, updated)
+        }
+        if (!changed) return item
+
+        val oldWindow = scheduleDateWindow(previous, item.scheduleType)
+        val newWindow = scheduleDateWindow(updated, item.scheduleType)
+            ?: return item
+        val currentDate = item.scheduleDateMillis
+            ?.let(CreatePostValidator::startOfDayMillis)
+            ?: return item
+
+        return item.copy(
+            scheduleDateMillis = rebaseDateIntoWindow(
+                date = currentDate,
+                oldWindow = oldWindow,
+                newWindow = newWindow
+            )
+        )
+    }
+
+    private fun rebaseSelectedPhysicalDate(
+        previous: CreatePostDraft,
+        updated: CreatePostDraft,
+        selectedDate: Long?
+    ): Long? {
+        if (selectedDate == null) return null
+        if (!physicalScheduleWindowChanged(previous, updated)) {
+            return validSelectedPhysicalDate(updated, selectedDate)
+        }
+
+        val newWindow = scheduleDateWindow(updated, ScheduleType.PHYSICAL)
+            ?: return null
+        val rebased = rebaseDateIntoWindow(
+            date = CreatePostValidator.startOfDayMillis(selectedDate),
+            oldWindow = scheduleDateWindow(previous, ScheduleType.PHYSICAL),
+            newWindow = newWindow
+        )
+
+        return validSelectedPhysicalDate(updated, rebased)
+    }
+
+    private fun physicalScheduleWindowChanged(
+        previous: CreatePostDraft,
+        updated: CreatePostDraft
+    ): Boolean {
+        return previous.isMultiDayPhysicalEvent != updated.isMultiDayPhysicalEvent ||
+            normalizedDate(previous.physicalStartDateMillis) != normalizedDate(updated.physicalStartDateMillis) ||
+            normalizedDate(previous.physicalEndDateMillis) != normalizedDate(updated.physicalEndDateMillis)
+    }
+
+    private fun remoteScheduleWindowChanged(
+        previous: CreatePostDraft,
+        updated: CreatePostDraft
+    ): Boolean {
+        return normalizedDate(previous.remoteStartDateMillis) != normalizedDate(updated.remoteStartDateMillis) ||
+            normalizedDate(previous.remoteDueDateMillis) != normalizedDate(updated.remoteDueDateMillis)
+    }
+
+    private fun scheduleDateWindow(
+        draft: CreatePostDraft,
+        scheduleType: ScheduleType
+    ): ScheduleDateWindow? {
+        return when (scheduleType) {
+            ScheduleType.PHYSICAL -> {
+                val start = normalizedDate(draft.physicalStartDateMillis) ?: return null
+                val requestedEnd = if (draft.isMultiDayPhysicalEvent) {
+                    normalizedDate(draft.physicalEndDateMillis) ?: return null
+                } else {
+                    start
+                }
+                ScheduleDateWindow(
+                    start = start,
+                    end = requestedEnd.coerceAtLeast(start)
+                )
+            }
+
+            ScheduleType.REMOTE -> {
+                val start = normalizedDate(draft.remoteStartDateMillis) ?: return null
+                val requestedEnd = normalizedDate(draft.remoteDueDateMillis) ?: return null
+                ScheduleDateWindow(
+                    start = start,
+                    end = requestedEnd.coerceAtLeast(start)
+                )
+            }
+        }
+    }
+
+    /**
+     * If the whole range moved while keeping the same duration, preserve the
+     * item's relative day (Day 1 -> Day 1, Day 2 -> Day 2, and so on). When
+     * only one edge of the range changed, keep dates that are still valid and
+     * move only the dates that fell outside the new range.
+     */
+    private fun rebaseDateIntoWindow(
+        date: Long,
+        oldWindow: ScheduleDateWindow?,
+        newWindow: ScheduleDateWindow
+    ): Long {
+        val normalized = CreatePostValidator.startOfDayMillis(date)
+        if (oldWindow == null) {
+            return normalized.coerceIn(newWindow.start, newWindow.end)
+        }
+
+        val oldSpan = calendarDayOffset(oldWindow.start, oldWindow.end)
+        val newSpan = calendarDayOffset(newWindow.start, newWindow.end)
+        val wholeRangeShifted = oldWindow.start != newWindow.start && oldSpan == newSpan
+
+        if (!wholeRangeShifted && normalized in newWindow.start..newWindow.end) {
+            return normalized
+        }
+
+        if (!wholeRangeShifted) {
+            return normalized.coerceIn(newWindow.start, newWindow.end)
+        }
+
+        val relativeDay = calendarDayOffset(oldWindow.start, normalized)
+        return addCalendarDays(newWindow.start, relativeDay)
+            .coerceIn(newWindow.start, newWindow.end)
+    }
+
+    private fun normalizedDate(value: Long?): Long? {
+        return value?.let(CreatePostValidator::startOfDayMillis)
+    }
+
+    private fun calendarDayOffset(
+        fromMillis: Long,
+        toMillis: Long
+    ): Int {
+        val from = CreatePostValidator.startOfDayMillis(fromMillis)
+        val to = CreatePostValidator.startOfDayMillis(toMillis)
+        if (from == to) return 0
+
+        val direction = if (to > from) 1 else -1
+        val calendar = Calendar.getInstance().apply { timeInMillis = from }
+        var offset = 0
+
+        while (calendar.timeInMillis != to && kotlin.math.abs(offset) < 3660) {
+            calendar.add(Calendar.DAY_OF_YEAR, direction)
+            offset += direction
+        }
+
+        return offset
+    }
+
+    private fun addCalendarDays(
+        dateMillis: Long,
+        days: Int
+    ): Long {
+        return Calendar.getInstance().apply {
+            timeInMillis = CreatePostValidator.startOfDayMillis(dateMillis)
+            add(Calendar.DAY_OF_YEAR, days)
+        }.timeInMillis
     }
 
     private fun parsePositiveNumber(text: String): Int? {

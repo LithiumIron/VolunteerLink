@@ -17,6 +17,7 @@ data class PostEditPolicy(
     val isReadOnly: Boolean,
     val readOnlyReason: String? = null,
     val canEditSharedPostInfo: Boolean = true,
+    val canEditPhysicalDates: Boolean = true,
     val canEditPhysicalCore: Boolean = true,
     val canEditPhysicalMeetingPoint: Boolean = true,
     val canEditPhysicalCapacity: Boolean = true,
@@ -342,6 +343,10 @@ object PostEditPolicyEvaluator {
             postStatus = status,
             isReadOnly = false,
             canEditSharedPostInfo = draft || (!closed && !anyStarted),
+            // Once a Physical/Hybrid post is published, its physical event date
+            // is a final commitment. Time/location keep their existing lifecycle
+            // rules, but the date range itself can only change while still DRAFT.
+            canEditPhysicalDates = draft,
             canEditPhysicalCore = draft || (!closed && physicalUpcoming && !physicalActivePeople),
             canEditPhysicalMeetingPoint = draft || physicalUpcoming,
             canEditPhysicalCapacity = draft || (
@@ -396,8 +401,11 @@ object PostEditPolicyEvaluator {
             return "Post information is locked because this opportunity has already started."
         }
 
+        if (!policy.canEditPhysicalDates && physicalDatesChanged(original, edited)) {
+            return "Physical event dates are locked after the post has been published."
+        }
         if (!policy.canEditPhysicalCore && physicalCoreChanged(original, edited)) {
-            return "Physical date, time and location are locked because volunteers already depend on them or the activity has started."
+            return "Physical time and location are locked because volunteers already depend on them or the activity has started."
         }
         if (!policy.canEditPhysicalMeetingPoint && original.meetingPoint != edited.meetingPoint) {
             return "The Physical meeting point can no longer be changed."
@@ -498,6 +506,7 @@ object PostEditPolicyEvaluator {
             isReadOnly = true,
             readOnlyReason = reason,
             canEditSharedPostInfo = false,
+            canEditPhysicalDates = false,
             canEditPhysicalCore = false,
             canEditPhysicalMeetingPoint = false,
             canEditPhysicalCapacity = false,
@@ -557,11 +566,14 @@ object PostEditPolicyEvaluator {
         )
     }
 
-    private fun physicalCoreChanged(a: CreatePostDraft, b: CreatePostDraft): Boolean {
+    private fun physicalDatesChanged(a: CreatePostDraft, b: CreatePostDraft): Boolean {
         return a.isMultiDayPhysicalEvent != b.isMultiDayPhysicalEvent ||
             a.physicalStartDateMillis != b.physicalStartDateMillis ||
-            a.physicalEndDateMillis != b.physicalEndDateMillis ||
-            a.physicalStartTimeMinutes != b.physicalStartTimeMinutes ||
+            a.physicalEndDateMillis != b.physicalEndDateMillis
+    }
+
+    private fun physicalCoreChanged(a: CreatePostDraft, b: CreatePostDraft): Boolean {
+        return a.physicalStartTimeMinutes != b.physicalStartTimeMinutes ||
             a.physicalEndTimeMinutes != b.physicalEndTimeMinutes ||
             a.physicalLocationQuery != b.physicalLocationQuery ||
             a.physicalLocation != b.physicalLocation

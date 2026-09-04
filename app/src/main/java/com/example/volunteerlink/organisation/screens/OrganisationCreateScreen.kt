@@ -166,21 +166,21 @@ fun OrganisationCreateScreen(
         OrganisationModulePage(
             title = "Changes Saved",
             message =
-                "Post ${uiState.updatedPostId} was updated successfully. " +
+                "Your changes were saved successfully. " +
                     "Use Back to return to Post Management."
         )
     } else if (uiState.savedDraftPostId != null) {
         OrganisationModulePage(
             title = "Draft Saved",
             message =
-                "Post ${uiState.savedDraftPostId} was saved as a draft and is not published yet. " +
+                "Your volunteer post was saved as a draft and is not published yet. " +
                     "Use Back to return to the Organisation area."
         )
     } else if (uiState.publishedPostId != null) {
         OrganisationModulePage(
             title = "Volunteer Post Published",
             message =
-                "Post ${uiState.publishedPostId} was published successfully. " +
+                "Your volunteer post was published successfully. " +
                     "Use Back to return to the Organisation area."
         )
     } else when (uiState.currentStep) {

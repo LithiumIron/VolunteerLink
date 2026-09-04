@@ -1972,7 +1972,7 @@ fun ImpactWeaveMatchResultsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = "Groq checks resource compatibility while VolunteerLink verifies quantities, capacities and location.",
+                        text = "VolunteerLink checks resource compatibility, quantities, capacities and location.",
                         style = MaterialTheme.typography.bodySmall,
                         lineHeight = 17.sp,
                         textAlign = TextAlign.Center,
@@ -2039,6 +2039,10 @@ fun ImpactWeaveMatchResultsScreen(
                         results.needResults.any {
                             it.need.supportType.equals("VENUE", true) && it.need.isFulfilled
                         },
+                    hasWaitingPartnershipResponse = partnershipRequests.any { state ->
+                        state.status.equals("PENDING", ignoreCase = true) ||
+                            state.status.equals("RECONFIRMATION_REQUIRED", ignoreCase = true)
+                    },
                     minimumPostDateMillis = minimumPostDateMillis,
                     isSaving = isSavingPlanChange,
                     errorMessage = planChangeError,
@@ -2321,6 +2325,7 @@ private fun ImpactWeavePlanActionsCard(
     status: String,
     startDateMillis: Long?,
     hasConfirmedVenue: Boolean,
+    hasWaitingPartnershipResponse: Boolean,
     minimumPostDateMillis: Long,
     isSaving: Boolean,
     errorMessage: String?,
@@ -2332,9 +2337,11 @@ private fun ImpactWeavePlanActionsCard(
 ) {
     val normalizedStatus = status.uppercase(Locale.ROOT)
     val terminal = normalizedStatus == "DISPOSED" || normalizedStatus == "CONVERTED"
-    val supportAllowsPost = normalizedStatus == "PARTIAL" || normalizedStatus == "READY"
+    val statusAllowsPost = normalizedStatus == "MATCHING" ||
+        normalizedStatus == "PARTIAL" || normalizedStatus == "READY"
     val dateAllowsPost = startDateMillis != null && startDateMillis >= minimumPostDateMillis
-    val canCreatePost = supportAllowsPost && hasConfirmedVenue && dateAllowsPost && !terminal
+    val canCreatePost = statusAllowsPost && !hasWaitingPartnershipResponse &&
+        hasConfirmedVenue && dateAllowsPost && !terminal
     CreateSectionCard(
         title = when {
             normalizedStatus == "DISPOSED" -> "Disposed plan"
@@ -2345,12 +2352,13 @@ private fun ImpactWeavePlanActionsCard(
         subtitle = when {
             terminal -> "This plan is kept as read-only history, including its partnership record."
             canCreatePost -> "Confirmed support can be partial. Continue to add volunteer roles and capacity; the agreed activity details stay locked."
-            supportAllowsPost && !hasConfirmedVenue -> "A confirmed physical venue is required before this plan can become a Volunteer Post."
-            supportAllowsPost && !dateAllowsPost -> "Create Post is locked because the activity starts in less than 7 days. Reschedule it before continuing."
-            else -> "You can change text details or the schedule. Location and support requirements stay locked after matching."
+            normalizedStatus == "WAITING" || hasWaitingPartnershipResponse -> "A partnership request or schedule reconfirmation is still waiting for a response. Finish that first before creating the Volunteer Post."
+            statusAllowsPost && !hasConfirmedVenue -> "A confirmed physical venue is required before this plan can become a Volunteer Post."
+            statusAllowsPost && !dateAllowsPost -> "Create Post is locked because the activity starts in less than 7 days. Reschedule it before continuing."
+            else -> "You can create the Volunteer Post without waiting for every support need to be fulfilled, as long as no partnership response is still pending."
         }
     ) {
-        if (supportAllowsPost && !terminal) {
+        if (statusAllowsPost && !terminal) {
             Button(
                 onClick = onCreatePost,
                 enabled = !isSaving && canCreatePost,

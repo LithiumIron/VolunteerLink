@@ -115,7 +115,8 @@ private val PostManagementPillShape = RoundedCornerShape(50)
 fun PostManagementTopBar(
     onBack: () -> Unit,
     onEdit: () -> Unit,
-    showEdit: Boolean
+    showEdit: Boolean,
+    showEditAttention: Boolean = false
 ) {
     Row(
         modifier = Modifier
@@ -150,20 +151,42 @@ fun PostManagementTopBar(
         )
 
         if (showEdit) {
-            TextButton(onClick = onEdit) {
-                Icon(
-                    painter = painterResource(R.drawable.edit),
-                    contentDescription = null,
-                    modifier = Modifier.size(17.dp),
-                    tint = VolunteerLinkSurface
-                )
-                Text(
-                    text = "Edit",
-                    modifier = Modifier.padding(start = 5.dp),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = VolunteerLinkSurface
-                )
+            Box {
+                TextButton(onClick = onEdit) {
+                    Icon(
+                        painter = painterResource(R.drawable.edit),
+                        contentDescription = null,
+                        modifier = Modifier.size(17.dp),
+                        tint = VolunteerLinkSurface
+                    )
+                    Text(
+                        text = "Edit",
+                        modifier = Modifier.padding(start = 5.dp),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = VolunteerLinkSurface
+                    )
+                }
+
+                if (showEditAttention) {
+                    Surface(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .size(15.dp),
+                        shape = CircleShape,
+                        color = VolunteerLinkError
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                text = "!",
+                                fontSize = 9.sp,
+                                lineHeight = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = VolunteerLinkSurface
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -468,6 +491,67 @@ fun PostManagementOverview(
         OrganisationSectionSurface { PostManagementParticipationCard(post) }
         OrganisationSectionSurface { PostManagementRoleSection(post) }
         OrganisationSectionSurface { PostManagementScheduleSection(post) }
+    }
+}
+
+@Composable
+fun PostManagementDraftPublishSection(
+    isPublishing: Boolean,
+    blockMessage: String?,
+    errorMessage: String?,
+    enabled: Boolean,
+    onPublish: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    OrganisationSectionSurface(modifier = modifier) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            OrganisationSectionHeader(
+                title = "Publish this draft",
+                subtitle = "Once published, volunteers can discover this opportunity and apply to its roles."
+            )
+
+            blockMessage?.takeIf { it.isNotBlank() }?.let { message ->
+                Text(
+                    text = message,
+                    modifier = Modifier.padding(top = 10.dp),
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = VolunteerLinkError
+                )
+            }
+
+            errorMessage
+                ?.takeIf { it.isNotBlank() && it != blockMessage }
+                ?.let { message ->
+                    Text(
+                        text = message,
+                        modifier = Modifier.padding(top = 10.dp),
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp,
+                        color = VolunteerLinkError
+                    )
+                }
+
+            Button(
+                onClick = onPublish,
+                enabled = enabled,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 14.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = VolunteerLinkPrimaryGreen,
+                    contentColor = VolunteerLinkSurface,
+                    disabledContainerColor = VolunteerLinkPrimaryGreen.copy(alpha = 0.32f),
+                    disabledContentColor = VolunteerLinkSurface.copy(alpha = 0.78f)
+                )
+            ) {
+                Text(
+                    text = if (isPublishing) "Publishing..." else "Publish Post",
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
     }
 }
 
