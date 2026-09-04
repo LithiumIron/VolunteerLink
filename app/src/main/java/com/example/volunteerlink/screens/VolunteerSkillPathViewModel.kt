@@ -17,8 +17,13 @@ data class VolunteerSkillPathUiState(
     val errorMessage: String? = null
 )
 
+/**
+ * Owns the screen state for Skill Path. The screen observes this read-only StateFlow;
+ * only this ViewModel starts repository work or changes loading/error values.
+ */
 class VolunteerSkillPathViewModel : ViewModel() {
 
+    // Private mutable state prevents Composables from changing progress directly.
     private val mutableUiState =
         MutableStateFlow(
             VolunteerSkillPathUiState()
@@ -28,15 +33,20 @@ class VolunteerSkillPathViewModel : ViewModel() {
         mutableUiState.asStateFlow()
 
     init {
+        // Start the first fetch when the ViewModel is created. It survives ordinary
+        // recomposition, unlike placing the fetch directly inside the Composable.
         loadSkillPaths()
     }
 
     fun retry() {
+        // The Retry button uses exactly the same loading path as the first screen visit.
         loadSkillPaths()
     }
 
     private fun loadSkillPaths() {
         viewModelScope.launch {
+            // Keep old values only while loading; clear the old error so the UI does not
+            // show an outdated failure together with a new request.
             mutableUiState.update {
                     currentUiState ->
                 currentUiState.copy(
@@ -46,6 +56,8 @@ class VolunteerSkillPathViewModel : ViewModel() {
             }
 
             try {
+                // Repository combines verified completion records into the level, role
+                // count and service-time values displayed by the Skill Path screens.
                 val skillPaths =
                     VolunteerSkillPathRepository
                         .getSkillPaths()
@@ -56,6 +68,8 @@ class VolunteerSkillPathViewModel : ViewModel() {
                         skillPaths = skillPaths
                     )
             } catch (exception: Exception) {
+                // Do not fabricate zero progress after a failed network/policy request.
+                // A visible error is safer than telling a volunteer that achievements vanished.
                 exception.printStackTrace()
 
                 mutableUiState.value =

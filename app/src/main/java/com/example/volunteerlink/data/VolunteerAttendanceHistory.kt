@@ -12,6 +12,7 @@ import java.util.Locale
 import java.util.TimeZone
 
 enum class VolunteerAttendanceDayState {
+    // UI states are derived from schedule + records. They are not new database statuses.
     NOT_STARTED, NOT_SCHEDULED, OPEN, NOT_OPENED, NO_RECORD, PRESENT, ABSENT, UNKNOWN, DATE_REVIEW
 }
 
@@ -46,6 +47,8 @@ object VolunteerAttendanceHistory {
     fun build(event: VolunteerOpportunityEvent, role: VolunteerOpportunityRole,
               records: List<VolunteerAttendanceRecord>?, days: List<VolunteerAttendanceDay>,
               now: Long): List<VolunteerAttendanceHistoryDay> {
+        // Attendance is meaningful only for an accepted Physical role. Remote work uses
+        // submission progress instead, so this guard prevents accidental mixed-mode UI.
         require(role.roleMode.equals("PHYSICAL", true))
         require(event.eventTimeZone in TimeZone.getAvailableIDs())
         val zone = TimeZone.getTimeZone(event.eventTimeZone)
@@ -65,6 +68,8 @@ object VolunteerAttendanceHistory {
         require(assigned.all { it in dates }) { "Assigned dates are outside the Physical phase" }
         val today = formatter.format(Date(now))
         return dates.mapIndexed { index, date ->
+            // Each date receives one display state. Keeping this calculation here makes
+            // the card and History view agree instead of applying separate UI rules.
             val start = parse("$date ${hours(event.eventPhysicalStartTime)}", "yyyy-MM-dd HH:mm:ss", zone).time
             val end = parse("$date ${hours(event.eventPhysicalEndTime)}", "yyyy-MM-dd HH:mm:ss", zone).time
             // The existing backend has same-day phase hours. Never invent an overnight shift.
@@ -115,6 +120,8 @@ object VolunteerAttendanceHistory {
     }
 
     fun preview(rows: List<VolunteerAttendanceHistoryDay>, today: String): List<VolunteerAttendanceHistoryDay> {
+        // The summary card is deliberately short; the full History section remains the
+        // source for every event day, including past and future dates.
         if (rows.size <= 3) return rows
         val current = rows.indexOfLast { it.date <= today }.coerceAtLeast(0)
         val start = (current - 1).coerceIn(0, rows.size - 3)
