@@ -22,6 +22,9 @@ val supabase = createSupabaseClient(
     install(Storage)
 }
 
+// Purpose: Handles the test supabase connection rule in the data layer so screens do not duplicate this business logic.
+// Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+// Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
 suspend fun testSupabaseConnection(): Boolean {
     return try {
         supabase

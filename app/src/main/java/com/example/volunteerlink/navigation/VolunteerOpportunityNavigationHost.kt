@@ -74,6 +74,9 @@ import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.launch
 
 @Composable
+// Purpose: Owns the Volunteer navigation graph and translates route arguments into screen callbacks.
+// Usage: Used by the app navigation graph when the volunteer opens, returns from, or switches a destination.
+// Navigation effect: Route arguments identify the selected event, role, application or certificate.
 fun VolunteerOpportunityNavigationHost(
     onLoggedOut: () -> Unit
 ) {
@@ -91,8 +94,10 @@ fun VolunteerOpportunityNavigationHost(
     volunteerNotificationViewModel.uiState
         .collectAsStateWithLifecycle()
 
+    // Check this condition before showing the action, preventing an invalid Volunteer flow from continuing.
     if (opportunityUiState.isLoading) {
         VolunteerOpportunityLoadingScreen()
+        // Keep this Compose block separate so its visual state follows the value prepared above.
         return
     }
 
@@ -101,9 +106,11 @@ fun VolunteerOpportunityNavigationHost(
             errorMessage = errorMessage,
             onRetry = volunteerOpportunityViewModel::retry
         )
+        // Keep this Compose block separate so its visual state follows the value prepared above.
         return
     }
 
+    // Name the calculated volunteer navigation controller value because later UI branches reuse it during this Compose pass.
     val volunteerNavigationController =
         rememberNavController()
 
@@ -111,11 +118,13 @@ fun VolunteerOpportunityNavigationHost(
     volunteerNavigationController
         .currentBackStackEntryAsState()
 
+    // Read the active route so the correct bottom-navigation item and app bar state are displayed.
     val currentVolunteerNavigationRoute =
         currentVolunteerNavigationBackStackEntry
             ?.destination
             ?.route
 
+    // Name the calculated volunteer bottom navigation routes value because later UI branches reuse it during this Compose pass.
     val volunteerBottomNavigationRoutes =
         setOf(
             VolunteerOpportunityNavigationRoutes
@@ -134,6 +143,7 @@ fun VolunteerOpportunityNavigationHost(
                 .VOLUNTEER_PROFILE_ROUTE
         )
 
+    // Calculate whether the following UI or action is allowed before it is rendered or executed.
     val shouldShowVolunteerBottomNavigationBar =
         currentVolunteerNavigationRoute in
                 volunteerBottomNavigationRoutes
@@ -145,8 +155,10 @@ fun VolunteerOpportunityNavigationHost(
     // the "Log Out" row in Settings.
     var showBackLogoutConfirmation by remember { mutableStateOf(false) }
     var isLoggingOutFromBack by remember { mutableStateOf(false) }
+    // Create a lifecycle-aware coroutine scope for asynchronous work started by this Compose screen.
     val backLogoutScope = rememberCoroutineScope()
 
+    // Intercept the Android back action so it follows this screen’s intended Volunteer navigation path.
     BackHandler(
         enabled =
             currentVolunteerNavigationRoute ==
@@ -408,6 +420,7 @@ fun VolunteerOpportunityNavigationHost(
                         )
                 ) { navigationBackStackEntry ->
 
+                    // Resolve or prepare event data from the shared dashboard snapshot for this part of the screen.
                     val volunteerEventId =
                         navigationBackStackEntry
                             .arguments
@@ -481,6 +494,7 @@ fun VolunteerOpportunityNavigationHost(
                         )
                 ) { navigationBackStackEntry ->
 
+                    // Resolve or prepare event data from the shared dashboard snapshot for this part of the screen.
                     val volunteerEventId =
                         navigationBackStackEntry
                             .arguments
@@ -490,6 +504,7 @@ fun VolunteerOpportunityNavigationHost(
                             )
                             ?: return@composable
 
+                    // Resolve or prepare role data used for eligibility, schedule and application controls.
                     val volunteerRoleId =
                         navigationBackStackEntry
                             .arguments
@@ -553,6 +568,7 @@ fun VolunteerOpportunityNavigationHost(
                         )
                 ) { navigationBackStackEntry ->
 
+                    // Resolve or prepare event data from the shared dashboard snapshot for this part of the screen.
                     val volunteerEventId =
                         navigationBackStackEntry
                             .arguments
@@ -562,6 +578,7 @@ fun VolunteerOpportunityNavigationHost(
                             )
                             ?: return@composable
 
+                    // Resolve or prepare role data used for eligibility, schedule and application controls.
                     val volunteerRoleId =
                         navigationBackStackEntry
                             .arguments
@@ -619,6 +636,7 @@ fun VolunteerOpportunityNavigationHost(
                             }
                         )
                 ) { navigationBackStackEntry ->
+                    // Resolve or prepare the application data used by the next status, cancellation or navigation decision.
                     val volunteerApplicationId =
                         navigationBackStackEntry
                             .arguments
@@ -692,6 +710,7 @@ fun VolunteerOpportunityNavigationHost(
                             }
                         )
                 ) { navigationBackStackEntry ->
+                    // Resolve or prepare the application data used by the next status, cancellation or navigation decision.
                     val volunteerApplicationId =
                         navigationBackStackEntry
                             .arguments
@@ -774,6 +793,7 @@ fun VolunteerOpportunityNavigationHost(
                             }
                         )
                 ) { navigationBackStackEntry ->
+                    // Prepare Skill Path data used to explain progress, evidence or the next suitable level.
                     val volunteerSkillPathId =
                         navigationBackStackEntry
                             .arguments
@@ -856,6 +876,7 @@ fun VolunteerOpportunityNavigationHost(
                         }
                     )
                 ) { entry ->
+                    // Name the calculated chat id value because later UI branches reuse it during this Compose pass.
                     val chatId = entry.arguments
                         ?.getString(
                             VolunteerOpportunityNavigationRoutes.VOLUNTEER_CHAT_ID_ARGUMENT
@@ -901,6 +922,7 @@ fun VolunteerOpportunityNavigationHost(
                         }
                     )
                 ) { entry ->
+                    // Name the calculated chat id value because later UI branches reuse it during this Compose pass.
                     val chatId = entry.arguments
                         ?.getString(
                             VolunteerOpportunityNavigationRoutes.VOLUNTEER_CHAT_ID_ARGUMENT
@@ -936,6 +958,7 @@ fun VolunteerOpportunityNavigationHost(
                         VolunteerOpportunityNavigationRoutes
                             .VOLUNTEER_PROFILE_ROUTE
                 ) {
+                    // Create a lifecycle-aware coroutine scope for asynchronous work started by this Compose screen.
                     val profileScope = rememberCoroutineScope()
 
                     VolunteerProfileScreen(
@@ -1002,6 +1025,7 @@ fun VolunteerOpportunityNavigationHost(
                         onRefresh = {
                             profileScope.launch {
                                 VolunteerOpportunitySessionStore.updateProfileLoading(true)
+                                // Name the calculated loaded profile value because later UI branches reuse it during this Compose pass.
                                 val loadedProfile = VolunteerProfileRepository.loadProfile()
                                 if (loadedProfile != null) {
                                     VolunteerOpportunitySessionStore.setProfileData(loadedProfile)
@@ -1092,6 +1116,7 @@ fun VolunteerOpportunityNavigationHost(
                             VolunteerOpportunityNavigationRoutes
                                 .VOLUNTEER_HOME_ROUTE
                         ) {
+                            // Name the calculated returned to home value because later UI branches reuse it during this Compose pass.
                             val returnedToHome =
                                 volunteerNavigationController
                                     .popBackStack(
@@ -1187,6 +1212,9 @@ fun VolunteerOpportunityNavigationHost(
 }
 
 @Composable
+// Purpose: Renders the volunteer opportunity loading screen and connects user actions to navigation or its ViewModel.
+// Usage: Used by the app navigation graph when the volunteer opens, returns from, or switches a destination.
+// Navigation effect: Route arguments identify the selected event, role, application or certificate.
 private fun VolunteerOpportunityLoadingScreen() {
     Column(
         modifier = Modifier
@@ -1209,6 +1237,9 @@ private fun VolunteerOpportunityLoadingScreen() {
 }
 
 @Composable
+// Purpose: Renders the volunteer opportunity load error screen and connects user actions to navigation or its ViewModel.
+// Usage: Used by the app navigation graph when the volunteer opens, returns from, or switches a destination.
+// Navigation effect: Route arguments identify the selected event, role, application or certificate.
 private fun VolunteerOpportunityLoadErrorScreen(
     errorMessage: String,
     onRetry: () -> Unit

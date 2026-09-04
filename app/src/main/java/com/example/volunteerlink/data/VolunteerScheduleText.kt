@@ -20,6 +20,9 @@ object VolunteerScheduleText {
         SimpleDateFormat("d MMM yyyy", Locale.ENGLISH).apply { timeZone = parser.timeZone }.format(parsed)
     }.getOrDefault(raw.ifBlank { "Not specified" })
 
+    // Purpose: Handles the time rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     fun time(raw: String): String = runCatching {
         require(raw.matches(Regex("\\d{2}:\\d{2}(:\\d{2}(\\.\\d+)?)?")))
         val parser = SimpleDateFormat("HH:mm", Locale.ENGLISH).apply { isLenient = false; timeZone = TimeZone.getTimeZone("UTC") }
@@ -27,6 +30,9 @@ object VolunteerScheduleText {
         SimpleDateFormat("h:mm a", Locale.ENGLISH).apply { timeZone = parser.timeZone }.format(parsed)
     }.getOrDefault(raw.ifBlank { "Not specified" })
 
+    // Purpose: Handles the range rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     fun range(start: String, end: String): String =
         if (start == end && start.isNotBlank()) date(start) else "${date(start)} – ${date(end)}"
 
@@ -48,6 +54,9 @@ object VolunteerScheduleText {
         }.format(instant)
     }.getOrDefault("Not available — sync to check")
 
+    // Purpose: Handles the compact rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     fun compact(event: VolunteerOpportunityEvent, role: VolunteerOpportunityRole): String {
         val remote = role.roleMode.equals("REMOTE", true)
         return "${if (remote) "Remote work" else "Physical phase"}: " + range(
@@ -55,6 +64,9 @@ object VolunteerScheduleText {
             if (remote) event.eventRemoteEndDate else event.eventPhysicalEndDate)
     }
 
+    // Purpose: Handles the event rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     fun event(event: VolunteerOpportunityEvent): String = buildList {
         if (event.eventPhysicalStartDate.isNotBlank()) add(
             "Physical phase: ${range(event.eventPhysicalStartDate, event.eventPhysicalEndDate)}\n" +
@@ -71,6 +83,9 @@ object VolunteerScheduleText {
         if (isEmpty()) add("Phase dates are not available in this copy. Sync online to check the latest schedule.")
     }.joinToString("\n\n")
 
+    // Purpose: Handles the role rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     fun role(event: VolunteerOpportunityEvent, role: VolunteerOpportunityRole): String {
         val remote = role.roleMode.equals("REMOTE", true)
         val stageStart = if (remote) event.eventRemoteStartDate else event.eventPhysicalStartDate

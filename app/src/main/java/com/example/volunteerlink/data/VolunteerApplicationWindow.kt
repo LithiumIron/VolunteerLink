@@ -21,6 +21,9 @@ import java.util.TimeZone
  *
  * Event-level checks mean "at least one role is still open".
  */
+// Purpose: Handles the volunteer application window rule in the data layer so screens do not duplicate this business logic.
+// Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+// Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
 object VolunteerApplicationWindow {
 
     fun beforeStart(
@@ -32,6 +35,9 @@ object VolunteerApplicationWindow {
         return raw?.let { isBeforeDate(it, nowMillis) } ?: false
     }
 
+    // Purpose: Handles the can apply rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     fun canApply(
         event: VolunteerOpportunityEvent?,
         role: VolunteerOpportunityRole?,
@@ -40,6 +46,9 @@ object VolunteerApplicationWindow {
         event?.eventStatus.equals("PUBLISHED", ignoreCase = true) &&
             beforeStart(event, role, nowMillis)
 
+    // Purpose: Handles the reason rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     fun reason(
         event: VolunteerOpportunityEvent?,
         role: VolunteerOpportunityRole?
@@ -73,6 +82,9 @@ object VolunteerApplicationWindow {
         event?.eventStatus.equals("PUBLISHED", ignoreCase = true) &&
             beforeStart(event, nowMillis)
 
+    // Purpose: Handles the reason rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     fun reason(event: VolunteerOpportunityEvent?): String = when {
         event == null ->
             "Application dates are unavailable. Please sync before continuing."
@@ -85,6 +97,9 @@ object VolunteerApplicationWindow {
             "This opportunity is not open for applications."
     }
 
+    // Purpose: Handles the role start date rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     private fun roleStartDate(
         event: VolunteerOpportunityEvent?,
         role: VolunteerOpportunityRole?
@@ -104,11 +119,17 @@ object VolunteerApplicationWindow {
         return event.eventApplicationStartDate.takeIf { it.isNotBlank() }
     }
 
+    // Purpose: Handles the is before date rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     private fun isBeforeDate(raw: String, nowMillis: Long): Boolean {
         val start = parseDate(raw) ?: return false
         return Date(nowMillis).before(start)
     }
 
+    // Purpose: Handles the parse date rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     private fun parseDate(raw: String): Date? {
         if (!Regex("\\d{4}-\\d{2}-\\d{2}").matches(raw)) return null
 

@@ -26,6 +26,9 @@ enum class VolunteerMatchFactorStatus {
     ATTENTION
 }
 
+// Purpose: Handles the volunteer match factor rule in the data layer so screens do not duplicate this business logic.
+// Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+// Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
 data class VolunteerMatchFactor(
     val title: String,
     val explanation: String,
@@ -34,6 +37,9 @@ data class VolunteerMatchFactor(
     val status: VolunteerMatchFactorStatus
 )
 
+// Purpose: Handles the volunteer home recommendation rule in the data layer so screens do not duplicate this business logic.
+// Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+// Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
 data class VolunteerHomeRecommendation(
     val event: VolunteerOpportunityEvent,
     val score: Int,
@@ -51,6 +57,9 @@ data class VolunteerHomeRecommendation(
  */
 object VolunteerHomeFeedEngine {
 
+    // Purpose: Handles the filter rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     fun filter(
         events: List<VolunteerOpportunityEvent>,
         filter: VolunteerHomeFeedFilter,
@@ -108,6 +117,9 @@ object VolunteerHomeFeedEngine {
  * Skill Path 30, verified skills 25, eligibility 20, growth 10,
  * practical access 10 and organisation trust 5.
  */
+// Purpose: Handles the volunteer home recommendation engine rule in the data layer so screens do not duplicate this business logic.
+// Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+// Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
 object VolunteerHomeRecommendationEngine {
 
     fun recommend(
@@ -208,6 +220,9 @@ object VolunteerHomeRecommendationEngine {
             )
     }
 
+    // Purpose: Handles the create recommendation rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     private fun createRecommendation(
         event: VolunteerOpportunityEvent,
         applications: List<VolunteerOpportunityApplication>,
@@ -260,6 +275,9 @@ object VolunteerHomeRecommendationEngine {
         )
     }
 
+    // Purpose: Handles the score role rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     private fun scoreRole(
         event: VolunteerOpportunityEvent,
         role: VolunteerOpportunityRole,
@@ -472,6 +490,9 @@ object VolunteerHomeRecommendationEngine {
         )
     }
 
+    // Purpose: Handles the match label rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     private fun matchLabel(score: Int): String =
         when {
             score >= 90 -> "Excellent match"
@@ -480,6 +501,9 @@ object VolunteerHomeRecommendationEngine {
             else -> "Growth match"
         }
 
+    // Purpose: Handles the recommendation reason rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     private fun recommendationReason(
         role: VolunteerOpportunityRole,
         experiencedPaths: Set<String>,

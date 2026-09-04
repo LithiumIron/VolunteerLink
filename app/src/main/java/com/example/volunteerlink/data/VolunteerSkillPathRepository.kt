@@ -11,6 +11,9 @@ import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
+// Purpose: Handles the volunteer skill path repository rule in the data layer so screens do not duplicate this business logic.
+// Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+// Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
 object VolunteerSkillPathRepository {
 
     suspend fun getSkillPaths():
@@ -25,6 +28,9 @@ object VolunteerSkillPathRepository {
         }
     }
 
+    // Purpose: Reads skill paths from cloud from the data source and returns models that the ViewModel can expose to Compose.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     private suspend fun loadSkillPathsFromCloud():
         List<VolunteerSkillPath> {
         val skillPathRows =
@@ -200,4 +206,3 @@ private data class VolunteerSkillPathProgressRow(
     @SerialName("updated_at")
     val updatedAt: String
 )
-

@@ -11,6 +11,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+// Purpose: Handles volunteer notification ui state as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 data class VolunteerNotificationUiState(
     val isLoading: Boolean = true,
     val isMarkingRead: Boolean = false,
@@ -38,6 +41,9 @@ class VolunteerNotificationViewModel(application: Application) : AndroidViewMode
         refresh()
     }
 
+    // Purpose: Requests a fresh cloud snapshot without discarding the current cached screen immediately.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     fun refresh() {
         // Notifications are online-only; do not pretend cached/empty data is a successful refresh.
         if (!checkOnline()) return
@@ -73,6 +79,9 @@ class VolunteerNotificationViewModel(application: Application) : AndroidViewMode
         }
     }
 
+    // Purpose: Handles mark all read as one reusable step in the Volunteer flow.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     fun markAllRead() {
         // Avoid an unnecessary RPC when every notification is already read.
         if (!checkOnline()) return
@@ -111,6 +120,9 @@ class VolunteerNotificationViewModel(application: Application) : AndroidViewMode
         }
     }
 
+    // Purpose: Handles dismiss as one reusable step in the Volunteer flow.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     fun dismiss(notification: VolunteerNotification) {
         // stableKey identifies one notification consistently across a refreshed list.
         if (!checkOnline()) return
@@ -140,6 +152,9 @@ class VolunteerNotificationViewModel(application: Application) : AndroidViewMode
         }
     }
 
+    // Purpose: Handles dismiss all as one reusable step in the Volunteer flow.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     fun dismissAll() {
         // Save the exact keys before the request. The success handler removes only the
         // notifications that were present when the volunteer pressed "Clear all".
@@ -171,6 +186,9 @@ class VolunteerNotificationViewModel(application: Application) : AndroidViewMode
         }
     }
 
+    // Purpose: Handles check online as one reusable step in the Volunteer flow.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     private fun checkOnline(): Boolean {
         // Central guard gives every action the same user-facing offline explanation.
         if (com.example.volunteerlink.data.VolunteerOnline.available(getApplication<Application>())) return true

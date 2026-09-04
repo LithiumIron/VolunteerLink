@@ -57,11 +57,15 @@ import java.util.Locale
 import java.text.SimpleDateFormat
 
 @Composable
+// Purpose: Renders the volunteer remote submission card from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 fun VolunteerRemoteSubmissionCard(
     participationId: String,
     dataVersion: Int,
     onRefreshApplications: () -> Unit
 ) {
+    // Name the calculated model value because later UI branches reuse it during this Compose pass.
     val model: VolunteerRemoteSubmissionViewModel = viewModel(key = "remote-submission-$participationId")
     val state by model.uiState.collectAsStateWithLifecycle()
     val androidContext = LocalContext.current
@@ -201,6 +205,9 @@ fun VolunteerRemoteSubmissionCard(
     }
 }
 
+// Purpose: Handles remote submission time as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun remoteSubmissionTime(value: String): String = runCatching {
     // PostgreSQL may emit microseconds; java.text expects exactly milliseconds.
     val normalized = value.replace(Regex("\\.(\\d+)(?=Z|[+-])")) {

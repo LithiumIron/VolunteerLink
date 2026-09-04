@@ -20,6 +20,9 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
+// Purpose: Handles volunteer auth ui state as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 data class VolunteerAuthUiState(
     val isCheckingSession: Boolean = true,
     val isSigningIn: Boolean = false,
@@ -29,6 +32,9 @@ data class VolunteerAuthUiState(
     val errorMessage: String? = null
 )
 
+// Purpose: Handles volunteer auth view model as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 class VolunteerAuthViewModel(
     application: Application
 ) : AndroidViewModel(application) {
@@ -54,6 +60,9 @@ class VolunteerAuthViewModel(
         checkExistingSession()
     }
 
+    // Purpose: Handles sign in as one reusable step in the Volunteer flow.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     fun signIn(email: String, password: String, rememberMe: Boolean) {
         val normalizedEmail = email.trim()
         when {
@@ -101,6 +110,9 @@ class VolunteerAuthViewModel(
         }
     }
 
+    // Purpose: Handles sign up as one reusable step in the Volunteer flow.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     fun signUp(
         fullName: String,
         email: String,
@@ -191,18 +203,27 @@ class VolunteerAuthViewModel(
         }
     }
 
+    // Purpose: Handles is valid volunteer phone number as one reusable step in the Volunteer flow.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     private fun isValidVolunteerPhoneNumber(phone: String): Boolean {
         val cleaned = phone.replace(Regex("[\\s\\-()]"), "")
         val isLocalFormat = cleaned.matches(Regex("^0\\d{8,9}$"))
         return isLocalFormat
     }
 
+    // Purpose: Handles clear error as one reusable step in the Volunteer flow.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     fun clearError() {
         mutableUiState.update {
             it.copy(errorMessage = null)
         }
     }
 
+    // Purpose: Handles check existing session as one reusable step in the Volunteer flow.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     private fun checkExistingSession() {
         viewModelScope.launch {
             try {
@@ -270,6 +291,9 @@ class VolunteerAuthViewModel(
         }
     }
 
+    // Purpose: Keeps  verified volunteer stable across Compose recompositions until its inputs change.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     private fun rememberVerifiedVolunteer() {
         val authUserId = supabase.auth.currentUserOrNull()?.id ?: return
         offlineAccountPreferences.edit()
@@ -277,6 +301,9 @@ class VolunteerAuthViewModel(
             .apply()
     }
 
+    // Purpose: Handles is previously verified volunteer as one reusable step in the Volunteer flow.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     private fun isPreviouslyVerifiedVolunteer(): Boolean {
         val currentAuthUserId =
             supabase.auth.currentUserOrNull()?.id ?: return false
@@ -286,6 +313,9 @@ class VolunteerAuthViewModel(
         ) == currentAuthUserId
     }
 
+    // Purpose: Handles confirm volunteer profile as one reusable step in the Volunteer flow.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     private suspend fun confirmVolunteerProfile() {
         val authUserId = supabase.auth.currentUserOrNull()?.id
             ?: error("The Supabase session is no longer available.")
@@ -307,6 +337,9 @@ class VolunteerAuthViewModel(
         }
     }
 
+    // Purpose: Handles fetch account type as one reusable step in the Volunteer flow.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     private suspend fun fetchAccountType(): String? =
         runCatching {
             val authUserId = supabase.auth.currentUserOrNull()?.id
@@ -323,6 +356,9 @@ class VolunteerAuthViewModel(
                 ?.accountType
         }.getOrNull()
 
+    // Purpose: Handles show error as one reusable step in the Volunteer flow.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     private fun showError(message: String) {
         mutableUiState.update {
             it.copy(errorMessage = message)
@@ -330,6 +366,9 @@ class VolunteerAuthViewModel(
     }
 }
 
+// Purpose: Handles auth error message as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun authErrorMessage(exception: Exception): String {
     val message = exception.message.orEmpty()
     return when {

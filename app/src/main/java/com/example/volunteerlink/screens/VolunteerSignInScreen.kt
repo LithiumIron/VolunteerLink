@@ -52,6 +52,9 @@ import com.example.volunteerlink.ui.theme.VolunteerLinkTextPrimary
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextSecondary
 
 @Composable
+// Purpose: Renders the volunteer sign in screen and connects user actions to navigation or its ViewModel.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 fun VolunteerSignInScreen(
     onBackSelected: () -> Unit,
     onSignUpSelected: () -> Unit,
@@ -65,12 +68,16 @@ fun VolunteerSignInScreen(
     var password by rememberSaveable { mutableStateOf("") }
     var rememberMe by rememberSaveable { mutableStateOf(false) }
 
+    // Run this side effect only when its Compose keys change, instead of repeating it on every redraw.
     LaunchedEffect(uiState.isAuthenticated) {
+        // Check this condition before showing the action, preventing an invalid Volunteer flow from continuing.
         if (uiState.isAuthenticated) onSignedIn()
     }
 
+    // Calculate whether the following UI or action is allowed before it is rendered or executed.
     val isBusy = uiState.isSigningIn || uiState.isCheckingSession
 
+    // Arrange the following screen content vertically inside the available space.
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -89,12 +96,14 @@ fun VolunteerSignInScreen(
             )
         }
 
+        // Arrange the following screen content vertically inside the available space.
         Column(
             modifier = Modifier
                 .weight(1f)
                 .padding(horizontal = 28.dp),
             verticalArrangement = Arrangement.Center
         ) {
+            // Display the prepared label; business rules are calculated before reaching this UI call.
             Text(
                 text = "Volunteer sign in",
                 fontSize = 28.sp,
@@ -104,6 +113,7 @@ fun VolunteerSignInScreen(
 
             Spacer(Modifier.height(7.dp))
 
+            // Display the prepared label; business rules are calculated before reaching this UI call.
             Text(
                 text =
                     "Sign in to load your opportunities, applications " +
@@ -115,6 +125,7 @@ fun VolunteerSignInScreen(
 
             Spacer(Modifier.height(26.dp))
 
+            // Display an editable Compose field and send each value change back to screen state.
             OutlinedTextField(
                 value = email,
                 onValueChange = {
@@ -141,6 +152,7 @@ fun VolunteerSignInScreen(
 
             Spacer(Modifier.height(13.dp))
 
+            // Display an editable Compose field and send each value change back to screen state.
             OutlinedTextField(
                 value = password,
                 onValueChange = {
@@ -169,6 +181,7 @@ fun VolunteerSignInScreen(
 
             uiState.errorMessage?.let { message ->
                 Spacer(Modifier.height(11.dp))
+                // Display the prepared label; business rules are calculated before reaching this UI call.
                 Text(
                     text = message,
                     fontSize = 12.sp,

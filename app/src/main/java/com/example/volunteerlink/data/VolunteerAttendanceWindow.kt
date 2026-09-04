@@ -8,6 +8,9 @@ import java.text.SimpleDateFormat
 import java.text.ParsePosition
 import java.util.*
 
+// Purpose: Handles the volunteer attendance window rule in the data layer so screens do not duplicate this business logic.
+// Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+// Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
 object VolunteerAttendanceWindow {
     fun localDate(nowMillis: Long, zone: String): String {
         require(zone in TimeZone.getAvailableIDs())
@@ -16,6 +19,9 @@ object VolunteerAttendanceWindow {
         }.format(Date(nowMillis))
     }
 
+    // Purpose: Handles the valid date rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     private fun validDate(raw: String): String {
         require(raw.matches(Regex("\\d{4}-\\d{2}-\\d{2}")))
         val parser = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply { isLenient = false; timeZone = TimeZone.getTimeZone("UTC") }
@@ -24,6 +30,9 @@ object VolunteerAttendanceWindow {
         return raw
     }
 
+    // Purpose: Handles the seconds rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     private fun seconds(raw: String): Double {
         val parts = raw.split(':')
         require(parts.size in 2..3)
@@ -34,6 +43,9 @@ object VolunteerAttendanceWindow {
     }
 
     // Mirrors the existing server's PHASE-hours rule, not a role-hours replacement.
+    // Purpose: Handles the reason rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     fun reason(event: VolunteerOpportunityEvent, role: VolunteerOpportunityRole, nowMillis: Long): String? = runCatching {
         val today = localDate(nowMillis, event.eventTimeZone)
         val start = validDate(event.eventPhysicalStartDate)

@@ -63,6 +63,9 @@ import com.example.volunteerlink.ui.theme.VolunteerLinkTextSecondary
 import com.example.volunteerlink.ui.theme.VolunteerLinkWarning
 
 @Composable
+// Purpose: Combines role information, eligibility, existing applications and schedule conflicts into one action state.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 fun VolunteerRoleDetailsScreen(
     volunteerEventId: Int,
     volunteerRoleId: Int,
@@ -77,11 +80,13 @@ fun VolunteerRoleDetailsScreen(
     // Use the shared business clock so eligibility follows the same test/real date
     // rule as Home, application windows and attendance.
     val businessNow = volunteerBusinessTime()
+    // Resolve or prepare event data from the shared dashboard snapshot for this part of the screen.
     val volunteerOpportunityEvent =
         VolunteerOpportunitySessionStore.findEventById(
             volunteerEventId
         )
 
+    // Resolve or prepare event data from the shared dashboard snapshot for this part of the screen.
     val volunteerOpportunityRole =
         VolunteerOpportunitySessionStore.findRoleById(
             eventId = volunteerEventId,
@@ -114,19 +119,23 @@ fun VolunteerRoleDetailsScreen(
                             .rolePrimarySkillPath
             }
 
+    // Prepare Skill Path data used to explain progress, evidence or the next suitable level.
     val currentVolunteerSkillPathLevel =
         matchingVolunteerSkillPath
             ?.currentLevel
             ?: 1
 
+    // Name the calculated eligibility is loading value because later UI branches reuse it during this Compose pass.
     val eligibilityIsLoading =
         skillPathUiState.isLoading
 
+    // Name the calculated eligibility is available value because later UI branches reuse it during this Compose pass.
     val eligibilityIsAvailable =
         !eligibilityIsLoading &&
                 skillPathUiState.errorMessage == null &&
                 matchingVolunteerSkillPath != null
 
+    // Name the calculated volunteer is eligible value because later UI branches reuse it during this Compose pass.
     val volunteerIsEligible =
         eligibilityIsAvailable &&
             currentVolunteerSkillPathLevel >=
@@ -141,6 +150,7 @@ fun VolunteerRoleDetailsScreen(
                 eventId = volunteerEventId,
                 roleId = volunteerRoleId
             )
+    // Name the calculated volunteer can reapply value because later UI branches reuse it during this Compose pass.
     val volunteerCanReapply =
         VolunteerOpportunitySessionStore.volunteerApplications.any {
             it.applicationEventId == volunteerEventId &&
@@ -149,6 +159,7 @@ fun VolunteerRoleDetailsScreen(
                     com.example.volunteerlink.model.VolunteerApplicationStatus.CANCELLED
         }
 
+    // Name the calculated volunteer was rejected value because later UI branches reuse it during this Compose pass.
     val volunteerWasRejected =
         VolunteerOpportunitySessionStore.volunteerApplications.any {
             it.applicationEventId == volunteerEventId &&
@@ -157,6 +168,7 @@ fun VolunteerRoleDetailsScreen(
                     com.example.volunteerlink.model.VolunteerApplicationStatus.REJECTED
         }
 
+    // Resolve or prepare the application data used by the next status, cancellation or navigation decision.
     val activeOtherApplication =
         VolunteerOpportunitySessionStore.activeApplicationForEvent(volunteerEventId)
             ?.takeIf { application -> application.applicationRoleId != volunteerRoleId }
@@ -315,6 +327,9 @@ fun VolunteerRoleDetailsScreen(
 }
 
 @Composable
+// Purpose: Handles volunteer role details top bar as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerRoleDetailsTopBar(
     onBackSelected: () -> Unit
 ) {
@@ -351,12 +366,16 @@ private fun VolunteerRoleDetailsTopBar(
 }
 
 @Composable
+// Purpose: Renders the volunteer role header section from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerRoleHeaderSection(
     volunteerOpportunityEvent:
     VolunteerOpportunityEvent,
     volunteerOpportunityRole:
     VolunteerOpportunityRole
 ) {
+    // Resolve or prepare role data used for eligibility, schedule and application controls.
     val roleLevelColour =
         when (volunteerOpportunityRole.roleLevel) {
             "Beginner" -> VolunteerLinkSuccess
@@ -468,6 +487,9 @@ private fun VolunteerRoleHeaderSection(
 }
 
 @Composable
+// Purpose: Renders the volunteer role assignment section from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerRoleAssignmentSection(
     volunteerOpportunityEvent:
     VolunteerOpportunityEvent,
@@ -494,6 +516,9 @@ private fun VolunteerRoleAssignmentSection(
 }
 
 @Composable
+// Purpose: Renders the volunteer role requirements section from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerRoleRequirementsSection(
     volunteerOpportunityRole:
     VolunteerOpportunityRole
@@ -527,6 +552,9 @@ private fun VolunteerRoleRequirementsSection(
 }
 
 @Composable
+// Purpose: Renders the volunteer role skills section from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerRoleSkillsSection(
     volunteerOpportunityRole:
     VolunteerOpportunityRole
@@ -578,6 +606,9 @@ private fun VolunteerRoleSkillsSection(
 }
 
 @Composable
+// Purpose: Renders the volunteer role responsibilities section from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerRoleResponsibilitiesSection(
     volunteerOpportunityRole:
     VolunteerOpportunityRole
@@ -636,6 +667,9 @@ private fun VolunteerRoleResponsibilitiesSection(
 }
 
 @Composable
+// Purpose: Renders the volunteer role schedule section from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerRoleScheduleSection(
     volunteerOpportunityRole:
     VolunteerOpportunityRole
@@ -690,6 +724,9 @@ private fun VolunteerRoleScheduleSection(
 }
 
 @Composable
+// Purpose: Renders the volunteer role eligibility section from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerRoleEligibilitySection(
     volunteerOpportunityRole:
     VolunteerOpportunityRole,
@@ -699,6 +736,7 @@ private fun VolunteerRoleEligibilitySection(
     eligibilityIsLoading: Boolean,
     eligibilityIsAvailable: Boolean
 ) {
+    // Prepare Skill Path data used to explain progress, evidence or the next suitable level.
     val requiredSkillPathLevel =
         volunteerSkillPath
             ?.levels
@@ -902,6 +940,9 @@ private fun VolunteerRoleEligibilitySection(
 }
 
 @Composable
+// Purpose: Renders the volunteer role join section from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerRoleJoinSection(
     applicationWindowMessage: String?,
     volunteerOpportunityRole:
@@ -1089,6 +1130,9 @@ private fun VolunteerRoleJoinSection(
     }
 }
 
+// Purpose: Handles volunteer role level name as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun volunteerRoleLevelName(
     level: Int
 ): String {
@@ -1101,6 +1145,9 @@ private fun volunteerRoleLevelName(
 }
 
 @Composable
+// Purpose: Renders the volunteer role section container from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerRoleSectionContainer(
     sectionTitle: String,
     sectionContent: @Composable () -> Unit
@@ -1148,6 +1195,9 @@ private fun VolunteerRoleSectionContainer(
 }
 
 @Composable
+// Purpose: Handles volunteer role label as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerRoleLabel(
     labelText: String,
     labelTextColour: Color,
@@ -1171,6 +1221,9 @@ private fun VolunteerRoleLabel(
 }
 
 @Composable
+// Purpose: Renders the volunteer role not found screen and connects user actions to navigation or its ViewModel.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerRoleNotFoundScreen(
     onBackSelected: () -> Unit
 ) {

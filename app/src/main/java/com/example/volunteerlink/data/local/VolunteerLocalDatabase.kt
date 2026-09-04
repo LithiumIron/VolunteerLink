@@ -11,11 +11,17 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 
+// Purpose: Handles the cached volunteer dashboard rule in the data layer so screens do not duplicate this business logic.
+// Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+// Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
 data class CachedVolunteerDashboard(
     val data: VolunteerOpportunityDashboardData,
     val lastSyncedAtEpochMillis: Long
 )
 
+// Purpose: Handles the pending volunteer action rule in the data layer so screens do not duplicate this business logic.
+// Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+// Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
 data class PendingVolunteerAction(
     val actionId: Long,
     val actionType: String,
@@ -32,6 +38,9 @@ data class PendingVolunteerAction(
  * satisfies the cloud + local persistence architecture without storing auth
  * tokens or passwords.
  */
+// Purpose: Handles the volunteer local database rule in the data layer so screens do not duplicate this business logic.
+// Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+// Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
 class VolunteerLocalDatabase private constructor(
     context: Context
 ) : SQLiteOpenHelper(
@@ -72,6 +81,9 @@ class VolunteerLocalDatabase private constructor(
         }
     }
 
+    // Purpose: Handles the read dashboard rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     suspend fun readDashboard(
         userScope: String
     ): CachedVolunteerDashboard? = withContext(Dispatchers.IO) {
@@ -103,6 +115,9 @@ class VolunteerLocalDatabase private constructor(
         }
     }
 
+    // Purpose: Handles the write dashboard rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     suspend fun writeDashboard(
         userScope: String,
         dashboard: VolunteerOpportunityDashboardData,
@@ -128,6 +143,9 @@ class VolunteerLocalDatabase private constructor(
         )
     }
 
+    // Purpose: Handles the clear dashboard rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     suspend fun clearDashboard(userScope: String) =
         withContext(Dispatchers.IO) {
             writableDatabase.delete(
@@ -137,6 +155,9 @@ class VolunteerLocalDatabase private constructor(
             )
         }
 
+    // Purpose: Handles the read skill paths rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     suspend fun readSkillPaths(
         userScope: String
     ): List<VolunteerSkillPath>? = withContext(Dispatchers.IO) {
@@ -159,6 +180,9 @@ class VolunteerLocalDatabase private constructor(
         }
     }
 
+    // Purpose: Handles the write skill paths rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     suspend fun writeSkillPaths(
         userScope: String,
         skillPaths: List<VolunteerSkillPath>
@@ -184,6 +208,9 @@ class VolunteerLocalDatabase private constructor(
         )
     }
 
+    // Purpose: Handles the enqueue action rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     suspend fun enqueueAction(
         actionType: String,
         targetId: String,
@@ -203,6 +230,9 @@ class VolunteerLocalDatabase private constructor(
         )
     }
 
+    // Purpose: Handles the read pending actions rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     suspend fun readPendingActions(
         userScope: String
     ): List<PendingVolunteerAction> = withContext(Dispatchers.IO) {
@@ -237,6 +267,9 @@ class VolunteerLocalDatabase private constructor(
         }
     }
 
+    // Purpose: Applies the delete pending action data operation and returns only after local/shared state can be updated consistently.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     suspend fun deletePendingAction(actionId: Long) =
         withContext(Dispatchers.IO) {
             writableDatabase.delete(
@@ -248,10 +281,16 @@ class VolunteerLocalDatabase private constructor(
 
     private var pendingActionUserScope: String = ""
 
+    // Purpose: Applies the set pending action user scope data operation and returns only after local/shared state can be updated consistently.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     fun setPendingActionUserScope(userScope: String) {
         pendingActionUserScope = userScope
     }
 
+    // Purpose: Handles the target user scope rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     private fun targetUserScope(): String {
         check(pendingActionUserScope.isNotBlank()) {
             "A user scope is required before queueing an offline action."
@@ -259,6 +298,9 @@ class VolunteerLocalDatabase private constructor(
         return pendingActionUserScope
     }
 
+    // Purpose: Handles the create skill path cache table rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     private fun createSkillPathCacheTable(database: SQLiteDatabase) {
         database.execSQL(
             """
@@ -271,6 +313,9 @@ class VolunteerLocalDatabase private constructor(
         )
     }
 
+    // Purpose: Handles the create pending action table rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     private fun createPendingActionTable(database: SQLiteDatabase) {
         database.execSQL(
             """
@@ -305,6 +350,9 @@ class VolunteerLocalDatabase private constructor(
         @Volatile
         private var instance: VolunteerLocalDatabase? = null
 
+        // Purpose: Handles the get instance rule in the data layer so screens do not duplicate this business logic.
+        // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+        // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
         fun getInstance(context: Context): VolunteerLocalDatabase =
             instance ?: synchronized(this) {
                 instance ?: VolunteerLocalDatabase(context).also {

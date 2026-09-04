@@ -39,6 +39,9 @@ import androidx.compose.ui.unit.sp
  * Each section of the app provides its own route, label and drawable icon,
  * while AppBottomNavigationBar controls the visual design.
  */
+// Purpose: Handles bottom nav item as one reusable step in the Volunteer flow.
+// Usage: Used by the app navigation graph when the volunteer opens, returns from, or switches a destination.
+// Navigation effect: Route arguments identify the selected event, role, application or certificate.
 data class BottomNavItem(
     val route: String,
     val label: String,
@@ -53,6 +56,9 @@ data class BottomNavItem(
  * without repeating the navigation bar code.
  */
 @Composable
+// Purpose: Handles app bottom navigation bar as one reusable step in the Volunteer flow.
+// Usage: Used by the app navigation graph when the volunteer opens, returns from, or switches a destination.
+// Navigation effect: Route arguments identify the selected event, role, application or certificate.
 fun AppBottomNavigationBar(
     items: List<BottomNavItem>,
     currentRoute: String?,

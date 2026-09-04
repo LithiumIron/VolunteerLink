@@ -14,6 +14,9 @@ import kotlinx.serialization.json.putJsonArray
 import kotlin.math.absoluteValue
 
 @Serializable
+// Purpose: Handles the volunteer notification rule in the data layer so screens do not duplicate this business logic.
+// Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+// Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
 data class VolunteerNotification(
     @SerialName("notification_id")
     val notificationId: Long,
@@ -51,6 +54,9 @@ private data class VolunteerApplicationReceipt(
     @SerialName("created_at") val createdAt: String
 )
 
+// Purpose: Handles the volunteer notification repository rule in the data layer so screens do not duplicate this business logic.
+// Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+// Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
 object VolunteerNotificationRepository {
     suspend fun load(): List<VolunteerNotification> {
         val cloudNotifications = runCatching {
@@ -136,11 +142,17 @@ object VolunteerNotificationRepository {
             .sortedByDescending { it.createdAt }
     }
 
+    // Purpose: Handles the mark all read rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     suspend fun markAllRead() {
         // Let the ViewModel display failure instead of reporting false success.
         supabase.postgrest.rpc("mark_my_notifications_read")
     }
 
+    // Purpose: Handles the dismiss rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     suspend fun dismiss(notificationKey: String) {
         supabase.postgrest.rpc(
             function = "dismiss_my_volunteer_notification",
@@ -150,6 +162,9 @@ object VolunteerNotificationRepository {
         )
     }
 
+    // Purpose: Handles the dismiss all rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     suspend fun dismissAll(notificationKeys: List<String>) {
         if (notificationKeys.isEmpty()) return
         supabase.postgrest.rpc(

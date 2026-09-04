@@ -16,6 +16,9 @@ enum class VolunteerRoleApplicationMethod {
 }
 
 @Serializable
+// Purpose: Handles volunteer role schedule item as one reusable step in the Volunteer flow.
+// Usage: Read by repositories, ViewModels and Compose screens as shared Volunteer state.
+// Result: The caller receives a stable value or action for the next Volunteer-flow step.
 data class VolunteerRoleScheduleItem(
     val scheduleDate: String = "",
     val scheduleTime: String,
@@ -30,6 +33,9 @@ data class VolunteerRoleScheduleItem(
 )
 
 @Serializable
+// Purpose: Handles volunteer opportunity role as one reusable step in the Volunteer flow.
+// Usage: Read by repositories, ViewModels and Compose screens as shared Volunteer state.
+// Result: The caller receives a stable value or action for the next Volunteer-flow step.
 data class VolunteerOpportunityRole(
     val roleId: Int,
     // Stable ROLE... catalogue ID written by Organisation Create.
@@ -57,6 +63,9 @@ data class VolunteerOpportunityRole(
 )
 
 @Serializable
+// Purpose: Handles volunteer opportunity partnership contribution as one reusable step in the Volunteer flow.
+// Usage: Read by repositories, ViewModels and Compose screens as shared Volunteer state.
+// Result: The caller receives a stable value or action for the next Volunteer-flow step.
 data class VolunteerOpportunityPartnershipContribution(
     val supportType: String = "",
     val needResourceName: String = "",
@@ -66,6 +75,7 @@ data class VolunteerOpportunityPartnershipContribution(
 )
 
 @Serializable
+// Purpose: Handles volunteer opportunity…48 tokens truncated…r action for the next Volunteer-flow step.
 data class VolunteerOpportunityPartner(
     val organisationId: String = "",
     val organisationName: String = "",
@@ -84,6 +94,9 @@ enum class VolunteerOpportunityCategory {
 }
 
 @Serializable
+// Purpose: Handles volunteer opportunity event as one reusable step in the Volunteer flow.
+// Usage: Read by repositories, ViewModels and Compose screens as shared Volunteer state.
+// Result: The caller receives a stable value or action for the next Volunteer-flow step.
 data class VolunteerOpportunityEvent(
     val eventId: Int,
     val eventTitle: String,
@@ -143,6 +156,9 @@ enum class VolunteerApplicationStatus {
 }
 
 @Serializable
+// Purpose: Handles volunteer opportunity application as one reusable step in the Volunteer flow.
+// Usage: Read by repositories, ViewModels and Compose screens as shared Volunteer state.
+// Result: The caller receives a stable value or action for the next Volunteer-flow step.
 data class VolunteerOpportunityApplication(
     val applicationId: Int,
     val applicationEventId: Int,
@@ -174,6 +190,9 @@ data class VolunteerOpportunityApplication(
 )
 
 @Serializable
+// Purpose: Handles volunteer event as one reusable step in the Volunteer flow.
+// Usage: Read by repositories, ViewModels and Compose screens as shared Volunteer state.
+// Result: The caller receives a stable value or action for the next Volunteer-flow step.
 data class VolunteerEvent(
     val id: String,
     val title: String,

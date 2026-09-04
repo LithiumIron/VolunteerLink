@@ -11,6 +11,9 @@ import java.util.Calendar
 import java.util.Locale
 import java.util.TimeZone
 
+// Purpose: Handles the volunteer physical schedule conflict rule in the data layer so screens do not duplicate this business logic.
+// Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+// Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
 data class VolunteerPhysicalScheduleConflict(
     val application: VolunteerOpportunityApplication,
     val event: VolunteerOpportunityEvent,
@@ -22,6 +25,9 @@ data class VolunteerPhysicalScheduleConflict(
     val isAccepted: Boolean
         get() = application.applicationStatus == VolunteerApplicationStatus.ACCEPTED
 
+    // Purpose: Handles the message rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     fun message(): String =
         "This Physical activity overlaps with your ${if (isAccepted) "accepted role" else "pending application"} " +
             "in \"${event.eventTitle}\" on ${VolunteerScheduleText.date(date)}, " +
@@ -39,6 +45,9 @@ object VolunteerPhysicalScheduleConflictEvaluator {
         events: List<VolunteerOpportunityEvent>
     ): Boolean = firstFor(candidateEvent, candidateRole, applications, events) != null
 
+    // Purpose: Handles the first for rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     fun firstFor(
         candidateEvent: VolunteerOpportunityEvent,
         candidateRole: VolunteerOpportunityRole,
@@ -70,6 +79,9 @@ object VolunteerPhysicalScheduleConflictEvaluator {
             .firstOrNull()
     }
 
+    // Purpose: Handles the windows rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     private fun windows(event: VolunteerOpportunityEvent, role: VolunteerOpportunityRole): List<Window> {
         // Role-specific schedule items override the general event schedule.
         val assigned = role.roleScheduleItems.filter {

@@ -15,6 +15,9 @@ import kotlinx.serialization.json.*
 import java.util.UUID
 
 @Serializable
+// Purpose: Handles the volunteer application action result rule in the data layer so screens do not duplicate this business logic.
+// Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+// Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
 data class VolunteerApplicationActionResult(
     val success: Boolean,
     @SerialName("application_status") val status: String? = null,
@@ -27,6 +30,9 @@ object VolunteerApplicationActions {
     private fun preferences(context: Context) = context.getSharedPreferences("volunteer_application_outbox_v1", Context.MODE_PRIVATE)
     private fun key(account: String, post: String) = "$account|$post"
 
+    // Purpose: Handles the submit rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     suspend fun submit(context: Context, post: String, role: String, answers: List<String>,
         previousRole: String?, previousStatus: String?, previousCreatedAt: String?,
         onlineOnly: Boolean): VolunteerApplicationActionResult? = mutex.withLock {
@@ -52,6 +58,9 @@ object VolunteerApplicationActions {
         send(context, account, storageKey, payload)
     }
 
+    // Purpose: Applies the sync data operation and returns only after local/shared state can be updated consistently.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     suspend fun sync(context: Context) = mutex.withLock {
         val account = supabase.auth.currentUserOrNull()?.id ?: return@withLock
         val pending = preferences(context).all.filterKeys { it.startsWith("$account|") }
@@ -62,6 +71,9 @@ object VolunteerApplicationActions {
         }
     }
 
+    // Purpose: Handles the pending applications rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     fun pendingApplications(context: Context, dashboard: VolunteerOpportunityDashboardData): List<com.example.volunteerlink.model.VolunteerOpportunityApplication> {
         val account = supabase.auth.currentUserOrNull()?.id ?: return emptyList()
         return preferences(context).all.filterKeys { it.startsWith("$account|") }.values.mapNotNull { raw ->
@@ -85,6 +97,9 @@ object VolunteerApplicationActions {
         }
     }
 
+    // Purpose: Handles the send rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     private suspend fun send(context: Context, account: String, storageKey: String,
                              payload: JsonObject): VolunteerApplicationActionResult {
         check(VolunteerRemoteSubmissionRepository.readyAccountId() == account) { "Account changed. Reopen your application." }

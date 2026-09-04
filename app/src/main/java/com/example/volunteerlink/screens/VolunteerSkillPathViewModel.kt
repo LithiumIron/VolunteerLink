@@ -10,6 +10,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+// Purpose: Handles volunteer skill path ui state as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 data class VolunteerSkillPathUiState(
     val isLoading: Boolean = true,
     val skillPaths: List<VolunteerSkillPath> =
@@ -38,11 +41,17 @@ class VolunteerSkillPathViewModel : ViewModel() {
         loadSkillPaths()
     }
 
+    // Purpose: Repeats the last failed dashboard load.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     fun retry() {
         // The Retry button uses exactly the same loading path as the first screen visit.
         loadSkillPaths()
     }
 
+    // Purpose: Handles load skill paths as one reusable step in the Volunteer flow.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     private fun loadSkillPaths() {
         viewModelScope.launch {
             // Keep old values only while loading; clear the old error so the UI does not

@@ -16,6 +16,9 @@ data class VolunteerPromotion(
     @SerialName("promotion_start_ms") val promotionStartMillis: Long,
     @SerialName("observed_at_ms") val observedAtMillis: Long
 ) {
+    // Purpose: Handles the is active rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     fun isActive(nowMillis: Long): Boolean =
         postId.isNotBlank() && priorityRank > 0 &&
             promotionStartMillis <= segmentStartMillis &&
@@ -29,6 +32,9 @@ data class VolunteerPromotion(
     }
 }
 
+// Purpose: Handles the volunteer promotion engine rule in the data layer so screens do not duplicate this business logic.
+// Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+// Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
 object VolunteerPromotionEngine {
     /** Input MUST already pass the normal discovery/filter rules. Paid placement cannot bypass them. */
     fun prioritize(
@@ -48,6 +54,9 @@ object VolunteerPromotionEngine {
             })
     }
 
+    // Purpose: Handles the active by post rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     fun activeByPost(promotions: List<VolunteerPromotion>, nowMillis: Long): Map<String, VolunteerPromotion> =
         promotions.filter { it.isActive(nowMillis) }.groupBy { it.postId }
             // A malformed/overlapping response must not give a post two ads or an arbitrary price.

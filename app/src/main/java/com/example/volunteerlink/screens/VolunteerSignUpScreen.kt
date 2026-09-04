@@ -68,6 +68,9 @@ import com.example.volunteerlink.organisation.countryStates
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+// Purpose: Renders the volunteer sign up screen and connects user actions to navigation or its ViewModel.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 fun VolunteerSignUpScreen(
     onBackSelected: () -> Unit,
     onSignedUp: () -> Unit,
@@ -121,6 +124,9 @@ fun VolunteerSignUpScreen(
         }
     }
 
+    // Purpose: Handles begin current location resolution as one reusable step in the Volunteer flow.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     fun beginCurrentLocationResolution() {
         if (!CurrentLocationResolver.isLocationEnabled(locationContext)) {
             isResolvingCurrentLocation = false
@@ -589,6 +595,9 @@ fun VolunteerSignUpScreen(
 }
 
 @Composable
+// Purpose: Handles volunteer field colours as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 internal fun volunteerFieldColours() =
     OutlinedTextFieldDefaults.colors(
         focusedContainerColor = MaterialTheme.colorScheme.surface,

@@ -81,6 +81,9 @@ private data class VolunteerApplicationTimelineStep(
 )
 
 @Composable
+// Purpose: Displays the volunteer application history and applies the selected status or Today filter.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 fun VolunteerMyApplicationsScreen(
     onBackSelected: () -> Unit,
     onVolunteerApplicationSelected: (
@@ -114,6 +117,7 @@ fun VolunteerMyApplicationsScreen(
         VolunteerOpportunitySessionStore
             .volunteerApplications
             .filter { volunteerApplication ->
+                // Choose one mutually exclusive UI result from the current status or user selection.
                 when (selectedStatusFilter) {
                     "Today" -> volunteerApplicationIsRelevantToday(volunteerApplication, businessNow)
                     "Physical Today" -> volunteerApplicationIsPhysicalToday(volunteerApplication, businessNow)
@@ -144,6 +148,7 @@ fun VolunteerMyApplicationsScreen(
                 }
             }
 
+    // Arrange the following screen content vertically inside the available space.
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -165,6 +170,7 @@ fun VolunteerMyApplicationsScreen(
             horizontalArrangement =
                 Arrangement.spacedBy(8.dp)
         ) {
+            // Render one reusable row/card for each item in the prepared list.
             items(
                 items = statusFilters,
                 key = { statusFilter ->
@@ -180,6 +186,7 @@ fun VolunteerMyApplicationsScreen(
                             statusFilter
                     },
                     label = {
+                        // Display the prepared label; business rules are calculated before reaching this UI call.
                         Text(
                             text = statusFilter,
                             fontSize = 11.sp
@@ -202,6 +209,7 @@ fun VolunteerMyApplicationsScreen(
             }
         }
 
+        // Arrange the following controls horizontally and keep their alignment consistent.
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -215,6 +223,7 @@ fun VolunteerMyApplicationsScreen(
             verticalAlignment =
                 Alignment.CenterVertically
         ) {
+            // Display the prepared label; business rules are calculated before reaching this UI call.
             Text(
                 text = "Application history",
                 fontSize = 15.sp,
@@ -222,6 +231,7 @@ fun VolunteerMyApplicationsScreen(
                 color = VolunteerLinkTextPrimary
             )
 
+            // Display the prepared label; business rules are calculated before reaching this UI call.
             Text(
                 text =
                     "${filteredApplications.size} total",
@@ -230,7 +240,9 @@ fun VolunteerMyApplicationsScreen(
             )
         }
 
+        // Check this condition before showing the action, preventing an invalid Volunteer flow from continuing.
         if (filteredApplications.isEmpty()) {
+            // Arrange the following screen content vertically inside the available space.
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -240,6 +252,7 @@ fun VolunteerMyApplicationsScreen(
                 verticalArrangement =
                     Arrangement.Center
             ) {
+                // Display the prepared label; business rules are calculated before reaching this UI call.
                 Text(
                     text = "No applications found",
                     fontSize = 17.sp,
@@ -251,6 +264,7 @@ fun VolunteerMyApplicationsScreen(
                     modifier = Modifier.height(6.dp)
                 )
 
+                // Display the prepared label; business rules are calculated before reaching this UI call.
                 Text(
                     text =
                         "Applications matching this status will appear here.",
@@ -259,6 +273,7 @@ fun VolunteerMyApplicationsScreen(
                 )
             }
         } else {
+            // Render this content as a lazy scrolling list so only visible items need to be composed.
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(
@@ -271,6 +286,7 @@ fun VolunteerMyApplicationsScreen(
                 verticalArrangement =
                     Arrangement.spacedBy(10.dp)
             ) {
+                // Render one reusable row/card for each item in the prepared list.
                 items(
                     items = filteredApplications,
                     key = { volunteerApplication ->
@@ -293,6 +309,9 @@ fun VolunteerMyApplicationsScreen(
 }
 
 @Composable
+// Purpose: Explains one application status, timeline, attendance, submission and certificate actions.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 fun VolunteerApplicationDetailsScreen(
     volunteerApplicationId: Int,
     onBackSelected: () -> Unit,
@@ -323,24 +342,29 @@ fun VolunteerApplicationDetailsScreen(
     var cancellationDetails by rememberSaveable { mutableStateOf("") }
     var formAnswers by remember { mutableStateOf(emptyList<String>()) }
 
+    // Resolve or prepare the application data used by the next status, cancellation or navigation decision.
     val volunteerApplication =
         VolunteerOpportunitySessionStore
             .findApplicationById(
                 volunteerApplicationId
             )
 
+    // Check this condition before showing the action, preventing an invalid Volunteer flow from continuing.
     if (volunteerApplication == null) {
         VolunteerApplicationDetailsNotFoundScreen(
             onBackSelected = onBackSelected
         )
+        // Keep this Compose block separate so its visual state follows the value prepared above.
         return
     }
 
+    // Resolve or prepare event data from the shared dashboard snapshot for this part of the screen.
     val volunteerOpportunityEvent =
         VolunteerOpportunitySessionStore.findEventById(
             volunteerApplication.applicationEventId
         )
 
+    // Resolve or prepare event data from the shared dashboard snapshot for this part of the screen.
     val volunteerOpportunityRole =
         volunteerApplication.applicationRoleId
             ?.let { applicationRoleId ->
@@ -351,6 +375,7 @@ fun VolunteerApplicationDetailsScreen(
                 )
             }
 
+    // Name the calculated phone contact is relevant value because later UI branches reuse it during this Compose pass.
     val phoneContactIsRelevant =
         volunteerApplication.applicationStatus == VolunteerApplicationStatus.ACCEPTED &&
             volunteerOpportunityEvent != null &&
@@ -416,6 +441,7 @@ fun VolunteerApplicationDetailsScreen(
             item(
                 key = "application_information"
             ) {
+                // Resolve or prepare the application data used by the next status, cancellation or navigation decision.
                 val applicationIsRemote =
                     volunteerOpportunityRole?.roleMode == "REMOTE" ||
                             volunteerApplication.applicationRoleMode == "REMOTE" ||
@@ -597,6 +623,7 @@ fun VolunteerApplicationDetailsScreen(
                     ) {
                         OutlinedButton(
                             onClick = {
+                                // Name the calculated questions value because later UI branches reuse it during this Compose pass.
                                 val questions = volunteerOpportunityRole.roleExtraApplicationQuestions
                                 formAnswers = questions.mapIndexed { index, _ ->
                                     volunteerApplication.applicationScreeningAnswers
@@ -804,6 +831,7 @@ fun VolunteerApplicationDetailsScreen(
     }
 
     if (shouldShowEditDialog) {
+        // Name the calculated questions value because later UI branches reuse it during this Compose pass.
         val questions = volunteerOpportunityRole?.roleExtraApplicationQuestions.orEmpty()
         AlertDialog(
             containerColor = Color.White,
@@ -918,6 +946,7 @@ fun VolunteerApplicationDetailsScreen(
     }
 }
 
+// Calculate whether the following UI or action is allowed before it is rendered or executed.
 private val cancellationReasons = listOf(
     "Schedule conflict",
     "Personal or family emergency",
@@ -930,6 +959,9 @@ private val cancellationReasons = listOf(
 )
 
 @Composable
+// Purpose: Handles volunteer applications top bar as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerApplicationsTopBar(
     title: String,
     onBackSelected: () -> Unit
@@ -967,6 +999,9 @@ private fun VolunteerApplicationsTopBar(
 }
 
 @Composable
+// Purpose: Renders the volunteer application list card from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerApplicationListCard(
     volunteerApplication:
     VolunteerOpportunityApplication,
@@ -1079,10 +1114,14 @@ private fun VolunteerApplicationListCard(
 }
 
 @Composable
+// Purpose: Renders the volunteer application status card from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerApplicationStatusCard(
     volunteerApplication:
     VolunteerOpportunityApplication
 ) {
+    // Translate the stored status into the label, colour or action rules shown to the volunteer.
     val statusColour =
         volunteerApplicationStatusColour(
             volunteerApplication.applicationStatus
@@ -1163,10 +1202,14 @@ private fun VolunteerApplicationStatusCard(
 }
 
 @Composable
+// Purpose: Renders the volunteer application timeline card from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerApplicationTimelineCard(
     volunteerApplication:
     VolunteerOpportunityApplication
 ) {
+    // Name the calculated steps value because later UI branches reuse it during this Compose pass.
     val steps =
         volunteerApplicationTimelineSteps(
             volunteerApplication
@@ -1213,10 +1256,14 @@ private fun VolunteerApplicationTimelineCard(
 }
 
 @Composable
+// Purpose: Renders the volunteer application timeline row from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerApplicationTimelineRow(
     step: VolunteerApplicationTimelineStep,
     showConnector: Boolean
 ) {
+    // Choose a visual colour that represents the current status without changing business data.
     val stepColour = when (step.state) {
         "COMPLETE" -> VolunteerLinkSuccess
         "CURRENT" -> VolunteerLinkInformation
@@ -1326,29 +1373,47 @@ private fun VolunteerApplicationTimelineRow(
     }
 }
 
+// Purpose: Checks whether an accepted role has remote work or a physical schedule on the app business date.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun volunteerApplicationIsRelevantToday(application: VolunteerOpportunityApplication, nowMillis: Long): Boolean {
     if (application.applicationStatus != VolunteerApplicationStatus.ACCEPTED) return false
+    // Resolve or prepare event data from the shared dashboard snapshot for this part of the screen.
     val event = VolunteerOpportunitySessionStore.findEventById(application.applicationEventId) ?: return false
+    // Resolve or prepare role data used for eligibility, schedule and application controls.
     val role = application.applicationRoleId?.let { VolunteerOpportunitySessionStore.findRoleById(event.eventId, it) } ?: return false
     return runCatching {
+        // Name the calculated remote value because later UI branches reuse it during this Compose pass.
         val remote = role.roleMode == "REMOTE"
+        // Name the calculated today value because later UI branches reuse it during this Compose pass.
         val today = com.example.volunteerlink.data.VolunteerAttendanceWindow.localDate(
             nowMillis, if (remote) "UTC" else event.eventTimeZone)
+        // Name the calculated start value because later UI branches reuse it during this Compose pass.
         val start = if (remote) event.eventRemoteStartDate else event.eventPhysicalStartDate
+        // Name the calculated end value because later UI branches reuse it during this Compose pass.
         val end = if (remote) event.eventRemoteEndDate else event.eventPhysicalEndDate
+        // Name the calculated assigned dates value because later UI branches reuse it during this Compose pass.
         val assignedDates = role.roleScheduleItems.filter { it.assignedToRole && it.scheduleType == "PHYSICAL" }.map { it.rawDate }
         start.isNotBlank() && end.isNotBlank() && today >= start && today <= end &&
             (remote || assignedDates.isEmpty() || today in assignedDates)
     }.getOrDefault(false)
 }
 
+// Purpose: Keeps the Physical Today filter limited to fixed on-site role schedules.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun volunteerApplicationIsPhysicalToday(application: VolunteerOpportunityApplication, nowMillis: Long): Boolean {
     if (!volunteerApplicationIsRelevantToday(application, nowMillis)) return false
+    // Resolve or prepare event data from the shared dashboard snapshot for this part of the screen.
     val event = VolunteerOpportunitySessionStore.findEventById(application.applicationEventId) ?: return false
+    // Resolve or prepare role data used for eligibility, schedule and application controls.
     val role = application.applicationRoleId?.let { VolunteerOpportunitySessionStore.findRoleById(event.eventId, it) } ?: return false
     return role.roleMode.equals("PHYSICAL", ignoreCase = true)
 }
 
+// Purpose: Builds the ordered submitted, accepted, service and verification steps shown in Application Details.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun volunteerApplicationTimelineSteps(
     application: VolunteerOpportunityApplication
 ): List<VolunteerApplicationTimelineStep> {
@@ -1356,6 +1421,7 @@ private fun volunteerApplicationTimelineSteps(
         VolunteerApplicationTimelineStep("Waiting to sync", "Saved on this device only. Not sent for review; no place is reserved.", "CURRENT"),
         VolunteerApplicationTimelineStep("Server confirmation", "Connect and Sync. Instant Join becomes accepted only after the server confirms a place. Review applications still need organisation approval.", "PENDING")
     )
+    // Name the calculated submitted value because later UI branches reuse it during this Compose pass.
     val submitted =
         VolunteerApplicationTimelineStep(
             title = "Application submitted",
@@ -1477,6 +1543,9 @@ private fun volunteerApplicationTimelineSteps(
 }
 
 @Composable
+// Purpose: Renders the volunteer application information card from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerApplicationInformationCard(
     volunteerApplication:
     VolunteerOpportunityApplication,
@@ -1547,8 +1616,10 @@ private fun VolunteerApplicationInformationCard(
             )
 
             if (eventDate != null || eventTime != null) {
+                // Name the calculated schedule text value because later UI branches reuse it during this Compose pass.
                 val scheduleText =
                     if (applicationIsRemote) {
+                        // Name the calculated end date value because later UI branches reuse it during this Compose pass.
                         val endDate = eventEndDate
                             ?.takeUnless { it == eventDate }
                         listOfNotNull(eventDate, endDate)
@@ -1638,8 +1709,13 @@ private fun VolunteerApplicationInformationCard(
     }
 }
 
+// Purpose: Converts verified minutes into a readable hours-and-minutes label.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun formatVerifiedServiceTime(minutes: Int): String {
+    // Name the calculated hours value because later UI branches reuse it during this Compose pass.
     val hours = minutes / 60
+    // Name the calculated remaining minutes value because later UI branches reuse it during this Compose pass.
     val remainingMinutes = minutes % 60
     return when {
         hours == 0 -> "$remainingMinutes minutes"
@@ -1649,6 +1725,9 @@ private fun formatVerifiedServiceTime(minutes: Int): String {
 }
 
 @Composable
+// Purpose: Renders the volunteer application information row from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerApplicationInformationRow(
     label: String,
     value: String
@@ -1677,9 +1756,13 @@ private fun VolunteerApplicationInformationRow(
 }
 
 @Composable
+// Purpose: Renders the volunteer application status badge from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerApplicationStatusBadge(
     applicationStatus: VolunteerApplicationStatus
 ) {
+    // Translate the stored status into the label, colour or action rules shown to the volunteer.
     val statusColour =
         volunteerApplicationStatusColour(
             applicationStatus
@@ -1705,6 +1788,9 @@ private fun VolunteerApplicationStatusBadge(
     }
 }
 
+// Purpose: Handles volunteer application status text as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun volunteerApplicationStatusText(
     applicationStatus: VolunteerApplicationStatus
 ): String {
@@ -1729,6 +1815,9 @@ private fun volunteerApplicationStatusText(
     }
 }
 
+// Purpose: Handles volunteer application status colour as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun volunteerApplicationStatusColour(
     applicationStatus: VolunteerApplicationStatus
 ): Color {
@@ -1754,6 +1843,9 @@ private fun volunteerApplicationStatusColour(
 }
 
 @Composable
+// Purpose: Renders the volunteer application details not found screen and connects user actions to navigation or its ViewModel.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerApplicationDetailsNotFoundScreen(
     onBackSelected: () -> Unit
 ) {
@@ -1792,6 +1884,9 @@ private fun VolunteerApplicationDetailsNotFoundScreen(
 }
 
 @Composable
+// Purpose: Renders the volunteer application event phone contact card from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerApplicationEventPhoneContactCard(
     organisationName: String,
     phoneContactState: VolunteerEventPhoneContactUiState,
@@ -1833,6 +1928,7 @@ private fun VolunteerApplicationEventPhoneContactCard(
                 )
             }
 
+            // Translate the stored status into the label, colour or action rules shown to the volunteer.
             val statusText = when {
                 phoneContactState.isLoading -> "Checking contact permission..."
                 phoneContactState.errorMessage != null -> phoneContactState.errorMessage

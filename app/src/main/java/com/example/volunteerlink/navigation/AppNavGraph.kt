@@ -19,6 +19,9 @@ import com.example.volunteerlink.screens.VolunteerSignUpScreen
  * Supabase Auth screen before reaching their respective module.
  */
 @Composable
+// Purpose: Handles app nav graph as one reusable step in the Volunteer flow.
+// Usage: Used by the app navigation graph when the volunteer opens, returns from, or switches a destination.
+// Navigation effect: Route arguments identify the selected event, role, application or certificate.
 fun AppNavGraph(
     navController: NavHostController = rememberNavController()
 ) {

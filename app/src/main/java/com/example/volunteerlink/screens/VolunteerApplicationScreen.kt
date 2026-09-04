@@ -70,6 +70,9 @@ import com.example.volunteerlink.ui.theme.VolunteerLinkTextSecondary
 import com.example.volunteerlink.ui.theme.VolunteerLinkWarning
 
 @Composable
+// Purpose: Controls the application form, profile preview, submission request and success result.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 fun VolunteerApplicationScreen(
     volunteerEventId: Int,
     volunteerRoleId: Int,
@@ -89,6 +92,7 @@ fun VolunteerApplicationScreen(
             volunteerEventId
         )
 
+    // Resolve or prepare event data from the shared dashboard snapshot for this part of the screen.
     val volunteerOpportunityRole =
         VolunteerOpportunitySessionStore.findRoleById(
             eventId = volunteerEventId,
@@ -103,6 +107,7 @@ fun VolunteerApplicationScreen(
         VolunteerApplicationNotFoundScreen(
             onBackSelected = onBackSelected
         )
+        // Keep this Compose block separate so its visual state follows the value prepared above.
         return
     }
 
@@ -120,6 +125,7 @@ fun VolunteerApplicationScreen(
         mutableStateOf<List<String>?>(null)
     }
 
+    // Resolve or prepare the application data used by the next status, cancellation or navigation decision.
     val existingApplication =
         VolunteerOpportunitySessionStore
             .volunteerApplications
@@ -162,7 +168,9 @@ fun VolunteerApplicationScreen(
         }
 
         else -> {
+            // Name the calculated answers to review value because later UI branches reuse it during this Compose pass.
             val answersToReview = reviewAnswers
+            // Check this condition before showing the action, preventing an invalid Volunteer flow from continuing.
             if (answersToReview != null) {
                 // The preview is a confirmation step; it does not submit until Confirm is pressed.
                 VolunteerApplicationPreviewDialog(
@@ -199,6 +207,9 @@ fun VolunteerApplicationScreen(
 }
 
 @Composable
+// Purpose: Renders the volunteer application form screen and connects user actions to navigation or its ViewModel.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerApplicationFormScreen(
     volunteerOpportunityEvent:
     VolunteerOpportunityEvent,
@@ -209,6 +220,7 @@ private fun VolunteerApplicationFormScreen(
     serverErrorMessage: String?,
     onApplicationSubmitted: (List<String>) -> Unit
 ) {
+    // Name the calculated extra questions value because later UI branches reuse it during this Compose pass.
     val extraQuestions =
         volunteerOpportunityRole
             .roleExtraApplicationQuestions
@@ -237,18 +249,21 @@ private fun VolunteerApplicationFormScreen(
         mutableStateOf<String?>(null)
     }
 
+    // Resolve or prepare the application data used by the next status, cancellation or navigation decision.
     val applicationNeedsAdditionalForm =
         volunteerOpportunityRole
             .roleApplicationFlow ==
                 VolunteerRoleApplicationFlow
                     .ADDITIONAL_FORM
 
+    // Resolve or prepare the application data used by the next status, cancellation or navigation decision.
     val applicationIsInstantJoin =
         volunteerOpportunityRole
             .roleApplicationMethod ==
                 VolunteerRoleApplicationMethod
                     .INSTANT_JOIN
 
+    // Arrange the following screen content vertically inside the available space.
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -265,6 +280,7 @@ private fun VolunteerApplicationFormScreen(
                 onBackSelected
         )
 
+        // Arrange the following screen content vertically inside the available space.
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -291,8 +307,10 @@ private fun VolunteerApplicationFormScreen(
                 modifier = Modifier.height(20.dp)
             )
 
+            // Display the prepared label; business rules are calculated before reaching this UI call.
             Text(
                 text =
+                    // Check this condition before showing the action, preventing an invalid Volunteer flow from continuing.
                     if (
                         applicationNeedsAdditionalForm
                     ) {
@@ -309,8 +327,10 @@ private fun VolunteerApplicationFormScreen(
                 modifier = Modifier.height(5.dp)
             )
 
+            // Display the prepared label; business rules are calculated before reaching this UI call.
             Text(
                 text =
+                    // Check this condition before showing the action, preventing an invalid Volunteer flow from continuing.
                     if (
                         applicationNeedsAdditionalForm
                     ) {
@@ -318,6 +338,7 @@ private fun VolunteerApplicationFormScreen(
                                 "additional information before " +
                                 "reviewing your application."
                     } else {
+                        // Check this condition before showing the action, preventing an invalid Volunteer flow from continuing.
                         if (applicationIsInstantJoin) {
                             "This role supports instant joining. " +
                                     "Confirm your availability to secure the role."
@@ -330,6 +351,7 @@ private fun VolunteerApplicationFormScreen(
                 color = VolunteerLinkTextSecondary
             )
 
+            // Check this condition before showing the action, preventing an invalid Volunteer flow from continuing.
             if (applicationNeedsAdditionalForm) {
                 Spacer(
                     modifier = Modifier.height(16.dp)
@@ -340,6 +362,7 @@ private fun VolunteerApplicationFormScreen(
                             questionIndex,
                             applicationQuestion ->
 
+                        // Display the prepared label; business rules are calculated before reaching this UI call.
                         Text(
                             text =
                                 "${questionIndex + 1}. " +
@@ -357,6 +380,7 @@ private fun VolunteerApplicationFormScreen(
                                 Modifier.height(7.dp)
                         )
 
+                        // Display an editable Compose field and send each value change back to screen state.
                         OutlinedTextField(
                             value =
                                 questionAnswers[
@@ -365,6 +389,7 @@ private fun VolunteerApplicationFormScreen(
                             onValueChange = {
                                     updatedAnswer ->
 
+                                // Name the calculated updated answers value because later UI branches reuse it during this Compose pass.
                                 val updatedAnswers =
                                     ArrayList(
                                         questionAnswers
@@ -383,6 +408,7 @@ private fun VolunteerApplicationFormScreen(
                             modifier =
                                 Modifier.fillMaxWidth(),
                             placeholder = {
+                                // Display the prepared label; business rules are calculated before reaching this UI call.
                                 Text(
                                     text =
                                         "Enter your answer",
@@ -419,6 +445,7 @@ private fun VolunteerApplicationFormScreen(
                     modifier = Modifier.height(16.dp)
                 )
 
+                // Group the related information and actions into one readable Volunteer UI card.
                 Card(
                     modifier =
                         Modifier.fillMaxWidth(),
@@ -437,10 +464,12 @@ private fun VolunteerApplicationFormScreen(
                                     .copy(alpha = 0.25f)
                         )
                 ) {
+                    // Arrange the following screen content vertically inside the available space.
                     Column(
                         modifier =
                             Modifier.padding(15.dp)
                     ) {
+                        // Display the prepared label; business rules are calculated before reaching this UI call.
                         Text(
                             text =
                                 "What happens after submission?",
@@ -456,8 +485,10 @@ private fun VolunteerApplicationFormScreen(
                                 Modifier.height(7.dp)
                         )
 
+                        // Display the prepared label; business rules are calculated before reaching this UI call.
                         Text(
                             text =
+                                // Check this condition before showing the action, preventing an invalid Volunteer flow from continuing.
                                 if (applicationIsInstantJoin) {
                                     "Your place will be confirmed immediately. " +
                                             "The role will appear in My Applications."
@@ -481,6 +512,7 @@ private fun VolunteerApplicationFormScreen(
                 )
             }
 
+            // Group the related information and actions into one readable Volunteer UI card.
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -496,6 +528,7 @@ private fun VolunteerApplicationFormScreen(
                             VolunteerLinkBorderColour
                     )
             ) {
+                // Arrange the following controls horizontally and keep their alignment consistent.
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -527,6 +560,7 @@ private fun VolunteerApplicationFormScreen(
                             )
                     )
 
+                    // Display the prepared label; business rules are calculated before reaching this UI call.
                     Text(
                         text =
                             "I confirm that the information " +
@@ -550,6 +584,7 @@ private fun VolunteerApplicationFormScreen(
                             Modifier.height(10.dp)
                     )
 
+                    // Display the prepared label; business rules are calculated before reaching this UI call.
                     Text(
                         text = errorMessage,
                         fontSize = 12.sp,
@@ -565,6 +600,7 @@ private fun VolunteerApplicationFormScreen(
                         modifier = Modifier.height(10.dp)
                     )
 
+                    // Display the prepared label; business rules are calculated before reaching this UI call.
                     Text(
                         text = errorMessage,
                         fontSize = 12.sp,
@@ -583,8 +619,10 @@ private fun VolunteerApplicationFormScreen(
             color = VolunteerLinkSurface,
             shadowElevation = 8.dp
         ) {
+            // Connect this visible button to the callback supplied by the parent screen or navigation host.
             Button(
                 onClick = {
+                    // Calculate whether the following UI or action is allowed before it is rendered or executed.
                     val hasEmptyRequiredAnswer =
                         applicationNeedsAdditionalForm &&
                                 questionAnswers.any {
@@ -606,6 +644,7 @@ private fun VolunteerApplicationFormScreen(
                             else -> null
                         }
 
+                    // Check this condition before showing the action, preventing an invalid Volunteer flow from continuing.
                     if (
                         validationErrorMessage == null
                     ) {
@@ -637,6 +676,7 @@ private fun VolunteerApplicationFormScreen(
                     ),
                 enabled = !isSubmitting
             ) {
+                // Display the prepared label; business rules are calculated before reaching this UI call.
                 Text(
                     text =
                         if (isSubmitting) {
@@ -655,6 +695,9 @@ private fun VolunteerApplicationFormScreen(
 }
 
 @Composable
+// Purpose: Handles volunteer application top bar as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerApplicationTopBar(
     applicationNeedsAdditionalForm: Boolean,
     applicationIsInstantJoin: Boolean,
@@ -705,6 +748,9 @@ private fun VolunteerApplicationTopBar(
 }
 
 @Composable
+// Purpose: Handles volunteer application role summary as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerApplicationRoleSummary(
     volunteerOpportunityEvent:
     VolunteerOpportunityEvent,
@@ -851,6 +897,9 @@ private fun VolunteerApplicationRoleSummary(
 }
 
 @Composable
+// Purpose: Renders the volunteer application success screen and connects user actions to navigation or its ViewModel.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerApplicationSuccessScreen(
     volunteerOpportunityEvent:
     VolunteerOpportunityEvent,
@@ -858,6 +907,7 @@ private fun VolunteerApplicationSuccessScreen(
     VolunteerOpportunityRole,
     onReturnHomeSelected: () -> Unit
 ) {
+    // Resolve or prepare the application data used by the next status, cancellation or navigation decision.
     val applicationIsInstantJoin =
         volunteerOpportunityRole
             .roleApplicationMethod ==
@@ -989,6 +1039,9 @@ private fun VolunteerApplicationSuccessScreen(
 }
 
 @Composable
+// Purpose: Renders the volunteer existing application screen and connects user actions to navigation or its ViewModel.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerExistingApplicationScreen(
     volunteerOpportunityEvent:
     VolunteerOpportunityEvent,
@@ -999,6 +1052,7 @@ private fun VolunteerExistingApplicationScreen(
     onBackSelected: () -> Unit,
     onReturnHomeSelected: () -> Unit
 ) {
+    // Translate the stored status into the label, colour or action rules shown to the volunteer.
     val statusText =
         when (
             volunteerApplication.applicationStatus
@@ -1022,6 +1076,7 @@ private fun VolunteerExistingApplicationScreen(
                 "Cancelled"
         }
 
+    // Translate the stored status into the label, colour or action rules shown to the volunteer.
     val statusColour =
         when (
             volunteerApplication.applicationStatus
@@ -1281,6 +1336,9 @@ private fun VolunteerExistingApplicationScreen(
 }
 
 @Composable
+// Purpose: Renders the volunteer application not found screen and connects user actions to navigation or its ViewModel.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerApplicationNotFoundScreen(
     onBackSelected: () -> Unit
 ) {
