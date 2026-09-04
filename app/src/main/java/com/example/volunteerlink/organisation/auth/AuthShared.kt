@@ -30,21 +30,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-// =====================================================================
-// Everything on this file is shared by BOTH VolunteerSignUpScreen and
-// OrganisationSignUpScreen. Previously each screen had its own private
-// copy of the field colours and the OTP verification composable — those
-// copies were identical (or near-identical), so this is now the single
-// source of truth both screens import instead of duplicating.
-// =====================================================================
-
-
-// ---------------------------------------------------------------------
-// FIELD COLOURS
-// ---------------------------------------------------------------------
-// Replaces the old per-screen organisationFieldColours() /
-// volunteerFieldColours() — both had the exact same colour values.
-
 @Composable
 fun authFieldColours() =
     OutlinedTextFieldDefaults.colors(

@@ -8,7 +8,7 @@ import kotlinx.serialization.json.Json
 import java.net.HttpURLConnection
 import java.net.URL
 
-/** A GPS fix matched against VolunteerLink's own countryStates dropdown data. */
+// Stores the country, state or region, and city matched from the GPS location.
 data class GeoapifyLocationMatch(
     val country: String,
     val stateRegion: String,
@@ -17,12 +17,6 @@ data class GeoapifyLocationMatch(
 
 object GeoapifyReverseGeocoder {
 
-    /**
-     * Reverse-geocodes lat/lon via Geoapify, then tries to match the result
-     * against [countryStates]. Returns null on any API failure OR when
-     * nothing in the response matches an existing entry — callers must
-     * fall back to manual selection rather than accept an unmatched value.
-     */
     suspend fun matchToKnownLocation(
         apiKey: String,
         latitude: Double,
@@ -30,6 +24,7 @@ object GeoapifyReverseGeocoder {
         countryStates: Map<String, Map<String, List<String>>>
     ): GeoapifyLocationMatch? = withContext(Dispatchers.IO) {
         try {
+            // Builds the Geoapify reverse-geocoding API URL using the GPS coordinates.
             val url = URL(
                 "https://api.geoapify.com/v1/geocode/reverse" +
                         "?lat=$latitude&lon=$longitude&apiKey=${Uri.encode(apiKey)}"
@@ -40,6 +35,7 @@ object GeoapifyReverseGeocoder {
             connection.connectTimeout = 10_000
             connection.readTimeout = 10_000
 
+            // Stores the API response body after a successful request.
             val body = try {
                 if (connection.responseCode !in 200..299) return@withContext null
                 connection.inputStream.bufferedReader().use { it.readText() }
@@ -47,9 +43,11 @@ object GeoapifyReverseGeocoder {
                 connection.disconnect()
             }
 
+            // Converts the JSON response into a Geoapify response object.
             val parsed = Json { ignoreUnknownKeys = true }
                 .decodeFromString<GeoapifyReverseResponse>(body)
 
+            // Retrieves the first location feature from the API response.
             val properties = parsed.features.firstOrNull()?.properties
                 ?: return@withContext null
 
@@ -64,6 +62,7 @@ object GeoapifyReverseGeocoder {
         properties: GeoapifyProperties,
         countryStates: Map<String, Map<String, List<String>>>
     ): GeoapifyLocationMatch? {
+        // Collects possible city or area names returned by Geoapify.
         val candidateCities = listOfNotNull(
             properties.city, properties.county, properties.suburb, properties.district
         )
@@ -90,12 +89,15 @@ object GeoapifyReverseGeocoder {
     }
 }
 
+// Stores the list of reverse-geocoding features returned by Geoapify
 @Serializable
 private data class GeoapifyReverseResponse(val features: List<GeoapifyFeature> = emptyList())
 
+// Stores the location properties returned for a Geoapify result.
 @Serializable
 private data class GeoapifyFeature(val properties: GeoapifyProperties)
 
+// Stores the country, state and possible city names returned by Geoapify.
 @Serializable
 private data class GeoapifyProperties(
     val country: String? = null,

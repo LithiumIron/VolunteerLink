@@ -30,11 +30,6 @@ import com.example.volunteerlink.ui.theme.VolunteerLinkPrimaryGreen
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextPrimary
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextSecondary
 
-/**
- * Temporary first screen used before login/account routing is implemented.
- *
- * It only decides which side of VolunteerLink to open. It is not a login page.
- */
 @Composable
 fun UserTypeSelectionScreen(
     onVolunteerClick: () -> Unit,
@@ -44,7 +39,6 @@ fun UserTypeSelectionScreen(
         modifier = Modifier.fillMaxSize(),
         color = VolunteerLinkBackground
     ) {
-        // The page has a fixed amount of content, so a normal Column is enough.
         Column(
             modifier = Modifier
                 .fillMaxSize()

@@ -23,19 +23,13 @@ object CurrentLocationResolver {
                 ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
                 PackageManager.PERMISSION_GRANTED
 
+    // Checks whether location services are enabled on the device.
     fun isLocationEnabled(context: Context): Boolean {
         val manager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
         return LocationManagerCompat.isLocationEnabled(manager)
     }
 
-    /**
-     * Same GPS fetch as MapScreen (VolunteerMapLocationRequest), followed by
-     * a Geoapify reverse-geocode + countryStates match. onOutcome is always
-     * called exactly once — with a match, or null match + a message
-     * explaining why (permission/GPS/no-match), so the caller can fall back
-     * to manual selection. Returns a cancel function, same contract as
-     * VolunteerMapLocationRequest.start().
-     */
+    // Resolves the current device location and matches it to a supported country, state and city
     fun resolve(
         context: Context,
         countryStates: Map<String, Map<String, List<String>>>,

@@ -157,7 +157,7 @@ fun VolunteerSettingsScreen(
             SettingsRow(
                 icon = Icons.Filled.Person,
                 title = "Edit Profile",
-                subtitle = "Name, phone, bio, availability",
+                subtitle = "Name, phone, bio, email",
                 onClick = onEditProfileSelected
             )
 

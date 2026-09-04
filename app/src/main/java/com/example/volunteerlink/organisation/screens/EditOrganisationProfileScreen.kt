@@ -71,28 +71,19 @@ import com.example.volunteerlink.shared.countryStates
 import com.example.volunteerlink.shared.isValidAuthPhoneNumber
 import kotlinx.coroutines.launch
 
-// ENTER_EMAIL -> user types the new address, we call requestEmailChange().
-// ENTER_CODE -> user types the OTP that email contained, we call
-// verifyEmailChangeOtp(). No more polling/waiting on a clicked link.
+// Tracks the current step of changing the login email.
 private enum class EmailChangeStep { NONE, ENTER_EMAIL, ENTER_CODE }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditOrganisationProfileScreen(
     onBack: () -> Unit = {},
-    // Called after a successful save. Clears the cached profileData in
-    // OrganisationSessionStore so OrganisationProfileScreen refetches
-    // instead of showing the pre-edit values after navigating back.
     onSaved: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    // OrganisationProfileScreen loads the profile into
-    // OrganisationSessionStore and blocks its own UI (including the edit
-    // icon) until that finishes — so by the time this screen is reachable,
-    // the cache is already populated. Reading it directly here means no
-    // second fetch and no second spinner on tapping edit.
+    // Get the cached organisation profile to pre-fill the edit fields.
     val cachedProfile = OrganisationSessionStore.profileData
 
     var isSaving by remember { mutableStateOf(false) }
@@ -543,6 +534,7 @@ fun EditOrganisationProfileScreen(
                     onDispose { cancelCurrentLocationRequest?.invoke() }
                 }
 
+                // Resolves the user's current location and updates the location fields.
                 fun beginCurrentLocationResolution() {
                     if (!CurrentLocationResolver.isLocationEnabled(context)) {
                         isResolvingCurrentLocation = false
@@ -567,6 +559,7 @@ fun EditOrganisationProfileScreen(
                     }
                 }
 
+                // Handles the result of the location permission request.
                 val currentLocationPermissionLauncher = rememberLauncherForActivityResult(
                     ActivityResultContracts.RequestMultiplePermissions()
                 ) { permissions ->
@@ -614,8 +607,7 @@ fun EditOrganisationProfileScreen(
 
                 Spacer(Modifier.height(8.dp))
 
-                // LOCATION (tap to open cascading picker — same pattern
-                // and same countryStates data as the sign-up screen)
+                // location
                 Box {
                     OutlinedTextField(
                         value = when {
