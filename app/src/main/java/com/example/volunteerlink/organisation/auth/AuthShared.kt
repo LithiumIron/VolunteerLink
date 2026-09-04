@@ -201,28 +201,6 @@ val countryCallingCodes = mapOf(
     "Germany" to "+49"
 )
 
-fun updateCountryPhoneCode(
-    phone: String,
-    oldCountry: String,
-    newCountry: String
-): String {
-    val newCode = countryCallingCodes[newCountry] ?: return phone
-    val oldCode = countryCallingCodes[oldCountry]
-
-    return when {
-        phone.isBlank() -> {
-            "$newCode "
-        }
-
-        oldCode != null && phone.startsWith(oldCode) -> {
-            newCode + phone.removePrefix(oldCode)
-        }
-
-        else -> {
-            "$newCode $phone"
-        }
-    }
-}
 
 val OrganisationTypeOptions = listOf(
     "Registered NGO",

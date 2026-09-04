@@ -58,21 +58,6 @@ object VolunteerProfileRepository {
     }
 
 
-    suspend fun confirmEmailChange(newEmail: String, otpCode: String): Boolean {
-        return try {
-            supabase.auth.verifyEmailOtp(
-                type = OtpType.Email.EMAIL_CHANGE,
-                email = newEmail.trim(),
-                token = otpCode.trim()
-            )
-            runCatching { supabase.auth.refreshCurrentSession() }
-            true
-        } catch (e: Exception) {
-            e.printStackTrace()
-            false
-        }
-    }
-
     suspend fun loadProfile():  VolunteerProfileData? {
         val currentUser = supabase.auth.currentUserOrNull() ?: return null
 

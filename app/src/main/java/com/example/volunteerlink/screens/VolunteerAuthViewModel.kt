@@ -6,7 +6,6 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.volunteerlink.data.supabase
 import com.example.volunteerlink.shared.isValidAuthPhoneNumber
-import com.google.i18n.phonenumbers.PhoneNumberUtil
 import io.github.jan.supabase.auth.OtpType
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email

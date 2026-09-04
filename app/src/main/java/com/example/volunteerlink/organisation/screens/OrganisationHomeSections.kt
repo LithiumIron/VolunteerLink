@@ -38,7 +38,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.volunteerlink.R
-import com.example.volunteerlink.data.post.PostTimingState
 import com.example.volunteerlink.organisation.components.OrganisationDivider
 import com.example.volunteerlink.organisation.components.OrganisationInfoStrip
 import com.example.volunteerlink.organisation.components.OrganisationMetric
