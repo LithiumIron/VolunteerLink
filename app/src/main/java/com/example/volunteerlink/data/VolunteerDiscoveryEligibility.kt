@@ -30,6 +30,12 @@ object VolunteerDiscoveryEligibility {
         !hasParticipation(event.eventId, applications) &&
             VolunteerApplicationWindow.canApply(event, role, nowMillis) &&
             role.roleVacancies > 0 &&
+            !VolunteerPhysicalScheduleConflictEvaluator.hasConflict(
+                candidateEvent = event,
+                candidateRole = role,
+                applications = applications,
+                events = VolunteerOpportunitySessionStore.volunteerOpportunityEvents
+            ) &&
             applications.none {
                 it.applicationEventId == event.eventId &&
                     it.applicationRoleId == role.roleId &&

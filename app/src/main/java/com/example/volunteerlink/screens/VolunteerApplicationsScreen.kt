@@ -95,6 +95,7 @@ fun VolunteerMyApplicationsScreen(
         listOf(
             "All",
             "Today",
+            "Physical Today",
             "Waiting to sync",
             "Pending",
             "Accepted",
@@ -110,6 +111,7 @@ fun VolunteerMyApplicationsScreen(
             .filter { volunteerApplication ->
                 when (selectedStatusFilter) {
                     "Today" -> volunteerApplicationIsRelevantToday(volunteerApplication, businessNow)
+                    "Physical Today" -> volunteerApplicationIsPhysicalToday(volunteerApplication, businessNow)
                     "Waiting to sync" -> volunteerApplication.applicationDatabaseId.startsWith("offline|")
                     "Cancelled" -> volunteerApplication.applicationStatus == VolunteerApplicationStatus.CANCELLED
                     "Pending" ->
@@ -431,7 +433,7 @@ fun VolunteerApplicationDetailsScreen(
                     eventTime =
                         if (applicationIsRemote) "See submission deadline below" else
                             volunteerOpportunityEvent?.let {
-                                "${com.example.volunteerlink.data.VolunteerScheduleText.time(it.eventPhysicalStartTime)} ΓÇô " +
+                                "${com.example.volunteerlink.data.VolunteerScheduleText.time(it.eventPhysicalStartTime)} - " +
                                     "${com.example.volunteerlink.data.VolunteerScheduleText.time(it.eventPhysicalEndTime)}"
                             } ?: volunteerApplication.applicationEventTime,
                     eventLocation =
@@ -1061,7 +1063,7 @@ private fun VolunteerApplicationListCard(
                 )
 
                 Text(
-                    text = "View  ΓÇ║",
+                    text = "View details",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     color = VolunteerLinkPrimaryGreen
@@ -1245,7 +1247,7 @@ private fun VolunteerApplicationTimelineRow(
                         Text(
                             text =
                                 if (step.state == "ERROR") "!"
-                                else "ΓÇó",
+                                else "•",
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
                             color =
@@ -1333,6 +1335,13 @@ private fun volunteerApplicationIsRelevantToday(application: VolunteerOpportunit
         start.isNotBlank() && end.isNotBlank() && today >= start && today <= end &&
             (remote || assignedDates.isEmpty() || today in assignedDates)
     }.getOrDefault(false)
+}
+
+private fun volunteerApplicationIsPhysicalToday(application: VolunteerOpportunityApplication, nowMillis: Long): Boolean {
+    if (!volunteerApplicationIsRelevantToday(application, nowMillis)) return false
+    val event = VolunteerOpportunitySessionStore.findEventById(application.applicationEventId) ?: return false
+    val role = application.applicationRoleId?.let { VolunteerOpportunitySessionStore.findRoleById(event.eventId, it) } ?: return false
+    return role.roleMode.equals("PHYSICAL", ignoreCase = true)
 }
 
 private fun volunteerApplicationTimelineSteps(
@@ -1541,7 +1550,7 @@ private fun VolunteerApplicationInformationCard(
                             .joinToString(" - ")
                     } else {
                         listOfNotNull(eventDate, eventEndDate?.takeUnless { it == eventDate })
-                            .joinToString(" ΓÇô ") + (eventTime?.let { "\nCheck-in hours: $it" } ?: "")
+                            .joinToString(" - ") + (eventTime?.let { "\nCheck-in hours: $it" } ?: "")
                     }
                 VolunteerApplicationInformationRow(
                     label = "Work period",
@@ -1855,4 +1864,3 @@ private fun VolunteerApplicationEventPhoneContactCard(
         }
     }
 }
-

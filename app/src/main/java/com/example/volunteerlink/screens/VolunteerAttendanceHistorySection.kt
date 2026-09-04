@@ -60,9 +60,13 @@ internal fun VolunteerAttendanceHistorySection(event: VolunteerOpportunityEvent,
                     VolunteerDetailText("Recorded: ${VolunteerAttendanceHistory.recordedTime(day.recordedAt, event.eventTimeZone)}", secondary = true)
                 }
                 if (day.ended && day.state in setOf(VolunteerAttendanceDayState.NO_RECORD, VolunteerAttendanceDayState.ABSENT)) {
-                    VolunteerDetailText("In-app attendance review is not available yet. Contact the organiser for help.", secondary = true)
-                    TextButton(onClick = { onHelp(day.date) }, contentPadding = PaddingValues(vertical = 0.dp),
-                        colors = ButtonDefaults.textButtonColors(contentColor = VolunteerLinkPrimaryGreen)) { Text("Contact organiser", fontSize = 14.sp) }
+                    if (day.withinReviewWindow) {
+                        VolunteerDetailText("No check-in was recorded. Contact the organiser within 48 hours if this is an attendance error.", secondary = true)
+                        TextButton(onClick = { onHelp(day.date) }, contentPadding = PaddingValues(vertical = 0.dp),
+                            colors = ButtonDefaults.textButtonColors(contentColor = VolunteerLinkPrimaryGreen)) { Text("Contact organiser", fontSize = 14.sp) }
+                    } else {
+                        VolunteerDetailText("Review window closed. Only the organiser can correct an attendance error.", secondary = true)
+                    }
                 }
             }
         }

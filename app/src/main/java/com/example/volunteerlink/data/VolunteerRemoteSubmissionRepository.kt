@@ -53,11 +53,12 @@ object VolunteerRemoteFileRules {
         "xls" to "application/vnd.ms-excel",
         "xlsx" to "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "ppt" to "application/vnd.ms-powerpoint",
-        "pptx" to "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        "pptx" to "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "txt" to "text/plain", "zip" to "application/zip"
     )
 
     fun mimeType(name: String): String = mimeTypes[name.substringAfterLast('.', "").lowercase(Locale.ROOT)]
-        ?: throw IllegalArgumentException("Choose a PDF, JPG, PNG, Word, Excel or PowerPoint file.")
+        ?: throw IllegalArgumentException("Choose a PDF, image, Word, Excel, PowerPoint, TXT or ZIP file.")
 
     fun checkSize(bytes: Long) {
         require(bytes > 0) { "The selected file is empty." }

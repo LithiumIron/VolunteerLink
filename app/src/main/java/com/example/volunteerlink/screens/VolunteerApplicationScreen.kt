@@ -800,7 +800,7 @@ private fun VolunteerApplicationRoleSummary(
 
             Text(
                 text =
-                    "${volunteerOpportunityEvent.eventDate}  ΓÇó  " +
+                    "${volunteerOpportunityEvent.eventDate} - " +
                             volunteerOpportunityEvent
                                 .eventTime,
                 fontSize = 11.sp,
@@ -1311,4 +1311,3 @@ private fun VolunteerApplicationNotFoundScreen(
         }
     }
 }
-
