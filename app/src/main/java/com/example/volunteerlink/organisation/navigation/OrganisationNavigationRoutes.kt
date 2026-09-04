@@ -30,6 +30,15 @@ object OrganisationNavigationRoutes {
         "organisation_create_from_impact_weave/{impactWeaveDraftId}"
     const val CHATS = "organisation_chats"
     const val CHAT_ID_ARGUMENT = "chatId"
+    const val PARENT_CHAT_ID_ARGUMENT = "parentChatId"
+
+    const val CREATE_EVENT_CHAT_GROUP =
+        "organisation_create_event_chat_group/{$PARENT_CHAT_ID_ARGUMENT}"
+
+    fun createEventChatGroup(
+        parentChatId: String
+    ): String =
+        "organisation_create_event_chat_group/$parentChatId"
 
     const val CHAT_ROOM =
         "organisation_chat_room/{$CHAT_ID_ARGUMENT}"

@@ -599,6 +599,39 @@ fun VolunteerOpportunityNavigationHost(
                                     launchSingleTop = true
                                 }
                         },
+
+                        onJoinGroupChat = { postId ->
+                            val chatId =
+                                SupabaseChatRepository.joinMyInstantEventChat(postId)
+
+                            val loaded =
+                                SupabaseChatRepository.loadForSignedInUser(
+                                    viewerRole = Role.APPLICANT
+                                )
+
+                            ChatData.currentRole.value = Role.APPLICANT
+
+                            ChatData.updateSignedInProfile(
+                                role = Role.APPLICANT,
+                                profile = loaded.profile
+                            )
+
+                            ChatData.replaceChats(loaded.chats)
+
+                            volunteerNavigationController.navigate(
+                                VolunteerOpportunityNavigationRoutes
+                                    .createVolunteerChatRoomRoute(chatId)
+                            ) {
+                                popUpTo(
+                                    VolunteerOpportunityNavigationRoutes
+                                        .VOLUNTEER_HOME_ROUTE
+                                ) {
+                                    inclusive = false
+                                }
+
+                                launchSingleTop = true
+                            }
+                        },
                         volunteerOpportunityViewModel =
                             volunteerOpportunityViewModel
                     )

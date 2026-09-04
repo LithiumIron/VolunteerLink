@@ -62,6 +62,7 @@ import com.example.volunteerlink.organisation.screens.OrganisationViewPartnerPro
 import com.example.volunteerlink.organisation.screens.OrganisationViewVolunteerProfileScreen
 import com.example.volunteerlink.organisation.screens.OrganisationVolunteerCertificateScreen
 import com.example.volunteerlink.organisation.screens.OrganisationPromotionScreen
+
 import com.example.volunteerlink.organisation.home.model.HomeAttentionType
 import com.example.volunteerlink.organisation.screens.OrganisationSettingScreen
 import com.example.volunteerlink.chat.repository.SupabaseChatRepository
@@ -191,10 +192,9 @@ fun OrganisationNavigationHost(
                     items = organisationBottomNavigationItems,
                     currentRoute = bottomBarRoute,
                     showChatNotification =
-                        ChatData.partnershipAttention.value > 0 ||
-                            ChatData.chatsForCurrentRole().any {
-                                (it.readCounts[Role.ORGANISATION] ?: 0) < it.messages.size
-                            },
+                        ChatData.chatsForCurrentRole().any {
+                            (it.readCounts[Role.ORGANISATION] ?: 0) < it.messages.size
+                        },
                     onItemClick = { item ->
                         if (item.route != currentRoute) {
                             if (
@@ -533,6 +533,7 @@ fun OrganisationNavigationHost(
                     }
                 )
             }
+
 
             composable(
                 route = OrganisationNavigationRoutes.PARTNERSHIP_CHAT_ROOM,

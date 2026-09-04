@@ -5,7 +5,6 @@ import android.media.MediaRecorder
 import android.net.Uri
 import android.os.Build
 import android.widget.VideoView
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import android.content.ActivityNotFoundException
 import android.content.Intent
@@ -19,7 +18,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -49,7 +48,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -165,6 +163,9 @@ fun VolunteerChatRoomScreen(
     var replyingTo by remember { mutableStateOf<ChatMessage?>(null) }
     var forwardingMessage by remember { mutableStateOf<ChatMessage?>(null) }
     var showForwardChatSelector by remember { mutableStateOf(false) }
+    var forwardError by remember {
+        mutableStateOf<String?>(null)
+    }
 
     var highlightedMessageId by remember { mutableStateOf<String?>(null) }
     var highlightJob by remember { mutableStateOf<Job?>(null) }
@@ -348,7 +349,6 @@ fun VolunteerChatRoomScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .imePadding()
             .background(BubbleGreen.copy(alpha = 0.35f))
     ) {
         Row(
@@ -516,37 +516,7 @@ fun VolunteerChatRoomScreen(
                 contentPadding = PaddingValues(12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                itemsIndexed(
-                    items = visibleMessages,
-                    key = { _, message -> message.id }
-                ) { index, message ->
-                    val date = volunteerChatMessageDate(message.sentAtMillis)
-                    val previousDate = visibleMessages
-                        .getOrNull(index - 1)
-                        ?.let { volunteerChatMessageDate(it.sentAtMillis) }
-
-                    if (index == 0 || date != previousDate) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 6.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = CardBeige.copy(alpha = 0.9f)
-                            ) {
-                                Text(
-                                    text = date,
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
-                                    color = TextMuted,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
-                    }
-
+                items(visibleMessages, key = { it.id }) { message ->
                     MessageBubble(
                         msg = message,
                         viewerRole = ChatData.currentRole.value,
@@ -713,8 +683,6 @@ fun VolunteerChatRoomScreen(
                                     }
                                 }.onFailure {
                                     draft = textToSend
-                                    replyingTo = replyId?.let(ChatData::findMessageById)
-                                    Toast.makeText(context, "Unable to send this message.", Toast.LENGTH_LONG).show()
                                 }
                             }
                         }
@@ -927,14 +895,9 @@ fun VolunteerChatRoomScreen(
                         deleteConfirmationMessage = null
                         scope.launch {
                             runCatching {
-                                if (!message.id.startsWith("m")) {
-                                    SupabaseChatRepository.deleteMessage(message.id)
-                                }
-                            }.onSuccess {
-                                ChatData.deleteMessage(chatId, message.id)
-                            }.onFailure {
-                                Toast.makeText(context, "Unable to delete this message.", Toast.LENGTH_LONG).show()
-                            }
+                                SupabaseChatRepository.deleteMessage(message.id)
+                                SupabaseChatRepository.loadMessagesForChat(chatId)
+                            }.onSuccess { ChatData.replaceMessages(chatId, it) }
                         }
                     }
                 ) {
@@ -968,11 +931,8 @@ fun VolunteerChatRoomScreen(
                         scope.launch {
                             runCatching {
                                 SupabaseChatRepository.editMessage(message.id, replacement)
-                            }.onSuccess {
-                                ChatData.editMessage(chatId, message.id, replacement)
-                            }.onFailure {
-                                Toast.makeText(context, "Unable to edit this message.", Toast.LENGTH_LONG).show()
-                            }
+                                SupabaseChatRepository.loadMessagesForChat(chatId)
+                            }.onSuccess { ChatData.replaceMessages(chatId, it) }
                         }
                     }
                 ) {
@@ -994,6 +954,14 @@ fun VolunteerChatRoomScreen(
             title = { Text("Forward to...") },
             text = {
                 Column {
+                    forwardError?.let { error ->
+                        Text(
+                            text = error,
+                            color = Color(0xFFB3261E),
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                    }
                     // Only show chats the current user has access to
                     val availableChats = ChatData.chatsForCurrentRole()
                     availableChats.forEach { chat ->
@@ -1003,21 +971,34 @@ fun VolunteerChatRoomScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable {
-                                        val message = forwardingMessage ?: return@clickable
+                                        val messageToForward = forwardingMessage ?: return@clickable
+
                                         scope.launch {
+                                            forwardError = null
+
                                             runCatching {
-                                                SupabaseChatRepository.sendMessage(
-                                                    chat.id,
-                                                    "Forwarded: ${messageSummary(message)}"
+                                                SupabaseChatRepository.forwardMessage(
+                                                    sourceMessageId = messageToForward.id,
+                                                    targetConversationId = chat.id
                                                 )
-                                                SupabaseChatRepository.loadMessagesForChat(chat.id)
-                                            }.onSuccess { ChatData.replaceMessages(chat.id, it) }
-                                                .onFailure {
-                                                    Toast.makeText(context, "Unable to forward this message.", Toast.LENGTH_LONG).show()
-                                                }
+
+                                                SupabaseChatRepository.loadMessagesForChat(
+                                                    chat.id
+                                                )
+                                            }.onSuccess { updatedTargetMessages ->
+                                                ChatData.replaceMessages(
+                                                    chatId = chat.id,
+                                                    messages = updatedTargetMessages
+                                                )
+
+                                                forwardingMessage = null
+                                                showForwardChatSelector = false
+                                            }.onFailure { error ->
+                                                forwardError =
+                                                    error.message
+                                                        ?: "Could not forward this message."
+                                            }
                                         }
-                                        forwardingMessage = null
-                                        showForwardChatSelector = false
                                     }
                                     .padding(vertical = 10.dp)
                             )
@@ -1089,10 +1070,6 @@ fun VolunteerChatRoomScreen(
         }
     }
 }
-
-fun volunteerChatMessageDate(timestamp: Long): String =
-    java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.getDefault())
-        .format(java.util.Date(timestamp))
 
 @Composable
 private fun MessageActionRow(
@@ -1668,11 +1645,7 @@ private fun MessageBubble(
                     msg.fileUri != null -> {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .widthIn(max = 230.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(Color.White.copy(alpha = 0.55f))
-                                .padding(horizontal = 10.dp, vertical = 8.dp)
+                            modifier = Modifier.padding(vertical = 4.dp)
                         ) {
                             Icon(
                                 Icons.Default.Description,
@@ -1681,17 +1654,12 @@ private fun MessageBubble(
                                 modifier = Modifier.size(24.dp)
                             )
                             Spacer(Modifier.width(8.dp))
-                            Column {
-                                Text(
-                                    text = msg.fileName ?: "Document",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = DeepGreen,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text("Attachment", fontSize = 10.sp, color = TextMuted)
-                            }
+                            Text(
+                                text = msg.fileName ?: "Document",
+                                fontSize = 15.sp,
+                                color = Color(0xFF3B6FD6),
+                                textDecoration = TextDecoration.Underline
+                            )
                         }
                     }
                     else -> LinkifiedMessageText(text = msg.text, fontSize = 15.sp)
