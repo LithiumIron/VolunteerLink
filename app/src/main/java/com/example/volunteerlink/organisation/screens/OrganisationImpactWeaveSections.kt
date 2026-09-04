@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.screens
 
+// FILE OVERVIEW:
+/*
+ * OrganisationImpactWeaveSections contains presentation code for the organisation Impact Weave and partnership flow.
+ * It focuses on rendering state and forwarding user actions through callbacks/ViewModels,
+ * keeping database access and business rules outside the composables where possible.
+ */
+
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -108,6 +116,10 @@ import java.util.Locale
 import kotlin.math.roundToInt
 
 @Composable
+/**
+ * Renders the impact weave landing screen screen used in the organisation Impact Weave and partnership flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun ImpactWeaveLandingScreen(
     activePlans: List<ImpactWeaveActivePlan>,
     isLoadingActivePlans: Boolean,
@@ -244,6 +256,10 @@ fun ImpactWeaveLandingScreen(
 }
 
 @Composable
+/**
+ * Renders the impact weave active plan card card used in the organisation Impact Weave and partnership flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun ImpactWeaveActivePlanCard(
     plan: ImpactWeaveActivePlan,
     onClick: () -> Unit
@@ -301,6 +317,10 @@ private fun ImpactWeaveActivePlanCard(
 }
 
 @Composable
+/**
+ * Renders the impact weave activity plan screen screen used in the organisation Impact Weave and partnership flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun ImpactWeaveActivityPlanScreen(
     draft: ImpactWeaveDraft,
     minimumStartDateMillis: Long,
@@ -761,6 +781,10 @@ fun ImpactWeaveActivityPlanScreen(
 }
 
 @Composable
+/**
+ * Renders the impact weave wizard header header used in the organisation Impact Weave and partnership flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun ImpactWeaveWizardHeader(
     title: String,
     subtitle: String,
@@ -799,6 +823,10 @@ private fun ImpactWeaveWizardHeader(
 }
 
 @Composable
+/**
+ * Renders the UI represented by impact weave simple option for the organisation Impact Weave and partnership flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun ImpactWeaveSimpleOption(
     title: String,
     selected: Boolean,
@@ -828,6 +856,10 @@ private fun ImpactWeaveSimpleOption(
 }
 
 @Composable
+/**
+ * Renders the UI represented by impact weave mode option for the organisation Impact Weave and partnership flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun ImpactWeaveModeOption(
     title: String,
     description: String,
@@ -866,6 +898,10 @@ private fun ImpactWeaveModeOption(
 }
 
 @Composable
+/**
+ * Renders the impact weave location picker picker used in the organisation Impact Weave and partnership flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun ImpactWeaveLocationPicker(
     query: String,
     selectedLocation: LocationSuggestion?,
@@ -1037,6 +1073,10 @@ private fun ImpactWeaveLocationPicker(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+/**
+ * Renders the impact weave support needed screen screen used in the organisation Impact Weave and partnership flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun ImpactWeaveSupportNeededScreen(
     draft: ImpactWeaveDraft,
     onBack: () -> Unit,
@@ -1315,6 +1355,10 @@ fun ImpactWeaveSupportNeededScreen(
 }
 
 @Composable
+/**
+ * Renders the impact weave need row row used in the organisation Impact Weave and partnership flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun ImpactWeaveNeedRow(
     need: ImpactWeaveNeedDraft,
     onEdit: () -> Unit,
@@ -1362,6 +1406,10 @@ private fun ImpactWeaveNeedRow(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+/**
+ * Adds the edit impact weave need sheet to the organisation Impact Weave and partnership flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun AddEditImpactWeaveNeedSheet(
     need: ImpactWeaveNeedDraft?,
     requiredSupportType: String? = null,
@@ -1668,6 +1716,10 @@ private fun AddEditImpactWeaveNeedSheet(
 }
 
 @Composable
+/**
+ * Renders the impact weave review screen screen used in the organisation Impact Weave and partnership flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun ImpactWeaveReviewScreen(
     draft: ImpactWeaveDraft,
     planningDeadlineMillis: Long?,
@@ -1896,6 +1948,10 @@ fun ImpactWeaveReviewScreen(
 }
 
 @Composable
+/**
+ * Renders the impact weave match results screen screen used in the organisation Impact Weave and partnership flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun ImpactWeaveMatchResultsScreen(
     draft: ImpactWeaveDraft,
     results: ImpactWeaveMatchResults?,
@@ -2321,6 +2377,10 @@ fun ImpactWeaveMatchResultsScreen(
 }
 
 @Composable
+/**
+ * Renders the impact weave plan actions card card used in the organisation Impact Weave and partnership flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun ImpactWeavePlanActionsCard(
     status: String,
     startDateMillis: Long?,
@@ -2405,6 +2465,10 @@ private fun ImpactWeavePlanActionsCard(
 }
 
 @Composable
+/**
+ * Renders the impact weave details dialog dialog used in the organisation Impact Weave and partnership flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun ImpactWeaveDetailsDialog(
     draft: ImpactWeaveDraft,
     isSaving: Boolean,
@@ -2478,6 +2542,10 @@ private fun ImpactWeaveDetailsDialog(
 }
 
 @Composable
+/**
+ * Renders the impact weave reschedule dialog dialog used in the organisation Impact Weave and partnership flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun ImpactWeaveRescheduleDialog(
     draft: ImpactWeaveDraft,
     minimumStartDateMillis: Long,
@@ -2575,6 +2643,10 @@ private fun ImpactWeaveRescheduleDialog(
 }
 
 @Composable
+/**
+ * Renders the confirmed support progress card card used in the organisation Impact Weave and partnership flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun ConfirmedSupportProgressCard(
     result: ImpactWeaveNeedMatchResult,
     isReadOnly: Boolean = false
@@ -2791,6 +2863,10 @@ private fun ConfirmedSupportProgressCard(
 }
 
 @Composable
+/**
+ * Renders the partner matching summary card card used in the organisation Impact Weave and partnership flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun PartnerMatchingSummaryCard(
     results: ImpactWeaveMatchResults,
     organisationCount: Int,
@@ -2833,6 +2909,10 @@ private fun PartnerMatchingSummaryCard(
     }
 }
 
+/**
+ * Holds the values represented by partner organisation match group as one strongly typed model.
+ * It supports the Impact Weave and partnership presentation layer without adding backend responsibilities to the screen.
+ */
 private data class PartnerOrganisationMatchGroup(
     val organisationId: String,
     val organisationName: String,
@@ -2841,6 +2921,10 @@ private data class PartnerOrganisationMatchGroup(
     val nearestDistanceKm: Double?
 )
 
+/**
+ * Builds the partner organisation groups used by the organisation Impact Weave and partnership flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun buildPartnerOrganisationGroups(
     results: ImpactWeaveMatchResults
 ): List<PartnerOrganisationMatchGroup> {
@@ -2866,6 +2950,10 @@ private fun buildPartnerOrganisationGroups(
     )
 }
 
+/**
+ * Builds the alternative partner organisation groups used by the organisation Impact Weave and partnership flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun buildAlternativePartnerOrganisationGroups(
     results: ImpactWeaveMatchResults,
     excludedOrganisationIds: Set<String>
@@ -2905,6 +2993,10 @@ private fun buildAlternativePartnerOrganisationGroups(
         )
 }
 
+/**
+ * Derives the partnership status sort order value used by the organisation Impact Weave and partnership flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun partnershipStatusSortOrder(status: String): Int = when (status.uppercase(Locale.ROOT)) {
     "RECONFIRMATION_REQUIRED" -> 0
     "PENDING" -> 1
@@ -2916,6 +3008,10 @@ private fun partnershipStatusSortOrder(status: String): Int = when (status.upper
 }
 
 @Composable
+/**
+ * Renders the impact weave partnership state card card used in the organisation Impact Weave and partnership flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun ImpactWeavePartnershipStateCard(
     request: ImpactWeavePartnershipState,
     onViewProfile: () -> Unit
@@ -3146,6 +3242,10 @@ private fun ImpactWeavePartnershipStateCard(
 }
 
 @Composable
+/**
+ * Renders the partner organisation match card card used in the organisation Impact Weave and partnership flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun PartnerOrganisationMatchCard(
     partner: PartnerOrganisationMatchGroup,
     requestSent: Boolean,
@@ -3303,6 +3403,10 @@ private fun PartnerOrganisationMatchCard(
 }
 
 @Composable
+/**
+ * Renders the UI represented by partner organisation support line for the organisation Impact Weave and partnership flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun PartnerOrganisationSupportLine(option: PartnerRequestOption) {
     val result = option.needResult
     val candidate = option.candidate
@@ -3371,6 +3475,10 @@ private fun PartnerOrganisationSupportLine(option: PartnerRequestOption) {
 }
 
 @Composable
+/**
+ * Renders the alternative partner organisation card card used in the organisation Impact Weave and partnership flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun AlternativePartnerOrganisationCard(
     partner: PartnerOrganisationMatchGroup,
     onViewProfile: () -> Unit
@@ -3416,11 +3524,19 @@ private fun AlternativePartnerOrganisationCard(
     }
 }
 
+/**
+ * Holds the values represented by partner request option as one strongly typed model.
+ * It supports the Impact Weave and partnership presentation layer without adding backend responsibilities to the screen.
+ */
 private data class PartnerRequestOption(
     val needResult: ImpactWeaveNeedMatchResult,
     val candidate: ImpactWeaveSupportCandidate
 )
 
+/**
+ * Builds the partner request options used by the organisation Impact Weave and partnership flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun buildPartnerRequestOptions(
     results: ImpactWeaveMatchResults,
     selectedCandidate: ImpactWeaveSupportCandidate
@@ -3451,6 +3567,10 @@ private fun buildPartnerRequestOptions(
 }
 
 @Composable
+/**
+ * Renders the partnership request dialog dialog used in the organisation Impact Weave and partnership flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun PartnershipRequestDialog(
     draft: ImpactWeaveDraft,
     organisationName: String,
@@ -3775,6 +3895,10 @@ private fun PartnershipRequestDialog(
 }
 
 @Composable
+/**
+ * Renders the request activity overview card card used in the organisation Impact Weave and partnership flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun RequestActivityOverviewCard(draft: ImpactWeaveDraft) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -3847,6 +3971,10 @@ private fun RequestActivityOverviewCard(draft: ImpactWeaveDraft) {
 }
 
 @Composable
+/**
+ * Renders the UI represented by proposal detail block for the organisation Impact Weave and partnership flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun ProposalDetailBlock(
     label: String,
     primary: String,
@@ -3886,6 +4014,10 @@ private fun ProposalDetailBlock(
     }
 }
 
+/**
+ * Requests the activity location label for the organisation Impact Weave and partnership flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun requestActivityLocationLabel(draft: ImpactWeaveDraft): String {
     return if (draft.hasExistingVenue == true) {
         draft.existingVenueLocation?.let { location ->
@@ -3898,6 +4030,10 @@ private fun requestActivityLocationLabel(draft: ImpactWeaveDraft): String {
     }
 }
 
+/**
+ * Returns the matching need amount label used by the organisation Impact Weave and partnership flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun matchingNeedAmountLabel(need: com.example.volunteerlink.organisation.impactweave.model.ImpactWeaveDatabaseNeed): String {
     return if (need.supportType == "VENUE") {
         need.capacityRequired?.let { "Capacity $it" } ?: "Capacity not specified"
@@ -3906,6 +4042,10 @@ private fun matchingNeedAmountLabel(need: com.example.volunteerlink.organisation
     }
 }
 
+/**
+ * Checks whether the organisation Impact Weave and partnership flow allows idate availability label.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun candidateAvailabilityLabel(
     candidate: ImpactWeaveSupportCandidate,
     result: ImpactWeaveNeedMatchResult
@@ -3925,6 +4065,10 @@ private fun candidateAvailabilityLabel(
 }
 
 @Composable
+/**
+ * Renders the UI represented by impact weave summary line for the organisation Impact Weave and partnership flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun ImpactWeaveSummaryLine(
     iconRes: Int,
     label: String,
@@ -3972,6 +4116,10 @@ private fun ImpactWeaveSummaryLine(
 }
 
 @Composable
+/**
+ * Returns the form error text used by the organisation Impact Weave and partnership flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun FormErrorText(message: String?) {
     if (!message.isNullOrBlank()) {
         Text(
@@ -3982,6 +4130,10 @@ private fun FormErrorText(message: String?) {
     }
 }
 
+/**
+ * Returns the support type label used by the organisation Impact Weave and partnership flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun supportTypeLabel(value: String): String {
     return when (value) {
         "VENUE" -> "Venue"
@@ -3995,6 +4147,10 @@ private fun supportTypeLabel(value: String): String {
     }
 }
 
+/**
+ * Returns the need amount label used by the organisation Impact Weave and partnership flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun needAmountLabel(need: ImpactWeaveNeedDraft): String {
     return if (need.supportType == "VENUE") {
         need.capacityRequired?.let { "Capacity $it" } ?: "Capacity not specified"
@@ -4003,6 +4159,10 @@ private fun needAmountLabel(need: ImpactWeaveNeedDraft): String {
     }
 }
 
+/**
+ * Formats the draft schedule used by the organisation Impact Weave and partnership flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun formatDraftSchedule(draft: ImpactWeaveDraft): String {
     val startDate = draft.startDateMillis?.let(::formatDate).orEmpty()
     val endDate = draft.endDateMillis?.let(::formatDate).orEmpty()
@@ -4017,6 +4177,10 @@ private fun formatDraftSchedule(draft: ImpactWeaveDraft): String {
     return "$dateText · $startTime - $endTime"
 }
 
+/**
+ * Adds the days to the organisation Impact Weave and partnership flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun addDays(dateMillis: Long, days: Int): Long {
     return java.util.Calendar.getInstance().apply {
         timeInMillis = dateMillis
@@ -4024,6 +4188,10 @@ private fun addDays(dateMillis: Long, days: Int): Long {
     }.timeInMillis
 }
 
+/**
+ * Formats the date used by the organisation Impact Weave and partnership flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun formatDate(dateMillis: Long): String {
     return SimpleDateFormat(
         "dd MMM yyyy",

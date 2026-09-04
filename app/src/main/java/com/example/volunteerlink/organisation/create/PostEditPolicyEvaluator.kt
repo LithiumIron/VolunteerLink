@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.create
 
+// FILE OVERVIEW:
+/*
+ * PostEditPolicyEvaluator contains business rules used by the organisation Create/Edit Post flow.
+ * Keeping these checks separate from the UI makes validation and edit restrictions easier to
+ * reuse from different wizard steps and management actions.
+ */
+
+
 import com.example.volunteerlink.data.time.AppClock
 import com.example.volunteerlink.organisation.create.model.CreatePostDraft
 import com.example.volunteerlink.organisation.create.model.ScheduleType
@@ -35,6 +43,10 @@ data class PostEditPolicy(
     val schedulePolicies: Map<String, ScheduleEditPolicy> = emptyMap()
 )
 
+/**
+ * Holds the values represented by role edit policy as one strongly typed model.
+ * It centralises Create/Edit Post rules so every caller applies the same decision logic.
+ */
 data class RoleEditPolicy(
     val roleTemplateId: String,
     val roleMode: VolunteerRoleMode,
@@ -56,6 +68,10 @@ data class RoleEditPolicy(
     val settingsLockedReason: String? = null
 )
 
+/**
+ * Holds the values represented by schedule edit policy as one strongly typed model.
+ * It centralises Create/Edit Post rules so every caller applies the same decision logic.
+ */
 data class ScheduleEditPolicy(
     val scheduleItemId: String,
     val canEdit: Boolean,
@@ -81,26 +97,46 @@ data class PostEditPolicyInput(
     val screeningAnswerRoleIds: Set<String> = emptySet()
 )
 
+/**
+ * Holds the values represented by post edit role input as one strongly typed model.
+ * It centralises Create/Edit Post rules so every caller applies the same decision logic.
+ */
 data class PostEditRoleInput(
     val roleTemplateId: String,
     val roleMode: VolunteerRoleMode,
     val hasConfiguredScreeningQuestions: Boolean = false
 )
 
+/**
+ * Holds the values represented by post edit participation input as one strongly typed model.
+ * It centralises Create/Edit Post rules so every caller applies the same decision logic.
+ */
 data class PostEditParticipationInput(
     val roleTemplateId: String,
     val applicationStatus: String,
     val joinedAt: String? = null
 )
 
+/**
+ * Holds the values represented by post edit schedule input as one strongly typed model.
+ * It centralises Create/Edit Post rules so every caller applies the same decision logic.
+ */
 data class PostEditScheduleInput(
     val scheduleItemId: String,
     val scheduleType: ScheduleType,
     val scheduleDateMillis: Long
 )
 
+/**
+ * Groups the shared values and helper behaviour represented by post edit policy evaluator.
+ * It centralises Create/Edit Post rules so every caller applies the same decision logic.
+ */
 object PostEditPolicyEvaluator {
 
+    /**
+     * Evaluates the current business rules for the organisation Create/Edit Post flow and returns the resulting policy/state.
+     * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
+     */
     fun evaluate(
         input: PostEditPolicyInput,
         nowMillis: Long = AppClock.nowMillis()
@@ -135,6 +171,10 @@ object PostEditPolicyEvaluator {
         val participationByRole = input.participations.groupBy { it.roleTemplateId }
         val roleById = input.roles.associateBy { it.roleTemplateId }
 
+        /**
+         * Derives the side has active people value used by the organisation Create/Edit Post flow.
+         * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
+         */
         fun sideHasActivePeople(mode: VolunteerRoleMode): Boolean {
             val roleIds = input.roles
                 .filter { it.roleMode == mode }
@@ -147,6 +187,10 @@ object PostEditPolicyEvaluator {
             }
         }
 
+        /**
+         * Derives the side has participation dependency value used by the organisation Create/Edit Post flow.
+         * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
+         */
         fun sideHasParticipationDependency(mode: VolunteerRoleMode): Boolean {
             val roleIds = input.roles
                 .filter { it.roleMode == mode }
@@ -497,6 +541,10 @@ object PostEditPolicyEvaluator {
         return null
     }
 
+    /**
+     * Derives the read only policy value used by the organisation Create/Edit Post flow.
+     * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
+     */
     private fun readOnlyPolicy(
         input: PostEditPolicyInput,
         reason: String
@@ -566,12 +614,20 @@ object PostEditPolicyEvaluator {
         )
     }
 
+    /**
+     * Checks whether the physical dates changed compared with the previously loaded value.
+     * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
+     */
     private fun physicalDatesChanged(a: CreatePostDraft, b: CreatePostDraft): Boolean {
         return a.isMultiDayPhysicalEvent != b.isMultiDayPhysicalEvent ||
             a.physicalStartDateMillis != b.physicalStartDateMillis ||
             a.physicalEndDateMillis != b.physicalEndDateMillis
     }
 
+    /**
+     * Checks whether the physical core changed compared with the previously loaded value.
+     * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
+     */
     private fun physicalCoreChanged(a: CreatePostDraft, b: CreatePostDraft): Boolean {
         return a.physicalStartTimeMinutes != b.physicalStartTimeMinutes ||
             a.physicalEndTimeMinutes != b.physicalEndTimeMinutes ||
@@ -579,16 +635,28 @@ object PostEditPolicyEvaluator {
             a.physicalLocation != b.physicalLocation
     }
 
+    /**
+     * Checks whether the physical capacity changed compared with the previously loaded value.
+     * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
+     */
     private fun physicalCapacityChanged(a: CreatePostDraft, b: CreatePostDraft): Boolean {
         return a.physicalVolunteerCapacity != b.physicalVolunteerCapacity ||
             a.hybridPhysicalVolunteerCapacity != b.hybridPhysicalVolunteerCapacity
     }
 
+    /**
+     * Checks whether the remote capacity changed compared with the previously loaded value.
+     * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
+     */
     private fun remoteCapacityChanged(a: CreatePostDraft, b: CreatePostDraft): Boolean {
         return a.remoteVolunteerCapacity != b.remoteVolunteerCapacity ||
             a.hybridRemoteVolunteerCapacity != b.hybridRemoteVolunteerCapacity
     }
 
+    /**
+     * Starts the of day for the organisation Create/Edit Post flow.
+     * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
+     */
     private fun startOfDay(value: Long): Long {
         return Calendar.getInstance().apply {
             timeInMillis = value

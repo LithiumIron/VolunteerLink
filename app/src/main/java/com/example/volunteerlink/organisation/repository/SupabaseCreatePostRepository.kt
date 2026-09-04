@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.repository
 
+// FILE OVERVIEW:
+/*
+ * SupabaseCreatePostRepository defines or implements data access used by the organisation Create/Edit Post flow.
+ * Repository code keeps Supabase/RPC/storage details away from the composables and ViewModels
+ * so UI code can work with application models instead of backend-specific responses.
+ */
+
+
 import com.example.volunteerlink.data.supabase
 import com.example.volunteerlink.data.location.LocationSuggestion
 import com.example.volunteerlink.organisation.auth.OrganisationSession
@@ -52,6 +60,10 @@ import java.util.UUID
  */
 class SupabaseCreatePostRepository : CreatePostRepository {
 
+    /**
+     * Saves the draft for the organisation Create/Edit Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     override suspend fun saveDraft(
         draft: CreatePostDraft,
         roleCatalogue: List<CreateRoleTemplate>,
@@ -65,6 +77,10 @@ class SupabaseCreatePostRepository : CreatePostRepository {
         )
     }
 
+    /**
+     * Publishes the current Volunteer Post data after the required Create/Edit Post checks pass.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     override suspend fun publishPost(
         draft: CreatePostDraft,
         roleCatalogue: List<CreateRoleTemplate>,
@@ -80,6 +96,10 @@ class SupabaseCreatePostRepository : CreatePostRepository {
         )
     }
 
+    /**
+     * Saves the post for the organisation Create/Edit Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     private suspend fun savePost(
         draft: CreatePostDraft,
         roleCatalogue: List<CreateRoleTemplate>,
@@ -189,6 +209,10 @@ class SupabaseCreatePostRepository : CreatePostRepository {
         }
     }
 
+    /**
+     * Builds the new post payload used by the organisation Create/Edit Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     private fun buildNewPostPayload(
         draft: CreatePostDraft,
         roleCatalogue: List<CreateRoleTemplate>
@@ -296,6 +320,10 @@ class SupabaseCreatePostRepository : CreatePostRepository {
         }
     }
 
+    /**
+     * Loads the existing post for edit needed by the organisation Create/Edit Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     override suspend fun loadExistingPostForEdit(postId: String): ExistingPostEditData {
         val organisationId = OrganisationSession.requireOrganisationId()
         val postRow = supabase.from("volunteer_posts")
@@ -566,6 +594,10 @@ class SupabaseCreatePostRepository : CreatePostRepository {
         )
     }
 
+    /**
+     * Updates the existing post used by the organisation Create/Edit Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     override suspend fun updateExistingPost(
         latest: ExistingPostEditData,
         editedDraft: CreatePostDraft,
@@ -649,6 +681,10 @@ class SupabaseCreatePostRepository : CreatePostRepository {
         }
     }
 
+    /**
+     * Builds the existing edit payload used by the organisation Create/Edit Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     private fun buildExistingEditPayload(
         latest: ExistingPostEditData,
         editedDraft: CreatePostDraft,
@@ -768,6 +804,10 @@ class SupabaseCreatePostRepository : CreatePostRepository {
         }
     }
 
+    /**
+     * Loads the role catalogue needed by the organisation Create/Edit Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     override suspend fun loadRoleCatalogue(): List<CreateRoleTemplate> {
         // Step 2 now depends on four normalized catalogue tables.
         // Keep the table name in any thrown error so test builds tell us
@@ -842,6 +882,10 @@ class SupabaseCreatePostRepository : CreatePostRepository {
             .sortedBy { it.roleTemplateId }
     }
 
+    /**
+     * Renders the build physical details row row used in the organisation Create/Edit Post flow.
+     * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+     */
     private fun buildPhysicalDetailsRow(
         postId: String,
         draft: CreatePostDraft
@@ -903,6 +947,10 @@ class SupabaseCreatePostRepository : CreatePostRepository {
         }
     }
 
+    /**
+     * Renders the build remote details row row used in the organisation Create/Edit Post flow.
+     * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+     */
     private fun buildRemoteDetailsRow(
         postId: String,
         draft: CreatePostDraft
@@ -944,6 +992,10 @@ class SupabaseCreatePostRepository : CreatePostRepository {
         }
     }
 
+    /**
+     * Builds the schedule publish data used by the organisation Create/Edit Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     private fun buildSchedulePublishData(
         postId: String,
         draft: CreatePostDraft,
@@ -1018,6 +1070,10 @@ class SupabaseCreatePostRepository : CreatePostRepository {
         ).format(Date(dateMillis))
     }
 
+    /**
+     * Returns the sql time value required by the organisation Create/Edit Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     private fun sqlTime(minutesAfterMidnight: Int): String {
         require(minutesAfterMidnight in 0..1439) {
             "Time must be between 00:00 and 23:59."
@@ -1028,10 +1084,18 @@ class SupabaseCreatePostRepository : CreatePostRepository {
         return String.format(Locale.US, "%02d:%02d:00", hour, minute)
     }
 
+    /**
+     * Derives the string value used by the organisation Create/Edit Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     private fun String?.nullIfBlank(): String? {
         return this?.trim()?.takeIf { it.isNotEmpty() }
     }
 
+    /**
+     * Loads the catalogue table needed by the organisation Create/Edit Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     private suspend fun loadCatalogueTable(
         tableName: String
     ): List<JsonObject> {
@@ -1049,53 +1113,93 @@ class SupabaseCreatePostRepository : CreatePostRepository {
         }
     }
 
+    /**
+     * Derives the json object value used by the organisation Create/Edit Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     private fun JsonObject.requiredText(key: String): String {
         return optionalText(key)
             ?: error("Missing '$key' in Create Post catalogue data.")
     }
 
+    /**
+     * Derives the json object value used by the organisation Create/Edit Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     private fun JsonObject.optionalText(key: String): String? {
         return this[key]
             ?.jsonPrimitive
             ?.contentOrNull
     }
 
+    /**
+     * Derives the json object value used by the organisation Create/Edit Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     private fun JsonObject.optionalBoolean(key: String): Boolean? {
         return optionalText(key)?.toBooleanStrictOrNull()
     }
 
+    /**
+     * Derives the json object value used by the organisation Create/Edit Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     private fun JsonObject.optionalInt(key: String): Int? {
         val element: JsonElement = this[key] ?: return null
         if (element is JsonNull) return null
         return runCatching { element.jsonPrimitive.intOrNull }.getOrNull()
     }
 
+    /**
+     * Derives the json object value used by the organisation Create/Edit Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     private fun JsonObject.requiredInt(key: String): Int {
         return optionalInt(key) ?: error("Missing required integer '$key'.")
     }
 
+    /**
+     * Derives the json object value used by the organisation Create/Edit Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     private fun JsonObject.optionalDouble(key: String): Double? {
         val element: JsonElement = this[key] ?: return null
         if (element is JsonNull) return null
         return runCatching { element.jsonPrimitive.doubleOrNull }.getOrNull()
     }
 
+    /**
+     * Derives the json object value used by the organisation Create/Edit Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     private fun JsonObject.requiredDouble(key: String): Double {
         return optionalDouble(key) ?: error("Missing required number '$key'.")
     }
 
+    /**
+     * Parses the sql date used by the organisation Create/Edit Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     private fun parseSqlDate(value: String): Long {
         return SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
             isLenient = false
         }.parse(value)?.time ?: error("Invalid database date: $value")
     }
 
+    /**
+     * Parses the sql time used by the organisation Create/Edit Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     private fun parseSqlTime(value: String): Int {
         val parts = value.take(5).split(":")
         if (parts.size != 2) error("Invalid database time: $value")
         return parts[0].toInt() * 60 + parts[1].toInt()
     }
 
+    /**
+     * Holds the values represented by schedule publish data as one strongly typed model.
+     * It keeps backend-facing work behind the Create/Edit Post repository boundary.
+     */
     private data class SchedulePublishData(
         val row: JsonObject,
         val targetRoleTemplateIds: List<String>

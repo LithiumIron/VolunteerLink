@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.create.steps
 
+// FILE OVERVIEW:
+/*
+ * ScheduleSections contains presentation code for the organisation Create/Edit Post flow.
+ * It focuses on rendering state and forwarding user actions through callbacks/ViewModels,
+ * keeping database access and business rules outside the composables where possible.
+ */
+
+
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
@@ -64,6 +72,10 @@ import java.util.Locale
 
 
 @Composable
+/**
+ * Renders the UI represented by schedule section selector for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun ScheduleSectionSelector(
     sections: List<ScheduleType>,
     selectedSection: ScheduleType,
@@ -123,6 +135,10 @@ fun ScheduleSectionSelector(
 }
 
 @Composable
+/**
+ * Renders the physical schedule section section used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun PhysicalScheduleSection(
     draft: CreatePostDraft,
     roleCatalogue: List<CreateRoleTemplate>,
@@ -267,6 +283,10 @@ fun PhysicalScheduleSection(
 }
 
 @Composable
+/**
+ * Renders the remote schedule section section used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun RemoteScheduleSection(
     draft: CreatePostDraft,
     roleCatalogue: List<CreateRoleTemplate>,
@@ -327,6 +347,10 @@ fun RemoteScheduleSection(
 }
 
 @Composable
+/**
+ * Renders the copy physical day dialog dialog used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun CopyPhysicalDayDialog(
     sourceDate: Long,
     targetDates: List<Long>,
@@ -397,6 +421,10 @@ fun CopyPhysicalDayDialog(
 }
 
 @Composable
+/**
+ * Renders the UI represented by schedule item editor for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun ScheduleItemEditor(
     uiState: CreatePostUiState,
     item: ScheduleItemDraft,
@@ -418,6 +446,10 @@ fun ScheduleItemEditor(
 }
 
 @Composable
+/**
+ * Renders the UI represented by physical schedule item editor for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun PhysicalScheduleItemEditor(
     uiState: CreatePostUiState,
     item: ScheduleItemDraft,
@@ -496,6 +528,10 @@ private fun PhysicalScheduleItemEditor(
 }
 
 @Composable
+/**
+ * Renders the UI represented by remote schedule item editor for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun RemoteScheduleItemEditor(
     uiState: CreatePostUiState,
     item: ScheduleItemDraft,
@@ -550,6 +586,10 @@ private fun RemoteScheduleItemEditor(
 }
 
 @Composable
+/**
+ * Renders the UI represented by role target editor for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun RoleTargetEditor(
     draft: CreatePostDraft,
     roleCatalogue: List<CreateRoleTemplate>,
@@ -620,6 +660,10 @@ private fun RoleTargetEditor(
 }
 
 @Composable
+/**
+ * Renders the role check row row used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun RoleCheckRow(
     role: CreateRoleTemplate,
     checked: Boolean,
@@ -686,6 +730,10 @@ private fun RoleCheckRow(
 }
 
 @Composable
+/**
+ * Renders the UI represented by notes editor for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun NotesEditor(
     value: String,
     onValueChanged: (String) -> Unit
@@ -707,6 +755,10 @@ private fun NotesEditor(
 }
 
 @Composable
+/**
+ * Renders the UI represented by schedule choice option for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun ScheduleChoiceOption(
     title: String,
     description: String,
@@ -767,6 +819,10 @@ private fun ScheduleChoiceOption(
 }
 
 @Composable
+/**
+ * Renders the UI represented by editor group for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun EditorGroup(
     title: String,
     subtitle: String,
@@ -808,6 +864,10 @@ private fun EditorGroup(
 }
 
 @Composable
+/**
+ * Renders the UI represented by read only schedule value for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun ReadOnlyScheduleValue(
     label: String,
     value: String
@@ -836,6 +896,10 @@ private fun ReadOnlyScheduleValue(
 }
 
 @Composable
+/**
+ * Renders the UI represented by schedule section intro for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun ScheduleSectionIntro(
     @DrawableRes iconRes: Int,
     title: String,
@@ -882,6 +946,10 @@ private fun ScheduleSectionIntro(
 }
 
 @Composable
+/**
+ * Renders the schedule context card card used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun ScheduleContextCard(
     primary: String,
     secondary: String
@@ -911,6 +979,10 @@ private fun ScheduleContextCard(
 }
 
 @Composable
+/**
+ * Renders the UI represented by empty schedule state for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun EmptyScheduleState(text: String) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -927,6 +999,10 @@ private fun EmptyScheduleState(text: String) {
 }
 
 @Composable
+/**
+ * Renders the add schedule button button used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun AddScheduleButton(
     text: String,
     enabled: Boolean = true,
@@ -952,6 +1028,10 @@ private fun AddScheduleButton(
 }
 
 @Composable
+/**
+ * Renders the schedule date chip chip used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun ScheduleDateChip(
     dateMillis: Long,
     selected: Boolean,
@@ -998,6 +1078,10 @@ private fun ScheduleDateChip(
 }
 
 @Composable
+/**
+ * Renders the schedule overview item card card used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun ScheduleOverviewItemCard(
     draft: CreatePostDraft,
     roleCatalogue: List<CreateRoleTemplate>,
@@ -1152,6 +1236,10 @@ private fun ScheduleOverviewItemCard(
     }
 }
 
+/**
+ * Derives the item eyebrow value used by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun itemEyebrow(item: ScheduleItemDraft): String {
     return when (item.scheduleType) {
         ScheduleType.PHYSICAL -> scheduleTimeRangeText(
@@ -1166,6 +1254,10 @@ private fun itemEyebrow(item: ScheduleItemDraft): String {
     }
 }
 
+/**
+ * Renders the role summary summary block used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun roleSummary(
     draft: CreatePostDraft,
     roleCatalogue: List<CreateRoleTemplate>,
@@ -1192,6 +1284,10 @@ private fun roleSummary(
         .ifBlank { "Selected roles need review" }
 }
 
+/**
+ * Returns the item location or format text used by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun itemLocationOrFormatText(
     item: ScheduleItemDraft
 ): String? {
@@ -1203,6 +1299,10 @@ private fun itemLocationOrFormatText(
     }
 }
 
+/**
+ * Returns the physical date range text used by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun physicalDateRangeText(draft: CreatePostDraft): String {
     val start = draft.physicalStartDateMillis ?: return "Physical dates not set"
     val end = if (draft.isMultiDayPhysicalEvent) {
@@ -1221,12 +1321,20 @@ private fun physicalDateRangeText(draft: CreatePostDraft): String {
     }
 }
 
+/**
+ * Returns the remote date range text used by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun remoteDateRangeText(draft: CreatePostDraft): String {
     val start = draft.remoteStartDateMillis ?: return "Remote dates not set"
     val due = draft.remoteDueDateMillis ?: return formatScheduleDate(start)
     return "${formatScheduleDate(start)} – ${formatScheduleDate(due)}"
 }
 
+/**
+ * Returns the schedule time range text used by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun scheduleTimeRangeText(
     startMinutes: Int?,
     endMinutes: Int?
@@ -1234,6 +1342,10 @@ private fun scheduleTimeRangeText(
     return "${formatScheduleTime(startMinutes)} – ${formatScheduleTime(endMinutes)}"
 }
 
+/**
+ * Formats the schedule time used by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun formatScheduleTime(minutes: Int?): String {
     if (minutes == null) return "Not set"
 
@@ -1253,6 +1365,10 @@ fun formatScheduleTime(minutes: Int?): String {
     )
 }
 
+/**
+ * Formats the day heading used by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun formatDayHeading(dateMillis: Long): String {
     return SimpleDateFormat(
         "EEE, dd MMM",

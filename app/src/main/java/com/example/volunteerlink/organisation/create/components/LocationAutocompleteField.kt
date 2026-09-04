@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.create.components
 
+// FILE OVERVIEW:
+/*
+ * LocationAutocompleteField contains presentation code for the organisation Create/Edit Post flow.
+ * It focuses on rendering state and forwarding user actions through callbacks/ViewModels,
+ * keeping database access and business rules outside the composables where possible.
+ */
+
+
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -23,10 +31,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.example.volunteerlink.data.location.LocationSuggestion
+import com.example.volunteerlink.data.location.LocationSuggestion
+
 import com.example.volunteerlink.ui.theme.CreateGreen
 
 @Composable
+/**
+ * Renders the location autocomplete field input field used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun LocationAutocompleteField(
     query: String,
     selectedLocation: LocationSuggestion?,
@@ -147,6 +160,10 @@ fun LocationAutocompleteField(
 }
 
 @Composable
+/**
+ * Renders the UI represented by location suggestion list for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun LocationSuggestionList(
     suggestions: List<LocationSuggestion>,
     onLocationSelected: (LocationSuggestion) -> Unit

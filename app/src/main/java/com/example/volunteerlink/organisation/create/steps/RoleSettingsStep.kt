@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.create.steps
 
+// FILE OVERVIEW:
+/*
+ * RoleSettingsStep contains presentation code for the organisation Create/Edit Post flow.
+ * It focuses on rendering state and forwarding user actions through callbacks/ViewModels,
+ * keeping database access and business rules outside the composables where possible.
+ */
+
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -54,7 +62,8 @@ import com.example.volunteerlink.organisation.create.model.SelectedRoleDraft
 import com.example.volunteerlink.organisation.create.model.VolunteerPostType
 import com.example.volunteerlink.organisation.create.model.VolunteerRoleMode
 import com.example.volunteerlink.organisation.viewmodel.CreatePostViewModel
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.delay
+
 import com.example.volunteerlink.ui.theme.RoleSettingsBorder
 import com.example.volunteerlink.ui.theme.RoleSettingsOrange
 import com.example.volunteerlink.ui.theme.RoleSettingsOrangeBackground
@@ -96,6 +105,10 @@ fun RoleSettingsStep(
 }
 
 @Composable
+/**
+ * Renders the UI represented by role settings overview for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun RoleSettingsOverview(
     uiState: CreatePostUiState,
     onBack: () -> Unit,
@@ -241,6 +254,10 @@ fun RoleSettingsOverview(
 }
 
 @Composable
+/**
+ * Renders the UI represented by role configuration editor for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun RoleConfigurationEditor(
     uiState: CreatePostUiState,
     selectedRole: SelectedRoleDraft,
@@ -292,7 +309,7 @@ fun RoleConfigurationEditor(
     }
 
     // Save & Next swaps the role while this composable remains visible.
-    // Resetting here prevents the next role from opening at the old scroll spot.
+    // Resetting here prevents the next role from opening at the previous role's scroll position.
     LaunchedEffect(selectedRole.roleTemplateId) {
         listState.scrollToItem(0)
     }
@@ -565,6 +582,10 @@ fun RoleConfigurationEditor(
 }
 
 @Composable
+/**
+ * Renders the step three header header used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun StepThreeHeader(
     onBack: () -> Unit,
     isEditingFromReview: Boolean
@@ -603,6 +624,10 @@ fun StepThreeHeader(
 }
 
 @Composable
+/**
+ * Renders the setup progress card card used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun SetupProgressCard(
     readyCount: Int,
     totalRoles: Int
@@ -687,6 +712,10 @@ fun SetupProgressCard(
 }
 
 @Composable
+/**
+ * Renders the remote submission overview card card used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun RemoteSubmissionOverviewCard(
     draft: CreatePostDraft,
     catalogue: List<CreateRoleTemplate>,
@@ -878,6 +907,10 @@ fun RemoteSubmissionOverviewCard(
     }
 }
 
+/**
+ * Checks whether the remote submission is ready for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun isRemoteSubmissionReady(
     draft: CreatePostDraft,
     catalogue: List<CreateRoleTemplate>
@@ -905,6 +938,10 @@ fun isRemoteSubmissionReady(
     }
 }
 
+/**
+ * Derives the role save hint value used by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun roleSaveHint(
     draft: CreatePostDraft,
     template: CreateRoleTemplate,

@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.navigation
 
+// FILE OVERVIEW:
+/*
+ * OrganisationNavigationHost contains route/navigation definitions for the organisation navigation flow.
+ * Centralising destinations and route wiring keeps screen transitions consistent and avoids
+ * embedding NavController logic inside reusable screen sections.
+ */
+
+
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
@@ -97,6 +105,10 @@ fun OrganisationNavigationHost(
     var discardReviewSession by remember { mutableStateOf<(() -> Unit)?>(null) }
     var pendingBottomRoute by remember { mutableStateOf<String?>(null) }
 
+    /**
+     * Navigates the bottom for the organisation organisation navigation flow.
+     * Centralising the route behaviour keeps every caller consistent.
+     */
     fun navigateBottom(route: String) {
         navController.navigate(route) {
             popUpTo(OrganisationNavigationRoutes.HOME) {

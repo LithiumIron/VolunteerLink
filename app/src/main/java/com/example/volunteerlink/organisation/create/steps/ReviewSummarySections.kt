@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.create.steps
 
+// FILE OVERVIEW:
+/*
+ * ReviewSummarySections contains presentation code for the organisation Create/Edit Post flow.
+ * It focuses on rendering state and forwarding user actions through callbacks/ViewModels,
+ * keeping database access and business rules outside the composables where possible.
+ */
+
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
@@ -41,6 +49,10 @@ import java.util.Locale
 
 
 @Composable
+/**
+ * Renders the UI represented by review paused schedule banner for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun ReviewPausedScheduleBanner() {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -68,6 +80,10 @@ fun ReviewPausedScheduleBanner() {
 
 
 @Composable
+/**
+ * Renders the review section header header used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun ReviewSectionHeader(
     title: String,
     onEdit: () -> Unit
@@ -107,6 +123,10 @@ fun ReviewSectionHeader(
 
 
 @Composable
+/**
+ * Renders the review meta chip chip used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun ReviewMetaChip(
     text: String
 ) {
@@ -129,6 +149,10 @@ fun ReviewMetaChip(
 
 
 @Composable
+/**
+ * Renders the review white card card used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun ReviewWhiteCard(
     content: @Composable () -> Unit
 ) {
@@ -149,6 +173,10 @@ fun ReviewWhiteCard(
 
 
 @Composable
+/**
+ * Renders the review post mode summary summary block used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun ReviewPostModeSummary(
     title: String,
     firstLine: String,
@@ -183,6 +211,10 @@ fun ReviewPostModeSummary(
 
 
 @Composable
+/**
+ * Renders the UI represented by review compact label value for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun ReviewCompactLabelValue(
     label: String,
     value: String
@@ -206,6 +238,10 @@ fun ReviewCompactLabelValue(
 
 
 @Composable
+/**
+ * Renders the UI represented by review stat for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun ReviewStat(
     value: String,
     label: String
@@ -230,6 +266,10 @@ fun ReviewStat(
 
 
 @Composable
+/**
+ * Renders the UI represented by review chevron for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun ReviewChevron(
     isExpanded: Boolean
 ) {
@@ -253,6 +293,10 @@ fun ReviewChevron(
 
 
 @Composable
+/**
+ * Renders the UI represented by review detail heading for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun ReviewDetailHeading(
     text: String
 ) {
@@ -266,6 +310,10 @@ fun ReviewDetailHeading(
 
 
 @Composable
+/**
+ * Returns the review bullet text used by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun ReviewBulletText(
     text: String
 ) {
@@ -289,6 +337,10 @@ fun ReviewBulletText(
 
 
 @Composable
+/**
+ * Returns the review numbered text used by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun ReviewNumberedText(
     number: Int,
     text: String
@@ -314,6 +366,10 @@ fun ReviewNumberedText(
 
 
 @Composable
+/**
+ * Returns the review empty text used by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun ReviewEmptyText(
     text: String
 ) {
@@ -325,6 +381,10 @@ fun ReviewEmptyText(
 }
 
 
+/**
+ * Returns the review slot text used by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun reviewSlotText(
     capacity: Int?
 ): String? {
@@ -334,6 +394,10 @@ fun reviewSlotText(
 }
 
 
+/**
+ * Returns the review date value required by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun reviewDate(
     millis: Long?
 ): String {
@@ -346,6 +410,10 @@ fun reviewDate(
 }
 
 
+/**
+ * Returns the review date range value required by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun reviewDateRange(
     startMillis: Long?,
     endMillis: Long?
@@ -359,6 +427,10 @@ fun reviewDateRange(
 }
 
 
+/**
+ * Returns the review time range value required by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun reviewTimeRange(
     startMinutes: Int?,
     endMinutes: Int?
@@ -374,6 +446,10 @@ fun reviewTimeRange(
 }
 
 
+/**
+ * Returns the review time value required by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun reviewTime(
     minutes: Int?
 ): String {

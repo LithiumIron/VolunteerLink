@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.create.steps
 
+// FILE OVERVIEW:
+/*
+ * ReviewSummaryStep contains presentation code for the organisation Create/Edit Post flow.
+ * It focuses on rendering state and forwarding user actions through callbacks/ViewModels,
+ * keeping database access and business rules outside the composables where possible.
+ */
+
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -180,6 +188,10 @@ fun ReviewSummaryStep(
 }
 
 @Composable
+/**
+ * Renders the UI represented by review summary actions for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun ReviewSummaryActions(
     isExistingPostEdit: Boolean,
     isSavingDraft: Boolean,
@@ -262,6 +274,10 @@ fun ReviewSummaryActions(
 }
 
 @Composable
+/**
+ * Renders the review summary header header used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun ReviewSummaryHeader(
     onUp: () -> Unit
 ) {

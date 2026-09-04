@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.repository
 
+// FILE OVERVIEW:
+/*
+ * SupabaseImpactWeaveRepository defines or implements data access used by the organisation Impact Weave and partnership flow.
+ * Repository code keeps Supabase/RPC/storage details away from the composables and ViewModels
+ * so UI code can work with application models instead of backend-specific responses.
+ */
+
+
 import com.example.volunteerlink.data.location.LocationSuggestion
 import com.example.volunteerlink.data.supabase
 import com.example.volunteerlink.organisation.auth.OrganisationSession
@@ -32,6 +40,10 @@ import java.util.Locale
 
 
 @Serializable
+/**
+ * Holds the values represented by active impact weave plan row as one strongly typed model.
+ * It keeps backend-facing work behind the Impact Weave and partnership repository boundary.
+ */
 private data class ActiveImpactWeavePlanRow(
     @SerialName("draft_id") val draftId: String,
     val category: String? = null,
@@ -51,12 +63,20 @@ private data class ActiveImpactWeavePlanRow(
 )
 
 @Serializable
+/**
+ * Holds the values represented by matching input response as one strongly typed model.
+ * It keeps backend-facing work behind the Impact Weave and partnership repository boundary.
+ */
 private data class MatchingInputResponse(
     val needs: List<MatchingNeedRow> = emptyList(),
     val candidates: List<MatchingCandidateRow> = emptyList()
 )
 
 @Serializable
+/**
+ * Holds the values represented by matching need row as one strongly typed model.
+ * It keeps backend-facing work behind the Impact Weave and partnership repository boundary.
+ */
 private data class MatchingNeedRow(
     @SerialName("need_id") val needId: String,
     @SerialName("original_text") val originalText: String,
@@ -69,10 +89,14 @@ private data class MatchingNeedRow(
 )
 
 @Serializable
+/**
+ * Holds the values represented by matching candidate row as one strongly typed model.
+ * It keeps backend-facing work behind the Impact Weave and partnership repository boundary.
+ */
 private data class MatchingCandidateRow(
-    // Old matching RPC versions returned need_id on every candidate. The semantic
-    // matching RPC returns each real support only once, so this field is optional
-    // for backward compatibility and is deliberately not used for matching.
+    // Some candidate responses can include need_id, but matching is performed from the
+    // support record itself. Keeping the field optional lets the decoder accept either
+    // response shape without using need_id as the compatibility decision.
     @SerialName("need_id") val legacyNeedId: String? = null,
     @SerialName("support_id") val supportId: String,
     @SerialName("organisation_id") val organisationId: String,
@@ -91,6 +115,10 @@ private data class MatchingCandidateRow(
 )
 
 @Serializable
+/**
+ * Holds the values represented by impact weave post prefill row as one strongly typed model.
+ * It keeps backend-facing work behind the Impact Weave and partnership repository boundary.
+ */
 private data class ImpactWeavePostPrefillRow(
     @SerialName("draft_id") val draftId: String,
     val category: String,
@@ -110,11 +138,19 @@ private data class ImpactWeavePostPrefillRow(
 )
 
 @Serializable
+/**
+ * Holds the values represented by impact weave post partner row as one strongly typed model.
+ * It keeps backend-facing work behind the Impact Weave and partnership repository boundary.
+ */
 private data class ImpactWeavePostPartnerRow(
     @SerialName("organisation_name") val organisationName: String,
     @SerialName("contribution_summary") val contributionSummary: String
 )
 
+/**
+ * Holds the values represented by prepared impact weave plan as one strongly typed model.
+ * It keeps backend-facing work behind the Impact Weave and partnership repository boundary.
+ */
 private data class PreparedImpactWeavePlan(
     val mode: ImpactWeaveMode,
     val startDate: Long,
@@ -133,6 +169,10 @@ private data class PreparedImpactWeavePlan(
 /** Supabase implementation for Impact Weave Find Partners. */
 class SupabaseImpactWeaveRepository : ImpactWeaveRepository {
 
+    /**
+     * Loads the active plans needed by the organisation Impact Weave and partnership flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     override suspend fun loadActivePlans(): List<ImpactWeaveActivePlan> {
         val response = supabase.postgrest.rpc(
             function = "organisation_list_active_impact_weave_plans"
@@ -175,6 +215,10 @@ class SupabaseImpactWeaveRepository : ImpactWeaveRepository {
     }
 
 
+    /**
+     * Starts the matching for the organisation Impact Weave and partnership flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     override suspend fun startMatching(
         draft: ImpactWeaveDraft
     ): StartedImpactWeaveMatchingResult {
@@ -192,6 +236,10 @@ class SupabaseImpactWeaveRepository : ImpactWeaveRepository {
         )
     }
 
+    /**
+     * Loads the matching input needed by the organisation Impact Weave and partnership flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     override suspend fun loadMatchingInput(draftId: String): ImpactWeaveMatchingInput {
         val response = supabase.postgrest.rpc(
             function = "organisation_get_impact_weave_matching_input",
@@ -240,6 +288,10 @@ class SupabaseImpactWeaveRepository : ImpactWeaveRepository {
         )
     }
 
+    /**
+     * Updates the basic details used by the organisation Impact Weave and partnership flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     override suspend fun updateBasicDetails(
         draftId: String,
         title: String,
@@ -257,6 +309,10 @@ class SupabaseImpactWeaveRepository : ImpactWeaveRepository {
         )
     }
 
+    /**
+     * Derives the reschedule value used by the organisation Impact Weave and partnership flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     override suspend fun reschedule(
         draftId: String,
         startDateMillis: Long,
@@ -276,6 +332,10 @@ class SupabaseImpactWeaveRepository : ImpactWeaveRepository {
         )
     }
 
+    /**
+     * Derives the dispose value used by the organisation Impact Weave and partnership flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     override suspend fun dispose(draftId: String) {
         supabase.postgrest.rpc(
             function = "organisation_dispose_impact_weave",
@@ -283,6 +343,10 @@ class SupabaseImpactWeaveRepository : ImpactWeaveRepository {
         )
     }
 
+    /**
+     * Loads the post prefill needed by the organisation Impact Weave and partnership flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     override suspend fun loadPostPrefill(draftId: String): ImpactWeavePostPrefill {
         val response = supabase.postgrest.rpc(
             function = "organisation_get_impact_weave_post_prefill",
@@ -317,6 +381,10 @@ class SupabaseImpactWeaveRepository : ImpactWeaveRepository {
         )
     }
 
+    /**
+     * Confirms the conversion in the organisation Impact Weave and partnership flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     override suspend fun completeConversion(draftId: String, postId: String) {
         supabase.postgrest.rpc(
             function = "organisation_complete_impact_weave_conversion",
@@ -327,6 +395,10 @@ class SupabaseImpactWeaveRepository : ImpactWeaveRepository {
         )
     }
 
+    /**
+     * Prepares the plan for the organisation Impact Weave and partnership flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     private suspend fun preparePlan(draft: ImpactWeaveDraft): PreparedImpactWeavePlan {
         val organisation = OrganisationSession.requireContext()
         require(organisation.isVerified) {
@@ -392,6 +464,10 @@ class SupabaseImpactWeaveRepository : ImpactWeaveRepository {
         )
     }
 
+    /**
+     * Builds the plan parameters used by the organisation Impact Weave and partnership flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     private fun buildPlanParameters(
         draft: ImpactWeaveDraft,
         prepared: PreparedImpactWeavePlan
@@ -452,6 +528,10 @@ class SupabaseImpactWeaveRepository : ImpactWeaveRepository {
         })
     }
 
+    /**
+     * Returns the require draft id value required by the organisation Impact Weave and partnership flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     private fun requireDraftId(data: String, errorMessage: String): String {
         val result = Json.parseToJsonElement(data).jsonObject
         return result["draft_id"]
@@ -461,20 +541,36 @@ class SupabaseImpactWeaveRepository : ImpactWeaveRepository {
             ?: error(errorMessage)
     }
 
+    /**
+     * Parses the sql date used by the organisation Impact Weave and partnership flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     private fun parseSqlDate(value: String): Long =
         SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
             isLenient = false
         }.parse(value)?.time ?: error("Invalid Impact Weave date: $value")
 
+    /**
+     * Parses the sql time used by the organisation Impact Weave and partnership flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     private fun parseSqlTime(value: String): Int {
         val parts = value.take(5).split(":")
         if (parts.size != 2) error("Invalid Impact Weave time: $value")
         return parts[0].toInt() * 60 + parts[1].toInt()
     }
 
+    /**
+     * Formats the date used by the organisation Impact Weave and partnership flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     private fun formatDate(timeMillis: Long): String =
         SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(timeMillis))
 
+    /**
+     * Formats the time used by the organisation Impact Weave and partnership flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     private fun formatTime(totalMinutes: Int): String = "%02d:%02d:00".format(
         Locale.US,
         totalMinutes / 60,

@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.impactweave
 
+// FILE OVERVIEW:
+/*
+ * ImpactWeaveViewModel coordinates state and user actions for the organisation Impact Weave and partnership flow.
+ * It translates UI events into validation/repository operations and exposes observable state
+ * back to Compose so the screen can stay declarative.
+ */
+
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.volunteerlink.data.ai.GroqImpactWeaveCandidate
@@ -36,6 +44,10 @@ import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
 
+/**
+ * Encapsulates the state and behaviour represented by impact weave view model.
+ * It supports state coordination and user actions for the Impact Weave and partnership flow.
+ */
 class ImpactWeaveViewModel : ViewModel() {
 
     private val impactWeaveRepository: ImpactWeaveRepository =
@@ -49,6 +61,10 @@ class ImpactWeaveViewModel : ViewModel() {
     private var nextDraftId = 1
     private var nextNeedId = 1
 
+    /**
+     * Loads the active plans needed by the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun loadActivePlans() {
         if (_uiState.value.isLoadingActivePlans) return
 
@@ -75,6 +91,10 @@ class ImpactWeaveViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Derives the reopen active plan value used by the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun reopenActivePlan(plan: ImpactWeaveActivePlan) {
         if (_uiState.value.isFindingPartners) return
 
@@ -119,6 +139,10 @@ class ImpactWeaveViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Starts the new draft for the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun startNewDraft() {
         val now = AppClock.nowMillis()
         _uiState.value = _uiState.value.copy(
@@ -142,6 +166,10 @@ class ImpactWeaveViewModel : ViewModel() {
         )
     }
 
+    /**
+     * Returns the organisation Impact Weave and partnership flow to the requested step or state.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun returnToList() {
         _uiState.value = _uiState.value.copy(
             page = ImpactWeavePage.LIST,
@@ -162,18 +190,30 @@ class ImpactWeaveViewModel : ViewModel() {
         loadActivePlans()
     }
 
+    /**
+     * Derives the go to activity plan value used by the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun goToActivityPlan() {
         if (_uiState.value.workingDraft != null) {
             _uiState.value = _uiState.value.copy(page = ImpactWeavePage.ACTIVITY_PLAN)
         }
     }
 
+    /**
+     * Derives the continue to support needed value used by the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun continueToSupportNeeded(): Boolean {
         if (activityPlanErrors().isNotEmpty()) return false
         _uiState.value = _uiState.value.copy(page = ImpactWeavePage.SUPPORT_NEEDED)
         return true
     }
 
+    /**
+     * Derives the continue to review value used by the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun continueToReview(): Boolean {
         val draft = _uiState.value.workingDraft ?: return false
         if (draft.needs.isEmpty()) return false
@@ -186,6 +226,10 @@ class ImpactWeaveViewModel : ViewModel() {
         return true
     }
 
+    /**
+     * Derives the go back from review value used by the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun goBackFromReview() {
         _uiState.value = _uiState.value.copy(
             page = ImpactWeavePage.SUPPORT_NEEDED,
@@ -193,6 +237,10 @@ class ImpactWeaveViewModel : ViewModel() {
         )
     }
 
+    /**
+     * Returns the partners used by the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun findPartners() {
         if (_uiState.value.isFindingPartners) return
 
@@ -265,6 +313,10 @@ class ImpactWeaveViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Retries the current operation in the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun retryMatchingResults() {
         if (_uiState.value.isFindingPartners) return
         val draft = _uiState.value.workingDraft ?: return
@@ -281,6 +333,10 @@ class ImpactWeaveViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Loads the matching results needed by the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private suspend fun loadMatchingResults(
         draftId: String,
         draft: ImpactWeaveDraft
@@ -344,6 +400,10 @@ class ImpactWeaveViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Loads the partnership states needed by the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private suspend fun loadPartnershipStates(
         draftId: String
     ): Map<String, ImpactWeavePartnershipState> {
@@ -421,6 +481,10 @@ class ImpactWeaveViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Builds the match results used by the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun buildMatchResults(
         draftId: String,
         input: ImpactWeaveMatchingInput,
@@ -471,6 +535,10 @@ class ImpactWeaveViewModel : ViewModel() {
         )
     }
 
+    /**
+     * Builds the venue match result used by the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun buildVenueMatchResult(
         need: ImpactWeaveDatabaseNeed,
         directSemantic: List<ImpactWeaveSupportCandidate>,
@@ -505,6 +573,10 @@ class ImpactWeaveViewModel : ViewModel() {
         )
     }
 
+    /**
+     * Builds the quantity match result used by the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun buildQuantityMatchResult(
         need: ImpactWeaveDatabaseNeed,
         directSemantic: List<ImpactWeaveSupportCandidate>,
@@ -534,6 +606,10 @@ class ImpactWeaveViewModel : ViewModel() {
         )
     }
 
+    /**
+     * Derives the fallback semantic matches value used by the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun fallbackSemanticMatches(
         input: ImpactWeaveMatchingInput
     ): List<ImpactWeaveSemanticMatch> {
@@ -549,6 +625,10 @@ class ImpactWeaveViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Derives the fallback match level value used by the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun fallbackMatchLevel(needName: String, candidateName: String): String {
         val need = matchingTokens(needName)
         val candidate = matchingTokens(candidateName)
@@ -559,12 +639,20 @@ class ImpactWeaveViewModel : ViewModel() {
         return if (need.intersect(candidate).isNotEmpty()) "ALTERNATIVE" else "NONE"
     }
 
+    /**
+     * Derives the matching tokens value used by the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun matchingTokens(value: String): Set<String> = value
         .lowercase()
         .split(Regex("[^a-z0-9]+"))
         .filter { it.length >= 2 }
         .toSet()
 
+    /**
+     * Derives the distance km from activity value used by the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun distanceKmFromActivity(
         draft: ImpactWeaveDraft,
         candidate: ImpactWeaveSupportCandidate
@@ -580,6 +668,10 @@ class ImpactWeaveViewModel : ViewModel() {
         )
     }
 
+    /**
+     * Derives the haversine km value used by the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun haversineKm(
         latitude1: Double,
         longitude1: Double,
@@ -597,18 +689,42 @@ class ImpactWeaveViewModel : ViewModel() {
         return earthRadiusKm * 2 * atan2(sqrt(a), sqrt(1 - a))
     }
 
+    /**
+     * Checks whether the organisation Impact Weave and partnership flow allows idate distance comparator.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun candidateDistanceComparator() =
         compareBy<ImpactWeaveSupportCandidate> { it.distanceKm ?: Double.MAX_VALUE }
             .thenBy { it.organisationName.lowercase() }
 
+    /**
+     * Updates the category used by the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun updateCategory(value: VolunteerPostCategory) = updateDraft { copy(category = value) }
 
+    /**
+     * Updates the title used by the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun updateTitle(value: String) = updateDraft { copy(title = value) }
 
+    /**
+     * Updates the description used by the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun updateDescription(value: String) = updateDraft { copy(description = value) }
 
+    /**
+     * Updates the mode used by the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun updateMode(value: ImpactWeaveMode) = updateDraft { copy(mode = value) }
 
+    /**
+     * Updates the duration used by the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun updateDuration(value: ImpactWeaveDuration) = updateDraft {
         when (value) {
             ImpactWeaveDuration.ONE_DAY -> copy(
@@ -625,6 +741,10 @@ class ImpactWeaveViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Updates the start date used by the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun updateStartDate(value: Long) = updateDraft {
         when (duration) {
             ImpactWeaveDuration.ONE_DAY -> copy(
@@ -639,6 +759,10 @@ class ImpactWeaveViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Updates the end date used by the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun updateEndDate(value: Long) = updateDraft {
         if (duration == ImpactWeaveDuration.MULTIPLE_DAYS) {
             copy(endDateMillis = value)
@@ -678,6 +802,10 @@ class ImpactWeaveViewModel : ViewModel() {
         return null
     }
 
+    /**
+     * Updates the area query used by the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun updateAreaQuery(value: String) = updateDraft {
         copy(
             areaQuery = value,
@@ -685,6 +813,10 @@ class ImpactWeaveViewModel : ViewModel() {
         )
     }
 
+    /**
+     * Selects the area used by the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun selectArea(location: LocationSuggestion) = updateDraft {
         val area = location.asGeneralArea()
         copy(
@@ -693,6 +825,10 @@ class ImpactWeaveViewModel : ViewModel() {
         )
     }
 
+    /**
+     * Clears the area for the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun clearArea() = updateDraft {
         copy(
             areaQuery = "",
@@ -700,6 +836,10 @@ class ImpactWeaveViewModel : ViewModel() {
         )
     }
 
+    /**
+     * Updates the has existing venue used by the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun updateHasExistingVenue(value: Boolean) = updateDraft {
         if (value) {
             copy(
@@ -716,6 +856,10 @@ class ImpactWeaveViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Updates the venue query used by the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun updateVenueQuery(value: String) = updateDraft {
         copy(
             venueQuery = value,
@@ -723,6 +867,10 @@ class ImpactWeaveViewModel : ViewModel() {
         )
     }
 
+    /**
+     * Selects the venue used by the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun selectVenue(location: LocationSuggestion) = updateDraft {
         val area = location.asGeneralArea()
         copy(
@@ -733,6 +881,10 @@ class ImpactWeaveViewModel : ViewModel() {
         )
     }
 
+    /**
+     * Clears the venue for the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun clearVenue() = updateDraft {
         copy(
             venueQuery = "",
@@ -742,6 +894,10 @@ class ImpactWeaveViewModel : ViewModel() {
         )
     }
 
+    /**
+     * Adds the need to the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun addNeed(
         originalText: String,
         supportType: String,
@@ -763,6 +919,10 @@ class ImpactWeaveViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Updates the need used by the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun updateNeed(
         needId: Int,
         originalText: String,
@@ -790,12 +950,20 @@ class ImpactWeaveViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Removes the need from the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun removeNeed(needId: Int) {
         updateDraft {
             copy(needs = needs.filterNot { it.needId == needId })
         }
     }
 
+    /**
+     * Derives the activity plan errors value used by the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun activityPlanErrors(): Map<String, String> {
         val draft = _uiState.value.workingDraft ?: return mapOf("draft" to "Draft is unavailable.")
         val errors = linkedMapOf<String, String>()
@@ -855,6 +1023,10 @@ class ImpactWeaveViewModel : ViewModel() {
         return errors
     }
 
+    /**
+     * Returns the minimum impact weave start date millis value required by the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun minimumImpactWeaveStartDateMillis(): Long {
         return startOfLocalDay(AppClock.nowMillis()).let { today ->
             Calendar.getInstance().apply {
@@ -864,6 +1036,10 @@ class ImpactWeaveViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Returns the partnership planning deadline millis value required by the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun partnershipPlanningDeadlineMillis(startDateMillis: Long?): Long? {
         if (startDateMillis == null) return null
         return Calendar.getInstance().apply {
@@ -872,6 +1048,10 @@ class ImpactWeaveViewModel : ViewModel() {
         }.timeInMillis
     }
 
+    /**
+     * Sends the partnership request for the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun sendPartnershipRequest(
         organisationId: String,
         organisationName: String,
@@ -923,6 +1103,10 @@ class ImpactWeaveViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Clears the partnership request feedback for the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun clearPartnershipRequestFeedback() {
         _uiState.value = _uiState.value.copy(
             partnershipRequestError = null,
@@ -930,6 +1114,10 @@ class ImpactWeaveViewModel : ViewModel() {
         )
     }
 
+    /**
+     * Updates the active plan details used by the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun updateActivePlanDetails(
         category: VolunteerPostCategory,
         title: String,
@@ -964,6 +1152,10 @@ class ImpactWeaveViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Derives the reschedule active plan value used by the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun rescheduleActivePlan(
         startDateMillis: Long,
         endDateMillis: Long,
@@ -1026,6 +1218,10 @@ class ImpactWeaveViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Derives the dispose active plan value used by the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun disposeActivePlan() {
         val draft = _uiState.value.workingDraft ?: return
         val draftId = draft.databaseDraftId ?: return
@@ -1046,6 +1242,10 @@ class ImpactWeaveViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Clears the plan change feedback for the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun clearPlanChangeFeedback() {
         _uiState.value = _uiState.value.copy(
             planChangeError = null,
@@ -1053,6 +1253,10 @@ class ImpactWeaveViewModel : ViewModel() {
         )
     }
 
+    /**
+     * Derives the run plan change value used by the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun runPlanChange(action: suspend () -> Unit) {
         _uiState.value = _uiState.value.copy(
             isSavingPlanChange = true,
@@ -1073,6 +1277,10 @@ class ImpactWeaveViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Derives the first incomplete need value used by the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun firstIncompleteNeed(draft: ImpactWeaveDraft): ImpactWeaveNeedDraft? =
         draft.needs.firstOrNull { need ->
             when (need.supportType.trim().uppercase()) {
@@ -1081,9 +1289,17 @@ class ImpactWeaveViewModel : ViewModel() {
             }
         }
 
+    /**
+     * Returns the support type label for error used by the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun supportTypeLabelForError(supportType: String): String =
         supportType.lowercase().replaceFirstChar { it.titlecase() }
 
+    /**
+     * Returns the friendly matching error used by the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun friendlyMatchingError(exception: Exception): String {
         val message = exception.message.orEmpty()
         return when {
@@ -1101,6 +1317,10 @@ class ImpactWeaveViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Returns the safe partnership request error used by the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun safePartnershipRequestError(rawMessage: String): String {
         val safe = safeDatabaseError(rawMessage)
         return if (safe.startsWith("Unable to start Impact Weave", ignoreCase = true)) {
@@ -1138,6 +1358,10 @@ class ImpactWeaveViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Updates the draft used by the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun updateDraft(change: ImpactWeaveDraft.() -> ImpactWeaveDraft) {
         val draft = _uiState.value.workingDraft ?: return
         _uiState.value = _uiState.value.copy(
@@ -1146,6 +1370,10 @@ class ImpactWeaveViewModel : ViewModel() {
         )
     }
 
+    /**
+     * Starts the of local day for the organisation Impact Weave and partnership flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun startOfLocalDay(timeMillis: Long): Long {
         return Calendar.getInstance().apply {
             timeInMillis = timeMillis

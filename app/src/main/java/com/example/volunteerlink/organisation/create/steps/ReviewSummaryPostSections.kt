@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.create.steps
 
+// FILE OVERVIEW:
+/*
+ * ReviewSummaryPostSections contains presentation code for the organisation Create/Edit Post flow.
+ * It focuses on rendering state and forwarding user actions through callbacks/ViewModels,
+ * keeping database access and business rules outside the composables where possible.
+ */
+
+
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -60,6 +68,10 @@ import java.util.Date
 import java.util.Locale
 
 @Composable
+/**
+ * Renders the review post preview card card used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun ReviewPostPreviewCard(
     uiState: CreatePostUiState
 ) {
@@ -228,6 +240,10 @@ fun ReviewPostPreviewCard(
 
 
 @Composable
+/**
+ * Renders the review post details card card used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun ReviewPostDetailsCard(
     uiState: CreatePostUiState
 ) {

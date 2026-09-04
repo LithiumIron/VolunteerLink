@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.screens
 
+// FILE OVERVIEW:
+/*
+ * OrganisationApplicantReviewScreen contains presentation code for the organisation Manage Post flow.
+ * It focuses on rendering state and forwarding user actions through callbacks/ViewModels,
+ * keeping database access and business rules outside the composables where possible.
+ */
+
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -218,6 +226,10 @@ fun OrganisationApplicantReviewScreen(
 }
 
 @Composable
+/**
+ * Renders the organisation applicant decline dialog dialog used in the organisation Manage Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun OrganisationApplicantDeclineDialog(
     person: PostManagementPerson,
     reason: String,
@@ -338,6 +350,10 @@ private fun OrganisationApplicantDeclineDialog(
 }
 
 @Composable
+/**
+ * Renders the organisation applicant review content content block used in the organisation Manage Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun OrganisationApplicantReviewContent(
     post: PostManagementPost,
     role: PostManagementRole,
@@ -547,6 +563,10 @@ private fun OrganisationApplicantReviewContent(
 }
 
 @Composable
+/**
+ * Renders the UI represented by organisation applicant review top bar for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun OrganisationApplicantReviewTopBar(
     person: PostManagementPerson,
     onBack: () -> Unit,
@@ -597,6 +617,10 @@ private fun OrganisationApplicantReviewTopBar(
 }
 
 @Composable
+/**
+ * Renders the organisation application role summary summary block used in the organisation Manage Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun OrganisationApplicationRoleSummary(
     post: PostManagementPost,
     role: PostManagementRole
@@ -702,6 +726,10 @@ private fun OrganisationApplicationRoleSummary(
     }
 }
 
+/**
+ * Formats the application date used by the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun formatApplicationDate(raw: String): String {
     if (raw.isBlank()) return "Date unavailable"
     return runCatching {

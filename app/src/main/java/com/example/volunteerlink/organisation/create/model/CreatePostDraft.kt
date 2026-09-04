@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.create.model
 
+// FILE OVERVIEW:
+/*
+ * CreatePostDraft groups the data structures used by the organisation Create/Edit Post flow.
+ * These models make state explicit and allow the UI, ViewModel and repository layers to exchange
+ * strongly typed values instead of passing unrelated parameters throughout the feature.
+ */
+
+
 import com.example.volunteerlink.data.location.LocationSuggestion
 
 /** Values match volunteer_posts.mode in Supabase. */

@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.create.steps
 
+// FILE OVERVIEW:
+/*
+ * SelectRolesStep contains presentation code for the organisation Create/Edit Post flow.
+ * It focuses on rendering state and forwarding user actions through callbacks/ViewModels,
+ * keeping database access and business rules outside the composables where possible.
+ */
+
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -558,6 +566,10 @@ fun SelectRolesStep(
 }
 
 @Composable
+/**
+ * Renders the role selection header header used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun RoleSelectionHeader(
     onBack: () -> Unit,
     isEditingFromReview: Boolean
@@ -599,6 +611,10 @@ fun RoleSelectionHeader(
 }
 
 @Composable
+/**
+ * Renders the role assignment summary card card used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun RoleAssignmentSummaryCard(
     draft: CreatePostDraft,
     templatesById: Map<String, CreateRoleTemplate>
@@ -728,6 +744,10 @@ fun RoleAssignmentSummaryCard(
 }
 
 @Composable
+/**
+ * Renders the UI represented by role selection mode assignment line for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun RoleSelectionModeAssignmentLine(
     label: String,
     assigned: Int,
@@ -758,6 +778,10 @@ fun RoleSelectionModeAssignmentLine(
 }
 
 @Composable
+/**
+ * Renders the UI represented by role selection hybrid mode selector for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun RoleSelectionHybridModeSelector(
     selectedMode: VolunteerRoleMode,
     physicalAssigned: Int,
@@ -803,6 +827,10 @@ fun RoleSelectionHybridModeSelector(
 }
 
 @Composable
+/**
+ * Renders the role selection mode button button used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun RoleSelectionModeButton(
     title: String,
     progressText: String,
@@ -849,6 +877,10 @@ fun RoleSelectionModeButton(
 }
 
 @Composable
+/**
+ * Renders the role selection area card card used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun RoleSelectionAreaCard(
     roleArea: String,
     availableCount: Int,
@@ -954,6 +986,10 @@ fun RoleSelectionAreaCard(
 }
 
 @Composable
+/**
+ * Renders the UI represented by role selection section heading for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun RoleSelectionSectionHeading(
     title: String,
     subtitle: String,
@@ -979,6 +1015,10 @@ fun RoleSelectionSectionHeading(
 }
 
 @Composable
+/**
+ * Renders the available role selection card card used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun AvailableRoleSelectionCard(
     role: CreateRoleTemplate,
     canAdd: Boolean,
@@ -1052,6 +1092,10 @@ fun AvailableRoleSelectionCard(
 }
 
 @Composable
+/**
+ * Renders the selected role selection card card used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun SelectedRoleSelectionCard(
     role: CreateRoleTemplate,
     selectedRole: SelectedRoleDraft,
@@ -1218,6 +1262,10 @@ fun SelectedRoleSelectionCard(
 }
 
 @Composable
+/**
+ * Renders the role capacity number field input field used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun RoleCapacityNumberField(
     roleTemplateId: String,
     value: Int,
@@ -1308,7 +1356,7 @@ fun RoleCapacityNumberField(
                         hasFocus = focusState.isFocused
 
                         if (justFocused) {
-                            // Select the old value so typing a new number
+                            // Select the current value so typing a replacement number
                             // replaces it instead of turning 1 + 3 into 13.
                             input = input.copy(
                                 selection = TextRange(
@@ -1344,6 +1392,10 @@ fun RoleCapacityNumberField(
 }
 
 @Composable
+/**
+ * Renders the role capacity icon button button used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun RoleCapacityIconButton(
     iconRes: Int,
     contentDescription: String,
@@ -1384,6 +1436,10 @@ fun RoleCapacityIconButton(
 }
 
 @Composable
+/**
+ * Renders the role selection level chip chip used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun RoleSelectionLevelChip(
     level: VolunteerRoleLevel
 ) {
@@ -1417,6 +1473,10 @@ fun RoleSelectionLevelChip(
 }
 
 @Composable
+/**
+ * Renders the UI represented by role selection area icon for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun RoleSelectionAreaIcon(
     roleArea: String
 ) {
@@ -1435,6 +1495,10 @@ fun RoleSelectionAreaIcon(
     }
 }
 
+/**
+ * Returns the role selection area icon res value required by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun roleSelectionAreaIconRes(
     roleArea: String
 ): Int {
@@ -1456,6 +1520,10 @@ fun roleSelectionAreaIconRes(
 }
 
 @Composable
+/**
+ * Renders the role selection empty card card used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun RoleSelectionEmptyCard(
     text: String
 ) {
@@ -1476,6 +1544,10 @@ fun RoleSelectionEmptyCard(
 }
 
 @Composable
+/**
+ * Renders the UI represented by role selection status for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun RoleSelectionStatus(
     uiState: CreatePostUiState,
     templatesById: Map<String, CreateRoleTemplate>
@@ -1553,6 +1625,10 @@ fun RoleSelectionStatus(
 }
 
 @Composable
+/**
+ * Renders the role selection loading card card used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun RoleSelectionLoadingCard() {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -1570,6 +1646,10 @@ fun RoleSelectionLoadingCard() {
 }
 
 @Composable
+/**
+ * Renders the role selection catalogue error card card used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun RoleSelectionCatalogueErrorCard(
     message: String,
     onRetry: () -> Unit
@@ -1600,6 +1680,10 @@ fun RoleSelectionCatalogueErrorCard(
     }
 }
 
+/**
+ * Checks whether the role selection matches the post type required by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun roleSelectionMatchesPostType(
     roleMode: VolunteerRoleMode,
     postType: VolunteerPostType?
@@ -1614,6 +1698,10 @@ fun roleSelectionMatchesPostType(
     }
 }
 
+/**
+ * Derives the assigned role capacity for mode value used by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun assignedRoleCapacityForMode(
     draft: CreatePostDraft,
     mode: VolunteerRoleMode,
@@ -1626,6 +1714,10 @@ fun assignedRoleCapacityForMode(
         .sumOf { selectedRole -> selectedRole.capacity }
 }
 
+/**
+ * Derives the remaining role capacity for mode value used by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun remainingRoleCapacityForMode(
     draft: CreatePostDraft,
     mode: VolunteerRoleMode,
@@ -1643,6 +1735,10 @@ fun remainingRoleCapacityForMode(
     )
 }
 
+/**
+ * Returns the role capacity completion message used by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun roleCapacityCompletionMessage(
     label: String,
     assigned: Int,

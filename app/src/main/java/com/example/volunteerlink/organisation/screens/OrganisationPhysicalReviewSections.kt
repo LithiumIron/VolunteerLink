@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.screens
 
+// FILE OVERVIEW:
+/*
+ * OrganisationPhysicalReviewSections contains presentation code for the organisation Manage Post flow.
+ * It focuses on rendering state and forwarding user actions through callbacks/ViewModels,
+ * keeping database access and business rules outside the composables where possible.
+ */
+
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -236,6 +244,10 @@ fun PostManagementPhysicalReviewContent(
 }
 
 @Composable
+/**
+ * Returns the review dialog title used by the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun ReviewDialogTitle(text: String) {
     Text(
         text = text,
@@ -308,6 +320,10 @@ private fun ReviewFlowHeader(
 }
 
 @Composable
+/**
+ * Renders the UI represented by review stage step for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun ReviewStageStep(
     number: Int,
     label: String,
@@ -384,6 +400,10 @@ private fun ReviewStageSurface(
 }
 
 @Composable
+/**
+ * Renders the UI represented by review section heading for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun ReviewSectionHeading(
     title: String,
     subtitle: String? = null,
@@ -393,11 +413,19 @@ private fun ReviewSectionHeading(
 }
 
 @Composable
+/**
+ * Renders the UI represented by review section divider for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun ReviewSectionDivider() {
     OrganisationDivider(modifier = Modifier.padding(vertical = 14.dp))
 }
 
 @Composable
+/**
+ * Renders the UI represented by review stage footer for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun ReviewStageFooter(
     backLabel: String?,
     backEnabled: Boolean = true,
@@ -435,6 +463,10 @@ private fun ReviewStageFooter(
 }
 
 @Composable
+/**
+ * Renders the UI represented by attendance review stage for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun AttendanceReviewStage(
     entries: List<PostManagementPhysicalReviewEntry>,
     busy: Boolean,
@@ -508,6 +540,10 @@ private fun AttendanceReviewStage(
 }
 
 @Composable
+/**
+ * Renders the UI represented by completion review stage for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun CompletionReviewStage(
     ready: List<PostManagementPhysicalReviewEntry>,
     decisionExceptions: List<PostManagementPhysicalReviewEntry>,
@@ -648,6 +684,10 @@ private fun CompletionReviewStage(
 }
 
 @Composable
+/**
+ * Renders the completion decision card card used in the organisation Manage Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun CompletionDecisionCard(
     entry: PostManagementPhysicalReviewEntry,
     busy: Boolean,
@@ -746,6 +786,10 @@ private fun CompletionDecisionCard(
 }
 
 @Composable
+/**
+ * Renders the selected decision section section used in the organisation Manage Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun SelectedDecisionSection(
     fullAttendanceCompleted: List<PostManagementPhysicalReviewEntry>,
     individualCompleted: List<Pair<PostManagementPhysicalReviewEntry, PostManagementPendingReviewDecision>>,
@@ -857,6 +901,10 @@ private fun SelectedDecisionSection(
 }
 
 @Composable
+/**
+ * Renders the selected decision row row used in the organisation Manage Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun SelectedDecisionRow(
     entry: PostManagementPhysicalReviewEntry,
     status: String,
@@ -901,6 +949,10 @@ private fun SelectedDecisionRow(
 }
 
 @Composable
+/**
+ * Renders the UI represented by work issue finder for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun WorkIssueFinder(
     candidates: List<PostManagementPhysicalReviewEntry>,
     busy: Boolean,
@@ -1040,6 +1092,10 @@ private fun WorkIssueFinder(
 }
 
 @Composable
+/**
+ * Renders the UI represented by feedback review stage for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun FeedbackReviewStage(
     review: PostManagementPhysicalReview,
     session: PostManagementPhysicalReviewSession,
@@ -1089,6 +1145,10 @@ private fun FeedbackReviewStage(
         .filter { id -> available.any { entry -> entry.person.userId == id } }
         .toSet()
 
+    /**
+     * Resets the composer for the organisation Manage Post flow.
+     * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+     */
     fun resetComposer() {
         onReviewDraftDirtyChanged(false)
         composerOpen = false
@@ -1246,6 +1306,10 @@ private fun FeedbackReviewStage(
 }
 
 @Composable
+/**
+ * Renders the UI represented by feedback composer for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun FeedbackComposer(
     available: List<PostManagementPhysicalReviewEntry>,
     withoutFeedback: List<PostManagementPhysicalReviewEntry>,
@@ -1379,6 +1443,10 @@ private fun FeedbackComposer(
 }
 
 @Composable
+/**
+ * Renders the temporary feedback group row row used in the organisation Manage Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun TemporaryFeedbackGroupRow(
     feedback: String,
     userIds: List<String>,
@@ -1422,6 +1490,10 @@ private fun TemporaryFeedbackGroupRow(
 }
 
 @Composable
+/**
+ * Completes the review stage for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun FinishReviewStage(
     review: PostManagementPhysicalReview,
     session: PostManagementPhysicalReviewSession,
@@ -1589,6 +1661,10 @@ private fun ReviewExpandableHeader(
 }
 
 @Composable
+/**
+ * Renders the UI represented by attendance browser for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun AttendanceBrowser(
     title: String,
     subtitle: String,
@@ -1734,6 +1810,10 @@ private fun AttendanceBrowser(
 }
 
 @Composable
+/**
+ * Renders the UI represented by attendance timeline for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun AttendanceTimeline(
     entry: PostManagementPhysicalReviewEntry,
     busy: Boolean,
@@ -1767,6 +1847,10 @@ private fun AttendanceTimeline(
 }
 
 @Composable
+/**
+ * Renders the attendance timeline row row used in the organisation Manage Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun AttendanceTimelineRow(
     person: PostManagementPerson,
     status: PostManagementVolunteerAttendanceDateStatus,
@@ -1846,6 +1930,10 @@ private fun AttendanceTimelineRow(
 }
 
 @Composable
+/**
+ * Renders the volunteer identity header header used in the organisation Manage Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun VolunteerIdentityHeader(
     entry: PostManagementPhysicalReviewEntry,
     trailingLabel: String,
@@ -1907,6 +1995,10 @@ private fun VolunteerIdentityHeader(
 }
 
 @Composable
+/**
+ * Renders the compact volunteer row row used in the organisation Manage Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun CompactVolunteerRow(
     entry: PostManagementPhysicalReviewEntry,
     statusText: String,
@@ -1960,6 +2052,10 @@ private fun CompactVolunteerRow(
 }
 
 @Composable
+/**
+ * Renders the role filter row row used in the organisation Manage Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun RoleFilterRow(
     entries: List<PostManagementPhysicalReviewEntry>,
     selectedRoleId: String?,
@@ -1993,6 +2089,10 @@ private fun RoleFilterRow(
 }
 
 @Composable
+/**
+ * Renders the UI represented by feedback role selector for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun FeedbackRoleSelector(
     entries: List<PostManagementPhysicalReviewEntry>,
     selectedRoleIds: Set<String>,
@@ -2021,6 +2121,10 @@ private fun FeedbackRoleSelector(
 }
 
 @Composable
+/**
+ * Renders the UI represented by review filter pill for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun ReviewFilterPill(
     label: String,
     selected: Boolean,
@@ -2047,6 +2151,10 @@ private fun ReviewFilterPill(
 }
 
 @Composable
+/**
+ * Renders the UI represented by review status pill for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun ReviewStatusPill(
     text: String,
     color: Color,
@@ -2069,6 +2177,10 @@ private fun ReviewStatusPill(
 }
 
 @Composable
+/**
+ * Renders the UI represented by review message strip for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun ReviewMessageStrip(message: String) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -2087,6 +2199,10 @@ private fun ReviewMessageStrip(message: String) {
 }
 
 @Composable
+/**
+ * Renders the review summary row row used in the organisation Manage Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun ReviewSummaryRow(label: String, value: String) {
     Row(
         modifier = Modifier
@@ -2110,6 +2226,10 @@ private fun ReviewSummaryRow(label: String, value: String) {
 }
 
 @Composable
+/**
+ * Renders the UI represented by review chevron for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun ReviewChevron(expanded: Boolean) {
     Icon(
         painter = painterResource(
@@ -2123,15 +2243,31 @@ private fun ReviewChevron(expanded: Boolean) {
     )
 }
 
+/**
+ * Derives the review key value used by the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun reviewKey(entry: PostManagementPhysicalReviewEntry): String =
     "${entry.person.roleTemplateId}|${entry.person.userId}"
 
+/**
+ * Derives the decision key value used by the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun decisionKey(decision: PostManagementPendingReviewDecision): String =
     "${decision.roleTemplateId}|${decision.userId}"
 
+/**
+ * Returns the attendance summary label used by the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun attendanceSummaryLabel(entry: PostManagementPhysicalReviewEntry): String =
     "${entry.attendanceSummary.attendedDays}/${entry.attendanceSummary.expectedDays} · ${formatMinutesForReview(entry.attendanceSummary.verifiedMinutes)}"
 
+/**
+ * Renders the role summary summary block used in the organisation Manage Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun roleSummary(entries: List<PostManagementPhysicalReviewEntry>): String = entries
     .groupBy { it.person.roleName }
     .entries
@@ -2139,6 +2275,10 @@ private fun roleSummary(entries: List<PostManagementPhysicalReviewEntry>): Strin
     .joinToString(" · ") { (role, people) -> "$role ${people.size}" }
     .ifBlank { "No volunteers" }
 
+/**
+ * Formats the minutes for review used by the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun formatMinutesForReview(minutes: Int): String {
     val safe = minutes.coerceAtLeast(0)
     val hours = safe / 60
@@ -2150,6 +2290,10 @@ fun formatMinutesForReview(minutes: Int): String {
     }
 }
 
+/**
+ * Formats the review date used by the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun formatReviewDate(value: String): String {
     return runCatching {
         val parser = SimpleDateFormat("yyyy-MM-dd", Locale.US)

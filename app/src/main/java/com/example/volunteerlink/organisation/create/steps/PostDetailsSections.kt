@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.create.steps
 
+// FILE OVERVIEW:
+/*
+ * PostDetailsSections contains presentation code for the organisation Create/Edit Post flow.
+ * It focuses on rendering state and forwarding user actions through callbacks/ViewModels,
+ * keeping database access and business rules outside the composables where possible.
+ */
+
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -220,7 +228,7 @@ fun PhysicalEventDetailsSection(
         subtitle = if (uiState.impactWeaveDraftId != null) {
             "Confirmed partnership venue. This location is locked."
         } else {
-            "Select a real location from Geoapify so its address and coordinates can be saved later."
+            "Search broadly for an area, venue, building, street or address. Select a Geoapify result so its coordinates can be saved."
         }
     ) {
         if (uiState.isExistingPostEdit && (!canEditPhysicalCore || !canEditMeetingPoint)) {
@@ -240,6 +248,7 @@ fun PhysicalEventDetailsSection(
             isSearching = uiState.isLocationSearching,
             searchError = uiState.locationSearchError,
             validationError = errors.physicalLocation,
+            placeholder = "Search an area, venue or address",
             onQueryChanged = viewModel::onLocationQueryChanged,
             onLocationSelected = viewModel::onLocationSelected,
             onClearLocation = viewModel::clearLocation,
@@ -504,6 +513,10 @@ fun HybridVolunteerRequirementSection(
 }
 
 @Composable
+/**
+ * Renders the UI represented by duration option for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun DurationOption(
     title: String,
     selected: Boolean,
@@ -546,6 +559,10 @@ private fun DurationOption(
 }
 
 @Composable
+/**
+ * Renders the UI represented by submission mode option for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun SubmissionModeOption(
     title: String,
     description: String,

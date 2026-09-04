@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.home.model
 
+// FILE OVERVIEW:
+/*
+ * OrganisationHomeData groups the data structures used by the organisation Home dashboard flow.
+ * These models make state explicit and allow the UI, ViewModel and repository layers to exchange
+ * strongly typed values instead of passing unrelated parameters throughout the feature.
+ */
+
+
 import kotlinx.serialization.Serializable
 
 /**
@@ -17,6 +25,10 @@ data class OrganisationHomeSnapshot(
 )
 
 @Serializable
+/**
+ * Holds the values represented by organisation home post as one strongly typed model.
+ * It keeps related Home dashboard values together so callers do not pass disconnected fields around.
+ */
 data class OrganisationHomePost(
     val postId: String,
     val title: String,
@@ -38,6 +50,10 @@ data class OrganisationHomePost(
 }
 
 @Serializable
+/**
+ * Holds the values represented by organisation home schedule as one strongly typed model.
+ * It keeps related Home dashboard values together so callers do not pass disconnected fields around.
+ */
 data class OrganisationHomeSchedule(
     val scheduleItemId: String,
     val scheduleType: String,
@@ -60,6 +76,10 @@ data class OrganisationHomeRole(
 )
 
 @Serializable
+/**
+ * Holds the values represented by organisation home participation as one strongly typed model.
+ * It keeps related Home dashboard values together so callers do not pass disconnected fields around.
+ */
 data class OrganisationHomeParticipation(
     val userId: String,
     val applicationStatus: String
@@ -67,6 +87,10 @@ data class OrganisationHomeParticipation(
 
 
 @Serializable
+/**
+ * Holds the values represented by organisation impact weave attention as one strongly typed model.
+ * It keeps related Home dashboard values together so callers do not pass disconnected fields around.
+ */
 data class OrganisationImpactWeaveAttention(
     val draftId: String,
     val title: String,

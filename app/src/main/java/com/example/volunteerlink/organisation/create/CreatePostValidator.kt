@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.create
 
+// FILE OVERVIEW:
+/*
+ * CreatePostValidator contains business rules used by the organisation Create/Edit Post flow.
+ * Keeping these checks separate from the UI makes validation and edit restrictions easier to
+ * reuse from different wizard steps and management actions.
+ */
+
+
 import com.example.volunteerlink.data.time.AppClock
 import com.example.volunteerlink.organisation.create.model.CreatePostDraft
 import com.example.volunteerlink.organisation.create.model.CreatePostErrors
@@ -27,6 +35,10 @@ object CreatePostValidator {
 
     const val MINIMUM_LEAD_DAYS = 7
 
+    /**
+     * Starts the of day millis for the organisation Create/Edit Post flow.
+     * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
+     */
     fun startOfDayMillis(
         timeMillis: Long = AppClock.nowMillis()
     ): Long {
@@ -39,6 +51,10 @@ object CreatePostValidator {
         }.timeInMillis
     }
 
+    /**
+     * Returns the minimum start date millis value required by the organisation Create/Edit Post flow.
+     * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
+     */
     fun minimumStartDateMillis(
         todayMillis: Long = AppClock.nowMillis()
     ): Long {
@@ -48,6 +64,10 @@ object CreatePostValidator {
         }.timeInMillis
     }
 
+    /**
+     * Returns the next day millis value required by the organisation Create/Edit Post flow.
+     * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
+     */
     fun nextDayMillis(dateMillis: Long): Long {
         return Calendar.getInstance().apply {
             timeInMillis = startOfDayMillis(dateMillis)
@@ -132,8 +152,9 @@ object CreatePostValidator {
     }
 
     /**
-     * Save Draft may keep an old start date. Remove only the 7-day timing
-     * errors while preserving every other Step 1 validation error.
+     * Draft saving is allowed even when the current start date does not yet satisfy
+     * the 7-day publishing lead time. This helper removes only that timing error while
+     * preserving every other Step 1 validation problem.
      */
     fun withoutMinimumLeadTimeErrors(
         draft: CreatePostDraft,
@@ -154,11 +175,19 @@ object CreatePostValidator {
         )
     }
 
+    /**
+     * Formats the date used by the organisation Create/Edit Post flow.
+     * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
+     */
     private fun formatDate(dateMillis: Long): String {
         return SimpleDateFormat("d MMM yyyy", Locale.getDefault())
             .format(dateMillis)
     }
 
+    /**
+     * Returns the end time error used by the organisation Create/Edit Post flow.
+     * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
+     */
     fun endTimeError(
         startTimeMinutes: Int?,
         endTimeMinutes: Int
@@ -171,6 +200,10 @@ object CreatePostValidator {
         }
     }
 
+    /**
+     * Validates the step one used by the organisation Create/Edit Post flow.
+     * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
+     */
     fun validateStepOne(
         draft: CreatePostDraft
     ): CreatePostErrors {
@@ -374,6 +407,10 @@ object CreatePostValidator {
                     VolunteerRoleMode.REMOTE
         }
 
+        /**
+         * Returns the capacity error used by the organisation Create/Edit Post flow.
+         * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
+         */
         fun capacityError(
             label: String,
             required: Int?,
@@ -768,6 +805,10 @@ object CreatePostValidator {
         return null
     }
 
+    /**
+     * Validates the step four used by the organisation Create/Edit Post flow.
+     * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
+     */
     fun validateStepFour(
         draft: CreatePostDraft,
         roleCatalogue: List<CreateRoleTemplate>,
@@ -833,6 +874,10 @@ object CreatePostValidator {
         }
     }
 
+    /**
+     * Checks whether the schedule role targets are valid for the organisation Create/Edit Post flow.
+     * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
+     */
     private fun scheduleRoleTargetsAreValid(
         item: ScheduleItemDraft,
         applicableRoleIds: List<String>
@@ -844,6 +889,10 @@ object CreatePostValidator {
         return selectedTargets.all { it in validIds }
     }
 
+    /**
+     * Returns the effective schedule role ids value required by the organisation Create/Edit Post flow.
+     * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
+     */
     private fun effectiveScheduleRoleIds(
         draft: CreatePostDraft,
         item: ScheduleItemDraft,
@@ -863,6 +912,10 @@ object CreatePostValidator {
         }
     }
 
+    /**
+     * Checks whether the current Create/Edit Post state has timed schedule conflict.
+     * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
+     */
     private fun hasTimedScheduleConflict(
         draft: CreatePostDraft,
         item: ScheduleItemDraft,
@@ -889,16 +942,28 @@ object CreatePostValidator {
         }
     }
 
+    /**
+     * Returns the timed start epoch millis value required by the organisation Create/Edit Post flow.
+     * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
+     */
     private fun timedStartEpochMillis(item: ScheduleItemDraft): Long? {
         val time = item.startTimeMinutes ?: return null
         return timedEpochMillis(item, time)
     }
 
+    /**
+     * Returns the timed end epoch millis value required by the organisation Create/Edit Post flow.
+     * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
+     */
     private fun timedEndEpochMillis(item: ScheduleItemDraft): Long? {
         val time = item.endTimeMinutes ?: return null
         return timedEpochMillis(item, time)
     }
 
+    /**
+     * Returns the timed epoch millis value required by the organisation Create/Edit Post flow.
+     * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
+     */
     private fun timedEpochMillis(
         item: ScheduleItemDraft,
         timeMinutes: Int

@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.screens
 
+// FILE OVERVIEW:
+/*
+ * OrganisationImpactWeaveScreen contains presentation code for the organisation Impact Weave and partnership flow.
+ * It focuses on rendering state and forwarding user actions through callbacks/ViewModels,
+ * keeping database access and business rules outside the composables where possible.
+ */
+
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -17,6 +25,10 @@ import com.example.volunteerlink.organisation.impactweave.ImpactWeaveViewModel
 import com.example.volunteerlink.organisation.impactweave.model.ImpactWeavePage
 
 @Composable
+/**
+ * Renders the organisation impact weave screen screen used in the organisation Impact Weave and partnership flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun OrganisationImpactWeaveScreen(
     onBack: () -> Unit,
     onCreatePost: (String) -> Unit,
@@ -47,6 +59,10 @@ fun OrganisationImpactWeaveScreen(
         viewModel.loadActivePlans()
     }
 
+    /**
+     * Handles the back in the organisation Impact Weave and partnership flow.
+     * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+     */
     fun handleBack() {
         if (uiState.isFindingPartners) return
         when (uiState.page) {

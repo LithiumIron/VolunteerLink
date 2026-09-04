@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.manage.model
 
+// FILE OVERVIEW:
+/*
+ * OrganisationManageUiState groups the data structures used by the organisation Manage Post flow.
+ * These models make state explicit and allow the UI, ViewModel and repository layers to exchange
+ * strongly typed values instead of passing unrelated parameters throughout the feature.
+ */
+
+
 import com.example.volunteerlink.data.post.PostTimingState
 import com.example.volunteerlink.organisation.home.model.OrganisationImpactWeaveAttention
 
@@ -63,6 +71,10 @@ data class OrganisationManageUiState(
         get() = activePosts + draftPosts
 }
 
+/**
+ * Lists the supported values represented by manage post section.
+ * It keeps related Manage Post values together so callers do not pass disconnected fields around.
+ */
 enum class ManagePostSection {
     ACTIVE,
     DRAFTS,
@@ -71,6 +83,10 @@ enum class ManagePostSection {
     PARTNERSHIPS
 }
 
+/**
+ * Holds the values represented by manage post item as one strongly typed model.
+ * It keeps related Manage Post values together so callers do not pass disconnected fields around.
+ */
 data class ManagePostItem(
     val postId: String,
     val title: String,
@@ -94,6 +110,10 @@ data class ManagePostItem(
     val contributionSummary: String? = null
 )
 
+/**
+ * Lists the supported values represented by manage attention severity.
+ * It keeps related Manage Post values together so callers do not pass disconnected fields around.
+ */
 enum class ManageAttentionSeverity {
     URGENT,
     WARNING,
@@ -101,6 +121,10 @@ enum class ManageAttentionSeverity {
     REVIEW
 }
 
+/**
+ * Lists the supported values represented by manage attention type.
+ * It keeps related Manage Post values together so callers do not pass disconnected fields around.
+ */
 enum class ManageAttentionType {
     APPLICATIONS_TO_REVIEW,
     DRAFT_START_TOO_SOON,
@@ -108,6 +132,10 @@ enum class ManageAttentionType {
     COMPLETION_REVIEW
 }
 
+/**
+ * Holds the values represented by manage attention item as one strongly typed model.
+ * It keeps related Manage Post values together so callers do not pass disconnected fields around.
+ */
 data class ManageAttentionItem(
     val type: ManageAttentionType,
     val severity: ManageAttentionSeverity,

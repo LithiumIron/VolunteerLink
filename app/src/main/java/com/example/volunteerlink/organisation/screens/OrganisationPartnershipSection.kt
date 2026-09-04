@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.screens
 
+// FILE OVERVIEW:
+/*
+ * OrganisationPartnershipSection contains presentation code for the organisation Impact Weave and partnership flow.
+ * It focuses on rendering state and forwarding user actions through callbacks/ViewModels,
+ * keeping database access and business rules outside the composables where possible.
+ */
+
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
@@ -55,6 +63,10 @@ import com.example.volunteerlink.ui.theme.VolunteerLinkBorderColour
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+/**
+ * Holds the values represented by partnership support item as one strongly typed model.
+ * It supports the Impact Weave and partnership presentation layer without adding backend responsibilities to the screen.
+ */
 private data class PartnershipSupportItem(
     val id: String,
     val supportDescription: String,
@@ -65,6 +77,10 @@ private data class PartnershipSupportItem(
 )
 
 @Composable
+/**
+ * Renders the organisation partnership section section used in the organisation Impact Weave and partnership flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun OrganisationPartnershipSection(
     profileData: OrganisationProfileData
 ) {
@@ -390,6 +406,10 @@ fun OrganisationPartnershipSection(
 }
 
 @Composable
+/**
+ * Renders the partnership support row row used in the organisation Impact Weave and partnership flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun PartnershipSupportRow(
     support: PartnershipSupportItem,
     onEdit: () -> Unit,
@@ -458,6 +478,10 @@ private fun PartnershipSupportRow(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+/**
+ * Adds the edit support sheet to the organisation Impact Weave and partnership flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun AddEditSupportSheet(
     support: PartnershipSupportItem?,
     isSaving: Boolean,
@@ -893,6 +917,10 @@ private fun AddEditSupportSheet(
     }
 }
 
+/**
+ * Returns the support type label used by the organisation Impact Weave and partnership flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun supportTypeLabel(value: String): String {
     return when (value) {
         "VENUE" -> "Venue"
@@ -906,6 +934,10 @@ private fun supportTypeLabel(value: String): String {
     }
 }
 
+/**
+ * Derives the organisation support data value used by the organisation Impact Weave and partnership flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun OrganisationSupportData.toPartnershipSupportItem(): PartnershipSupportItem {
     val amount = if (supportType == "VENUE") {
         capacity

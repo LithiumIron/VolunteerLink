@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.screens
 
+// FILE OVERVIEW:
+/*
+ * OrganisationPostManagementScreen contains presentation code for the organisation Manage Post flow.
+ * It focuses on rendering state and forwarding user actions through callbacks/ViewModels,
+ * keeping database access and business rules outside the composables where possible.
+ */
+
+
 import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Context
@@ -160,6 +168,10 @@ fun OrganisationPostManagementScreen(
     val hasUnfinishedReview = reviewSession.hasUnfinishedReview || remoteReviewSession.hasUnfinishedReview
     var confirmLeaveReview by rememberSaveable { mutableStateOf(false) }
 
+    /**
+     * Derives the discard and leave value used by the organisation Manage Post flow.
+     * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+     */
     fun discardAndLeave() {
         viewModel.discardReviewSessions()
         onBack()
@@ -413,6 +425,10 @@ fun OrganisationPostManagementScreen(
 }
 
 @Composable
+/**
+ * Renders the organisation post management content content block used in the organisation Manage Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun OrganisationPostManagementContent(
     post: PostManagementPost,
     selectedTabName: String,
@@ -1485,6 +1501,10 @@ private fun OrganisationPostManagementContent(
     }
 }
 
+/**
+ * Creates the remote submission download intent used by the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun createRemoteSubmissionDownloadIntent(filePath: String): Intent {
     val fileName = filePath.substringAfterLast('/')
         .takeIf { it.isNotBlank() }
@@ -1497,6 +1517,10 @@ private fun createRemoteSubmissionDownloadIntent(filePath: String): Intent {
     }
 }
 
+/**
+ * Saves the remote submission file for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun saveRemoteSubmissionFile(
     context: Context,
     destination: Uri,
@@ -1511,6 +1535,10 @@ private fun saveRemoteSubmissionFile(
     }
 }
 
+/**
+ * Derives the remote submission mime type value used by the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun remoteSubmissionMimeType(fileName: String): String {
     val extension = fileName.substringAfterLast('.', "")
     return MimeTypeMap.getSingleton()
@@ -1518,6 +1546,10 @@ private fun remoteSubmissionMimeType(fileName: String): String {
         ?: "application/octet-stream"
 }
 
+/**
+ * Opens the remote submission file in the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun openRemoteSubmissionFile(
     context: Context,
     filePath: String,
@@ -1551,6 +1583,10 @@ private fun openRemoteSubmissionFile(
     }
 }
 
+/**
+ * Opens the remote submission url in the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun openRemoteSubmissionUrl(
     context: Context,
     url: String
@@ -1564,6 +1600,10 @@ private fun openRemoteSubmissionUrl(
     }
 }
 
+/**
+ * Derives the post management post value used by the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun PostManagementPost.isRemoteResubmission(
     submission: PostManagementRemoteSubmission
 ): Boolean {

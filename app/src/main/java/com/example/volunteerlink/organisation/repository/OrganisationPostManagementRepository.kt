@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.repository
 
+// FILE OVERVIEW:
+/*
+ * OrganisationPostManagementRepository defines or implements data access used by the organisation Manage Post flow.
+ * Repository code keeps Supabase/RPC/storage details away from the composables and ViewModels
+ * so UI code can work with application models instead of backend-specific responses.
+ */
+
+
 import com.example.volunteerlink.organisation.manage.model.PostManagementAttendanceSnapshot
 import com.example.volunteerlink.organisation.manage.model.PostManagementPost
 import com.example.volunteerlink.organisation.manage.model.PostManagementPendingReviewDecision
@@ -8,6 +16,10 @@ import com.example.volunteerlink.organisation.manage.model.PostManagementRemoteS
 
 /** Loads and updates the normalized data needed to manage one Volunteer Post. */
 interface OrganisationPostManagementRepository {
+    /**
+     * Loads the post needed by the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     suspend fun loadPost(postId: String): PostManagementPost
 
     /** Publishes one complete saved Draft after server-side ownership and 7-day checks. */

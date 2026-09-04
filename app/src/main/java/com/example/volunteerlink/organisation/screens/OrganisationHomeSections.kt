@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.screens
 
+// FILE OVERVIEW:
+/*
+ * OrganisationHomeSections contains presentation code for the organisation Home dashboard flow.
+ * It focuses on rendering state and forwarding user actions through callbacks/ViewModels,
+ * keeping database access and business rules outside the composables where possible.
+ */
+
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -173,6 +181,10 @@ fun OrganisationAttentionSection(
 }
 
 @Composable
+/**
+ * Renders the attention row row used in the organisation Home dashboard flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun AttentionRow(
     item: HomeAttentionItem,
     onClick: () -> Unit,
@@ -234,6 +246,10 @@ private fun AttentionRow(
 }
 
 @Composable
+/**
+ * Renders the organisation post summary section section used in the organisation Home dashboard flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun OrganisationPostSummarySection(
     ongoingCount: Int,
     upcomingCount: Int,
@@ -264,6 +280,10 @@ fun OrganisationPostSummarySection(
 }
 
 @Composable
+/**
+ * Renders the UI represented by home section heading for the organisation Home dashboard flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun HomeSectionHeading(
     title: String,
     actionLabel: String? = null,
@@ -286,6 +306,10 @@ fun OngoingPostCard(
 }
 
 @Composable
+/**
+ * Renders the upcoming post row row used in the organisation Home dashboard flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun UpcomingPostRow(
     post: HomePostItem,
     showDivider: Boolean,
@@ -296,6 +320,10 @@ fun UpcomingPostRow(
 }
 
 @Composable
+/**
+ * Renders the home post row row used in the organisation Home dashboard flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun HomePostRow(
     post: HomePostItem,
     ongoing: Boolean,
@@ -394,6 +422,10 @@ private fun HomePostRow(
 }
 
 @Composable
+/**
+ * Returns the home empty message used by the organisation Home dashboard flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun HomeEmptyMessage(text: String) {
     OrganisationInfoStrip(
         title = "Nothing here right now",
@@ -402,6 +434,10 @@ fun HomeEmptyMessage(text: String) {
     )
 }
 
+/**
+ * Renders the home attention item item used in the organisation Home dashboard flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun HomeAttentionItem.attentionKindLabel(): String = when (type) {
     HomeAttentionType.APPLICATIONS_TO_REVIEW -> "APPLICATIONS"
     HomeAttentionType.POST_COMPLETION_REVIEW -> "CLOSE-OUT"
@@ -414,6 +450,10 @@ private fun HomeAttentionItem.attentionKindLabel(): String = when (type) {
     HomeAttentionType.IMPACT_WEAVE_PROGRESS -> "IMPACT WEAVE"
 }
 
+/**
+ * Renders the home attention item item used in the organisation Home dashboard flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun HomeAttentionItem.severityLabel(): String = when (severity) {
     HomeAttentionSeverity.URGENT -> "URGENT"
     HomeAttentionSeverity.WARNING -> "WARNING"
@@ -421,8 +461,16 @@ private fun HomeAttentionItem.severityLabel(): String = when (severity) {
     HomeAttentionSeverity.REVIEW -> "REVIEW"
 }
 
+/**
+ * Renders the home attention item item used in the organisation Home dashboard flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun HomeAttentionItem.primaryTitle(): String = postTitle
 
+/**
+ * Renders the home attention item item used in the organisation Home dashboard flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun HomeAttentionItem.contextLine(): String? {
     val detailedContext = listOfNotNull(
         contextLabel?.takeIf { it.isNotBlank() },
@@ -438,6 +486,10 @@ private fun HomeAttentionItem.contextLine(): String? {
     }
 }
 
+/**
+ * Derives the string value used by the organisation Home dashboard flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun String.toHomeModeLabel(): String = when (uppercase(Locale.US)) {
     "PHYSICAL" -> "Physical"
     "REMOTE" -> "Remote"
@@ -445,6 +497,10 @@ private fun String.toHomeModeLabel(): String = when (uppercase(Locale.US)) {
     else -> lowercase(Locale.US).replaceFirstChar { it.titlecase(Locale.US) }
 }
 
+/**
+ * Derives the string value used by the organisation Home dashboard flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun String.homeModeDrawable(): Int = when (uppercase(Locale.US)) {
     "PHYSICAL" -> R.drawable.physical_event
     "REMOTE" -> R.drawable.remote_project
@@ -452,6 +508,10 @@ private fun String.homeModeDrawable(): Int = when (uppercase(Locale.US)) {
     else -> R.drawable.manage
 }
 
+/**
+ * Derives the organisation initials value used by the organisation Home dashboard flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun organisationInitials(name: String): String {
     val parts = name.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
     return when {
@@ -461,6 +521,10 @@ private fun organisationInitials(name: String): String {
     }
 }
 
+/**
+ * Derives the greeting for value used by the organisation Home dashboard flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun greetingFor(nowMillis: Long): String {
     val hour = Calendar.getInstance().apply { timeInMillis = nowMillis }.get(Calendar.HOUR_OF_DAY)
     return when (hour) {
@@ -470,9 +534,17 @@ private fun greetingFor(nowMillis: Long): String {
     }
 }
 
+/**
+ * Formats the current date used by the organisation Home dashboard flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun formatCurrentDate(nowMillis: Long): String =
     SimpleDateFormat("EEEE, d MMMM yyyy", Locale.getDefault()).format(Date(nowMillis))
 
+/**
+ * Formats the date range used by the organisation Home dashboard flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun formatDateRange(start: String?, end: String?): String {
     val startText = formatSingleDate(start)
     val endText = formatSingleDate(end)
@@ -484,11 +556,19 @@ fun formatDateRange(start: String?, end: String?): String {
     }
 }
 
+/**
+ * Formats the single date used by the organisation Home dashboard flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun formatSingleDate(value: String?): String? {
     val date = parseDatabaseDate(value) ?: return null
     return SimpleDateFormat("d MMM yyyy", Locale.getDefault()).format(date)
 }
 
+/**
+ * Parses the database date used by the organisation Home dashboard flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun parseDatabaseDate(value: String?): Date? {
     if (value.isNullOrBlank()) return null
     return runCatching {

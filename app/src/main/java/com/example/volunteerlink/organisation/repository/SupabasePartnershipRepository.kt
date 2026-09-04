@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.repository
 
+// FILE OVERVIEW:
+/*
+ * SupabasePartnershipRepository defines or implements data access used by the organisation Impact Weave and partnership flow.
+ * Repository code keeps Supabase/RPC/storage details away from the composables and ViewModels
+ * so UI code can work with application models instead of backend-specific responses.
+ */
+
+
 import com.example.volunteerlink.data.supabase
 import com.example.volunteerlink.organisation.impactweave.model.ImpactWeavePartnershipItemState
 import com.example.volunteerlink.organisation.impactweave.model.ImpactWeavePartnershipState
@@ -20,12 +28,20 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import java.util.Locale
 
+/**
+ * Holds the values represented by partnership request item as one strongly typed model.
+ * It keeps backend-facing work behind the Impact Weave and partnership repository boundary.
+ */
 data class PartnershipRequestItem(
     val needId: String,
     val supportId: String,
     val requestedAmount: Int?
 )
 
+/**
+ * Holds the values represented by partnership request result as one strongly typed model.
+ * It keeps backend-facing work behind the Impact Weave and partnership repository boundary.
+ */
 data class PartnershipRequestResult(
     val invitationId: String,
     val conversationId: String,
@@ -33,6 +49,10 @@ data class PartnershipRequestResult(
     val revisionNumber: Int
 )
 
+/**
+ * Holds the values represented by partnership response item as one strongly typed model.
+ * It keeps backend-facing work behind the Impact Weave and partnership repository boundary.
+ */
 data class PartnershipResponseItem(
     val resourceName: String,
     val supportType: String,
@@ -40,6 +60,10 @@ data class PartnershipResponseItem(
     val providerResourceName: String?
 )
 
+/**
+ * Holds the values represented by partnership response result as one strongly typed model.
+ * It keeps backend-facing work behind the Impact Weave and partnership repository boundary.
+ */
 data class PartnershipResponseResult(
     val outcome: String,
     val status: String,
@@ -49,6 +73,10 @@ data class PartnershipResponseResult(
     val items: List<PartnershipResponseItem> = emptyList()
 )
 
+/**
+ * Holds the values represented by partnership invitation summary as one strongly typed model.
+ * It keeps backend-facing work behind the Impact Weave and partnership repository boundary.
+ */
 data class PartnershipInvitationSummary(
     val invitationId: String,
     val direction: String,
@@ -65,6 +93,10 @@ data class PartnershipInvitationSummary(
     val respondedAt: String? = null
 )
 
+/**
+ * Holds the values represented by partnership conversation preview as one strongly typed model.
+ * It keeps backend-facing work behind the Impact Weave and partnership repository boundary.
+ */
 data class PartnershipConversationPreview(
     val conversationId: String,
     val draftId: String,
@@ -77,6 +109,10 @@ data class PartnershipConversationPreview(
     val unreadCount: Int = 0
 )
 
+/**
+ * Holds the values represented by partnership invitation item as one strongly typed model.
+ * It keeps backend-facing work behind the Impact Weave and partnership repository boundary.
+ */
 data class PartnershipInvitationItem(
     val contributionId: String,
     val needId: String,
@@ -94,6 +130,10 @@ data class PartnershipInvitationItem(
     val providerCapacity: Int? = null
 )
 
+/**
+ * Holds the values represented by partnership message invitation as one strongly typed model.
+ * It keeps backend-facing work behind the Impact Weave and partnership repository boundary.
+ */
 data class PartnershipMessageInvitation(
     val status: String,
     val currentRevision: Int,
@@ -102,6 +142,10 @@ data class PartnershipMessageInvitation(
     val items: List<PartnershipInvitationItem>
 )
 
+/**
+ * Holds the values represented by partnership chat message as one strongly typed model.
+ * It keeps backend-facing work behind the Impact Weave and partnership repository boundary.
+ */
 data class PartnershipChatMessage(
     val messageId: String,
     val senderUserId: String?,
@@ -117,6 +161,10 @@ data class PartnershipChatMessage(
     val invitation: PartnershipMessageInvitation?
 )
 
+/**
+ * Holds the values represented by partnership chat as one strongly typed model.
+ * It keeps backend-facing work behind the Impact Weave and partnership repository boundary.
+ */
 data class PartnershipChat(
     val conversationId: String,
     val draftId: String,
@@ -139,10 +187,18 @@ data class PartnershipChat(
     val messages: List<PartnershipChatMessage>
 )
 
+/**
+ * Groups the shared values and helper behaviour represented by supabase partnership repository.
+ * It keeps backend-facing work behind the Impact Weave and partnership repository boundary.
+ */
 object SupabasePartnershipRepository {
 
     private val json = Json { ignoreUnknownKeys = true }
 
+    /**
+     * Sends the partnership request for the organisation Impact Weave and partnership flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     suspend fun sendPartnershipRequest(
         draftId: String,
         receiverOrganisationId: String,
@@ -192,6 +248,10 @@ object SupabasePartnershipRepository {
         )
     }
 
+    /**
+     * Derives the respond to invitation value used by the organisation Impact Weave and partnership flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     suspend fun respondToInvitation(
         invitationId: String,
         action: String,
@@ -235,6 +295,10 @@ object SupabasePartnershipRepository {
         )
     }
 
+    /**
+     * Loads the impact weave partnership states needed by the organisation Impact Weave and partnership flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     suspend fun loadImpactWeavePartnershipStates(
         draftId: String
     ): List<ImpactWeavePartnershipState> {
@@ -268,6 +332,10 @@ object SupabasePartnershipRepository {
         }
     }
 
+    /**
+     * Loads the invitations needed by the organisation Impact Weave and partnership flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     suspend fun loadInvitations(): List<PartnershipInvitationSummary> {
         return supabase.postgrest
             .rpc("organisation_list_partnership_invitations")
@@ -291,6 +359,10 @@ object SupabasePartnershipRepository {
             }
     }
 
+    /**
+     * Loads the conversation previews needed by the organisation Impact Weave and partnership flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     suspend fun loadConversationPreviews(): List<PartnershipConversationPreview> {
         return supabase.postgrest
             .rpc("organisation_list_partnership_conversations")
@@ -310,6 +382,10 @@ object SupabasePartnershipRepository {
             }
     }
 
+    /**
+     * Loads the partnership chat needed by the organisation Impact Weave and partnership flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     suspend fun loadPartnershipChat(conversationId: String): PartnershipChat {
         val response = supabase.postgrest.rpc(
             function = "organisation_get_partnership_chat",
@@ -384,6 +460,10 @@ object SupabasePartnershipRepository {
         )
     }
 
+    /**
+     * Sends the text message for the organisation Impact Weave and partnership flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     suspend fun sendTextMessage(
         conversationId: String,
         messageText: String
@@ -409,6 +489,10 @@ object SupabasePartnershipRepository {
         }
     }
 
+    /**
+     * Marks the conversation read with its new state in the organisation Impact Weave and partnership flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     suspend fun markConversationRead(conversationId: String) {
         supabase.postgrest.rpc(
             function = "organisation_mark_partnership_conversation_read",
@@ -418,6 +502,10 @@ object SupabasePartnershipRepository {
         )
     }
 
+    /**
+     * Returns the current user id value required by the organisation Impact Weave and partnership flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     private suspend fun currentUserId(): String {
         val authUser = supabase.auth.currentUserOrNull()
             ?: error("You must sign in before opening partnership chat.")
@@ -436,11 +524,19 @@ object SupabasePartnershipRepository {
 }
 
 @Serializable
+/**
+ * Holds the values represented by partnership user profile row as one strongly typed model.
+ * It keeps backend-facing work behind the Impact Weave and partnership repository boundary.
+ */
 private data class PartnershipUserProfileRow(
     @SerialName("user_id") val userId: String
 )
 
 @Serializable
+/**
+ * Holds the values represented by partnership response row as one strongly typed model.
+ * It keeps backend-facing work behind the Impact Weave and partnership repository boundary.
+ */
 private data class PartnershipResponseRow(
     val outcome: String,
     val status: String,
@@ -451,6 +547,10 @@ private data class PartnershipResponseRow(
 )
 
 @Serializable
+/**
+ * Holds the values represented by partnership response item row as one strongly typed model.
+ * It keeps backend-facing work behind the Impact Weave and partnership repository boundary.
+ */
 private data class PartnershipResponseItemRow(
     @SerialName("resource_name") val resourceName: String,
     @SerialName("support_type") val supportType: String,
@@ -459,11 +559,19 @@ private data class PartnershipResponseItemRow(
 )
 
 @Serializable
+/**
+ * Holds the values represented by impact weave partnership states response as one strongly typed model.
+ * It keeps backend-facing work behind the Impact Weave and partnership repository boundary.
+ */
 private data class ImpactWeavePartnershipStatesResponse(
     val requests: List<ImpactWeavePartnershipStateRow> = emptyList()
 )
 
 @Serializable
+/**
+ * Holds the values represented by impact weave partnership state row as one strongly typed model.
+ * It keeps backend-facing work behind the Impact Weave and partnership repository boundary.
+ */
 private data class ImpactWeavePartnershipStateRow(
     @SerialName("invitation_id") val invitationId: String,
     @SerialName("organisation_id") val organisationId: String,
@@ -474,6 +582,10 @@ private data class ImpactWeavePartnershipStateRow(
 )
 
 @Serializable
+/**
+ * Holds the values represented by impact weave partnership state item row as one strongly typed model.
+ * It keeps backend-facing work behind the Impact Weave and partnership repository boundary.
+ */
 private data class ImpactWeavePartnershipStateItemRow(
     @SerialName("need_id") val needId: String,
     @SerialName("support_id") val supportId: String? = null,
@@ -485,6 +597,10 @@ private data class ImpactWeavePartnershipStateItemRow(
 )
 
 @Serializable
+/**
+ * Holds the values represented by partnership invitation row as one strongly typed model.
+ * It keeps backend-facing work behind the Impact Weave and partnership repository boundary.
+ */
 private data class PartnershipInvitationRow(
     @SerialName("invitation_id") val invitationId: String,
     val direction: String,
@@ -502,6 +618,10 @@ private data class PartnershipInvitationRow(
 )
 
 @Serializable
+/**
+ * Holds the values represented by partnership conversation row as one strongly typed model.
+ * It keeps backend-facing work behind the Impact Weave and partnership repository boundary.
+ */
 private data class PartnershipConversationRow(
     @SerialName("conversation_id") val conversationId: String,
     @SerialName("draft_id") val draftId: String,
@@ -515,6 +635,10 @@ private data class PartnershipConversationRow(
 )
 
 @Serializable
+/**
+ * Holds the values represented by partnership chat response as one strongly typed model.
+ * It keeps backend-facing work behind the Impact Weave and partnership repository boundary.
+ */
 private data class PartnershipChatResponse(
     val conversation: PartnershipConversationDetailRow,
     @SerialName("other_organisation") val otherOrganisation: PartnershipOtherOrganisationRow,
@@ -522,6 +646,10 @@ private data class PartnershipChatResponse(
 )
 
 @Serializable
+/**
+ * Holds the values represented by partnership conversation detail row as one strongly typed model.
+ * It keeps backend-facing work behind the Impact Weave and partnership repository boundary.
+ */
 private data class PartnershipConversationDetailRow(
     @SerialName("conversation_id") val conversationId: String,
     @SerialName("draft_id") val draftId: String,
@@ -540,6 +668,10 @@ private data class PartnershipConversationDetailRow(
 )
 
 @Serializable
+/**
+ * Holds the values represented by partnership other organisation row as one strongly typed model.
+ * It keeps backend-facing work behind the Impact Weave and partnership repository boundary.
+ */
 private data class PartnershipOtherOrganisationRow(
     @SerialName("organisation_id") val organisationId: String,
     @SerialName("organisation_name") val organisationName: String,
@@ -547,6 +679,10 @@ private data class PartnershipOtherOrganisationRow(
 )
 
 @Serializable
+/**
+ * Holds the values represented by partnership message row as one strongly typed model.
+ * It keeps backend-facing work behind the Impact Weave and partnership repository boundary.
+ */
 private data class PartnershipMessageRow(
     @SerialName("message_id") val messageId: String,
     @SerialName("sender_user_id") val senderUserId: String? = null,
@@ -563,6 +699,10 @@ private data class PartnershipMessageRow(
 )
 
 @Serializable
+/**
+ * Holds the values represented by partnership message invitation row as one strongly typed model.
+ * It keeps backend-facing work behind the Impact Weave and partnership repository boundary.
+ */
 private data class PartnershipMessageInvitationRow(
     val status: String,
     @SerialName("current_revision") val currentRevision: Int,
@@ -572,6 +712,10 @@ private data class PartnershipMessageInvitationRow(
 )
 
 @Serializable
+/**
+ * Holds the values represented by partnership invitation item row as one strongly typed model.
+ * It keeps backend-facing work behind the Impact Weave and partnership repository boundary.
+ */
 private data class PartnershipInvitationItemRow(
     @SerialName("contribution_id") val contributionId: String,
     @SerialName("need_id") val needId: String,

@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.viewmodel
 
+// FILE OVERVIEW:
+/*
+ * CreatePostViewModel coordinates state and user actions for the organisation Create/Edit Post flow.
+ * It translates UI events into validation/repository operations and exposes observable state
+ * back to Compose so the screen can stay declarative.
+ */
+
+
 import android.content.Context
 import android.net.Uri
 import android.webkit.MimeTypeMap
@@ -67,6 +75,10 @@ class CreatePostViewModel : ViewModel() {
     // not become UI responsibilities.
     private var originalExistingPost: ExistingPostEditData? = null
 
+    /**
+     * Loads the impact weave for create needed by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun loadImpactWeaveForCreate(draftId: String) {
         if (_uiState.value.impactWeaveDraftId == draftId ||
             _uiState.value.isLoadingImpactWeave
@@ -116,6 +128,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Loads the existing post for edit needed by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun loadExistingPostForEdit(postId: String) {
         val currentMode = _uiState.value.editorMode
         if (currentMode is CreatePostEditorMode.ExistingPostEdit &&
@@ -159,28 +175,48 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Retries the current operation in the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun retryExistingPostLoad() {
         val postId = _uiState.value.existingPostId ?: return
         originalExistingPost = null
         loadExistingPostForEdit(postId)
     }
 
+    /**
+     * Closes or clears the edit restriction message in the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun dismissEditRestrictionMessage() {
         _uiState.update { it.copy(editRestrictionMessage = null) }
     }
 
+    /**
+     * Derives the allow edit value used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun allowEdit(allowed: Boolean, message: String): Boolean {
         if (!_uiState.value.isExistingPostEdit || allowed) return true
         _uiState.update { it.copy(editRestrictionMessage = message) }
         return false
     }
 
+    /**
+     * Derives the allow impact weave field edit value used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun allowImpactWeaveFieldEdit(message: String): Boolean {
         if (_uiState.value.impactWeaveDraftId == null) return true
         _uiState.update { it.copy(editRestrictionMessage = message) }
         return false
     }
 
+    /**
+     * Returns the safe impact weave load error used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun safeImpactWeaveLoadError(raw: String): String = when {
         raw.contains("POST_REQUIRES_7_DAYS", true) ->
             "This activity starts in less than 7 days. Reschedule it in Impact Weave before creating a post."
@@ -193,9 +229,17 @@ class CreatePostViewModel : ViewModel() {
         else -> "Could not prepare this Impact Weave plan for Create Post. Please return and try again."
     }
 
+    /**
+     * Derives the role policy value used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun rolePolicy(roleTemplateId: String) =
         _uiState.value.editPolicy?.rolePolicies?.get(roleTemplateId)
 
+    /**
+     * Derives the current schedule policy value used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun currentSchedulePolicy() = _uiState.value.editingScheduleItemId
         ?.let { _uiState.value.editPolicy?.schedulePolicies?.get(it) }
 
@@ -263,6 +307,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Applies the post type change used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun applyPostTypeChange(type: VolunteerPostType) {
         _uiState.update { current ->
             val newDraft = current.draft.copy(postType = type)
@@ -280,6 +328,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Updates the category used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun updateCategory(category: VolunteerPostCategory) {
         if (!allowImpactWeaveFieldEdit("Impact Weave activity details are final here. Edit them from the Impact Weave plan.")) return
         if (!allowEdit(
@@ -290,6 +342,10 @@ class CreatePostViewModel : ViewModel() {
         updateDraft { it.copy(category = category) }
     }
 
+    /**
+     * Updates the title used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun updateTitle(title: String) {
         if (!allowImpactWeaveFieldEdit("Impact Weave activity details are final here. Edit them from the Impact Weave plan.")) return
         if (!allowEdit(
@@ -300,6 +356,10 @@ class CreatePostViewModel : ViewModel() {
         updateDraft { it.copy(title = title.take(120)) }
     }
 
+    /**
+     * Updates the description used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun updateDescription(description: String) {
         if (!allowImpactWeaveFieldEdit("Impact Weave activity details are final here. Edit them from the Impact Weave plan.")) return
         if (!allowEdit(
@@ -310,6 +370,10 @@ class CreatePostViewModel : ViewModel() {
         updateDraft { it.copy(description = description.take(2000)) }
     }
 
+    /**
+     * Updates the thumbnail uri used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun updateThumbnailUri(uri: String?) {
         if (!allowEdit(
                 _uiState.value.editPolicy?.canEditSharedPostInfo != false,
@@ -354,6 +418,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Updates the physical start date used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun updatePhysicalStartDate(dateMillis: Long) {
         if (!allowImpactWeaveFieldEdit("The agreed Impact Weave schedule is final and cannot be changed in Create Post.")) return
         if (!allowEdit(
@@ -388,6 +456,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Updates the physical end date used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun updatePhysicalEndDate(dateMillis: Long) {
         if (!allowImpactWeaveFieldEdit("The agreed Impact Weave schedule is final and cannot be changed in Create Post.")) return
         if (!allowEdit(
@@ -403,6 +475,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Updates the physical start time used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun updatePhysicalStartTime(hour: Int, minute: Int) {
         if (!allowImpactWeaveFieldEdit("The agreed Impact Weave schedule is final and cannot be changed in Create Post.")) return
         if (!allowEdit(
@@ -464,10 +540,18 @@ class CreatePostViewModel : ViewModel() {
         return null
     }
 
+    /**
+     * Clears the physical time error for the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun clearPhysicalTimeError() {
         _uiState.update { it.copy(physicalTimeError = null) }
     }
 
+    /**
+     * Updates the meeting point used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun updateMeetingPoint(text: String) {
         if (!allowEdit(
                 _uiState.value.editPolicy?.canEditPhysicalMeetingPoint != false,
@@ -477,6 +561,10 @@ class CreatePostViewModel : ViewModel() {
         updateDraft { it.copy(meetingPoint = text.take(250)) }
     }
 
+    /**
+     * Updates the physical volunteer capacity used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun updatePhysicalVolunteerCapacity(text: String) {
         if (!allowEdit(
                 _uiState.value.editPolicy?.canEditPhysicalCapacity != false,
@@ -499,6 +587,10 @@ class CreatePostViewModel : ViewModel() {
         locationBiasLongitude = longitude
     }
 
+    /**
+     * Handles the location query changed event for the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun onLocationQueryChanged(query: String) {
         if (!allowImpactWeaveFieldEdit("The confirmed partnership venue is locked for this post.")) return
         if (!allowEdit(
@@ -550,7 +642,10 @@ class CreatePostViewModel : ViewModel() {
             }
 
             try {
-                val results = locationService.searchEventLocations(
+                // Create Post accepts any real Geoapify location result: an area,
+                // locality, venue, building, street or exact address. Device
+                // coordinates only bias the ranking and never restrict the search.
+                val results = locationService.searchLocations(
                     query = cleanQuery,
                     biasLatitude = locationBiasLatitude,
                     biasLongitude = locationBiasLongitude
@@ -565,7 +660,7 @@ class CreatePostViewModel : ViewModel() {
                             locationSuggestions = results,
                             isLocationSearching = false,
                             locationSearchError = if (results.isEmpty()) {
-                                "No matching event location found."
+                                "No matching location found."
                             } else {
                                 null
                             }
@@ -580,7 +675,7 @@ class CreatePostViewModel : ViewModel() {
                         it.copy(
                             locationSuggestions = emptyList(),
                             isLocationSearching = false,
-                            locationSearchError = "Unable to search event locations."
+                            locationSearchError = "Unable to search locations."
                         )
                     }
                 }
@@ -588,6 +683,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Handles the location selected event for the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun onLocationSelected(location: LocationSuggestion) {
         if (!allowImpactWeaveFieldEdit("The confirmed partnership venue is locked for this post.")) return
         if (!allowEdit(
@@ -615,6 +714,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Clears the location for the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun clearLocation() {
         if (!allowImpactWeaveFieldEdit("The confirmed partnership venue is locked for this post.")) return
         if (!allowEdit(
@@ -674,6 +777,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Updates the remote due date used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun updateRemoteDueDate(dateMillis: Long) {
         val policy = _uiState.value.editPolicy
         if (!allowEdit(
@@ -698,6 +805,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Updates the remote volunteer capacity used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun updateRemoteVolunteerCapacity(text: String) {
         if (!allowEdit(
                 _uiState.value.editPolicy?.canEditRemoteCapacity != false,
@@ -711,6 +822,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Updates the remote submission mode used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun updateRemoteSubmissionMode(mode: RemoteSubmissionMode) {
         if (!allowEdit(
                 _uiState.value.editPolicy?.canEditRemoteSubmissionSetup != false,
@@ -722,6 +837,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Updates the shared deliverable used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun updateSharedDeliverable(text: String) {
         if (!allowEdit(
                 _uiState.value.editPolicy?.canEditRemoteSubmissionSetup != false,
@@ -750,6 +869,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Updates the hybrid remote volunteer capacity used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun updateHybridRemoteVolunteerCapacity(text: String) {
         if (!allowEdit(
                 _uiState.value.editPolicy?.canEditRemoteCapacity != false,
@@ -813,6 +936,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Moves the organisation Create/Edit Post flow back to the previous relevant step or state.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun backToStepOne() {
         _uiState.update { current ->
             current.copy(
@@ -823,10 +950,18 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Retries the current operation in the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun retryRoleCatalogue() {
         loadRoleCatalogue(forceReload = true)
     }
 
+    /**
+     * Loads the role catalogue needed by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun loadRoleCatalogue(forceReload: Boolean = false) {
         if (
             !forceReload &&
@@ -883,6 +1018,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Updates the role search query used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun updateRoleSearchQuery(query: String) {
         _uiState.update { current ->
             current.copy(
@@ -892,6 +1031,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Updates the role mode filter used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun updateRoleModeFilter(mode: VolunteerRoleMode?) {
         val postType = _uiState.value.draft.postType
 
@@ -924,6 +1067,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Adds the role to the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun addRole(roleTemplateId: String) {
         val current = _uiState.value
         if (current.draft.selectedRoles.any {
@@ -986,6 +1133,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Removes the role from the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun removeRole(roleTemplateId: String) {
         val policy = rolePolicy(roleTemplateId)
         if (!allowEdit(
@@ -1012,6 +1163,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Increases the role capacity in the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun increaseRoleCapacity(roleTemplateId: String) {
         val policy = rolePolicy(roleTemplateId)
         if (!allowEdit(
@@ -1050,6 +1205,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Decreases the role capacity in the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun decreaseRoleCapacity(roleTemplateId: String) {
         val policy = rolePolicy(roleTemplateId)
         if (!allowEdit(
@@ -1074,6 +1233,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Updates the role capacity used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun updateRoleCapacity(
         roleTemplateId: String,
         text: String
@@ -1135,6 +1298,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Derives the continue from step two value used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun continueFromStepTwo(): Boolean {
         val current = _uiState.value
         val errors = CreatePostValidator.validateStepTwo(
@@ -1366,6 +1533,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Toggles the practised skill used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun togglePractisedSkill(
         roleTemplateId: String,
         skillId: String
@@ -1430,6 +1601,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Toggles the required skill used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun toggleRequiredSkill(
         roleTemplateId: String,
         skillId: String
@@ -1487,6 +1662,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Increases the required skill experience in the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun increaseRequiredSkillExperience(
         roleTemplateId: String,
         skillId: String
@@ -1498,6 +1677,10 @@ class CreatePostViewModel : ViewModel() {
         )
     }
 
+    /**
+     * Decreases the required skill experience in the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun decreaseRequiredSkillExperience(
         roleTemplateId: String,
         skillId: String
@@ -1509,6 +1692,10 @@ class CreatePostViewModel : ViewModel() {
         )
     }
 
+    /**
+     * Derives the change required skill experience value used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun changeRequiredSkillExperience(
         roleTemplateId: String,
         skillId: String,
@@ -1531,6 +1718,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Adds the responsibility to the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun addResponsibility(roleTemplateId: String) {
         if (!allowEdit(
                 rolePolicy(roleTemplateId)?.canChangeResponsibilities != false,
@@ -1548,6 +1739,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Updates the responsibility used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun updateResponsibility(
         roleTemplateId: String,
         index: Int,
@@ -1571,6 +1766,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Removes the responsibility from the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun removeResponsibility(
         roleTemplateId: String,
         index: Int
@@ -1624,6 +1823,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Adds the screening question to the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun addScreeningQuestion(roleTemplateId: String) {
         if (!allowEdit(
                 rolePolicy(roleTemplateId)?.canChangeScreeningQuestions != false,
@@ -1645,6 +1848,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Updates the screening question used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun updateScreeningQuestion(
         roleTemplateId: String,
         index: Int,
@@ -1668,6 +1875,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Removes the screening question from the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun removeScreeningQuestion(
         roleTemplateId: String,
         index: Int
@@ -1685,6 +1896,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Updates the role notes used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun updateRoleNotes(
         roleTemplateId: String,
         text: String
@@ -1699,6 +1914,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Updates the individual submission requirement used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun updateIndividualSubmissionRequirement(
         roleTemplateId: String,
         text: String
@@ -1715,6 +1934,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Updates the shared submission responsible role used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun updateSharedSubmissionResponsibleRole(
         roleTemplateId: String
     ) {
@@ -1960,6 +2183,10 @@ class CreatePostViewModel : ViewModel() {
         return true
     }
 
+    /**
+     * Moves the organisation Create/Edit Post flow back to the previous relevant step or state.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun backToStepThree() {
         _uiState.update { state ->
             state.copy(
@@ -1988,6 +2215,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Selects the physical schedule date used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun selectPhysicalScheduleDate(dateMillis: Long) {
         val date = CreatePostValidator.startOfDayMillis(dateMillis)
         if (date !in CreatePostValidator.physicalScheduleDates(_uiState.value.draft)) {
@@ -2003,6 +2234,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Opens the schedule item editor in the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun openScheduleItemEditor(itemId: String) {
         val current = _uiState.value
         val editSchedulePolicy = current.editPolicy?.schedulePolicies?.get(itemId)
@@ -2051,6 +2286,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Derives the resume schedule editor draft value used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun resumeScheduleEditorDraft() {
         val item = _uiState.value.scheduleEditorDraft ?: return
         _uiState.update { state ->
@@ -2070,6 +2309,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Derives the discard schedule editor draft value used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun discardScheduleEditorDraft() {
         _uiState.update { state ->
             state.copy(
@@ -2232,6 +2475,10 @@ class CreatePostViewModel : ViewModel() {
         return newId
     }
 
+    /**
+     * Renders the remove schedule item item used in the organisation Create/Edit Post flow.
+     * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+     */
     fun removeScheduleItem(itemId: String) {
         val schedulePolicy = _uiState.value.editPolicy?.schedulePolicies?.get(itemId)
         if (!allowEdit(
@@ -2253,18 +2500,30 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Updates the schedule editor title used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun updateScheduleEditorTitle(text: String) {
         updateScheduleEditor { item ->
             item.copy(title = text.take(120))
         }
     }
 
+    /**
+     * Updates the schedule editor notes used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun updateScheduleEditorNotes(text: String) {
         updateScheduleEditor { item ->
             item.copy(notes = text.take(500))
         }
     }
 
+    /**
+     * Updates the schedule editor location used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun updateScheduleEditorLocation(text: String) {
         updateScheduleEditor { item ->
             if (item.scheduleType == ScheduleType.PHYSICAL) {
@@ -2275,6 +2534,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Updates the schedule editor date used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun updateScheduleEditorDate(dateMillis: Long) {
         val date = CreatePostValidator.startOfDayMillis(dateMillis)
         val current = _uiState.value
@@ -2299,6 +2562,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Updates the schedule editor start time used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun updateScheduleEditorStartTime(
         hour: Int,
         minute: Int
@@ -2336,6 +2603,10 @@ class CreatePostViewModel : ViewModel() {
         return null
     }
 
+    /**
+     * Updates the schedule editor end time used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun updateScheduleEditorEndTime(
         hour: Int,
         minute: Int
@@ -2372,6 +2643,10 @@ class CreatePostViewModel : ViewModel() {
         return null
     }
 
+    /**
+     * Updates the schedule editor applies to all used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun updateScheduleEditorAppliesToAll(appliesToAll: Boolean) {
         val current = _uiState.value
         val item = current.scheduleEditorDraft ?: return
@@ -2411,6 +2686,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Toggles the schedule editor role used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun toggleScheduleEditorRole(roleTemplateId: String) {
         val current = _uiState.value
         val item = current.scheduleEditorDraft ?: return
@@ -2638,6 +2917,10 @@ class CreatePostViewModel : ViewModel() {
         return true
     }
 
+    /**
+     * Derives the physical schedule day has items value used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun physicalScheduleDayHasItems(dateMillis: Long): Boolean {
         val date = CreatePostValidator.startOfDayMillis(dateMillis)
         return _uiState.value.draft.scheduleItems.any { item ->
@@ -2648,6 +2931,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Checks whether the organisation Create/Edit Post flow allows copy physical schedule day.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun canCopyPhysicalScheduleDay(dateMillis: Long): Boolean {
         val current = _uiState.value
         val date = CreatePostValidator.startOfDayMillis(dateMillis)
@@ -2667,6 +2954,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Validates the schedule for continue used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun validateScheduleForContinue(): Boolean {
         val current = _uiState.value
         if (current.scheduleEditorDraft != null) {
@@ -2694,6 +2985,10 @@ class CreatePostViewModel : ViewModel() {
         return error == null
     }
 
+    /**
+     * Returns the schedule proceed warning used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun getScheduleProceedWarning(): String? {
         return CreatePostValidator.scheduleProceedWarning(
             draft = _uiState.value.draft
@@ -2932,6 +3227,10 @@ class CreatePostViewModel : ViewModel() {
         returnToReviewFromEdit()
     }
 
+    /**
+     * Saves the changes for the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun saveChanges(context: Context) {
         val current = _uiState.value
         val mode = current.editorMode as? CreatePostEditorMode.ExistingPostEdit ?: return
@@ -3084,6 +3383,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Saves the draft for the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun saveDraft(context: Context) {
         saveDraftInternal(
             context = context,
@@ -3105,12 +3408,20 @@ class CreatePostViewModel : ViewModel() {
         )
     }
 
+    /**
+     * Closes or clears the save draft date warning in the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun dismissSaveDraftDateWarning() {
         _uiState.update { state ->
             state.copy(saveDraftDateWarning = null)
         }
     }
 
+    /**
+     * Saves the draft internal for the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun saveDraftInternal(
         context: Context,
         allowMinimumLeadTimeIssue: Boolean
@@ -3223,6 +3534,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Publishes the current Volunteer Post data after the required Create/Edit Post checks pass.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun publishPost(context: Context) {
         val current = _uiState.value
         if (current.isSavingDraft || current.isPublishing) return
@@ -3326,6 +3641,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Closes or clears the publish date block in the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun dismissPublishDateBlock() {
         _uiState.update { state ->
             state.copy(publishDateBlockMessage = null)
@@ -3356,6 +3675,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Returns the post save validation error used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun postSaveValidationError(
         state: CreatePostUiState,
         ignoreMinimumLeadTime: Boolean = false
@@ -3440,6 +3763,10 @@ class CreatePostViewModel : ViewModel() {
         return null
     }
 
+    /**
+     * Derives the schedule item validation message for current editor value used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun scheduleItemValidationMessageForCurrentEditor(
         draft: CreatePostDraft,
         item: ScheduleItemDraft,
@@ -3467,6 +3794,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Derives the schedule validation context unchanged value used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun scheduleValidationContextUnchanged(
         current: CreatePostDraft,
         original: CreatePostDraft
@@ -3483,6 +3814,10 @@ class CreatePostViewModel : ViewModel() {
                 original.selectedRoles.map { it.roleTemplateId }.toSet()
     }
 
+    /**
+     * Prepares the thumbnail for save for the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private suspend fun prepareThumbnailForSave(
         context: Context,
         thumbnailUri: String?
@@ -3520,6 +3855,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Opens the new schedule editor in the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun openNewScheduleEditor(
         item: ScheduleItemDraft,
         selectedPhysicalDate: Long? = null
@@ -3539,6 +3878,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Updates the schedule editor used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun updateScheduleEditor(
         transform: (ScheduleItemDraft) -> ScheduleItemDraft
     ) {
@@ -3560,6 +3903,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Renders the clean schedule item item used in the organisation Create/Edit Post flow.
+     * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+     */
     private fun cleanScheduleItem(
         item: ScheduleItemDraft
     ): ScheduleItemDraft {
@@ -3571,6 +3918,10 @@ class CreatePostViewModel : ViewModel() {
         )
     }
 
+    /**
+     * Renders the draft with editor item item used in the organisation Create/Edit Post flow.
+     * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+     */
     private fun draftWithEditorItem(
         draft: CreatePostDraft,
         item: ScheduleItemDraft
@@ -3587,6 +3938,10 @@ class CreatePostViewModel : ViewModel() {
         return draft.copy(scheduleItems = items)
     }
 
+    /**
+     * Updates the step four draft used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun updateStepFourDraft(
         change: (CreatePostDraft) -> CreatePostDraft
     ) {
@@ -3600,6 +3955,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Sets the schedule error used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun setScheduleError(message: String) {
         _uiState.update { state ->
             state.copy(
@@ -3611,6 +3970,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Returns the available schedule sections value required by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun availableScheduleSections(
         postType: VolunteerPostType?
     ): List<ScheduleType> {
@@ -3626,6 +3989,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Returns the valid selected physical date value required by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun validSelectedPhysicalDate(
         draft: CreatePostDraft,
         currentDate: Long?
@@ -3638,6 +4005,10 @@ class CreatePostViewModel : ViewModel() {
     }
 
 
+    /**
+     * Updates the role configuration used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun updateRoleConfiguration(
         roleTemplateId: String,
         transform: (SelectedRoleDraft) -> SelectedRoleDraft
@@ -3666,6 +4037,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Sets the role settings error used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun setRoleSettingsError(message: String) {
         _uiState.update { state ->
             state.copy(
@@ -3695,6 +4070,10 @@ class CreatePostViewModel : ViewModel() {
         )
     }
 
+    /**
+     * Derives the clean schedule item role references value used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun cleanScheduleItemRoleReferences(
         item: ScheduleItemDraft,
         draft: CreatePostDraft,
@@ -3713,6 +4092,10 @@ class CreatePostViewModel : ViewModel() {
         )
     }
 
+    /**
+     * Updates the step two draft used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun updateStepTwoDraft(
         change: (CreatePostDraft) -> CreatePostDraft
     ) {
@@ -3746,6 +4129,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Checks whether the role matches the post type required by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun roleMatchesPostType(
         roleMode: VolunteerRoleMode,
         postType: VolunteerPostType?
@@ -3762,6 +4149,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Derives the required capacity for mode value used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun requiredCapacityForMode(
         draft: CreatePostDraft,
         mode: VolunteerRoleMode
@@ -3775,6 +4166,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Derives the assigned capacity for mode value used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun assignedCapacityForMode(
         draft: CreatePostDraft,
         mode: VolunteerRoleMode,
@@ -3811,6 +4206,10 @@ class CreatePostViewModel : ViewModel() {
         return errors
     }
 
+    /**
+     * Derives the continue from step one value used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun continueFromStepOne(): Boolean {
         val currentDraft = _uiState.value.draft
         val errors = validateStepOneForCurrentEditor(currentDraft)
@@ -3818,7 +4217,7 @@ class CreatePostViewModel : ViewModel() {
 
         _uiState.update { current ->
             current.copy(
-                // Only clear unused temporary mode data after validation succeeds.
+                // Clear data for modes that are no longer selected only after the current step validates.
                 draft = if (ready) {
                     current.draft.keepOnlySelectedModeData()
                 } else {
@@ -3840,6 +4239,10 @@ class CreatePostViewModel : ViewModel() {
         return ready
     }
 
+    /**
+     * Checks whether the current Create/Edit Post state has unsaved input.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun hasUnsavedInput(): Boolean {
         val current = _uiState.value
         val original = originalExistingPost
@@ -3850,6 +4253,10 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Derives the discard draft value used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun discardDraft() {
         locationSearchJob?.cancel()
         _uiState.value = CreatePostUiState()
@@ -3905,11 +4312,19 @@ class CreatePostViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Holds the values represented by schedule date window as one strongly typed model.
+     * It supports state coordination and user actions for the Create/Edit Post flow.
+     */
     private data class ScheduleDateWindow(
         val start: Long,
         val end: Long
     )
 
+    /**
+     * Re-maps the saved schedule dates when the organisation Create/Edit Post date range changes.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun rebaseSavedScheduleDates(
         previous: CreatePostDraft,
         updated: CreatePostDraft
@@ -3930,6 +4345,10 @@ class CreatePostViewModel : ViewModel() {
         )
     }
 
+    /**
+     * Re-maps the schedule item date when the organisation Create/Edit Post date range changes.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun rebaseScheduleItemDate(
         previous: CreatePostDraft,
         updated: CreatePostDraft,
@@ -3957,6 +4376,10 @@ class CreatePostViewModel : ViewModel() {
         )
     }
 
+    /**
+     * Re-maps the selected physical date when the organisation Create/Edit Post date range changes.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun rebaseSelectedPhysicalDate(
         previous: CreatePostDraft,
         updated: CreatePostDraft,
@@ -3978,6 +4401,10 @@ class CreatePostViewModel : ViewModel() {
         return validSelectedPhysicalDate(updated, rebased)
     }
 
+    /**
+     * Checks whether the physical schedule window changed compared with the previously loaded value.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun physicalScheduleWindowChanged(
         previous: CreatePostDraft,
         updated: CreatePostDraft
@@ -3987,6 +4414,10 @@ class CreatePostViewModel : ViewModel() {
             normalizedDate(previous.physicalEndDateMillis) != normalizedDate(updated.physicalEndDateMillis)
     }
 
+    /**
+     * Checks whether the remote schedule window changed compared with the previously loaded value.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun remoteScheduleWindowChanged(
         previous: CreatePostDraft,
         updated: CreatePostDraft
@@ -3995,6 +4426,10 @@ class CreatePostViewModel : ViewModel() {
             normalizedDate(previous.remoteDueDateMillis) != normalizedDate(updated.remoteDueDateMillis)
     }
 
+    /**
+     * Derives the schedule date window value used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun scheduleDateWindow(
         draft: CreatePostDraft,
         scheduleType: ScheduleType
@@ -4057,10 +4492,18 @@ class CreatePostViewModel : ViewModel() {
             .coerceIn(newWindow.start, newWindow.end)
     }
 
+    /**
+     * Normalises the date into the consistent form used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun normalizedDate(value: Long?): Long? {
         return value?.let(CreatePostValidator::startOfDayMillis)
     }
 
+    /**
+     * Derives the calendar day offset value used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun calendarDayOffset(
         fromMillis: Long,
         toMillis: Long
@@ -4081,6 +4524,10 @@ class CreatePostViewModel : ViewModel() {
         return offset
     }
 
+    /**
+     * Adds the calendar days to the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun addCalendarDays(
         dateMillis: Long,
         days: Int
@@ -4091,6 +4538,10 @@ class CreatePostViewModel : ViewModel() {
         }.timeInMillis
     }
 
+    /**
+     * Parses the positive number used by the organisation Create/Edit Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun parsePositiveNumber(text: String): Int? {
         val digitsOnly = text.filter { it.isDigit() }.take(4)
         if (digitsOnly.isBlank()) return null

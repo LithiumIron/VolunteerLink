@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.home.model
 
+// FILE OVERVIEW:
+/*
+ * OrganisationHomeUiState groups the data structures used by the organisation Home dashboard flow.
+ * These models make state explicit and allow the UI, ViewModel and repository layers to exchange
+ * strongly typed values instead of passing unrelated parameters throughout the feature.
+ */
+
+
 import com.example.volunteerlink.data.post.PostTimingState
 
 /**
@@ -23,6 +31,10 @@ data class OrganisationHomeUiState(
     val errorMessage: String? = null
 )
 
+/**
+ * Holds the values represented by home post item as one strongly typed model.
+ * It keeps related Home dashboard values together so callers do not pass disconnected fields around.
+ */
 data class HomePostItem(
     val postId: String,
     val title: String,
@@ -44,6 +56,10 @@ data class HomePostItem(
     val remoteTimingState: PostTimingState? = null
 )
 
+/**
+ * Lists the supported values represented by home attention severity.
+ * It keeps related Home dashboard values together so callers do not pass disconnected fields around.
+ */
 enum class HomeAttentionSeverity {
     URGENT,
     WARNING,
@@ -51,6 +67,10 @@ enum class HomeAttentionSeverity {
     REVIEW
 }
 
+/**
+ * Lists the supported values represented by home attention type.
+ * It keeps related Home dashboard values together so callers do not pass disconnected fields around.
+ */
 enum class HomeAttentionType {
     APPLICATIONS_TO_REVIEW,
     POST_COMPLETION_REVIEW,
@@ -63,6 +83,10 @@ enum class HomeAttentionType {
     IMPACT_WEAVE_PROGRESS
 }
 
+/**
+ * Holds the values represented by home attention item as one strongly typed model.
+ * It keeps related Home dashboard values together so callers do not pass disconnected fields around.
+ */
 data class HomeAttentionItem(
     val type: HomeAttentionType,
     val severity: HomeAttentionSeverity,
