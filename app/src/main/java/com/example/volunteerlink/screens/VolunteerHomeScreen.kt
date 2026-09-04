@@ -62,6 +62,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -98,6 +99,7 @@ import com.example.volunteerlink.ui.theme.VolunteerLinkTextPrimary
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextSecondary
 import com.example.volunteerlink.ui.theme.VolunteerLinkWarning
 import com.example.volunteerlink.model.VolunteerOpportunityCategory
+import com.example.volunteerlink.ui.theme.VolunteerLinkTheme
 import java.text.DateFormat
 import java.util.Date
 

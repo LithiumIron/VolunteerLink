@@ -1,9 +1,11 @@
 package com.example.volunteerlink.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,6 +21,7 @@ import androidx.compose.material.icons.filled.Mail
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -32,6 +35,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -58,52 +62,15 @@ fun VolunteerSignInScreen(
     val uiState by volunteerAuthViewModel.uiState
         .collectAsStateWithLifecycle()
 
-    var email by rememberSaveable {
-        mutableStateOf("")
-    }
-    var password by rememberSaveable {
-        mutableStateOf("")
-    }
+    var email by rememberSaveable { mutableStateOf("") }
+    var password by rememberSaveable { mutableStateOf("") }
+    var rememberMe by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(uiState.isAuthenticated) {
         if (uiState.isAuthenticated) onSignedIn()
     }
 
     val isBusy = uiState.isSigningIn || uiState.isCheckingSession
-
-    // A saved session was restored on launch — ask before signing in
-    // automatically, so a different account can be used instead without
-    // needing to sign out manually first. Same pattern as the
-    // organisation sign-in screen.
-    uiState.pendingAccountEmail?.let { pendingEmail ->
-        AlertDialog(
-            // Empty on purpose — force an explicit choice rather than
-            // letting a tap-outside or back-press silently sign someone in.
-            onDismissRequest = {},
-            title = { Text("Continue as $pendingEmail?") },
-            text = {
-                Text(
-                    "You're already signed in with this account on this " +
-                            "device. Continue with it, or sign in with a " +
-                            "different account instead."
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = { volunteerAuthViewModel.continueWithRestoredSession() }
-                ) {
-                    Text("Continue")
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { volunteerAuthViewModel.useDifferentAccount() }
-                ) {
-                    Text("Use a different account")
-                }
-            }
-        )
-    }
 
     Column(
         modifier = Modifier
@@ -211,13 +178,34 @@ fun VolunteerSignInScreen(
                 )
             }
 
+            Spacer(Modifier.height(11.dp))
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(enabled = !isBusy) { rememberMe = !rememberMe },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Checkbox(
+                    checked = rememberMe,
+                    onCheckedChange = { rememberMe = it },
+                    enabled = !isBusy
+                )
+                Text(
+                    text = "Remember me on this device",
+                    fontSize = 13.sp,
+                    color = VolunteerLinkTextSecondary
+                )
+            }
+
             Spacer(Modifier.height(22.dp))
 
             Button(
                 onClick = {
                     volunteerAuthViewModel.signIn(
                         email = email,
-                        password = password
+                        password = password,
+                        rememberMe = rememberMe
                     )
                 },
                 modifier = Modifier
@@ -247,7 +235,8 @@ fun VolunteerSignInScreen(
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = "New volunteer?",
@@ -257,7 +246,8 @@ fun VolunteerSignInScreen(
 
                 TextButton(
                     onClick = onSignUpSelected,
-                    enabled = !isBusy
+                    enabled = !isBusy,
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
                 ) {
                     Text(
                         text = "Create an account",

@@ -1,5 +1,6 @@
 package com.example.volunteerlink.navigation
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -8,15 +9,21 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -31,6 +38,7 @@ import androidx.navigation.navArgument
 import androidx.compose.runtime.rememberCoroutineScope
 import com.example.volunteerlink.data.VolunteerOpportunitySessionStore
 import com.example.volunteerlink.data.VolunteerProfileRepository
+import com.example.volunteerlink.data.supabase
 import com.example.volunteerlink.screens.EditVolunteerProfileScreen
 import com.example.volunteerlink.screens.MapScreen
 import com.example.volunteerlink.screens.VolunteerAllCertificatesScreen
@@ -60,6 +68,7 @@ import com.example.volunteerlink.chat.repository.SupabaseChatRepository
 import com.example.volunteerlink.screens.chat.VolunteerChatListScreen
 import com.example.volunteerlink.screens.chat.VolunteerChatRoomScreen
 import com.example.volunteerlink.screens.chat.VolunteerGroupInfoScreen
+import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.launch
 
 @Composable
@@ -126,6 +135,23 @@ fun VolunteerOpportunityNavigationHost(
     val shouldShowVolunteerBottomNavigationBar =
         currentVolunteerNavigationRoute in
                 volunteerBottomNavigationRoutes
+
+    // Pressing the system back button while at Home would otherwise pop
+    // straight out of this nav graph to the user-type selection screen,
+    // silently signing the volunteer out with no confirmation. Intercept
+    // it and ask first instead — same confirm-before-logout behaviour as
+    // the "Log Out" row in Settings.
+    var showBackLogoutConfirmation by remember { mutableStateOf(false) }
+    var isLoggingOutFromBack by remember { mutableStateOf(false) }
+    val backLogoutScope = rememberCoroutineScope()
+
+    BackHandler(
+        enabled =
+            currentVolunteerNavigationRoute ==
+                    VolunteerOpportunityNavigationRoutes.VOLUNTEER_HOME_ROUTE
+    ) {
+        showBackLogoutConfirmation = true
+    }
 
     Box(
         modifier = Modifier
@@ -1104,6 +1130,56 @@ fun VolunteerOpportunityNavigationHost(
                     }
                 )
             }
+        }
+
+        if (showBackLogoutConfirmation) {
+            AlertDialog(
+                onDismissRequest = {
+                    // Tapping outside cancels — same as choosing "Cancel" —
+                    // never silently logs out. Ignored mid-request so the
+                    // dialog can't be dismissed while signOut() is running.
+                    if (!isLoggingOutFromBack) showBackLogoutConfirmation = false
+                },
+                title = { Text("Log out?") },
+                text = {
+                    Text(
+                        "You'll need to sign in again to access your " +
+                                "volunteer profile."
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        enabled = !isLoggingOutFromBack,
+                        onClick = {
+                            backLogoutScope.launch {
+                                isLoggingOutFromBack = true
+                                try {
+                                    supabase.auth.signOut()
+                                    VolunteerOpportunitySessionStore.clearProfileData()
+                                    showBackLogoutConfirmation = false
+                                    onLoggedOut()
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                } finally {
+                                    isLoggingOutFromBack = false
+                                }
+                            }
+                        }
+                    ) { Text("Log out", color = Color(0xFFC62828)) }
+                },
+                dismissButton = {
+                    TextButton(
+                        enabled = !isLoggingOutFromBack,
+                        onClick = {
+                            // User said no — stay signed in, just close the
+                            // dialog. No navigation, no sign-out.
+                            showBackLogoutConfirmation = false
+                        }
+                    ) {
+                        Text("Cancel", color = VolunteerLinkPrimaryGreen)
+                    }
+                }
+            )
         }
     }
 }
