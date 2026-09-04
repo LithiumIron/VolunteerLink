@@ -1,5 +1,20 @@
 package com.example.volunteerlink.organisation.screens.chat
 
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Implements Organisation chat presentation/interaction associated with Organisation Chats Hub Screen.
+//
+// The screen/component renders shared chat models and emits repository-facing actions through callbacks or
+// coroutine calls rather than editing database tables directly.
+//
+// Sent messages, membership and read state remain Supabase-authoritative; only unsent text may be kept in account-
+// scoped local storage as a convenience.
+//
+// Architectural layer: Compose presentation layer.
+// ============================================================================
+
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -60,12 +75,32 @@ import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
 
+/**
+ * DETAILED DECLARATION — OrganisationChatHubTab
+ *
+ * Domain/UI type for Organisation Chat Hub Tab used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 private enum class OrganisationChatHubTab {
     MESSAGES,
     INVITATIONS
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — OrganisationChatsHubScreen
+ *
+ * Renders the Organisation Chats Hub screen from state supplied by the owning ViewModel/repository-facing
+ * coordinator.
+ *
+ * The composable maps state to Material3 UI and emits callbacks; it does not become the source of truth for
+ * persisted VolunteerLink data.
+ *
+ * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without leaving
+ * the UI in an assumed-success state.
+ */
 fun OrganisationChatsHubScreen(
     role: Role,
     onOpenEventChat: (String) -> Unit,
@@ -294,6 +329,14 @@ fun OrganisationChatsHubScreen(
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — ChatHubTabs
+ *
+ * Handles the Compose/UI responsibility for chat hub tabs.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun ChatHubTabs(
     selectedTab: OrganisationChatHubTab,
     pendingInvitationCount: Int,
@@ -331,6 +374,14 @@ private fun ChatHubTabs(
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — ChatHubTabButton
+ *
+ * Handles the Compose/UI responsibility for chat hub tab button.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun ChatHubTabButton(
     title: String,
     selected: Boolean,
@@ -378,6 +429,14 @@ private fun ChatHubTabButton(
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — PartnershipMessagesSection
+ *
+ * Renders the reusable Partnership Messages Section portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun PartnershipMessagesSection(
     chats: List<PartnershipConversationPreview>,
     isLoading: Boolean,
@@ -451,6 +510,14 @@ private fun PartnershipMessagesSection(
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — PartnershipConversationRow
+ *
+ * Renders the reusable Partnership Conversation Row portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun PartnershipConversationRow(
     chat: PartnershipConversationPreview,
     onClick: () -> Unit
@@ -521,6 +588,14 @@ private fun PartnershipConversationRow(
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — PartnershipInvitationsList
+ *
+ * Handles the Compose/UI responsibility for partnership invitations list.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun PartnershipInvitationsList(
     invitations: List<PartnershipInvitationSummary>,
     partnershipChats: List<PartnershipConversationPreview>,
@@ -603,6 +678,14 @@ private fun PartnershipInvitationsList(
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — InvitationSectionHeader
+ *
+ * Renders the reusable Invitation Section Header portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun InvitationSectionHeader(title: String) {
     Text(
         text = title,
@@ -614,6 +697,14 @@ private fun InvitationSectionHeader(title: String) {
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — PartnershipInvitationRow
+ *
+ * Renders the reusable Partnership Invitation Row portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun PartnershipInvitationRow(
     invitation: PartnershipInvitationSummary,
     onClick: (() -> Unit)?
@@ -667,6 +758,14 @@ private fun PartnershipInvitationRow(
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — InvitationStatusPill
+ *
+ * Handles the Compose/UI responsibility for invitation status pill.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun InvitationStatusPill(status: String) {
     val normalized = status.uppercase(Locale.ROOT)
     val label = normalized
@@ -695,6 +794,14 @@ private fun InvitationStatusPill(status: String) {
     }
 }
 
+/**
+ * DETAILED BEHAVIOUR — partnershipConversationFor
+ *
+ * Handles the Compose/UI responsibility for partnership conversation for.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun partnershipConversationFor(
     invitation: PartnershipInvitationSummary,
     chats: List<PartnershipConversationPreview>
@@ -703,6 +810,17 @@ private fun partnershipConversationFor(
         chat.otherOrganisationId == invitation.otherOrganisationId
 }
 
+/**
+ * DETAILED BEHAVIOUR — shortChatTime
+ *
+ * Handles the Compose/UI responsibility for short chat time.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ *
+ * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without leaving
+ * the UI in an assumed-success state.
+ */
 private fun shortChatTime(value: String): String {
     val patterns = listOf(
         "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
@@ -722,6 +840,14 @@ private fun shortChatTime(value: String): String {
     return SimpleDateFormat("h:mm a", Locale.getDefault()).format(parsed)
 }
 
+/**
+ * DETAILED BEHAVIOUR — safePartnershipUiError
+ *
+ * Handles the Compose/UI responsibility for safe partnership ui error.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun safePartnershipUiError(raw: String): String {
     val head = raw
         .substringBefore("\nCode:")

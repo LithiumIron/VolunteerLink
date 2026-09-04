@@ -1,11 +1,24 @@
 package com.example.volunteerlink.organisation.repository
 
-// FILE OVERVIEW:
-/*
- * SupabaseImpactWeaveRepository defines or implements data access used by the organisation Impact Weave and partnership flow.
- * Repository code keeps Supabase/RPC/storage details away from the composables and ViewModels
- * so UI code can work with application models instead of backend-specific responses.
- */
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Implements Impact Weave persistence through authenticated Supabase RPCs.
+//
+// The database owns plan status transitions such as MATCHING, WAITING, PARTIAL, READY, DISPOSED and CONVERTED so
+// two organisations cannot create contradictory partnership state locally.
+//
+// The repository converts Compose/ViewModel models to RPC parameters and converts returned JSON back into Impact
+// Weave domain models.
+//
+// Create Post prefill is read from the confirmed Impact Weave plan instead of asking the organisation to re-enter
+// agreed activity information.
+//
+// Conversion completion links accepted partner organisations/support to the real Volunteer Post and marks the plan
+// as historical in one server-controlled workflow.
+//
+// Architectural layer: Data/repository layer.
+// ============================================================================
 
 
 import com.example.volunteerlink.data.location.LocationSuggestion
@@ -44,6 +57,14 @@ import java.util.Locale
  * Holds the values represented by active impact weave plan row as one strongly typed model.
  * It keeps backend-facing work behind the Impact Weave and partnership repository boundary.
  */
+/**
+ * DETAILED DECLARATION — ActiveImpactWeavePlanRow
+ *
+ * Domain/UI type for Active Impact Weave Plan Row used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 private data class ActiveImpactWeavePlanRow(
     @SerialName("draft_id") val draftId: String,
     val category: String? = null,
@@ -67,6 +88,14 @@ private data class ActiveImpactWeavePlanRow(
  * Holds the values represented by matching input response as one strongly typed model.
  * It keeps backend-facing work behind the Impact Weave and partnership repository boundary.
  */
+/**
+ * DETAILED DECLARATION — MatchingInputResponse
+ *
+ * Domain/UI type for Matching Input Response used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 private data class MatchingInputResponse(
     val needs: List<MatchingNeedRow> = emptyList(),
     val candidates: List<MatchingCandidateRow> = emptyList()
@@ -76,6 +105,14 @@ private data class MatchingInputResponse(
 /**
  * Holds the values represented by matching need row as one strongly typed model.
  * It keeps backend-facing work behind the Impact Weave and partnership repository boundary.
+ */
+/**
+ * DETAILED DECLARATION — MatchingNeedRow
+ *
+ * Domain/UI type for Matching Need Row used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
  */
 private data class MatchingNeedRow(
     @SerialName("need_id") val needId: String,
@@ -92,6 +129,14 @@ private data class MatchingNeedRow(
 /**
  * Holds the values represented by matching candidate row as one strongly typed model.
  * It keeps backend-facing work behind the Impact Weave and partnership repository boundary.
+ */
+/**
+ * DETAILED DECLARATION — MatchingCandidateRow
+ *
+ * Domain/UI type for Matching Candidate Row used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
  */
 private data class MatchingCandidateRow(
     // Some candidate responses can include need_id, but matching is performed from the
@@ -119,6 +164,14 @@ private data class MatchingCandidateRow(
  * Holds the values represented by impact weave post prefill row as one strongly typed model.
  * It keeps backend-facing work behind the Impact Weave and partnership repository boundary.
  */
+/**
+ * DETAILED DECLARATION — ImpactWeavePostPrefillRow
+ *
+ * Domain/UI type for Impact Weave Post Prefill Row used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 private data class ImpactWeavePostPrefillRow(
     @SerialName("draft_id") val draftId: String,
     val category: String,
@@ -142,6 +195,14 @@ private data class ImpactWeavePostPrefillRow(
  * Holds the values represented by impact weave post partner row as one strongly typed model.
  * It keeps backend-facing work behind the Impact Weave and partnership repository boundary.
  */
+/**
+ * DETAILED DECLARATION — ImpactWeavePostPartnerRow
+ *
+ * Domain/UI type for Impact Weave Post Partner Row used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 private data class ImpactWeavePostPartnerRow(
     @SerialName("organisation_name") val organisationName: String,
     @SerialName("contribution_summary") val contributionSummary: String
@@ -150,6 +211,14 @@ private data class ImpactWeavePostPartnerRow(
 /**
  * Holds the values represented by prepared impact weave plan as one strongly typed model.
  * It keeps backend-facing work behind the Impact Weave and partnership repository boundary.
+ */
+/**
+ * DETAILED DECLARATION — PreparedImpactWeavePlan
+ *
+ * Domain/UI type for Prepared Impact Weave Plan used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
  */
 private data class PreparedImpactWeavePlan(
     val mode: ImpactWeaveMode,
@@ -167,13 +236,49 @@ private data class PreparedImpactWeavePlan(
 )
 
 /** Supabase implementation for Impact Weave Find Partners. */
+/**
+ * DETAILED DECLARATION — SupabaseImpactWeaveRepository
+ *
+ * Data-access implementation/contract for Supabase Impact Weave Repository, isolating backend details from the
+ * screen and ViewModel layers.
+ *
+ * Protected server state still relies on authenticated Supabase authorization and database rules rather than
+ * trusting client-side checks alone.
+ *
+ * This implementation translates VolunteerLink models to PostgREST/RPC/Storage operations and maps backend
+ * responses back into domain models.
+ */
 class SupabaseImpactWeaveRepository : ImpactWeaveRepository {
 
     /**
      * Loads the active plans needed by the organisation Impact Weave and partnership flow.
      * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
      */
+    /**
+     * DETAILED BEHAVIOUR — loadActivePlans
+     *
+     * Performs the repository/data-layer operation for load active plans.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Supabase RPC `organisation_list_active_impact_weave_plans`: Returns the authenticated organisation's
+     * active and historical Impact Weave plans for the planning/history UI.
+     *
+     * Works with structured location suggestions/coordinates so free-text search is separated from the final
+     * location fields saved with the post/plan.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     override suspend fun loadActivePlans(): List<ImpactWeaveActivePlan> {
+        // ------------------------------------------------------------------------
+        // SUPABASE RPC: organisation_list_active_impact_weave_plans
+        // Returns the authenticated organisation's active and historical Impact Weave plans for the
+        // planning/history UI.
+        // The client sends parameters and waits for the database result; ownership, lifecycle and multi-row
+        // consistency checks belong on the server for this operation.
+        // ------------------------------------------------------------------------
         val response = supabase.postgrest.rpc(
             function = "organisation_list_active_impact_weave_plans"
         )
@@ -219,10 +324,28 @@ class SupabaseImpactWeaveRepository : ImpactWeaveRepository {
      * Starts the matching for the organisation Impact Weave and partnership flow.
      * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
      */
+    /**
+     * DETAILED BEHAVIOUR — startMatching
+     *
+     * Performs the repository/data-layer operation for start matching.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Supabase RPC `organisation_start_impact_weave_matching`: Persists the reviewed Impact Weave
+     * activity/support requirements and enters server-backed partner matching.
+     */
     override suspend fun startMatching(
         draft: ImpactWeaveDraft
     ): StartedImpactWeaveMatchingResult {
         val prepared = preparePlan(draft)
+        // ------------------------------------------------------------------------
+        // SUPABASE RPC: organisation_start_impact_weave_matching
+        // Persists the reviewed Impact Weave activity/support requirements and enters server-backed partner
+        // matching.
+        // The client sends parameters and waits for the database result; ownership, lifecycle and multi-row
+        // consistency checks belong on the server for this operation.
+        // ------------------------------------------------------------------------
         val response = supabase.postgrest.rpc(
             function = "organisation_start_impact_weave_matching",
             parameters = buildPlanParameters(draft, prepared)
@@ -240,7 +363,25 @@ class SupabaseImpactWeaveRepository : ImpactWeaveRepository {
      * Loads the matching input needed by the organisation Impact Weave and partnership flow.
      * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
      */
+    /**
+     * DETAILED BEHAVIOUR — loadMatchingInput
+     *
+     * Performs the repository/data-layer operation for load matching input.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Supabase RPC `organisation_get_impact_weave_matching_input`: Returns normalized plan needs plus eligible
+     * provider support records used to build current partner recommendations.
+     */
     override suspend fun loadMatchingInput(draftId: String): ImpactWeaveMatchingInput {
+        // ------------------------------------------------------------------------
+        // SUPABASE RPC: organisation_get_impact_weave_matching_input
+        // Returns normalized plan needs plus eligible provider support records used to build current partner
+        // recommendations.
+        // The client sends parameters and waits for the database result; ownership, lifecycle and multi-row
+        // consistency checks belong on the server for this operation.
+        // ------------------------------------------------------------------------
         val response = supabase.postgrest.rpc(
             function = "organisation_get_impact_weave_matching_input",
             parameters = buildJsonObject {
@@ -292,12 +433,30 @@ class SupabaseImpactWeaveRepository : ImpactWeaveRepository {
      * Updates the basic details used by the organisation Impact Weave and partnership flow.
      * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
      */
+    /**
+     * DETAILED BEHAVIOUR — updateBasicDetails
+     *
+     * Performs the repository/data-layer operation for update basic details.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Supabase RPC `organisation_update_impact_weave_basic`: Updates fields that are still editable for an
+     * active Impact Weave plan while the database enforces lifecycle restrictions.
+     */
     override suspend fun updateBasicDetails(
         draftId: String,
         title: String,
         category: String,
         description: String
     ) {
+        // ------------------------------------------------------------------------
+        // SUPABASE RPC: organisation_update_impact_weave_basic
+        // Updates fields that are still editable for an active Impact Weave plan while the database enforces
+        // lifecycle restrictions.
+        // The client sends parameters and waits for the database result; ownership, lifecycle and multi-row
+        // consistency checks belong on the server for this operation.
+        // ------------------------------------------------------------------------
         supabase.postgrest.rpc(
             function = "organisation_update_impact_weave_basic",
             parameters = buildJsonObject {
@@ -313,6 +472,17 @@ class SupabaseImpactWeaveRepository : ImpactWeaveRepository {
      * Derives the reschedule value used by the organisation Impact Weave and partnership flow.
      * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
      */
+    /**
+     * DETAILED BEHAVIOUR — reschedule
+     *
+     * Performs the repository/data-layer operation for reschedule.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Supabase RPC `organisation_reschedule_impact_weave`: Moves an Impact Weave activity schedule through the
+     * server workflow so invitation/reconfirmation state can be adjusted consistently.
+     */
     override suspend fun reschedule(
         draftId: String,
         startDateMillis: Long,
@@ -320,6 +490,13 @@ class SupabaseImpactWeaveRepository : ImpactWeaveRepository {
         startTimeMinutes: Int,
         endTimeMinutes: Int
     ) {
+        // ------------------------------------------------------------------------
+        // SUPABASE RPC: organisation_reschedule_impact_weave
+        // Moves an Impact Weave activity schedule through the server workflow so invitation/reconfirmation
+        // state can be adjusted consistently.
+        // The client sends parameters and waits for the database result; ownership, lifecycle and multi-row
+        // consistency checks belong on the server for this operation.
+        // ------------------------------------------------------------------------
         supabase.postgrest.rpc(
             function = "organisation_reschedule_impact_weave",
             parameters = buildJsonObject {
@@ -336,7 +513,25 @@ class SupabaseImpactWeaveRepository : ImpactWeaveRepository {
      * Derives the dispose value used by the organisation Impact Weave and partnership flow.
      * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
      */
+    /**
+     * DETAILED BEHAVIOUR — dispose
+     *
+     * Performs the repository/data-layer operation for dispose.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Supabase RPC `organisation_dispose_impact_weave`: Marks an active Impact Weave plan as disposed and
+     * closes the associated unresolved partnership work while preserving history.
+     */
     override suspend fun dispose(draftId: String) {
+        // ------------------------------------------------------------------------
+        // SUPABASE RPC: organisation_dispose_impact_weave
+        // Marks an active Impact Weave plan as disposed and closes the associated unresolved partnership work
+        // while preserving history.
+        // The client sends parameters and waits for the database result; ownership, lifecycle and multi-row
+        // consistency checks belong on the server for this operation.
+        // ------------------------------------------------------------------------
         supabase.postgrest.rpc(
             function = "organisation_dispose_impact_weave",
             parameters = buildJsonObject { put("p_draft_id", draftId) }
@@ -347,7 +542,28 @@ class SupabaseImpactWeaveRepository : ImpactWeaveRepository {
      * Loads the post prefill needed by the organisation Impact Weave and partnership flow.
      * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
      */
+    /**
+     * DETAILED BEHAVIOUR — loadPostPrefill
+     *
+     * Performs the repository/data-layer operation for load post prefill.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Supabase RPC `organisation_get_impact_weave_post_prefill`: Returns the confirmed Impact Weave activity
+     * details that must prefill Create Post, including the resolved Physical venue where applicable.
+     *
+     * Works with structured location suggestions/coordinates so free-text search is separated from the final
+     * location fields saved with the post/plan.
+     */
     override suspend fun loadPostPrefill(draftId: String): ImpactWeavePostPrefill {
+        // ------------------------------------------------------------------------
+        // SUPABASE RPC: organisation_get_impact_weave_post_prefill
+        // Returns the confirmed Impact Weave activity details that must prefill Create Post, including the
+        // resolved Physical venue where applicable.
+        // The client sends parameters and waits for the database result; ownership, lifecycle and multi-row
+        // consistency checks belong on the server for this operation.
+        // ------------------------------------------------------------------------
         val response = supabase.postgrest.rpc(
             function = "organisation_get_impact_weave_post_prefill",
             parameters = buildJsonObject { put("p_draft_id", draftId) }
@@ -385,7 +601,25 @@ class SupabaseImpactWeaveRepository : ImpactWeaveRepository {
      * Confirms the conversion in the organisation Impact Weave and partnership flow.
      * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
      */
+    /**
+     * DETAILED BEHAVIOUR — completeConversion
+     *
+     * Performs the repository/data-layer operation for complete conversion.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Supabase RPC `organisation_complete_impact_weave_conversion`: Links a successfully-created Volunteer Post
+     * to the Impact Weave plan, carries accepted partners into post_partners and marks the plan CONVERTED.
+     */
     override suspend fun completeConversion(draftId: String, postId: String) {
+        // ------------------------------------------------------------------------
+        // SUPABASE RPC: organisation_complete_impact_weave_conversion
+        // Links a successfully-created Volunteer Post to the Impact Weave plan, carries accepted partners into
+        // post_partners and marks the plan CONVERTED.
+        // The client sends parameters and waits for the database result; ownership, lifecycle and multi-row
+        // consistency checks belong on the server for this operation.
+        // ------------------------------------------------------------------------
         supabase.postgrest.rpc(
             function = "organisation_complete_impact_weave_conversion",
             parameters = buildJsonObject {
@@ -398,6 +632,17 @@ class SupabaseImpactWeaveRepository : ImpactWeaveRepository {
     /**
      * Prepares the plan for the organisation Impact Weave and partnership flow.
      * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — preparePlan
+     *
+     * Performs the repository/data-layer operation for prepare plan.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Uses OrganisationSession so the client operation is associated with the signed-in organisation; server
+     * RLS/RPC ownership checks still make the final authorization decision.
      */
     private suspend fun preparePlan(draft: ImpactWeaveDraft): PreparedImpactWeavePlan {
         val organisation = OrganisationSession.requireContext()
@@ -468,6 +713,16 @@ class SupabaseImpactWeaveRepository : ImpactWeaveRepository {
      * Builds the plan parameters used by the organisation Impact Weave and partnership flow.
      * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
      */
+    /**
+     * DETAILED BEHAVIOUR — buildPlanParameters
+     *
+     * Performs the repository/data-layer operation for build plan parameters.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     private fun buildPlanParameters(
         draft: ImpactWeaveDraft,
         prepared: PreparedImpactWeavePlan
@@ -532,6 +787,14 @@ class SupabaseImpactWeaveRepository : ImpactWeaveRepository {
      * Returns the require draft id value required by the organisation Impact Weave and partnership flow.
      * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
      */
+    /**
+     * DETAILED BEHAVIOUR — requireDraftId
+     *
+     * Performs the repository/data-layer operation for require draft id.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     */
     private fun requireDraftId(data: String, errorMessage: String): String {
         val result = Json.parseToJsonElement(data).jsonObject
         return result["draft_id"]
@@ -545,6 +808,14 @@ class SupabaseImpactWeaveRepository : ImpactWeaveRepository {
      * Parses the sql date used by the organisation Impact Weave and partnership flow.
      * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
      */
+    /**
+     * DETAILED BEHAVIOUR — parseSqlDate
+     *
+     * Performs the repository/data-layer operation for parse sql date.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     */
     private fun parseSqlDate(value: String): Long =
         SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
             isLenient = false
@@ -553,6 +824,14 @@ class SupabaseImpactWeaveRepository : ImpactWeaveRepository {
     /**
      * Parses the sql time used by the organisation Impact Weave and partnership flow.
      * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — parseSqlTime
+     *
+     * Performs the repository/data-layer operation for parse sql time.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
      */
     private fun parseSqlTime(value: String): Int {
         val parts = value.take(5).split(":")
@@ -564,12 +843,28 @@ class SupabaseImpactWeaveRepository : ImpactWeaveRepository {
      * Formats the date used by the organisation Impact Weave and partnership flow.
      * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
      */
+    /**
+     * DETAILED BEHAVIOUR — formatDate
+     *
+     * Performs the repository/data-layer operation for format date.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     */
     private fun formatDate(timeMillis: Long): String =
         SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(timeMillis))
 
     /**
      * Formats the time used by the organisation Impact Weave and partnership flow.
      * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — formatTime
+     *
+     * Performs the repository/data-layer operation for format time.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
      */
     private fun formatTime(totalMinutes: Int): String = "%02d:%02d:00".format(
         Locale.US,

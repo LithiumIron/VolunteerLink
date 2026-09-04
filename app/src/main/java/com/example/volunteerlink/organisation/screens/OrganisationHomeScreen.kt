@@ -1,11 +1,18 @@
 package com.example.volunteerlink.organisation.screens
 
-// FILE OVERVIEW:
-/*
- * OrganisationHomeScreen contains presentation code for the organisation Home dashboard flow.
- * It focuses on rendering state and forwarding user actions through callbacks/ViewModels,
- * keeping database access and business rules outside the composables where possible.
- */
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Renders the Organisation dashboard using the state produced by OrganisationHomeViewModel.
+//
+// The page combines identity, post/activity summaries and attention items into presentation sections while
+// callbacks handle navigation to deeper workflows.
+//
+// A cached snapshot can be shown as read-only continuity when available; server mutations are never performed
+// directly from this composable.
+//
+// Architectural layer: Compose presentation layer.
+// ============================================================================
 
 
 import androidx.compose.foundation.background
@@ -55,6 +62,15 @@ import com.example.volunteerlink.ui.theme.VolunteerLinkTextSecondary
  * date-dependent rules stay in the repository/ViewModel/evaluator layer.
  */
 @Composable
+/**
+ * DETAILED BEHAVIOUR — OrganisationHomeScreen
+ *
+ * Renders the Organisation Home screen from state supplied by the owning ViewModel/repository-facing
+ * coordinator.
+ *
+ * The composable maps state to Material3 UI and emits callbacks; it does not become the source of truth for
+ * persisted VolunteerLink data.
+ */
 fun OrganisationHomeScreen(
     onViewAllPosts: () -> Unit,
     onPostClick: (String) -> Unit,
@@ -97,6 +113,20 @@ fun OrganisationHomeScreen(
 /**
  * Renders the organisation home content content block used in the organisation Home dashboard flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — OrganisationHomeContent
+ *
+ * Renders the reusable Organisation Home Content portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ *
+ * Uses OrganisationSession so the client operation is associated with the signed-in organisation; server
+ * RLS/RPC ownership checks still make the final authorization decision.
+ *
+ * Uses AppClock for business-date/time decisions so the same code works with the project test clock and normal
+ * device time.
  */
 private fun OrganisationHomeContent(
     uiState: OrganisationHomeUiState,

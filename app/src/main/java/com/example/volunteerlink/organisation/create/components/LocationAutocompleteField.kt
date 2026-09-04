@@ -1,11 +1,18 @@
 package com.example.volunteerlink.organisation.create.components
 
-// FILE OVERVIEW:
-/*
- * LocationAutocompleteField contains presentation code for the organisation Create/Edit Post flow.
- * It focuses on rendering state and forwarding user actions through callbacks/ViewModels,
- * keeping database access and business rules outside the composables where possible.
- */
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Contains reusable Create Post UI building blocks for Location Autocomplete Field.
+//
+// Components are intentionally presentation-focused: values and callbacks come from the parent step/ViewModel, so
+// a reusable field does not secretly own business state or perform database writes.
+//
+// Shared components keep spacing, colours, validation presentation and interaction patterns consistent across
+// Physical, Remote and Hybrid forms.
+//
+// Architectural layer: Compose presentation layer.
+// ============================================================================
 
 
 import androidx.compose.foundation.border
@@ -39,6 +46,17 @@ import com.example.volunteerlink.ui.theme.CreateGreen
 /**
  * Renders the location autocomplete field input field used in the organisation Create/Edit Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — LocationAutocompleteField
+ *
+ * Renders the reusable Location Autocomplete Field portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ *
+ * Works with structured location suggestions/coordinates so free-text search is separated from the final
+ * location fields saved with the post/plan.
  */
 fun LocationAutocompleteField(
     query: String,
@@ -163,6 +181,17 @@ fun LocationAutocompleteField(
 /**
  * Renders the UI represented by location suggestion list for the organisation Create/Edit Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — LocationSuggestionList
+ *
+ * Handles the Compose/UI responsibility for location suggestion list.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ *
+ * Works with structured location suggestions/coordinates so free-text search is separated from the final
+ * location fields saved with the post/plan.
  */
 private fun LocationSuggestionList(
     suggestions: List<LocationSuggestion>,

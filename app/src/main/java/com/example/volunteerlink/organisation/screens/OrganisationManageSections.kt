@@ -1,11 +1,21 @@
 package com.example.volunteerlink.organisation.screens
 
-// FILE OVERVIEW:
-/*
- * OrganisationManageSections contains presentation code for the organisation Manage Post flow.
- * It focuses on rendering state and forwarding user actions through callbacks/ViewModels,
- * keeping database access and business rules outside the composables where possible.
- */
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Implements the Organisation UI associated with Organisation Manage Sections.
+//
+// The composable layer is responsible for layout, interaction and displaying loading/error/validation state;
+// business rules and persistence are delegated to ViewModels/repositories.
+//
+// This separation makes it clear during maintenance which code changes appearance versus which code changes real
+// server data.
+//
+// Where the screen displays cached information, server-changing actions remain disabled or routed through a fresh
+// authenticated repository operation.
+//
+// Architectural layer: Compose presentation layer.
+// ============================================================================
 
 
 import androidx.annotation.DrawableRes
@@ -59,6 +69,14 @@ import java.util.Locale
 
 /** Green Manage header retained exactly as the Organisation visual anchor. */
 @Composable
+/**
+ * DETAILED BEHAVIOUR — OrganisationManageHeader
+ *
+ * Renders the reusable Organisation Manage Header portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun OrganisationManageHeader(
     title: String,
     subtitle: String? = null
@@ -90,6 +108,14 @@ fun OrganisationManageHeader(
 /**
  * Renders the organisation manage sub header header used in the organisation Manage Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — OrganisationManageSubHeader
+ *
+ * Renders the reusable Organisation Manage Sub Header portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
  */
 fun OrganisationManageSubHeader(
     title: String,
@@ -131,6 +157,14 @@ fun OrganisationManageSubHeader(
  * as a native management row instead of a large module card.
  */
 @Composable
+/**
+ * DETAILED BEHAVIOUR — ManageModuleChoiceCard
+ *
+ * Renders the reusable Manage Module Choice Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun ManageModuleChoiceCard(
     @DrawableRes iconRes: Int,
     title: String,
@@ -167,6 +201,14 @@ fun ManageModuleChoiceCard(
  * Renders the UI represented by manage post section selector for the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — ManagePostSectionSelector
+ *
+ * Renders the reusable Manage Post Section Selector portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun ManagePostSectionSelector(
     selected: ManagePostSection,
     activeCount: Int,
@@ -183,6 +225,14 @@ fun ManagePostSectionSelector(
     /**
      * Holds the values represented by tab item as one strongly typed model.
      * It supports the Manage Post presentation layer without adding backend responsibilities to the screen.
+     */
+    /**
+     * DETAILED DECLARATION — TabItem
+     *
+     * Domain/UI type for Tab Item used by the Organisation module.
+     *
+     * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-
+     * typed maps.
      */
     data class TabItem(
         val section: ManagePostSection,
@@ -255,6 +305,14 @@ fun ManagePostSectionSelector(
  * Renders the manage active group header header used in the organisation Manage Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
  */
+/**
+ * DETAILED BEHAVIOUR — ManageActiveGroupHeader
+ *
+ * Renders the reusable Manage Active Group Header portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun ManageActiveGroupHeader(
     title: String,
     count: Int,
@@ -283,6 +341,14 @@ fun ManageActiveGroupHeader(
  * Renders the UI represented by manage section overview for the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — ManageSectionOverview
+ *
+ * Renders the reusable Manage Section Overview portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun ManageSectionOverview(
     title: String,
     detail: String? = null,
@@ -307,6 +373,14 @@ fun ManageSectionOverview(
 
 /** Flat post row used throughout the lifecycle list. */
 @Composable
+/**
+ * DETAILED BEHAVIOUR — ManageVolunteerPostCard
+ *
+ * Renders the reusable Manage Volunteer Post Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun ManageVolunteerPostCard(
     post: ManagePostItem,
     section: ManagePostSection,
@@ -529,6 +603,14 @@ fun ManageVolunteerPostCard(
  * Returns the manage empty section message used by the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — ManageEmptySectionMessage
+ *
+ * Renders the reusable Manage Empty Section Message portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun ManageEmptySectionMessage(
     title: String,
     message: String,
@@ -546,6 +628,14 @@ fun ManageEmptySectionMessage(
 /**
  * Renders the UI represented by manage hybrid phase line for the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — ManageHybridPhaseLine
+ *
+ * Handles the Compose/UI responsibility for manage hybrid phase line.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
  */
 private fun ManageHybridPhaseLine(
     label: String,
@@ -578,6 +668,14 @@ private fun ManageHybridPhaseLine(
  * Derives the string value used by the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — manageModeDrawable
+ *
+ * Handles the Compose/UI responsibility for manage mode drawable.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun String.manageModeDrawable(): Int = when (uppercase(Locale.US)) {
     "PHYSICAL" -> R.drawable.physical_event
     "REMOTE" -> R.drawable.remote_project
@@ -589,6 +687,14 @@ private fun String.manageModeDrawable(): Int = when (uppercase(Locale.US)) {
  * Derives the string value used by the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — toManageModeLabel
+ *
+ * Handles the Compose/UI responsibility for to manage mode label.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun String.toManageModeLabel(): String = when (uppercase(Locale.US)) {
     "PHYSICAL" -> "Physical"
     "REMOTE" -> "Remote"
@@ -599,6 +705,14 @@ private fun String.toManageModeLabel(): String = when (uppercase(Locale.US)) {
 /**
  * Returns the manage lifecycle label used by the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — manageLifecycleLabel
+ *
+ * Handles the Compose/UI responsibility for manage lifecycle label.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
  */
 private fun manageLifecycleLabel(post: ManagePostItem, section: ManagePostSection): String = when (section) {
     ManagePostSection.DRAFTS -> "DRAFT"
@@ -617,6 +731,14 @@ private fun manageLifecycleLabel(post: ManagePostItem, section: ManagePostSectio
  * Derives the manage lifecycle color value used by the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — manageLifecycleColor
+ *
+ * Handles the Compose/UI responsibility for manage lifecycle color.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun manageLifecycleColor(post: ManagePostItem, section: ManagePostSection): Color = when (section) {
     ManagePostSection.REVIEW -> VolunteerLinkInformation
     ManagePostSection.COMPLETED -> VolunteerLinkPrimaryGreen
@@ -632,6 +754,14 @@ private fun manageLifecycleColor(post: ManagePostItem, section: ManagePostSectio
  * Returns the manage timeline text used by the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — manageTimelineText
+ *
+ * Handles the Compose/UI responsibility for manage timeline text.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun manageTimelineText(post: ManagePostItem): String {
     return if (post.mode.equals("HYBRID", true)) {
         val remote = manageDateRange(post.remoteStartDate, post.remoteEndDate)
@@ -645,6 +775,14 @@ private fun manageTimelineText(post: ManagePostItem): String {
 /**
  * Returns the manage date range value required by the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — manageDateRange
+ *
+ * Handles the Compose/UI responsibility for manage date range.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
  */
 private fun manageDateRange(start: String?, end: String?): String {
     val startText = manageShortDate(start)
@@ -660,6 +798,17 @@ private fun manageDateRange(start: String?, end: String?): String {
 /**
  * Returns the manage short date value required by the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — manageShortDate
+ *
+ * Handles the Compose/UI responsibility for manage short date.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ *
+ * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without leaving
+ * the UI in an assumed-success state.
  */
 fun manageShortDate(value: String?): String {
     if (value.isNullOrBlank()) return ""

@@ -1,5 +1,20 @@
 package com.example.volunteerlink.organisation.screens.chat
 
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Implements Organisation chat presentation/interaction associated with Organisation Group Info Screen.
+//
+// The screen/component renders shared chat models and emits repository-facing actions through callbacks or
+// coroutine calls rather than editing database tables directly.
+//
+// Sent messages, membership and read state remain Supabase-authoritative; only unsent text may be kept in account-
+// scoped local storage as a convenience.
+//
+// Architectural layer: Compose presentation layer.
+// ============================================================================
+
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -26,6 +41,15 @@ import com.example.volunteerlink.chat.data.meSenderId
 import com.example.volunteerlink.ui.theme.*
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — OrganisationGroupInfoScreen
+ *
+ * Renders the Organisation Group Info screen from state supplied by the owning ViewModel/repository-facing
+ * coordinator.
+ *
+ * The composable maps state to Material3 UI and emits callbacks; it does not become the source of truth for
+ * persisted VolunteerLink data.
+ */
 fun OrganisationGroupInfoScreen(
     chatId: String,
     onBack: () -> Unit,
@@ -172,6 +196,14 @@ fun OrganisationGroupInfoScreen(
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — MemberRow
+ *
+ * Renders the reusable Member Row portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun MemberRow(
     member: ChatMember,
     isCurrentUser: Boolean,

@@ -1,11 +1,21 @@
 package com.example.volunteerlink.organisation.create.steps
 
-// FILE OVERVIEW:
-/*
- * ReviewSummaryRoleSections contains presentation code for the organisation Create/Edit Post flow.
- * It focuses on rendering state and forwarding user actions through callbacks/ViewModels,
- * keeping database access and business rules outside the composables where possible.
- */
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Provides a reusable section used by the Create Post wizard for Review Summary Role Sections.
+//
+// The composables read CreatePostUiState/CreatePostDraft values and emit callbacks; they do not call Supabase
+// directly.
+//
+// Validation messages are supplied from CreatePostViewModel/CreatePostValidator so the same business rules apply
+// regardless of which UI component displays the field.
+//
+// Breaking large steps into section files keeps layout code readable while the ViewModel remains the single owner
+// of mutable workflow state.
+//
+// Architectural layer: Compose presentation layer.
+// ============================================================================
 
 
 import android.graphics.BitmapFactory
@@ -70,6 +80,14 @@ import java.util.Locale
 /**
  * Renders the review roles capacity section section used in the organisation Create/Edit Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — ReviewRolesCapacitySection
+ *
+ * Renders the reusable Review Roles Capacity Section portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
  */
 fun ReviewRolesCapacitySection(
     uiState: CreatePostUiState,
@@ -138,6 +156,14 @@ fun ReviewRolesCapacitySection(
 /**
  * Renders the review role settings section section used in the organisation Create/Edit Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — ReviewRoleSettingsSection
+ *
+ * Renders the reusable Review Role Settings Section portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
  */
 fun ReviewRoleSettingsSection(
     uiState: CreatePostUiState,
@@ -224,6 +250,14 @@ fun ReviewRoleSettingsSection(
  * Renders the UI represented by review capacity stats for the organisation Create/Edit Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — ReviewCapacityStats
+ *
+ * Handles the Compose/UI responsibility for review capacity stats.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun ReviewCapacityStats(
     physicalCapacity: Int,
     remoteCapacity: Int,
@@ -270,6 +304,14 @@ fun ReviewCapacityStats(
  * Renders the UI represented by review role group for the organisation Create/Edit Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — ReviewRoleGroup
+ *
+ * Handles the Compose/UI responsibility for review role group.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun ReviewRoleGroup(
     title: String,
     roles: List<SelectedRoleDraft>,
@@ -304,6 +346,14 @@ fun ReviewRoleGroup(
 /**
  * Renders the review role capacity row row used in the organisation Create/Edit Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — ReviewRoleCapacityRow
+ *
+ * Renders the reusable Review Role Capacity Row portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
  */
 fun ReviewRoleCapacityRow(
     roleName: String,
@@ -348,6 +398,14 @@ fun ReviewRoleCapacityRow(
 /**
  * Renders the review role settings card card used in the organisation Create/Edit Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — ReviewRoleSettingsCard
+ *
+ * Renders the reusable Review Role Settings Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
  */
 fun ReviewRoleSettingsCard(
     selectedRole: SelectedRoleDraft,
@@ -495,6 +553,14 @@ fun ReviewRoleSettingsCard(
 /**
  * Renders the review skill row row used in the organisation Create/Edit Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — ReviewSkillRow
+ *
+ * Renders the reusable Review Skill Row portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
  */
 fun ReviewSkillRow(
     skillName: String,

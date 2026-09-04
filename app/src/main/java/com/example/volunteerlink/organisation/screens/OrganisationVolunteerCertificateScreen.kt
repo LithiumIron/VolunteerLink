@@ -1,5 +1,23 @@
 package com.example.volunteerlink.organisation.screens
 
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Implements the Organisation UI associated with Organisation Volunteer Certificate Screen.
+//
+// The composable layer is responsible for layout, interaction and displaying loading/error/validation state;
+// business rules and persistence are delegated to ViewModels/repositories.
+//
+// This separation makes it clear during maintenance which code changes appearance versus which code changes real
+// server data.
+//
+// Where the screen displays cached information, server-changing actions remain disabled or routed through a fresh
+// authenticated repository operation.
+//
+// Architectural layer: Compose presentation layer.
+// ============================================================================
+
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -55,6 +73,15 @@ import com.example.volunteerlink.ui.theme.VolunteerLinkTextPrimary
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextSecondary
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — OrganisationVolunteerCertificateScreen
+ *
+ * Renders the Organisation Volunteer Certificate screen from state supplied by the owning ViewModel/repository-
+ * facing coordinator.
+ *
+ * The composable maps state to Material3 UI and emits callbacks; it does not become the source of truth for
+ * persisted VolunteerLink data.
+ */
 fun OrganisationVolunteerCertificateScreen(
     userId: String,
     postId: String,
@@ -300,6 +327,14 @@ fun OrganisationVolunteerCertificateScreen(
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — ReadOnlyCertificateMetric
+ *
+ * Handles the Compose/UI responsibility for read only certificate metric.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun ReadOnlyCertificateMetric(label: String, value: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
@@ -318,6 +353,14 @@ private fun ReadOnlyCertificateMetric(label: String, value: String) {
     }
 }
 
+/**
+ * DETAILED BEHAVIOUR — formatCertificateMinutes
+ *
+ * Handles the Compose/UI responsibility for format certificate minutes.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun formatCertificateMinutes(minutes: Int): String {
     val safe = minutes.coerceAtLeast(0)
     val hours = safe / 60

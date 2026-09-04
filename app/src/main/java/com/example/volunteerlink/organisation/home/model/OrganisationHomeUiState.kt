@@ -1,11 +1,18 @@
 package com.example.volunteerlink.organisation.home.model
 
-// FILE OVERVIEW:
-/*
- * OrganisationHomeUiState groups the data structures used by the organisation Home dashboard flow.
- * These models make state explicit and allow the UI, ViewModel and repository layers to exchange
- * strongly typed values instead of passing unrelated parameters throughout the feature.
- */
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Defines immutable Home dashboard data/state associated with Organisation Home Ui State.
+//
+// The repository/ViewModel fills these models from authenticated Supabase reads and derived timing/application
+// information.
+//
+// Compose consumes these models directly, which keeps raw JSON/table rows out of the Home screen and makes
+// loading/error/cached states explicit.
+//
+// Architectural layer: Domain/UI model layer.
+// ============================================================================
 
 
 import com.example.volunteerlink.data.post.PostTimingState
@@ -15,6 +22,14 @@ import com.example.volunteerlink.data.post.PostTimingState
  *
  * Home will only render this state. Supabase querying and date calculations stay
  * outside the Composable so the screen remains easy to read and maintain.
+ */
+/**
+ * DETAILED DECLARATION — OrganisationHomeUiState
+ *
+ * Immutable snapshot of all UI-visible state required by Organisation Home Ui State.
+ *
+ * Keeping loading/data/error/action flags together makes recomposition deterministic and avoids hidden mutable
+ * state in individual composables.
  */
 data class OrganisationHomeUiState(
     val isLoading: Boolean = false,
@@ -34,6 +49,14 @@ data class OrganisationHomeUiState(
 /**
  * Holds the values represented by home post item as one strongly typed model.
  * It keeps related Home dashboard values together so callers do not pass disconnected fields around.
+ */
+/**
+ * DETAILED DECLARATION — HomePostItem
+ *
+ * Domain/UI type for Home Post Item used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
  */
 data class HomePostItem(
     val postId: String,
@@ -60,6 +83,14 @@ data class HomePostItem(
  * Lists the supported values represented by home attention severity.
  * It keeps related Home dashboard values together so callers do not pass disconnected fields around.
  */
+/**
+ * DETAILED DECLARATION — HomeAttentionSeverity
+ *
+ * Domain/UI type for Home Attention Severity used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 enum class HomeAttentionSeverity {
     URGENT,
     WARNING,
@@ -70,6 +101,14 @@ enum class HomeAttentionSeverity {
 /**
  * Lists the supported values represented by home attention type.
  * It keeps related Home dashboard values together so callers do not pass disconnected fields around.
+ */
+/**
+ * DETAILED DECLARATION — HomeAttentionType
+ *
+ * Domain/UI type for Home Attention Type used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
  */
 enum class HomeAttentionType {
     APPLICATIONS_TO_REVIEW,
@@ -86,6 +125,14 @@ enum class HomeAttentionType {
 /**
  * Holds the values represented by home attention item as one strongly typed model.
  * It keeps related Home dashboard values together so callers do not pass disconnected fields around.
+ */
+/**
+ * DETAILED DECLARATION — HomeAttentionItem
+ *
+ * Domain/UI type for Home Attention Item used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
  */
 data class HomeAttentionItem(
     val type: HomeAttentionType,

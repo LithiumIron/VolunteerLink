@@ -1,11 +1,22 @@
 package com.example.volunteerlink.organisation.viewmodel
 
-// FILE OVERVIEW:
-/*
- * OrganisationManageViewModel coordinates state and user actions for the organisation Manage Post flow.
- * It translates UI events into validation/repository operations and exposes observable state
- * back to Compose so the screen can stay declarative.
- */
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Coordinates the Organisation Manage landing screen, where posts are grouped and filtered before the user opens a
+// specific Post Management screen.
+//
+// It converts repository data into UI categories such as active, draft, completed/cancelled and partnership-
+// related post views.
+//
+// The ViewModel also resolves stale application lifecycle state before presenting counts so pending applicants do
+// not remain visible after a role/post has logically closed.
+//
+// Cached data may support read-only continuity, but management actions are intentionally performed only against
+// fresh server-authoritative state.
+//
+// Architectural layer: ViewModel / workflow state layer.
+// ============================================================================
 
 
 import android.util.Log
@@ -47,6 +58,15 @@ import java.util.Locale
  * - PUBLISHED/CLOSED + Past -> Review
  * - COMPLETED -> Completed
  */
+/**
+ * DETAILED DECLARATION — OrganisationManageViewModel
+ *
+ * Lifecycle-aware state owner for Organisation Manage View Model. It survives ordinary Compose recomposition
+ * and coordinates asynchronous repository work.
+ *
+ * UI callbacks enter through methods on this class so validation, loading/error state and dependent business
+ * rules remain centralised.
+ */
 class OrganisationManageViewModel : ViewModel() {
 
     private val repository: OrganisationHomeRepository =
@@ -68,6 +88,25 @@ class OrganisationManageViewModel : ViewModel() {
     /**
      * Reloads the latest data for the organisation Manage Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — refresh
+     *
+     * Loads or refreshes the data required by refresh and writes the result into observable UI state.
+     *
+     * The coroutine/repository boundary is handled here so Compose only reacts to loading, success and error
+     * state.
+     *
+     * Coordinates account-scoped local persistence only for recoverable/cached UI state; published or
+     * transactional business state continues to come from Supabase.
+     *
+     * Runs asynchronous work in a lifecycle-aware coroutine and exposes progress/error state rather than
+     * blocking the UI thread.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
      */
     fun refresh() {
         if (refreshInProgress) return
@@ -171,8 +210,25 @@ class OrganisationManageViewModel : ViewModel() {
 
     /**
      * Resolves the ORGANISATION ID of whoever is actually signed in right now.
-     * Same lookup used in OrganisationHomeViewModel — replaces the previous
+     * Same lookup used in OrganisationHomeViewModel — uses the same
      * hardcoded prototype organisation identity.
+     */
+    /**
+     * DETAILED BEHAVIOUR — resolveCurrentOrganisationId
+     *
+     * Implements the ViewModel workflow operation for resolve current organisation id.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Uses OrganisationSession so the client operation is associated with the signed-in organisation; server
+     * RLS/RPC ownership checks still make the final authorization decision.
+     *
+     * Uses AppClock for business-date/time decisions so the same code works with the project test clock and
+     * normal device time.
+     *
+     * Runs asynchronous work in a lifecycle-aware coroutine and exposes progress/error state rather than
+     * blocking the UI thread.
      */
     private suspend fun resolveCurrentOrganisationId(): String =
         OrganisationSession.requireOrganisationId()
@@ -180,6 +236,20 @@ class OrganisationManageViewModel : ViewModel() {
     /**
      * Derives the observe app clock value used by the organisation Manage Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — observeAppClock
+     *
+     * Implements the ViewModel workflow operation for observe app clock.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Uses AppClock for business-date/time decisions so the same code works with the project test clock and
+     * normal device time.
+     *
+     * Runs asynchronous work in a lifecycle-aware coroutine and exposes progress/error state rather than
+     * blocking the UI thread.
      */
     private fun observeAppClock() {
         viewModelScope.launch {
@@ -193,6 +263,22 @@ class OrganisationManageViewModel : ViewModel() {
     /**
      * Applies the snapshot used by the organisation Manage Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — applySnapshot
+     *
+     * Implements the ViewModel workflow operation for apply snapshot.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Uses AppClock for business-date/time decisions so the same code works with the project test clock and
+     * normal device time.
+     *
+     * Uses the shared PostTimingEvaluator rather than duplicating the seven-day/timing classification inside
+     * this method.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
      */
     private fun applySnapshot(snapshot: OrganisationHomeSnapshot) {
         val nowMillis = AppClock.nowMillis()
@@ -376,6 +462,17 @@ class OrganisationManageViewModel : ViewModel() {
      * Builds the draft attention used by the organisation Manage Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — buildDraftAttention
+     *
+     * Implements the ViewModel workflow operation for build draft attention.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Uses the shared PostTimingEvaluator rather than duplicating the seven-day/timing classification inside
+     * this method.
+     */
     private fun buildDraftAttention(
         post: OrganisationHomePost,
         input: PostTimingInput?,
@@ -422,6 +519,14 @@ class OrganisationManageViewModel : ViewModel() {
      * Builds the application attention used by the organisation Manage Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — buildApplicationAttention
+     *
+     * Implements the ViewModel workflow operation for build application attention.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     private fun buildApplicationAttention(
         post: OrganisationHomePost,
         nowMillis: Long
@@ -466,6 +571,17 @@ class OrganisationManageViewModel : ViewModel() {
      * Derives the organisation home role value used by the organisation Manage Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — isReviewStillOpen
+     *
+     * Implements the ViewModel workflow operation for is review still open.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Uses the shared role application-window evaluator so Organisation and Volunteer flows interpret
+     * application timing consistently.
+     */
     private fun OrganisationHomeRole.isReviewStillOpen(
         post: OrganisationHomePost,
         nowMillis: Long
@@ -485,6 +601,14 @@ class OrganisationManageViewModel : ViewModel() {
      * Derives the organisation home post value used by the organisation Manage Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — toTimingInput
+     *
+     * Implements the ViewModel workflow operation for to timing input.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     private fun OrganisationHomePost.toTimingInput(): PostTimingInput? {
         val postMode = PostMode.fromDatabaseValue(mode) ?: return null
         return PostTimingInput(
@@ -499,6 +623,17 @@ class OrganisationManageViewModel : ViewModel() {
     /**
      * Derives the organisation home post value used by the organisation Manage Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — toManageItem
+     *
+     * Implements the ViewModel workflow operation for to manage item.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Uses the shared PostTimingEvaluator rather than duplicating the seven-day/timing classification inside
+     * this method.
      */
     private fun OrganisationHomePost.toManageItem(
         timingState: PostTimingState?,
@@ -549,6 +684,17 @@ class OrganisationManageViewModel : ViewModel() {
      * Derives the evaluate single period value used by the organisation Manage Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — evaluateSinglePeriod
+     *
+     * Implements the ViewModel workflow operation for evaluate single period.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Uses the shared PostTimingEvaluator rather than duplicating the seven-day/timing classification inside
+     * this method.
+     */
     private fun evaluateSinglePeriod(
         mode: PostMode,
         startDate: String?,
@@ -578,6 +724,14 @@ class OrganisationManageViewModel : ViewModel() {
      * Returns the requested data used by the organisation Manage Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — sortedBySeverity
+     *
+     * Implements the ViewModel workflow operation for sorted by severity.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     private fun List<ManageAttentionItem>.sortedBySeverity(): List<ManageAttentionItem> {
         return sortedWith(
             compareBy<ManageAttentionItem> {
@@ -595,6 +749,14 @@ class OrganisationManageViewModel : ViewModel() {
      * Renders the manage post item item used in the organisation Manage Post flow.
      * It receives state and callbacks from its caller so presentation code stays separate from database operations.
      */
+    /**
+     * DETAILED BEHAVIOUR — highestSeverityRank
+     *
+     * Implements the ViewModel workflow operation for highest severity rank.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     private fun ManagePostItem.highestSeverityRank(): Int {
         return attentionItems.maxOfOrNull {
             when (it.severity) {
@@ -610,6 +772,14 @@ class OrganisationManageViewModel : ViewModel() {
      * Returns the latest date value required by the organisation Manage Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — latestDate
+     *
+     * Implements the ViewModel workflow operation for latest date.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     private fun latestDate(first: String?, second: String?): String? {
         return when {
             first.isNullOrBlank() -> second
@@ -622,6 +792,14 @@ class OrganisationManageViewModel : ViewModel() {
     /**
      * Formats the short date used by the organisation Manage Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — formatShortDate
+     *
+     * Implements the ViewModel workflow operation for format short date.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
      */
     private fun formatShortDate(value: String): String {
         val parts = value.split("-")

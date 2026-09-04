@@ -1,11 +1,21 @@
 package com.example.volunteerlink.organisation.screens
 
-// FILE OVERVIEW:
-/*
- * OrganisationPostManagementScreen contains presentation code for the organisation Manage Post flow.
- * It focuses on rendering state and forwarding user actions through callbacks/ViewModels,
- * keeping database access and business rules outside the composables where possible.
- */
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Top-level Compose screen for managing one persisted Volunteer Post after it is opened from Manage.
+//
+// It switches between Overview/People/Review content according to post mode, application method and lifecycle
+// state, while preserving a single loaded PostManagementUiState from the ViewModel.
+//
+// Draft posts remain focused on Overview and publishing; published posts expose people/review workflows when those
+// workflows are meaningful.
+//
+// File opening/downloading helpers are Android presentation concerns; the actual Storage download and ownership
+// checks stay in the repository.
+//
+// Architectural layer: Compose presentation layer.
+// ============================================================================
 
 
 import android.app.Activity
@@ -89,6 +99,15 @@ import java.util.Locale
  * separate Physical/Remote management dashboards.
  */
 @Composable
+/**
+ * DETAILED BEHAVIOUR — OrganisationPostManagementScreen
+ *
+ * Renders the Organisation Post Management screen from state supplied by the owning ViewModel/repository-facing
+ * coordinator.
+ *
+ * The composable maps state to Material3 UI and emits callbacks; it does not become the source of truth for
+ * persisted VolunteerLink data.
+ */
 fun OrganisationPostManagementScreen(
     postId: String,
     onBack: () -> Unit,
@@ -171,6 +190,14 @@ fun OrganisationPostManagementScreen(
     /**
      * Derives the discard and leave value used by the organisation Manage Post flow.
      * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+     */
+    /**
+     * DETAILED BEHAVIOUR — discardAndLeave
+     *
+     * Handles the Compose/UI responsibility for discard and leave.
+     *
+     * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+     * ViewModel/repository layers.
      */
     fun discardAndLeave() {
         viewModel.discardReviewSessions()
@@ -428,6 +455,14 @@ fun OrganisationPostManagementScreen(
 /**
  * Renders the organisation post management content content block used in the organisation Manage Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — OrganisationPostManagementContent
+ *
+ * Renders the reusable Organisation Post Management Content portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
  */
 private fun OrganisationPostManagementContent(
     post: PostManagementPost,
@@ -1505,6 +1540,14 @@ private fun OrganisationPostManagementContent(
  * Creates the remote submission download intent used by the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — createRemoteSubmissionDownloadIntent
+ *
+ * Handles the Compose/UI responsibility for create remote submission download intent.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun createRemoteSubmissionDownloadIntent(filePath: String): Intent {
     val fileName = filePath.substringAfterLast('/')
         .takeIf { it.isNotBlank() }
@@ -1520,6 +1563,14 @@ private fun createRemoteSubmissionDownloadIntent(filePath: String): Intent {
 /**
  * Saves the remote submission file for the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — saveRemoteSubmissionFile
+ *
+ * Handles the Compose/UI responsibility for save remote submission file.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
  */
 private fun saveRemoteSubmissionFile(
     context: Context,
@@ -1539,6 +1590,14 @@ private fun saveRemoteSubmissionFile(
  * Derives the remote submission mime type value used by the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — remoteSubmissionMimeType
+ *
+ * Handles the Compose/UI responsibility for remote submission mime type.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun remoteSubmissionMimeType(fileName: String): String {
     val extension = fileName.substringAfterLast('.', "")
     return MimeTypeMap.getSingleton()
@@ -1549,6 +1608,17 @@ private fun remoteSubmissionMimeType(fileName: String): String {
 /**
  * Opens the remote submission file in the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — openRemoteSubmissionFile
+ *
+ * Handles the Compose/UI responsibility for open remote submission file.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ *
+ * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without leaving
+ * the UI in an assumed-success state.
  */
 private fun openRemoteSubmissionFile(
     context: Context,
@@ -1587,6 +1657,17 @@ private fun openRemoteSubmissionFile(
  * Opens the remote submission url in the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — openRemoteSubmissionUrl
+ *
+ * Handles the Compose/UI responsibility for open remote submission url.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ *
+ * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without leaving
+ * the UI in an assumed-success state.
+ */
 private fun openRemoteSubmissionUrl(
     context: Context,
     url: String
@@ -1603,6 +1684,14 @@ private fun openRemoteSubmissionUrl(
 /**
  * Derives the post management post value used by the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — isRemoteResubmission
+ *
+ * Handles the Compose/UI responsibility for is remote resubmission.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
  */
 private fun PostManagementPost.isRemoteResubmission(
     submission: PostManagementRemoteSubmission

@@ -1,11 +1,21 @@
 package com.example.volunteerlink.organisation.create.steps
 
-// FILE OVERVIEW:
-/*
- * PostDetailsSections contains presentation code for the organisation Create/Edit Post flow.
- * It focuses on rendering state and forwarding user actions through callbacks/ViewModels,
- * keeping database access and business rules outside the composables where possible.
- */
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Provides a reusable section used by the Create Post wizard for Post Details Sections.
+//
+// The composables read CreatePostUiState/CreatePostDraft values and emit callbacks; they do not call Supabase
+// directly.
+//
+// Validation messages are supplied from CreatePostViewModel/CreatePostValidator so the same business rules apply
+// regardless of which UI component displays the field.
+//
+// Breaking large steps into section files keeps layout code readable while the ViewModel remains the single owner
+// of mutable workflow state.
+//
+// Architectural layer: Compose presentation layer.
+// ============================================================================
 
 
 import androidx.compose.foundation.BorderStroke
@@ -45,6 +55,23 @@ import com.example.volunteerlink.organisation.viewmodel.CreatePostViewModel
 
 /** Physical part of Step 1. */
 @Composable
+/**
+ * DETAILED BEHAVIOUR — PhysicalEventDetailsSection
+ *
+ * Renders the reusable Physical Event Details Section portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ *
+ * Uses AppClock for business-date/time decisions so the same code works with the project test clock and normal
+ * device time.
+ *
+ * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the rest
+ * of the wizard.
+ *
+ * Works with structured location suggestions/coordinates so free-text search is separated from the final
+ * location fields saved with the post/plan.
+ */
 fun PhysicalEventDetailsSection(
     uiState: CreatePostUiState,
     viewModel: CreatePostViewModel,
@@ -287,6 +314,20 @@ fun PhysicalEventDetailsSection(
 
 /** Remote part of Step 1. */
 @Composable
+/**
+ * DETAILED BEHAVIOUR — RemoteProjectDetailsSection
+ *
+ * Renders the reusable Remote Project Details Section portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ *
+ * Uses AppClock for business-date/time decisions so the same code works with the project test clock and normal
+ * device time.
+ *
+ * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the rest
+ * of the wizard.
+ */
 fun RemoteProjectDetailsSection(
     uiState: CreatePostUiState,
     viewModel: CreatePostViewModel,
@@ -473,6 +514,14 @@ fun RemoteProjectDetailsSection(
 
 /** Hybrid-only capacity block so Physical and Remote cards are not duplicated. */
 @Composable
+/**
+ * DETAILED BEHAVIOUR — HybridVolunteerRequirementSection
+ *
+ * Renders the reusable Hybrid Volunteer Requirement Section portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun HybridVolunteerRequirementSection(
     uiState: CreatePostUiState,
     viewModel: CreatePostViewModel
@@ -516,6 +565,14 @@ fun HybridVolunteerRequirementSection(
 /**
  * Renders the UI represented by duration option for the organisation Create/Edit Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — DurationOption
+ *
+ * Handles the Compose/UI responsibility for duration option.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
  */
 private fun DurationOption(
     title: String,
@@ -562,6 +619,14 @@ private fun DurationOption(
 /**
  * Renders the UI represented by submission mode option for the organisation Create/Edit Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — SubmissionModeOption
+ *
+ * Handles the Compose/UI responsibility for submission mode option.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
  */
 private fun SubmissionModeOption(
     title: String,

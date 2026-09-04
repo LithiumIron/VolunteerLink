@@ -1,17 +1,32 @@
 package com.example.volunteerlink.organisation.manage.model
 
-// FILE OVERVIEW:
-/*
- * OrganisationManageUiState groups the data structures used by the organisation Manage Post flow.
- * These models make state explicit and allow the UI, ViewModel and repository layers to exchange
- * strongly typed values instead of passing unrelated parameters throughout the feature.
- */
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Defines immutable Organisation Manage/Post Management state associated with Organisation Manage Ui State.
+//
+// The models combine normalized backend data into one screen-oriented representation without changing the
+// underlying database structure.
+//
+// Flags such as loading, cached/offline, timing state and active review action make it explicit when the UI may
+// render information versus when it may perform a server mutation.
+//
+// Architectural layer: Domain/UI model layer.
+// ============================================================================
 
 
 import com.example.volunteerlink.data.post.PostTimingState
 import com.example.volunteerlink.organisation.home.model.OrganisationImpactWeaveAttention
 
 /** Top-level state shared by the Manage landing page and Volunteer Posts list. */
+/**
+ * DETAILED DECLARATION — OrganisationManageUiState
+ *
+ * Immutable snapshot of all UI-visible state required by Organisation Manage Ui State.
+ *
+ * Keeping loading/data/error/action flags together makes recomposition deterministic and avoids hidden mutable
+ * state in individual composables.
+ */
 data class OrganisationManageUiState(
     val isLoading: Boolean = true,
     val organisationName: String = "",
@@ -75,6 +90,14 @@ data class OrganisationManageUiState(
  * Lists the supported values represented by manage post section.
  * It keeps related Manage Post values together so callers do not pass disconnected fields around.
  */
+/**
+ * DETAILED DECLARATION — ManagePostSection
+ *
+ * Domain/UI type for Manage Post Section used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 enum class ManagePostSection {
     ACTIVE,
     DRAFTS,
@@ -86,6 +109,14 @@ enum class ManagePostSection {
 /**
  * Holds the values represented by manage post item as one strongly typed model.
  * It keeps related Manage Post values together so callers do not pass disconnected fields around.
+ */
+/**
+ * DETAILED DECLARATION — ManagePostItem
+ *
+ * Domain/UI type for Manage Post Item used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
  */
 data class ManagePostItem(
     val postId: String,
@@ -114,6 +145,14 @@ data class ManagePostItem(
  * Lists the supported values represented by manage attention severity.
  * It keeps related Manage Post values together so callers do not pass disconnected fields around.
  */
+/**
+ * DETAILED DECLARATION — ManageAttentionSeverity
+ *
+ * Domain/UI type for Manage Attention Severity used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 enum class ManageAttentionSeverity {
     URGENT,
     WARNING,
@@ -125,6 +164,14 @@ enum class ManageAttentionSeverity {
  * Lists the supported values represented by manage attention type.
  * It keeps related Manage Post values together so callers do not pass disconnected fields around.
  */
+/**
+ * DETAILED DECLARATION — ManageAttentionType
+ *
+ * Domain/UI type for Manage Attention Type used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 enum class ManageAttentionType {
     APPLICATIONS_TO_REVIEW,
     DRAFT_START_TOO_SOON,
@@ -135,6 +182,14 @@ enum class ManageAttentionType {
 /**
  * Holds the values represented by manage attention item as one strongly typed model.
  * It keeps related Manage Post values together so callers do not pass disconnected fields around.
+ */
+/**
+ * DETAILED DECLARATION — ManageAttentionItem
+ *
+ * Domain/UI type for Manage Attention Item used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
  */
 data class ManageAttentionItem(
     val type: ManageAttentionType,

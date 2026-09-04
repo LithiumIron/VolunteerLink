@@ -1,5 +1,23 @@
 package com.example.volunteerlink.organisation.screens
 
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Implements the Organisation UI associated with Edit Organisation Profile Screen.
+//
+// The composable layer is responsible for layout, interaction and displaying loading/error/validation state;
+// business rules and persistence are delegated to ViewModels/repositories.
+//
+// This separation makes it clear during maintenance which code changes appearance versus which code changes real
+// server data.
+//
+// Where the screen displays cached information, server-changing actions remain disabled or routed through a fresh
+// authenticated repository operation.
+//
+// Architectural layer: Compose presentation layer.
+// ============================================================================
+
+
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -14,7 +32,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -22,7 +39,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Business
@@ -56,28 +72,38 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.volunteerlink.data.location.CurrentLocationResolver
 import com.example.volunteerlink.data.saveProfileImage
+import com.example.volunteerlink.shared.OrganisationTypeOptions
 import com.example.volunteerlink.organisation.auth.OrganisationSessionStore
+import com.example.volunteerlink.shared.countryStates
 import com.example.volunteerlink.organisation.organisationFieldColours
 import com.example.volunteerlink.organisation.repository.OrganisationProfileRepository
-import com.example.volunteerlink.shared.OrganisationTypeOptions
-import com.example.volunteerlink.shared.countryStates
-import com.example.volunteerlink.shared.isValidAuthPhoneNumber
 import kotlinx.coroutines.launch
 
-// ENTER_EMAIL -> user types the new address, we call requestEmailChange().
-// ENTER_CODE -> user types the OTP that email contained, we call
-// verifyEmailChangeOtp(). No more polling/waiting on a clicked link.
-private enum class EmailChangeStep { NONE, ENTER_EMAIL, ENTER_CODE }
-
+/**
+ * DETAILED DECLARATION — EmailChangeStep
+ *
+ * Domain/UI type for Email Change Step used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
+private enum class EmailChangeStep { NONE, ENTER_EMAIL, WAITING_FOR_LINK }
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+/**
+ * DETAILED BEHAVIOUR — EditOrganisationProfileScreen
+ *
+ * Renders the Edit Organisation Profile screen from state supplied by the owning ViewModel/repository-facing
+ * coordinator.
+ *
+ * The composable maps state to Material3 UI and emits callbacks; it does not become the source of truth for
+ * persisted VolunteerLink data.
+ */
 fun EditOrganisationProfileScreen(
     onBack: () -> Unit = {},
     // Called after a successful save. Clears the cached profileData in
@@ -99,7 +125,6 @@ fun EditOrganisationProfileScreen(
 
     var organisationName by remember { mutableStateOf(cachedProfile?.organisationName ?: "") }
     var contactPhone by remember { mutableStateOf(cachedProfile?.registeredPhone ?: "") }
-    val contactPhoneError = contactPhone.isNotBlank() && !isValidAuthPhoneNumber(contactPhone.trim())
     var description by remember { mutableStateOf(cachedProfile?.bio ?: "") }
     var profileImageUrl by remember { mutableStateOf(cachedProfile?.profileImageUrl) }
 
@@ -107,7 +132,6 @@ fun EditOrganisationProfileScreen(
 
     var emailChangeStep by remember { mutableStateOf(EmailChangeStep.NONE) }
     var newEmailInput by remember { mutableStateOf("") }
-    var otpCodeInput by remember { mutableStateOf("") }
     var isProcessingEmailChange by remember { mutableStateOf(false) }
     var emailChangeError by remember { mutableStateOf<String?>(null) }
 
@@ -116,7 +140,6 @@ fun EditOrganisationProfileScreen(
         emailInteractionSource.interactions.collect {
             if (it is PressInteraction.Release) {
                 newEmailInput = ""
-                otpCodeInput = ""
                 emailChangeError = null
                 emailChangeStep = EmailChangeStep.ENTER_EMAIL
             }
@@ -143,6 +166,25 @@ fun EditOrganisationProfileScreen(
                 val imageUrl = saveProfileImage(context = context, uri = uri)
                 if (imageUrl != null) {
                     profileImageUrl = imageUrl
+                }
+            }
+        }
+    }
+
+    // While waiting, check every few seconds whether the email actually
+// changed server-side — this is what catches the link being clicked
+// on a completely different device.
+    LaunchedEffect(emailChangeStep) {
+        if (emailChangeStep == EmailChangeStep.WAITING_FOR_LINK) {
+            val originalEmail = loginEmailState
+            while (emailChangeStep == EmailChangeStep.WAITING_FOR_LINK) {
+                kotlinx.coroutines.delay(3000)
+                val refreshed = OrganisationProfileRepository.refreshLoginEmail()
+                if (refreshed != null && refreshed != originalEmail) {
+                    loginEmailState = refreshed
+                    OrganisationSessionStore.clearProfileData()
+                    emailChangeStep = EmailChangeStep.NONE
+                    break
                 }
             }
         }
@@ -204,11 +246,13 @@ fun EditOrganisationProfileScreen(
             }
         }
 
+        // No loading gate here anymore — cachedProfile above already came
+        // pre-loaded from OrganisationSessionStore.
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .navigationBarsPadding()
         ) {
 
             // LOGO
@@ -341,7 +385,7 @@ fun EditOrganisationProfileScreen(
 
                 Spacer(Modifier.height(13.dp))
 
-                // LOGIN EMAIL — tap to start the OTP-based email-change flow.
+                // LOGIN EMAIL — tap to start the Supabase Auth email-change flow.
                 Box {
                     OutlinedTextField(
                         value = loginEmailState,
@@ -354,149 +398,6 @@ fun EditOrganisationProfileScreen(
                         trailingIcon = { Text("›") },
                         colors = organisationFieldColours()
                     )
-
-                    if (emailChangeStep != EmailChangeStep.NONE) {
-                        AlertDialog(
-                            onDismissRequest = {
-                                if (!isProcessingEmailChange) {
-                                    emailChangeStep = EmailChangeStep.NONE
-                                    emailChangeError = null
-                                }
-                            },
-                            title = {
-                                Text(
-                                    if (emailChangeStep == EmailChangeStep.ENTER_EMAIL)
-                                        "Change login email"
-                                    else
-                                        "Enter verification code"
-                                )
-                            },
-                            text = {
-                                Column {
-                                    if (emailChangeStep == EmailChangeStep.ENTER_EMAIL) {
-                                        Text(
-                                            "We'll send a verification code to your new email.",
-                                            fontSize = 12.sp,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        Spacer(Modifier.height(10.dp))
-                                        OutlinedTextField(
-                                            value = newEmailInput,
-                                            onValueChange = {
-                                                newEmailInput = it
-                                                emailChangeError = null
-                                            },
-                                            modifier = Modifier.fillMaxWidth(),
-                                            singleLine = true,
-                                            enabled = !isProcessingEmailChange,
-                                            label = { Text("New email") }
-                                        )
-                                    } else {
-                                        Text(
-                                            "Enter the code sent to $newEmailInput.",
-                                            fontSize = 12.sp,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        Spacer(Modifier.height(10.dp))
-                                        OutlinedTextField(
-                                            value = otpCodeInput,
-                                            onValueChange = {
-                                                otpCodeInput = it
-                                                emailChangeError = null
-                                            },
-                                            modifier = Modifier.fillMaxWidth(),
-                                            singleLine = true,
-                                            enabled = !isProcessingEmailChange,
-                                            label = { Text("Verification code") },
-                                            placeholder = { Text("6-digit code") },
-                                            keyboardOptions = KeyboardOptions(
-                                                keyboardType = KeyboardType.Number,
-                                                imeAction = ImeAction.Done
-                                            )
-                                        )
-                                    }
-                                    emailChangeError?.let { message ->
-                                        Spacer(Modifier.height(6.dp))
-                                        Text(message, fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
-                                    }
-                                }
-                            },
-                            confirmButton = {
-                                TextButton(
-                                    enabled = !isProcessingEmailChange,
-                                    onClick = {
-                                        scope.launch {
-                                            if (emailChangeStep == EmailChangeStep.ENTER_EMAIL) {
-                                                val trimmed = newEmailInput.trim()
-                                                if (trimmed.isBlank()) {
-                                                    emailChangeError = "Enter an email address."
-                                                    return@launch
-                                                }
-                                                isProcessingEmailChange = true
-                                                val result = OrganisationProfileRepository.requestEmailChange(trimmed)
-                                                isProcessingEmailChange = false
-                                                result.onSuccess {
-                                                    otpCodeInput = ""
-                                                    emailChangeStep = EmailChangeStep.ENTER_CODE
-                                                }.onFailure { e ->
-                                                    emailChangeError = when {
-                                                        e.message?.contains("rate limit", ignoreCase = true) == true ->
-                                                            "Too many email requests — please wait a while and try again."
-                                                        e.message?.contains("already registered", ignoreCase = true) == true ||
-                                                                e.message?.contains("already exists", ignoreCase = true) == true ->
-                                                            "That email is already in use by another account."
-                                                        e.message?.contains("invalid", ignoreCase = true) == true ->
-                                                            "That email address isn't valid."
-                                                        else -> "Couldn't send code: ${e.message ?: "unknown error"}"
-                                                    }
-                                                }
-                                            } else {
-                                                if (otpCodeInput.isBlank()) {
-                                                    emailChangeError = "Enter the code sent to your email."
-                                                    return@launch
-                                                }
-                                                isProcessingEmailChange = true
-                                                val result = OrganisationProfileRepository
-                                                    .verifyEmailChangeOtp(newEmailInput.trim(), otpCodeInput.trim())
-                                                isProcessingEmailChange = false
-                                                result.onSuccess { updatedEmail ->
-                                                    loginEmailState = updatedEmail
-                                                    OrganisationSessionStore.clearProfileData()
-                                                    emailChangeStep = EmailChangeStep.NONE
-                                                    emailChangeError = null
-                                                }.onFailure { e ->
-                                                    emailChangeError = when {
-                                                        e.message?.contains("expired", ignoreCase = true) == true ->
-                                                            "That code has expired — request a new one."
-                                                        e.message?.contains("invalid", ignoreCase = true) == true ->
-                                                            "Incorrect code. Please try again."
-                                                        else -> "Couldn't verify code: ${e.message ?: "unknown error"}"
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                ) {
-                                    Text(
-                                        when {
-                                            isProcessingEmailChange -> "Please wait..."
-                                            emailChangeStep == EmailChangeStep.ENTER_EMAIL -> "Send code"
-                                            else -> "Verify"
-                                        }
-                                    )
-                                }
-                            },
-                            dismissButton = {
-                                TextButton(
-                                    enabled = !isProcessingEmailChange,
-                                    onClick = {
-                                        emailChangeStep = EmailChangeStep.NONE
-                                        emailChangeError = null
-                                    }
-                                ) { Text("Cancel") }
-                            }
-                        )
-                    }
                 }
 
                 Spacer(Modifier.height(13.dp))
@@ -504,37 +405,18 @@ fun EditOrganisationProfileScreen(
                 // CONTACT PHONE
                 OutlinedTextField(
                     value = contactPhone,
-                    onValueChange = { input ->
-                        contactPhone = input.filterIndexed { index, c ->
-                            c.isDigit() ||
-                                    (c == '+' && index == 0) ||
-                                    ((c == '-' || c == ' ') && index > 0)
-                        }
-                    },
+                    onValueChange = { contactPhone = it },
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text("Contact phone") },
                     singleLine = true,
                     enabled = !isSaving,
-                    isError = contactPhoneError,
-                    supportingText = {
-                        Text(
-                            text = if (contactPhoneError)
-                                "Enter a valid phone number (e.g. +60 12-456789)."
-                            else
-                                "Must include your country code (e.g. +60 12-456789)."
-                        )
-                    },
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Phone,
-                        imeAction = ImeAction.Next
-                    ),
                     colors = organisationFieldColours()
                 )
 
                 Spacer(Modifier.height(13.dp))
 
                 // USE CURRENT LOCATION (optional shortcut — manual picker below still
-                // works exactly as before)
+// works exactly as before)
                 var isResolvingCurrentLocation by remember { mutableStateOf(false) }
                 var currentLocationMessage by remember { mutableStateOf<String?>(null) }
                 var cancelCurrentLocationRequest by remember { mutableStateOf<(() -> Unit)?>(null) }
@@ -543,6 +425,14 @@ fun EditOrganisationProfileScreen(
                     onDispose { cancelCurrentLocationRequest?.invoke() }
                 }
 
+                /**
+                 * DETAILED BEHAVIOUR — beginCurrentLocationResolution
+                 *
+                 * Handles the Compose/UI responsibility for begin current location resolution.
+                 *
+                 * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+                 * ViewModel/repository layers.
+                 */
                 fun beginCurrentLocationResolution() {
                     if (!CurrentLocationResolver.isLocationEnabled(context)) {
                         isResolvingCurrentLocation = false
@@ -789,6 +679,94 @@ fun EditOrganisationProfileScreen(
                             }
                         )
                     }
+                    if (emailChangeStep != EmailChangeStep.NONE) {
+                        AlertDialog(
+                            onDismissRequest = {
+                                if (!isProcessingEmailChange) {
+                                    emailChangeStep = EmailChangeStep.NONE
+                                    emailChangeError = null
+                                }
+                            },
+                            title = {
+                                Text(
+                                    if (emailChangeStep == EmailChangeStep.ENTER_EMAIL)
+                                        "Change login email"
+                                    else
+                                        "Check your email"
+                                )
+                            },
+                            text = {
+                                Column {
+                                    if (emailChangeStep == EmailChangeStep.ENTER_EMAIL) {
+                                        Text(
+                                            "We'll send a confirmation link to your new email.",
+                                            fontSize = 12.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Spacer(Modifier.height(10.dp))
+                                        OutlinedTextField(
+                                            value = newEmailInput,
+                                            onValueChange = {
+                                                newEmailInput = it
+                                                emailChangeError = null
+                                            },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            singleLine = true,
+                                            enabled = !isProcessingEmailChange,
+                                            label = { Text("New email") }
+                                        )
+                                        emailChangeError?.let { message ->
+                                            Spacer(Modifier.height(6.dp))
+                                            Text(message, fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
+                                        }
+                                    } else {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                                            Spacer(Modifier.width(10.dp))
+                                            Text(
+                                                "We sent a link to $newEmailInput. Click it from any device — " +
+                                                        "this screen will update automatically once confirmed.",
+                                                fontSize = 12.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                }
+                            },
+                            confirmButton = {
+                                if (emailChangeStep == EmailChangeStep.ENTER_EMAIL) {
+                                    TextButton(
+                                        enabled = !isProcessingEmailChange,
+                                        onClick = {
+                                            scope.launch {
+                                                val trimmed = newEmailInput.trim()
+                                                if (trimmed.isBlank()) {
+                                                    emailChangeError = "Enter an email address."
+                                                    return@launch
+                                                }
+                                                isProcessingEmailChange = true
+                                                val success = OrganisationProfileRepository.requestEmailChange(trimmed)
+                                                isProcessingEmailChange = false
+                                                if (success) {
+                                                    emailChangeStep = EmailChangeStep.WAITING_FOR_LINK
+                                                } else {
+                                                    emailChangeError = "Couldn't send link. Try again shortly."
+                                                }
+                                            }
+                                        }
+                                    ) { Text(if (isProcessingEmailChange) "Sending..." else "Send link") }
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(
+                                    onClick = {
+                                        emailChangeStep = EmailChangeStep.NONE
+                                        emailChangeError = null
+                                    }
+                                ) { Text(if (emailChangeStep == EmailChangeStep.WAITING_FOR_LINK) "Close" else "Cancel") }
+                            }
+                        )
+                    }
                 }
 
                 Spacer(Modifier.height(13.dp))
@@ -835,7 +813,7 @@ fun EditOrganisationProfileScreen(
                             }
                         }
                     },
-                    enabled = !isSaving && !contactPhoneError,
+                    enabled = !isSaving,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(50.dp)

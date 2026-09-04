@@ -1,5 +1,23 @@
 package com.example.volunteerlink.organisation
 
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Implements the Organisation UI associated with Organisation Sign Up Screen.
+//
+// The composable layer is responsible for layout, interaction and displaying loading/error/validation state;
+// business rules and persistence are delegated to ViewModels/repositories.
+//
+// This separation makes it clear during maintenance which code changes appearance versus which code changes real
+// server data.
+//
+// Where the screen displays cached information, server-changing actions remain disabled or routed through a fresh
+// authenticated repository operation.
+//
+// Architectural layer: Compose presentation layer.
+// ============================================================================
+
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
@@ -73,6 +91,14 @@ import com.example.volunteerlink.shared.countryCallingCodes
 import com.example.volunteerlink.shared.countryStates
 import com.example.volunteerlink.shared.isValidAuthPhoneNumber
 
+/**
+ * DETAILED BEHAVIOUR — isOrganisationSignUpFormValid
+ *
+ * Handles the Compose/UI responsibility for is organisation sign up form valid.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun isOrganisationSignUpFormValid(
     organisationName: String,
     organisationType: String,
@@ -90,6 +116,15 @@ private fun isOrganisationSignUpFormValid(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+/**
+ * DETAILED BEHAVIOUR — OrganisationSignUpScreen
+ *
+ * Renders the Organisation Sign Up screen from state supplied by the owning ViewModel/repository-facing
+ * coordinator.
+ *
+ * The composable maps state to Material3 UI and emits callbacks; it does not become the source of truth for
+ * persisted VolunteerLink data.
+ */
 fun OrganisationSignUpScreen(
     onBackSelected: () -> Unit,
     onSignedUp: () -> Unit,
@@ -580,6 +615,14 @@ fun OrganisationSignUpScreen(
                     onDispose { cancelCurrentLocationRequest?.invoke() }
                 }
 
+                /**
+                 * DETAILED BEHAVIOUR — beginCurrentLocationResolution
+                 *
+                 * Handles the Compose/UI responsibility for begin current location resolution.
+                 *
+                 * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+                 * ViewModel/repository layers.
+                 */
                 fun beginCurrentLocationResolution() {
                     if (!CurrentLocationResolver.isLocationEnabled(locationContext)) {
                         isResolvingCurrentLocation = false

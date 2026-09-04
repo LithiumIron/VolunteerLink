@@ -1,11 +1,18 @@
 package com.example.volunteerlink.organisation.create.components
 
-// FILE OVERVIEW:
-/*
- * CreatePostComponents contains presentation code for the organisation Create/Edit Post flow.
- * It focuses on rendering state and forwarding user actions through callbacks/ViewModels,
- * keeping database access and business rules outside the composables where possible.
- */
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Contains reusable Create Post UI building blocks for Create Post Components.
+//
+// Components are intentionally presentation-focused: values and callbacks come from the parent step/ViewModel, so
+// a reusable field does not secretly own business state or perform database writes.
+//
+// Shared components keep spacing, colours, validation presentation and interaction patterns consistent across
+// Physical, Remote and Hybrid forms.
+//
+// Architectural layer: Compose presentation layer.
+// ============================================================================
 
 
 import androidx.compose.foundation.BorderStroke
@@ -58,6 +65,14 @@ import com.example.volunteerlink.organisation.create.model.VolunteerPostType
 /**
  * Renders the UI represented by edit restriction notice for the organisation Create/Edit Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — EditRestrictionNotice
+ *
+ * Handles the Compose/UI responsibility for edit restriction notice.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
  */
 fun EditRestrictionNotice(
     title: String,
@@ -115,6 +130,14 @@ fun EditRestrictionNotice(
  * Renders the create section card card used in the organisation Create/Edit Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
  */
+/**
+ * DETAILED BEHAVIOUR — CreateSectionCard
+ *
+ * Renders the reusable Create Section Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun CreateSectionCard(
     title: String,
     subtitle: String? = null,
@@ -161,6 +184,14 @@ fun CreateSectionCard(
 /**
  * Renders the post type card card used in the organisation Create/Edit Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — PostTypeCard
+ *
+ * Renders the reusable Post Type Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
  */
 fun PostTypeCard(
     type: VolunteerPostType,
@@ -261,6 +292,14 @@ fun PostTypeCard(
  * Renders the category picker picker used in the organisation Create/Edit Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
  */
+/**
+ * DETAILED BEHAVIOUR — CategoryPicker
+ *
+ * Renders the reusable Category Picker portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun CategoryPicker(
     selectedCategory: VolunteerPostCategory?,
     onCategorySelected: (VolunteerPostCategory) -> Unit,
@@ -354,6 +393,14 @@ fun CategoryPicker(
  * Renders the form selection field input field used in the organisation Create/Edit Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
  */
+/**
+ * DETAILED BEHAVIOUR — FormSelectionField
+ *
+ * Renders the reusable Form Selection Field portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun FormSelectionField(
     label: String,
     value: String,
@@ -436,6 +483,14 @@ fun FormSelectionField(
  * Renders the volunteer capacity field input field used in the organisation Create/Edit Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
  */
+/**
+ * DETAILED BEHAVIOUR — VolunteerCapacityField
+ *
+ * Renders the reusable Volunteer Capacity Field portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun VolunteerCapacityField(
     value: Int?,
     onValueChanged: (String) -> Unit,
@@ -480,6 +535,14 @@ fun VolunteerCapacityField(
 /**
  * Returns the form error used by the organisation Create/Edit Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — FormError
+ *
+ * Handles the Compose/UI responsibility for form error.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
  */
 fun FormError(message: String?) {
     if (!message.isNullOrBlank()) {

@@ -1,11 +1,18 @@
 package com.example.volunteerlink.organisation.screens
 
-// FILE OVERVIEW:
-/*
- * OrganisationManageScreen contains presentation code for the organisation Manage Post flow.
- * It focuses on rendering state and forwarding user actions through callbacks/ViewModels,
- * keeping database access and business rules outside the composables where possible.
- */
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Renders the Organisation Manage landing page from OrganisationManageUiState.
+//
+// It presents post groups, search/filter state and entry points into Post Management without directly reading
+// Supabase.
+//
+// All refresh and lifecycle reconciliation is requested through OrganisationManageViewModel so the screen remains
+// a state-to-UI mapping layer.
+//
+// Architectural layer: Compose presentation layer.
+// ============================================================================
 
 
 import androidx.compose.foundation.background
@@ -49,6 +56,15 @@ import com.example.volunteerlink.ui.theme.VolunteerLinkTextSecondary
 
 /** Manage starts with the three distinct areas from the original prototype. */
 @Composable
+/**
+ * DETAILED BEHAVIOUR — OrganisationManageScreen
+ *
+ * Renders the Organisation Manage screen from state supplied by the owning ViewModel/repository-facing
+ * coordinator.
+ *
+ * The composable maps state to Material3 UI and emits callbacks; it does not become the source of truth for
+ * persisted VolunteerLink data.
+ */
 fun OrganisationManageScreen(
     onVolunteerPostsClick: () -> Unit,
     onImpactWeaveClick: () -> Unit,
@@ -96,6 +112,14 @@ fun OrganisationManageScreen(
 /**
  * Renders the manage landing content content block used in the organisation Manage Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — ManageLandingContent
+ *
+ * Renders the reusable Manage Landing Content portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
  */
 private fun ManageLandingContent(
     uiState: OrganisationManageUiState,
@@ -219,6 +243,14 @@ private fun ManageLandingContent(
  * Renders the build post summary summary block used in the organisation Manage Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
  */
+/**
+ * DETAILED BEHAVIOUR — buildPostSummary
+ *
+ * Renders the reusable build Post Summary portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun buildPostSummary(uiState: OrganisationManageUiState): String {
     return buildList {
         add("${uiState.activePosts.size} active")
@@ -235,6 +267,14 @@ private fun buildPostSummary(uiState: OrganisationManageUiState): String {
 /**
  * Renders the build manage attention summary summary block used in the organisation Manage Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — buildManageAttentionSummary
+ *
+ * Renders the reusable build Manage Attention Summary portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
  */
 private fun buildManageAttentionSummary(uiState: OrganisationManageUiState): String {
     val alertPosts = uiState.attentionPostCount
@@ -253,11 +293,27 @@ private fun buildManageAttentionSummary(uiState: OrganisationManageUiState): Str
  * Derives the post word value used by the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — postWord
+ *
+ * Handles the Compose/UI responsibility for post word.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun postWord(count: Int): String = if (count == 1) "post" else "posts"
 
 /**
  * Renders the build impact weave attention summary summary block used in the organisation Manage Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — buildImpactWeaveAttentionSummary
+ *
+ * Renders the reusable build Impact Weave Attention Summary portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
  */
 private fun buildImpactWeaveAttentionSummary(
     uiState: OrganisationManageUiState
@@ -275,6 +331,14 @@ private fun buildImpactWeaveAttentionSummary(
 /**
  * Renders the UI represented by manage loading state for the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — ManageLoadingState
+ *
+ * Handles the Compose/UI responsibility for manage loading state.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
  */
 fun ManageLoadingState() {
     Column(
@@ -299,6 +363,14 @@ fun ManageLoadingState() {
 /**
  * Renders the UI represented by manage error state for the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — ManageErrorState
+ *
+ * Handles the Compose/UI responsibility for manage error state.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
  */
 fun ManageErrorState(
     message: String?,
@@ -337,6 +409,15 @@ fun ManageErrorState(
 
 /** Temporary destination shells so the three Manage choices navigate cleanly. */
 @Composable
+/**
+ * DETAILED BEHAVIOUR — OrganisationManageEmptyModuleScreen
+ *
+ * Renders the Organisation Manage Empty Module screen from state supplied by the owning ViewModel/repository-
+ * facing coordinator.
+ *
+ * The composable maps state to Material3 UI and emits callbacks; it does not become the source of truth for
+ * persisted VolunteerLink data.
+ */
 fun OrganisationManageEmptyModuleScreen(
     title: String,
     message: String,

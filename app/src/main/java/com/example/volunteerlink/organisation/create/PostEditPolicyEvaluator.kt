@@ -1,11 +1,22 @@
 package com.example.volunteerlink.organisation.create
 
-// FILE OVERVIEW:
-/*
- * PostEditPolicyEvaluator contains business rules used by the organisation Create/Edit Post flow.
- * Keeping these checks separate from the UI makes validation and edit restrictions easier to
- * reuse from different wizard steps and management actions.
- */
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Evaluates which parts of an existing persisted Volunteer Post may still be edited given lifecycle,
+// participation, application, schedule and submission dependencies.
+//
+// The policy exists because an edit that is safe for a DRAFT may be unsafe after volunteers have applied, joined,
+// attended or submitted work.
+//
+// It produces client-side restrictions/messages for the editor, while the atomic Supabase edit RPC re-checks
+// authoritative constraints so UI restrictions cannot be bypassed.
+//
+// The evaluator is deliberately separated from Compose so permission logic is testable and reusable across
+// fields/steps.
+//
+// Architectural layer: Organisation module.
+// ============================================================================
 
 
 import com.example.volunteerlink.data.time.AppClock
@@ -19,6 +30,14 @@ import java.util.Calendar
  *
  * The UI consumes this policy, but the same rules are checked again before
  * Save Changes so a stale screen cannot overwrite newer volunteer activity.
+ */
+/**
+ * DETAILED DECLARATION — PostEditPolicy
+ *
+ * Domain/UI type for Post Edit Policy used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
  */
 data class PostEditPolicy(
     val postStatus: String,
@@ -47,6 +66,14 @@ data class PostEditPolicy(
  * Holds the values represented by role edit policy as one strongly typed model.
  * It centralises Create/Edit Post rules so every caller applies the same decision logic.
  */
+/**
+ * DETAILED DECLARATION — RoleEditPolicy
+ *
+ * Domain/UI type for Role Edit Policy used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class RoleEditPolicy(
     val roleTemplateId: String,
     val roleMode: VolunteerRoleMode,
@@ -72,6 +99,14 @@ data class RoleEditPolicy(
  * Holds the values represented by schedule edit policy as one strongly typed model.
  * It centralises Create/Edit Post rules so every caller applies the same decision logic.
  */
+/**
+ * DETAILED DECLARATION — ScheduleEditPolicy
+ *
+ * Domain/UI type for Schedule Edit Policy used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class ScheduleEditPolicy(
     val scheduleItemId: String,
     val canEdit: Boolean,
@@ -80,6 +115,14 @@ data class ScheduleEditPolicy(
 )
 
 /** Raw dependency facts loaded from normalized Supabase tables. */
+/**
+ * DETAILED DECLARATION — PostEditPolicyInput
+ *
+ * Domain/UI type for Post Edit Policy Input used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class PostEditPolicyInput(
     val postStatus: String,
     val physicalStartDateMillis: Long? = null,
@@ -101,6 +144,14 @@ data class PostEditPolicyInput(
  * Holds the values represented by post edit role input as one strongly typed model.
  * It centralises Create/Edit Post rules so every caller applies the same decision logic.
  */
+/**
+ * DETAILED DECLARATION — PostEditRoleInput
+ *
+ * Domain/UI type for Post Edit Role Input used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class PostEditRoleInput(
     val roleTemplateId: String,
     val roleMode: VolunteerRoleMode,
@@ -110,6 +161,14 @@ data class PostEditRoleInput(
 /**
  * Holds the values represented by post edit participation input as one strongly typed model.
  * It centralises Create/Edit Post rules so every caller applies the same decision logic.
+ */
+/**
+ * DETAILED DECLARATION — PostEditParticipationInput
+ *
+ * Domain/UI type for Post Edit Participation Input used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
  */
 data class PostEditParticipationInput(
     val roleTemplateId: String,
@@ -121,6 +180,14 @@ data class PostEditParticipationInput(
  * Holds the values represented by post edit schedule input as one strongly typed model.
  * It centralises Create/Edit Post rules so every caller applies the same decision logic.
  */
+/**
+ * DETAILED DECLARATION — PostEditScheduleInput
+ *
+ * Domain/UI type for Post Edit Schedule Input used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class PostEditScheduleInput(
     val scheduleItemId: String,
     val scheduleType: ScheduleType,
@@ -131,11 +198,28 @@ data class PostEditScheduleInput(
  * Groups the shared values and helper behaviour represented by post edit policy evaluator.
  * It centralises Create/Edit Post rules so every caller applies the same decision logic.
  */
+/**
+ * DETAILED DECLARATION — PostEditPolicyEvaluator
+ *
+ * Single shared instance for Post Edit Policy Evaluator so related rules/state are defined once for the
+ * application process.
+ */
 object PostEditPolicyEvaluator {
 
     /**
      * Evaluates the current business rules for the organisation Create/Edit Post flow and returns the resulting policy/state.
      * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
+     */
+    /**
+     * DETAILED BEHAVIOUR — evaluate
+     *
+     * Evaluates the pure business rule represented by evaluate from the values supplied by the caller.
+     *
+     * The function does not perform UI or network side effects, which keeps the rule deterministic and reusable
+     * from multiple screens/workflows.
+     *
+     * Uses AppClock for business-date/time decisions so the same code works with the project test clock and
+     * normal device time.
      */
     fun evaluate(
         input: PostEditPolicyInput,
@@ -175,6 +259,15 @@ object PostEditPolicyEvaluator {
          * Derives the side has active people value used by the organisation Create/Edit Post flow.
          * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
          */
+        /**
+         * DETAILED BEHAVIOUR — sideHasActivePeople
+         *
+         * Evaluates the pure business rule represented by side has active people from the values supplied by
+         * the caller.
+         *
+         * The function does not perform UI or network side effects, which keeps the rule deterministic and
+         * reusable from multiple screens/workflows.
+         */
         fun sideHasActivePeople(mode: VolunteerRoleMode): Boolean {
             val roleIds = input.roles
                 .filter { it.roleMode == mode }
@@ -190,6 +283,15 @@ object PostEditPolicyEvaluator {
         /**
          * Derives the side has participation dependency value used by the organisation Create/Edit Post flow.
          * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
+         */
+        /**
+         * DETAILED BEHAVIOUR — sideHasParticipationDependency
+         *
+         * Evaluates the pure business rule represented by side has participation dependency from the values
+         * supplied by the caller.
+         *
+         * The function does not perform UI or network side effects, which keeps the rule deterministic and
+         * reusable from multiple screens/workflows.
          */
         fun sideHasParticipationDependency(mode: VolunteerRoleMode): Boolean {
             val roleIds = input.roles
@@ -423,6 +525,14 @@ object PostEditPolicyEvaluator {
      * Locked values must remain byte-for-byte equivalent from the editor's
      * perspective; otherwise Save Changes is stopped before any write occurs.
      */
+    /**
+     * DETAILED BEHAVIOUR — validateChanges
+     *
+     * Evaluates the pure business rule represented by validate changes from the values supplied by the caller.
+     *
+     * The function does not perform UI or network side effects, which keeps the rule deterministic and reusable
+     * from multiple screens/workflows.
+     */
     fun validateChanges(
         original: CreatePostDraft,
         edited: CreatePostDraft,
@@ -545,6 +655,14 @@ object PostEditPolicyEvaluator {
      * Derives the read only policy value used by the organisation Create/Edit Post flow.
      * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
      */
+    /**
+     * DETAILED BEHAVIOUR — readOnlyPolicy
+     *
+     * Evaluates the pure business rule represented by read only policy from the values supplied by the caller.
+     *
+     * The function does not perform UI or network side effects, which keeps the rule deterministic and reusable
+     * from multiple screens/workflows.
+     */
     private fun readOnlyPolicy(
         input: PostEditPolicyInput,
         reason: String
@@ -618,6 +736,15 @@ object PostEditPolicyEvaluator {
      * Checks whether the physical dates changed compared with the previously loaded value.
      * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
      */
+    /**
+     * DETAILED BEHAVIOUR — physicalDatesChanged
+     *
+     * Evaluates the pure business rule represented by physical dates changed from the values supplied by the
+     * caller.
+     *
+     * The function does not perform UI or network side effects, which keeps the rule deterministic and reusable
+     * from multiple screens/workflows.
+     */
     private fun physicalDatesChanged(a: CreatePostDraft, b: CreatePostDraft): Boolean {
         return a.isMultiDayPhysicalEvent != b.isMultiDayPhysicalEvent ||
             a.physicalStartDateMillis != b.physicalStartDateMillis ||
@@ -627,6 +754,15 @@ object PostEditPolicyEvaluator {
     /**
      * Checks whether the physical core changed compared with the previously loaded value.
      * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
+     */
+    /**
+     * DETAILED BEHAVIOUR — physicalCoreChanged
+     *
+     * Evaluates the pure business rule represented by physical core changed from the values supplied by the
+     * caller.
+     *
+     * The function does not perform UI or network side effects, which keeps the rule deterministic and reusable
+     * from multiple screens/workflows.
      */
     private fun physicalCoreChanged(a: CreatePostDraft, b: CreatePostDraft): Boolean {
         return a.physicalStartTimeMinutes != b.physicalStartTimeMinutes ||
@@ -639,6 +775,15 @@ object PostEditPolicyEvaluator {
      * Checks whether the physical capacity changed compared with the previously loaded value.
      * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
      */
+    /**
+     * DETAILED BEHAVIOUR — physicalCapacityChanged
+     *
+     * Evaluates the pure business rule represented by physical capacity changed from the values supplied by the
+     * caller.
+     *
+     * The function does not perform UI or network side effects, which keeps the rule deterministic and reusable
+     * from multiple screens/workflows.
+     */
     private fun physicalCapacityChanged(a: CreatePostDraft, b: CreatePostDraft): Boolean {
         return a.physicalVolunteerCapacity != b.physicalVolunteerCapacity ||
             a.hybridPhysicalVolunteerCapacity != b.hybridPhysicalVolunteerCapacity
@@ -648,6 +793,15 @@ object PostEditPolicyEvaluator {
      * Checks whether the remote capacity changed compared with the previously loaded value.
      * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
      */
+    /**
+     * DETAILED BEHAVIOUR — remoteCapacityChanged
+     *
+     * Evaluates the pure business rule represented by remote capacity changed from the values supplied by the
+     * caller.
+     *
+     * The function does not perform UI or network side effects, which keeps the rule deterministic and reusable
+     * from multiple screens/workflows.
+     */
     private fun remoteCapacityChanged(a: CreatePostDraft, b: CreatePostDraft): Boolean {
         return a.remoteVolunteerCapacity != b.remoteVolunteerCapacity ||
             a.hybridRemoteVolunteerCapacity != b.hybridRemoteVolunteerCapacity
@@ -656,6 +810,14 @@ object PostEditPolicyEvaluator {
     /**
      * Starts the of day for the organisation Create/Edit Post flow.
      * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
+     */
+    /**
+     * DETAILED BEHAVIOUR — startOfDay
+     *
+     * Evaluates the pure business rule represented by start of day from the values supplied by the caller.
+     *
+     * The function does not perform UI or network side effects, which keeps the rule deterministic and reusable
+     * from multiple screens/workflows.
      */
     private fun startOfDay(value: Long): Long {
         return Calendar.getInstance().apply {

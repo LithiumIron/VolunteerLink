@@ -1,11 +1,21 @@
 package com.example.volunteerlink.organisation.screens
 
-// FILE OVERVIEW:
-/*
- * OrganisationPromotionSections contains presentation code for the organisation promotion management flow.
- * It focuses on rendering state and forwarding user actions through callbacks/ViewModels,
- * keeping database access and business rules outside the composables where possible.
- */
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Implements the Organisation UI associated with Organisation Promotion Sections.
+//
+// The composable layer is responsible for layout, interaction and displaying loading/error/validation state;
+// business rules and persistence are delegated to ViewModels/repositories.
+//
+// This separation makes it clear during maintenance which code changes appearance versus which code changes real
+// server data.
+//
+// Where the screen displays cached information, server-changing actions remain disabled or routed through a fresh
+// authenticated repository operation.
+//
+// Architectural layer: Compose presentation layer.
+// ============================================================================
 
 
 import androidx.compose.foundation.BorderStroke
@@ -90,6 +100,15 @@ import java.util.Locale
 /**
  * Renders the promotion post selection screen screen used in the organisation promotion management flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — PromotionPostSelectionScreen
+ *
+ * Renders the Promotion Post Selection screen from state supplied by the owning ViewModel/repository-facing
+ * coordinator.
+ *
+ * The composable maps state to Material3 UI and emits callbacks; it does not become the source of truth for
+ * persisted VolunteerLink data.
  */
 fun PromotionPostSelectionScreen(
     isLoading: Boolean,
@@ -227,6 +246,15 @@ fun PromotionPostSelectionScreen(
  * Renders the promotion package screen screen used in the organisation promotion management flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
  */
+/**
+ * DETAILED BEHAVIOUR — PromotionPackageScreen
+ *
+ * Renders the Promotion Package screen from state supplied by the owning ViewModel/repository-facing
+ * coordinator.
+ *
+ * The composable maps state to Material3 UI and emits callbacks; it does not become the source of truth for
+ * persisted VolunteerLink data.
+ */
 fun PromotionPackageScreen(
     post: ManagePostItem,
     selectedPackage: PromotionPackage?,
@@ -352,6 +380,15 @@ fun PromotionPackageScreen(
  * Renders the promotion review screen screen used in the organisation promotion management flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
  */
+/**
+ * DETAILED BEHAVIOUR — PromotionReviewScreen
+ *
+ * Renders the Promotion Review screen from state supplied by the owning ViewModel/repository-facing
+ * coordinator.
+ *
+ * The composable maps state to Material3 UI and emits callbacks; it does not become the source of truth for
+ * persisted VolunteerLink data.
+ */
 fun PromotionReviewScreen(
     post: ManagePostItem,
     promotionPackage: PromotionPackage,
@@ -455,6 +492,15 @@ fun PromotionReviewScreen(
  * Renders the promotion payment method screen screen used in the organisation promotion management flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
  */
+/**
+ * DETAILED BEHAVIOUR — PromotionPaymentMethodScreen
+ *
+ * Renders the Promotion Payment Method screen from state supplied by the owning ViewModel/repository-facing
+ * coordinator.
+ *
+ * The composable maps state to Material3 UI and emits callbacks; it does not become the source of truth for
+ * persisted VolunteerLink data.
+ */
 fun PromotionPaymentMethodScreen(
     postTitle: String,
     promotionPackage: PromotionPackage,
@@ -537,6 +583,15 @@ fun PromotionPaymentMethodScreen(
 /**
  * Renders the promotion touch ngo screen screen used in the organisation promotion management flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — PromotionTouchNGoScreen
+ *
+ * Renders the Promotion Touch N Go screen from state supplied by the owning ViewModel/repository-facing
+ * coordinator.
+ *
+ * The composable maps state to Material3 UI and emits callbacks; it does not become the source of truth for
+ * persisted VolunteerLink data.
  */
 fun PromotionTouchNGoScreen(
     post: ManagePostItem,
@@ -645,6 +700,15 @@ fun PromotionTouchNGoScreen(
 /**
  * Renders the promotion card payment screen screen used in the organisation promotion management flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — PromotionCardPaymentScreen
+ *
+ * Renders the Promotion Card Payment screen from state supplied by the owning ViewModel/repository-facing
+ * coordinator.
+ *
+ * The composable maps state to Material3 UI and emits callbacks; it does not become the source of truth for
+ * persisted VolunteerLink data.
  */
 fun PromotionCardPaymentScreen(
     postTitle: String,
@@ -859,6 +923,15 @@ fun PromotionCardPaymentScreen(
  * Renders the promotion payment success screen screen used in the organisation promotion management flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
  */
+/**
+ * DETAILED BEHAVIOUR — PromotionPaymentSuccessScreen
+ *
+ * Renders the Promotion Payment Success screen from state supplied by the owning ViewModel/repository-facing
+ * coordinator.
+ *
+ * The composable maps state to Material3 UI and emits callbacks; it does not become the source of truth for
+ * persisted VolunteerLink data.
+ */
 fun PromotionPaymentSuccessScreen(
     promotion: PromotionPurchase,
     onDone: () -> Unit
@@ -967,6 +1040,14 @@ fun PromotionPaymentSuccessScreen(
  * Renders the UI represented by promotion page for the organisation promotion management flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — PromotionPage
+ *
+ * Handles the Compose/UI responsibility for promotion page.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun PromotionPage(
     title: String,
     subtitle: String,
@@ -1060,6 +1141,14 @@ fun PromotionPage(
  * Renders the UI represented by promotion centered state for the organisation promotion management flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — PromotionCenteredState
+ *
+ * Handles the Compose/UI responsibility for promotion centered state.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun PromotionCenteredState(content: @Composable ColumnScope.() -> Unit) {
     Column(
         modifier = Modifier
@@ -1075,6 +1164,14 @@ fun PromotionCenteredState(content: @Composable ColumnScope.() -> Unit) {
 /**
  * Renders the promotion post card card used in the organisation promotion management flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — PromotionPostCard
+ *
+ * Renders the reusable Promotion Post Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
  */
 fun PromotionPostCard(
     post: ManagePostItem,
@@ -1206,6 +1303,14 @@ fun PromotionPostCard(
  * Renders the promotion selected post summary summary block used in the organisation promotion management flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
  */
+/**
+ * DETAILED BEHAVIOUR — PromotionSelectedPostSummary
+ *
+ * Renders the reusable Promotion Selected Post Summary portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun PromotionSelectedPostSummary(post: ManagePostItem) {
     PromotionSectionCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1238,6 +1343,14 @@ fun PromotionSelectedPostSummary(post: ManagePostItem) {
 /**
  * Renders the promotion package card card used in the organisation promotion management flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — PromotionPackageCard
+ *
+ * Renders the reusable Promotion Package Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
  */
 fun PromotionPackageCard(
     option: PromotionPackage,
@@ -1352,6 +1465,14 @@ fun PromotionPackageCard(
  * Renders the promotion payment choice card card used in the organisation promotion management flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
  */
+/**
+ * DETAILED BEHAVIOUR — PromotionPaymentChoiceCard
+ *
+ * Renders the reusable Promotion Payment Choice Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun PromotionPaymentChoiceCard(
     title: String,
     subtitle: String,
@@ -1419,10 +1540,24 @@ fun PromotionPaymentChoiceCard(
  * Groups the shared values and helper behaviour represented by card number visual transformation.
  * It supports the promotion management presentation layer without adding backend responsibilities to the screen.
  */
+/**
+ * DETAILED DECLARATION — CardNumberVisualTransformation
+ *
+ * Single shared instance for Card Number Visual Transformation so related rules/state are defined once for the
+ * application process.
+ */
 object CardNumberVisualTransformation : VisualTransformation {
     /**
      * Filters the current data for the organisation promotion management flow.
      * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+     */
+    /**
+     * DETAILED BEHAVIOUR — filter
+     *
+     * Handles the Compose/UI responsibility for filter.
+     *
+     * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+     * ViewModel/repository layers.
      */
     override fun filter(text: AnnotatedString): TransformedText {
         val raw = text.text.take(16)
@@ -1438,6 +1573,14 @@ object CardNumberVisualTransformation : VisualTransformation {
              * Derives the original to transformed value used by the organisation promotion management flow.
              * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
              */
+            /**
+             * DETAILED BEHAVIOUR — originalToTransformed
+             *
+             * Handles the Compose/UI responsibility for original to transformed.
+             *
+             * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+             * ViewModel/repository layers.
+             */
             override fun originalToTransformed(offset: Int): Int {
                 val safeOffset = offset.coerceIn(0, raw.length)
                 return safeOffset + when {
@@ -1451,6 +1594,14 @@ object CardNumberVisualTransformation : VisualTransformation {
             /**
              * Derives the transformed to original value used by the organisation promotion management flow.
              * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+             */
+            /**
+             * DETAILED BEHAVIOUR — transformedToOriginal
+             *
+             * Handles the Compose/UI responsibility for transformed to original.
+             *
+             * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+             * ViewModel/repository layers.
              */
             override fun transformedToOriginal(offset: Int): Int {
                 val safeOffset = offset.coerceIn(0, formatted.length)
@@ -1471,10 +1622,24 @@ object CardNumberVisualTransformation : VisualTransformation {
  * Groups the shared values and helper behaviour represented by card expiry visual transformation.
  * It supports the promotion management presentation layer without adding backend responsibilities to the screen.
  */
+/**
+ * DETAILED DECLARATION — CardExpiryVisualTransformation
+ *
+ * Single shared instance for Card Expiry Visual Transformation so related rules/state are defined once for the
+ * application process.
+ */
 object CardExpiryVisualTransformation : VisualTransformation {
     /**
      * Filters the current data for the organisation promotion management flow.
      * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+     */
+    /**
+     * DETAILED BEHAVIOUR — filter
+     *
+     * Handles the Compose/UI responsibility for filter.
+     *
+     * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+     * ViewModel/repository layers.
      */
     override fun filter(text: AnnotatedString): TransformedText {
         val raw = text.text.take(4)
@@ -1489,6 +1654,14 @@ object CardExpiryVisualTransformation : VisualTransformation {
              * Derives the original to transformed value used by the organisation promotion management flow.
              * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
              */
+            /**
+             * DETAILED BEHAVIOUR — originalToTransformed
+             *
+             * Handles the Compose/UI responsibility for original to transformed.
+             *
+             * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+             * ViewModel/repository layers.
+             */
             override fun originalToTransformed(offset: Int): Int {
                 val safeOffset = offset.coerceIn(0, raw.length)
                 return if (safeOffset <= 2) safeOffset else safeOffset + 1
@@ -1497,6 +1670,14 @@ object CardExpiryVisualTransformation : VisualTransformation {
             /**
              * Derives the transformed to original value used by the organisation promotion management flow.
              * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+             */
+            /**
+             * DETAILED BEHAVIOUR — transformedToOriginal
+             *
+             * Handles the Compose/UI responsibility for transformed to original.
+             *
+             * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+             * ViewModel/repository layers.
              */
             override fun transformedToOriginal(offset: Int): Int {
                 val safeOffset = offset.coerceIn(0, formatted.length)
@@ -1513,6 +1694,14 @@ object CardExpiryVisualTransformation : VisualTransformation {
 /**
  * Renders the promotion payment field input field used in the organisation promotion management flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — PromotionPaymentField
+ *
+ * Renders the reusable Promotion Payment Field portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
  */
 fun PromotionPaymentField(
     value: String,
@@ -1553,6 +1742,14 @@ fun PromotionPaymentField(
  * Renders the promotion primary button button used in the organisation promotion management flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
  */
+/**
+ * DETAILED BEHAVIOUR — PromotionPrimaryButton
+ *
+ * Handles the Compose/UI responsibility for promotion primary button.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun PromotionPrimaryButton(
     text: String,
     enabled: Boolean,
@@ -1592,6 +1789,14 @@ fun PromotionPrimaryButton(
  * Renders the promotion section card card used in the organisation promotion management flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
  */
+/**
+ * DETAILED BEHAVIOUR — PromotionSectionCard
+ *
+ * Renders the reusable Promotion Section Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun PromotionSectionCard(content: @Composable ColumnScope.() -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -1610,6 +1815,14 @@ fun PromotionSectionCard(content: @Composable ColumnScope.() -> Unit) {
 /**
  * Renders the promotion detail row row used in the organisation promotion management flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — PromotionDetailRow
+ *
+ * Renders the reusable Promotion Detail Row portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
  */
 fun PromotionDetailRow(label: String, value: String) {
     Row(
@@ -1639,6 +1852,14 @@ fun PromotionDetailRow(label: String, value: String) {
  * Renders the UI represented by promotion divider for the organisation promotion management flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — PromotionDivider
+ *
+ * Handles the Compose/UI responsibility for promotion divider.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun PromotionDivider() {
     HorizontalDivider(
         modifier = Modifier.padding(vertical = 12.dp),
@@ -1650,6 +1871,14 @@ fun PromotionDivider() {
 /**
  * Renders the UI represented by fake payment qr for the organisation promotion management flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — FakePaymentQr
+ *
+ * Handles the Compose/UI responsibility for fake payment qr.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
  */
 fun FakePaymentQr(
     payload: String,
@@ -1699,6 +1928,14 @@ fun FakePaymentQr(
  * Derives the draw scope value used by the organisation promotion management flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — drawFinder
+ *
+ * Handles the Compose/UI responsibility for draw finder.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun DrawScope.drawFinder(column: Int, row: Int, cell: Float) {
     drawRect(
         color = Color.Black,
@@ -1721,6 +1958,14 @@ fun DrawScope.drawFinder(column: Int, row: Int, cell: Float) {
  * Checks whether the in is finder for the organisation promotion management flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — isInFinder
+ *
+ * Handles the Compose/UI responsibility for is in finder.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun isInFinder(column: Int, row: Int, modules: Int): Boolean {
     val topLeft = column in 0..6 && row in 0..6
     val topRight = column in (modules - 7)..(modules - 1) && row in 0..6
@@ -1732,12 +1977,34 @@ fun isInFinder(column: Int, row: Int, modules: Int): Boolean {
  * Formats the price used by the organisation promotion management flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — formatPrice
+ *
+ * Handles the Compose/UI responsibility for format price.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ *
+ * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without leaving
+ * the UI in an assumed-success state.
+ */
 fun formatPrice(value: Double): String =
     String.format(Locale.US, "RM%.2f", value)
 
 /**
  * Formats the display date used by the organisation promotion management flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — formatDisplayDate
+ *
+ * Handles the Compose/UI responsibility for format display date.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ *
+ * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without leaving
+ * the UI in an assumed-success state.
  */
 fun formatDisplayDate(value: String): String {
     if (value.isBlank()) return "—"
@@ -1751,6 +2018,14 @@ fun formatDisplayDate(value: String): String {
 /**
  * Formats the display date time used by the organisation promotion management flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — formatDisplayDateTime
+ *
+ * Handles the Compose/UI responsibility for format display date time.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
  */
 fun formatDisplayDateTime(value: Long): String {
     return SimpleDateFormat("d MMM yyyy, h:mm a", Locale.US).format(Date(value))

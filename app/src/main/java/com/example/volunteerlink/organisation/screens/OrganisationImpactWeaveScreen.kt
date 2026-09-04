@@ -1,11 +1,18 @@
 package com.example.volunteerlink.organisation.screens
 
-// FILE OVERVIEW:
-/*
- * OrganisationImpactWeaveScreen contains presentation code for the organisation Impact Weave and partnership flow.
- * It focuses on rendering state and forwarding user actions through callbacks/ViewModels,
- * keeping database access and business rules outside the composables where possible.
- */
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Hosts the Organisation Impact Weave planning/matching workflow and binds its screens to ImpactWeaveViewModel.
+//
+// Early planning input can be autosaved locally, but once a plan enters server-backed partnership matching the
+// database status becomes authoritative.
+//
+// The screen handles presentation and navigation between planning, matching, history and Create Post conversion;
+// partnership state changes remain repository/RPC operations.
+//
+// Architectural layer: Compose presentation layer.
+// ============================================================================
 
 
 import androidx.activity.compose.BackHandler
@@ -28,6 +35,15 @@ import com.example.volunteerlink.organisation.impactweave.model.ImpactWeavePage
 /**
  * Renders the organisation impact weave screen screen used in the organisation Impact Weave and partnership flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — OrganisationImpactWeaveScreen
+ *
+ * Renders the Organisation Impact Weave screen from state supplied by the owning ViewModel/repository-facing
+ * coordinator.
+ *
+ * The composable maps state to Material3 UI and emits callbacks; it does not become the source of truth for
+ * persisted VolunteerLink data.
  */
 fun OrganisationImpactWeaveScreen(
     onBack: () -> Unit,
@@ -62,6 +78,14 @@ fun OrganisationImpactWeaveScreen(
     /**
      * Handles the back in the organisation Impact Weave and partnership flow.
      * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+     */
+    /**
+     * DETAILED BEHAVIOUR — handleBack
+     *
+     * Handles the Compose/UI responsibility for handle back.
+     *
+     * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+     * ViewModel/repository layers.
      */
     fun handleBack() {
         if (uiState.isFindingPartners) return

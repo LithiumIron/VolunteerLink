@@ -1,11 +1,21 @@
 package com.example.volunteerlink.organisation.screens
 
-// FILE OVERVIEW:
-/*
- * OrganisationHomeSections contains presentation code for the organisation Home dashboard flow.
- * It focuses on rendering state and forwarding user actions through callbacks/ViewModels,
- * keeping database access and business rules outside the composables where possible.
- */
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Implements the Organisation UI associated with Organisation Home Sections.
+//
+// The composable layer is responsible for layout, interaction and displaying loading/error/validation state;
+// business rules and persistence are delegated to ViewModels/repositories.
+//
+// This separation makes it clear during maintenance which code changes appearance versus which code changes real
+// server data.
+//
+// Where the screen displays cached information, server-changing actions remain disabled or routed through a fresh
+// authenticated repository operation.
+//
+// Architectural layer: Compose presentation layer.
+// ============================================================================
 
 
 import androidx.compose.foundation.background
@@ -63,6 +73,14 @@ import java.util.Locale
 
 /** Green Organisation header intentionally retained as VolunteerLink identity. */
 @Composable
+/**
+ * DETAILED BEHAVIOUR — OrganisationHomeHeader
+ *
+ * Renders the reusable Organisation Home Header portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun OrganisationHomeHeader(
     organisationName: String,
     nowMillis: Long,
@@ -138,6 +156,14 @@ fun OrganisationHomeHeader(
  * emphasis.  Individual alerts are rows rather than nested cards.
  */
 @Composable
+/**
+ * DETAILED BEHAVIOUR — OrganisationAttentionSection
+ *
+ * Renders the reusable Organisation Attention Section portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun OrganisationAttentionSection(
     items: List<HomeAttentionItem>,
     onItemClick: (HomeAttentionItem) -> Unit,
@@ -199,6 +225,14 @@ fun OrganisationAttentionSection(
 /**
  * Renders the attention row row used in the organisation Home dashboard flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — AttentionRow
+ *
+ * Renders the reusable Attention Row portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
  */
 private fun AttentionRow(
     item: HomeAttentionItem,
@@ -265,6 +299,14 @@ private fun AttentionRow(
  * Renders the organisation post summary section section used in the organisation Home dashboard flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
  */
+/**
+ * DETAILED BEHAVIOUR — OrganisationPostSummarySection
+ *
+ * Renders the reusable Organisation Post Summary Section portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun OrganisationPostSummarySection(
     ongoingCount: Int,
     upcomingCount: Int,
@@ -299,6 +341,14 @@ fun OrganisationPostSummarySection(
  * Renders the UI represented by home section heading for the organisation Home dashboard flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — HomeSectionHeading
+ *
+ * Renders the reusable Home Section Heading portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun HomeSectionHeading(
     title: String,
     actionLabel: String? = null,
@@ -313,6 +363,14 @@ fun HomeSectionHeading(
 
 /** Existing function name retained so HomeScreen wiring stays unchanged. */
 @Composable
+/**
+ * DETAILED BEHAVIOUR — OngoingPostCard
+ *
+ * Renders the reusable Ongoing Post Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun OngoingPostCard(
     post: HomePostItem,
     onClick: () -> Unit
@@ -324,6 +382,14 @@ fun OngoingPostCard(
 /**
  * Renders the upcoming post row row used in the organisation Home dashboard flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — UpcomingPostRow
+ *
+ * Renders the reusable Upcoming Post Row portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
  */
 fun UpcomingPostRow(
     post: HomePostItem,
@@ -338,6 +404,14 @@ fun UpcomingPostRow(
 /**
  * Renders the home post row row used in the organisation Home dashboard flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — HomePostRow
+ *
+ * Renders the reusable Home Post Row portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
  */
 private fun HomePostRow(
     post: HomePostItem,
@@ -441,6 +515,14 @@ private fun HomePostRow(
  * Returns the home empty message used by the organisation Home dashboard flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — HomeEmptyMessage
+ *
+ * Handles the Compose/UI responsibility for home empty message.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun HomeEmptyMessage(text: String) {
     OrganisationInfoStrip(
         title = "Nothing here right now",
@@ -452,6 +534,14 @@ fun HomeEmptyMessage(text: String) {
 /**
  * Renders the home attention item item used in the organisation Home dashboard flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — attentionKindLabel
+ *
+ * Handles the Compose/UI responsibility for attention kind label.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
  */
 private fun HomeAttentionItem.attentionKindLabel(): String = when (type) {
     HomeAttentionType.APPLICATIONS_TO_REVIEW -> "APPLICATIONS"
@@ -469,6 +559,14 @@ private fun HomeAttentionItem.attentionKindLabel(): String = when (type) {
  * Renders the home attention item item used in the organisation Home dashboard flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
  */
+/**
+ * DETAILED BEHAVIOUR — severityLabel
+ *
+ * Handles the Compose/UI responsibility for severity label.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun HomeAttentionItem.severityLabel(): String = when (severity) {
     HomeAttentionSeverity.URGENT -> "URGENT"
     HomeAttentionSeverity.WARNING -> "WARNING"
@@ -480,11 +578,27 @@ private fun HomeAttentionItem.severityLabel(): String = when (severity) {
  * Renders the home attention item item used in the organisation Home dashboard flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
  */
+/**
+ * DETAILED BEHAVIOUR — primaryTitle
+ *
+ * Handles the Compose/UI responsibility for primary title.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun HomeAttentionItem.primaryTitle(): String = postTitle
 
 /**
  * Renders the home attention item item used in the organisation Home dashboard flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — contextLine
+ *
+ * Handles the Compose/UI responsibility for context line.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
  */
 private fun HomeAttentionItem.contextLine(): String? {
     val detailedContext = listOfNotNull(
@@ -505,6 +619,14 @@ private fun HomeAttentionItem.contextLine(): String? {
  * Derives the string value used by the organisation Home dashboard flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — toHomeModeLabel
+ *
+ * Handles the Compose/UI responsibility for to home mode label.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun String.toHomeModeLabel(): String = when (uppercase(Locale.US)) {
     "PHYSICAL" -> "Physical"
     "REMOTE" -> "Remote"
@@ -516,6 +638,14 @@ private fun String.toHomeModeLabel(): String = when (uppercase(Locale.US)) {
  * Derives the string value used by the organisation Home dashboard flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — homeModeDrawable
+ *
+ * Handles the Compose/UI responsibility for home mode drawable.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun String.homeModeDrawable(): Int = when (uppercase(Locale.US)) {
     "PHYSICAL" -> R.drawable.physical_event
     "REMOTE" -> R.drawable.remote_project
@@ -526,6 +656,14 @@ private fun String.homeModeDrawable(): Int = when (uppercase(Locale.US)) {
 /**
  * Derives the organisation initials value used by the organisation Home dashboard flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — organisationInitials
+ *
+ * Handles the Compose/UI responsibility for organisation initials.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
  */
 private fun organisationInitials(name: String): String {
     val parts = name.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
@@ -540,6 +678,14 @@ private fun organisationInitials(name: String): String {
  * Derives the greeting for value used by the organisation Home dashboard flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — greetingFor
+ *
+ * Handles the Compose/UI responsibility for greeting for.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun greetingFor(nowMillis: Long): String {
     val hour = Calendar.getInstance().apply { timeInMillis = nowMillis }.get(Calendar.HOUR_OF_DAY)
     return when (hour) {
@@ -553,12 +699,28 @@ private fun greetingFor(nowMillis: Long): String {
  * Formats the current date used by the organisation Home dashboard flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — formatCurrentDate
+ *
+ * Handles the Compose/UI responsibility for format current date.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun formatCurrentDate(nowMillis: Long): String =
     SimpleDateFormat("EEEE, d MMMM yyyy", Locale.getDefault()).format(Date(nowMillis))
 
 /**
  * Formats the date range used by the organisation Home dashboard flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — formatDateRange
+ *
+ * Handles the Compose/UI responsibility for format date range.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
  */
 fun formatDateRange(start: String?, end: String?): String {
     val startText = formatSingleDate(start)
@@ -575,6 +737,14 @@ fun formatDateRange(start: String?, end: String?): String {
  * Formats the single date used by the organisation Home dashboard flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — formatSingleDate
+ *
+ * Handles the Compose/UI responsibility for format single date.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun formatSingleDate(value: String?): String? {
     val date = parseDatabaseDate(value) ?: return null
     return SimpleDateFormat("d MMM yyyy", Locale.getDefault()).format(date)
@@ -583,6 +753,17 @@ fun formatSingleDate(value: String?): String? {
 /**
  * Parses the database date used by the organisation Home dashboard flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — parseDatabaseDate
+ *
+ * Handles the Compose/UI responsibility for parse database date.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ *
+ * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without leaving
+ * the UI in an assumed-success state.
  */
 fun parseDatabaseDate(value: String?): Date? {
     if (value.isNullOrBlank()) return null

@@ -1,11 +1,21 @@
 package com.example.volunteerlink.organisation.screens
 
-// FILE OVERVIEW:
-/*
- * OrganisationPostManagementSections contains presentation code for the organisation Manage Post flow.
- * It focuses on rendering state and forwarding user actions through callbacks/ViewModels,
- * keeping database access and business rules outside the composables where possible.
- */
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Implements the Organisation UI associated with Organisation Post Management Sections.
+//
+// The composable layer is responsible for layout, interaction and displaying loading/error/validation state;
+// business rules and persistence are delegated to ViewModels/repositories.
+//
+// This separation makes it clear during maintenance which code changes appearance versus which code changes real
+// server data.
+//
+// Where the screen displays cached information, server-changing actions remain disabled or routed through a fresh
+// authenticated repository operation.
+//
+// Architectural layer: Compose presentation layer.
+// ============================================================================
 
 
 import android.content.Intent
@@ -96,6 +106,14 @@ import java.util.Locale
  * Lists the supported values represented by post management tab.
  * It supports the Manage Post presentation layer without adding backend responsibilities to the screen.
  */
+/**
+ * DETAILED DECLARATION — PostManagementTab
+ *
+ * Domain/UI type for Post Management Tab used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 enum class PostManagementTab {
     OVERVIEW,
     PEOPLE,
@@ -106,6 +124,14 @@ enum class PostManagementTab {
  * Lists the supported values represented by post management people tab.
  * It supports the Manage Post presentation layer without adding backend responsibilities to the screen.
  */
+/**
+ * DETAILED DECLARATION — PostManagementPeopleTab
+ *
+ * Domain/UI type for Post Management People Tab used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 enum class PostManagementPeopleTab {
     APPLICANTS,
     VOLUNTEERS
@@ -115,6 +141,14 @@ enum class PostManagementPeopleTab {
  * Lists the supported values represented by post management hybrid review side.
  * It supports the Manage Post presentation layer without adding backend responsibilities to the screen.
  */
+/**
+ * DETAILED DECLARATION — PostManagementHybridReviewSide
+ *
+ * Domain/UI type for Post Management Hybrid Review Side used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 enum class PostManagementHybridReviewSide {
     PHYSICAL,
     REMOTE
@@ -123,6 +157,14 @@ enum class PostManagementHybridReviewSide {
 /**
  * Holds the values represented by post management phase line as one strongly typed model.
  * It supports the Manage Post presentation layer without adding backend responsibilities to the screen.
+ */
+/**
+ * DETAILED DECLARATION — PostManagementPhaseLine
+ *
+ * Domain/UI type for Post Management Phase Line used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
  */
 private data class PostManagementPhaseLine(
     val label: String,
@@ -139,6 +181,14 @@ private val PostManagementPillShape = RoundedCornerShape(50)
 /**
  * Renders the UI represented by post management top bar for the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — PostManagementTopBar
+ *
+ * Handles the Compose/UI responsibility for post management top bar.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
  */
 fun PostManagementTopBar(
     onBack: () -> Unit,
@@ -224,6 +274,14 @@ fun PostManagementTopBar(
 /**
  * Renders the post management summary card card used in the organisation Manage Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — PostManagementSummaryCard
+ *
+ * Renders the reusable Post Management Summary Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
  */
 fun PostManagementSummaryCard(
     post: PostManagementPost,
@@ -368,6 +426,14 @@ fun PostManagementSummaryCard(
  * Renders the UI represented by post management hybrid review selector for the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — PostManagementHybridReviewSelector
+ *
+ * Handles the Compose/UI responsibility for post management hybrid review selector.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun PostManagementHybridReviewSelector(
     selected: PostManagementHybridReviewSide,
     showPhysical: Boolean,
@@ -437,6 +503,14 @@ fun PostManagementHybridReviewSelector(
  * Renders the UI represented by post management main tabs for the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — PostManagementMainTabs
+ *
+ * Handles the Compose/UI responsibility for post management main tabs.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun PostManagementMainTabs(
     selected: PostManagementTab,
     pendingApplicantCount: Int,
@@ -481,6 +555,14 @@ fun PostManagementMainTabs(
  * Renders the post management main tab item item used in the organisation Manage Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
  */
+/**
+ * DETAILED BEHAVIOUR — PostManagementMainTabItem
+ *
+ * Renders the reusable Post Management Main Tab Item portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun PostManagementMainTabItem(
     label: String,
     selected: Boolean,
@@ -524,6 +606,14 @@ private fun PostManagementMainTabItem(
  * Renders the UI represented by post management overview for the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — PostManagementOverview
+ *
+ * Handles the Compose/UI responsibility for post management overview.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun PostManagementOverview(
     post: PostManagementPost,
     modifier: Modifier = Modifier
@@ -546,6 +636,14 @@ fun PostManagementOverview(
 /**
  * Renders the post management draft publish section section used in the organisation Manage Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — PostManagementDraftPublishSection
+ *
+ * Renders the reusable Post Management Draft Publish Section portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
  */
 fun PostManagementDraftPublishSection(
     isPublishing: Boolean,
@@ -611,6 +709,14 @@ fun PostManagementDraftPublishSection(
 /**
  * Renders the post management impact weave card card used in the organisation Manage Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — PostManagementImpactWeaveCard
+ *
+ * Renders the reusable Post Management Impact Weave Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
  */
 private fun PostManagementImpactWeaveCard(post: PostManagementPost) {
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -721,6 +827,14 @@ private fun PostManagementImpactWeaveCard(post: PostManagementPost) {
  * Renders the post management details card card used in the organisation Manage Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
  */
+/**
+ * DETAILED BEHAVIOUR — PostManagementDetailsCard
+ *
+ * Renders the reusable Post Management Details Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun PostManagementDetailsCard(post: PostManagementPost) {
     Column(modifier = Modifier.fillMaxWidth()) {
         OrganisationSectionHeader(
@@ -800,6 +914,14 @@ private fun PostManagementDetailsCard(post: PostManagementPost) {
  * Renders the UI represented by post management info line for the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — PostManagementInfoLine
+ *
+ * Handles the Compose/UI responsibility for post management info line.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun PostManagementInfoLine(
     label: String,
     value: String,
@@ -829,6 +951,14 @@ private fun PostManagementInfoLine(
  * Renders the UI represented by post management compact info block for the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — PostManagementCompactInfoBlock
+ *
+ * Handles the Compose/UI responsibility for post management compact info block.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun PostManagementCompactInfoBlock(
     label: String,
     value: String,
@@ -857,6 +987,14 @@ private fun PostManagementCompactInfoBlock(
 /**
  * Renders the post management participation card card used in the organisation Manage Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — PostManagementParticipationCard
+ *
+ * Renders the reusable Post Management Participation Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
  */
 private fun PostManagementParticipationCard(post: PostManagementPost) {
     val accepted = post.volunteers.size
@@ -891,6 +1029,14 @@ private fun PostManagementParticipationCard(post: PostManagementPost) {
 /**
  * Renders the UI represented by post management stat for the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — PostManagementStat
+ *
+ * Handles the Compose/UI responsibility for post management stat.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
  */
 private fun PostManagementStat(
     value: String,
@@ -938,6 +1084,14 @@ private fun PostManagementStat(
  * Renders the post management role section section used in the organisation Manage Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
  */
+/**
+ * DETAILED BEHAVIOUR — PostManagementRoleSection
+ *
+ * Renders the reusable Post Management Role Section portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun PostManagementRoleSection(post: PostManagementPost) {
     Column(modifier = Modifier.fillMaxWidth()) {
         OrganisationSectionHeader(
@@ -965,6 +1119,14 @@ private fun PostManagementRoleSection(post: PostManagementPost) {
 /**
  * Renders the post management role row row used in the organisation Manage Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — PostManagementRoleRow
+ *
+ * Renders the reusable Post Management Role Row portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
  */
 private fun PostManagementRoleRow(
     role: PostManagementRole,
@@ -1017,6 +1179,14 @@ private fun PostManagementRoleRow(
  * Renders the post management schedule section section used in the organisation Manage Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
  */
+/**
+ * DETAILED BEHAVIOUR — PostManagementScheduleSection
+ *
+ * Renders the reusable Post Management Schedule Section portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun PostManagementScheduleSection(post: PostManagementPost) {
     Column(modifier = Modifier.fillMaxWidth()) {
         OrganisationSectionHeader(
@@ -1040,6 +1210,14 @@ private fun PostManagementScheduleSection(post: PostManagementPost) {
 /**
  * Renders the post management schedule row row used in the organisation Manage Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — PostManagementScheduleRow
+ *
+ * Renders the reusable Post Management Schedule Row portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
  */
 private fun PostManagementScheduleRow(schedule: PostManagementScheduleItem) {
     Row(
@@ -1110,6 +1288,14 @@ private fun PostManagementScheduleRow(schedule: PostManagementScheduleItem) {
 /**
  * Renders the post management today attendance card card used in the organisation Manage Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — PostManagementTodayAttendanceCard
+ *
+ * Renders the reusable Post Management Today Attendance Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
  */
 fun PostManagementTodayAttendanceCard(
     attendance: PostManagementPhysicalAttendance,
@@ -1257,6 +1443,14 @@ fun PostManagementTodayAttendanceCard(
  * Renders the post management remote team submission card card used in the organisation Manage Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
  */
+/**
+ * DETAILED BEHAVIOUR — PostManagementRemoteTeamSubmissionCard
+ *
+ * Renders the reusable Post Management Remote Team Submission Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun PostManagementRemoteTeamSubmissionCard(
     deliverable: String?,
     responsibleRoleName: String?,
@@ -1358,6 +1552,14 @@ fun PostManagementRemoteTeamSubmissionCard(
  * Renders the UI represented by post management remote submission block for the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — PostManagementRemoteSubmissionBlock
+ *
+ * Handles the Compose/UI responsibility for post management remote submission block.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun PostManagementRemoteSubmissionBlock(
     requirement: String?,
     dueDate: String,
@@ -1451,6 +1653,15 @@ private fun PostManagementRemoteSubmissionBlock(
 /**
  * Renders the post management remote submission dialog dialog used in the organisation Manage Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — PostManagementRemoteSubmissionDialog
+ *
+ * Renders the Post Management Remote Submission Dialog modal interaction and keeps temporary form/confirmation
+ * UI separate from the underlying server action.
+ *
+ * The confirm callback is only emitted after the dialog-side input/choice is in an acceptable state; the
+ * ViewModel/repository performs the real mutation.
  */
 fun PostManagementRemoteSubmissionDialog(
     submission: PostManagementRemoteSubmission,
@@ -1652,6 +1863,14 @@ fun PostManagementRemoteSubmissionDialog(
  * Renders the submission decision row row used in the organisation Manage Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
  */
+/**
+ * DETAILED BEHAVIOUR — SubmissionDecisionRow
+ *
+ * Renders the reusable Submission Decision Row portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun SubmissionDecisionRow(
     title: String,
     subtitle: String,
@@ -1701,6 +1920,15 @@ private fun SubmissionDecisionRow(
 /**
  * Renders the post management request revision dialog dialog used in the organisation Manage Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — PostManagementRequestRevisionDialog
+ *
+ * Renders the Post Management Request Revision Dialog modal interaction and keeps temporary form/confirmation
+ * UI separate from the underlying server action.
+ *
+ * The confirm callback is only emitted after the dialog-side input/choice is in an acceptable state; the
+ * ViewModel/repository performs the real mutation.
  */
 fun PostManagementRequestRevisionDialog(
     isShared: Boolean,
@@ -1823,6 +2051,15 @@ fun PostManagementRequestRevisionDialog(
  * Renders the post management accept submission dialog dialog used in the organisation Manage Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
  */
+/**
+ * DETAILED BEHAVIOUR — PostManagementAcceptSubmissionDialog
+ *
+ * Renders the Post Management Accept Submission Dialog modal interaction and keeps temporary form/confirmation
+ * UI separate from the underlying server action.
+ *
+ * The confirm callback is only emitted after the dialog-side input/choice is in an acceptable state; the
+ * ViewModel/repository performs the real mutation.
+ */
 fun PostManagementAcceptSubmissionDialog(
     isShared: Boolean,
     isSaving: Boolean,
@@ -1897,6 +2134,15 @@ fun PostManagementAcceptSubmissionDialog(
  * Renders the post management not accept submission dialog dialog used in the organisation Manage Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
  */
+/**
+ * DETAILED BEHAVIOUR — PostManagementNotAcceptSubmissionDialog
+ *
+ * Renders the Post Management Not Accept Submission Dialog modal interaction and keeps temporary
+ * form/confirmation UI separate from the underlying server action.
+ *
+ * The confirm callback is only emitted after the dialog-side input/choice is in an acceptable state; the
+ * ViewModel/repository performs the real mutation.
+ */
 fun PostManagementNotAcceptSubmissionDialog(
     isShared: Boolean,
     onDismiss: () -> Unit,
@@ -1943,6 +2189,14 @@ fun PostManagementNotAcceptSubmissionDialog(
  * Returns the remote submission file label used by the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — remoteSubmissionFileLabel
+ *
+ * Handles the Compose/UI responsibility for remote submission file label.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun remoteSubmissionFileLabel(fileName: String): String {
     val extension = fileName.substringAfterLast('.', "")
         .trim()
@@ -1959,6 +2213,14 @@ private fun remoteSubmissionFileLabel(fileName: String): String {
 /**
  * Renders the UI represented by post management submission status pill for the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — PostManagementSubmissionStatusPill
+ *
+ * Handles the Compose/UI responsibility for post management submission status pill.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
  */
 private fun PostManagementSubmissionStatusPill(
     status: String,
@@ -2003,6 +2265,14 @@ private fun PostManagementSubmissionStatusPill(
  * Renders the UI represented by post management resubmission notice for the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — PostManagementResubmissionNotice
+ *
+ * Handles the Compose/UI responsibility for post management resubmission notice.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun PostManagementResubmissionNotice(
     isShared: Boolean,
     modifier: Modifier = Modifier
@@ -2044,6 +2314,14 @@ private fun PostManagementResubmissionNotice(
  * Renders the UI represented by post management resubmitted pill for the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — PostManagementResubmittedPill
+ *
+ * Handles the Compose/UI responsibility for post management resubmitted pill.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun PostManagementResubmittedPill(
     modifier: Modifier = Modifier
 ) {
@@ -2067,6 +2345,14 @@ private fun PostManagementResubmittedPill(
 /**
  * Renders the UI represented by post management attendance day selector for the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — PostManagementAttendanceDaySelector
+ *
+ * Handles the Compose/UI responsibility for post management attendance day selector.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
  */
 fun PostManagementAttendanceDaySelector(
     dates: List<String>,
@@ -2120,6 +2406,14 @@ fun PostManagementAttendanceDaySelector(
 /**
  * Renders the UI represented by post management volunteer attendance block for the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — PostManagementVolunteerAttendanceBlock
+ *
+ * Handles the Compose/UI responsibility for post management volunteer attendance block.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
  */
 private fun PostManagementVolunteerAttendanceBlock(
     summary: PostManagementVolunteerAttendanceSummary,
@@ -2240,6 +2534,15 @@ private fun PostManagementVolunteerAttendanceBlock(
  * Renders the post management mark absent dialog dialog used in the organisation Manage Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
  */
+/**
+ * DETAILED BEHAVIOUR — PostManagementMarkAbsentDialog
+ *
+ * Renders the Post Management Mark Absent Dialog modal interaction and keeps temporary form/confirmation UI
+ * separate from the underlying server action.
+ *
+ * The confirm callback is only emitted after the dialog-side input/choice is in an acceptable state; the
+ * ViewModel/repository performs the real mutation.
+ */
 fun PostManagementMarkAbsentDialog(
     person: PostManagementPerson,
     eventDate: String,
@@ -2286,6 +2589,14 @@ fun PostManagementMarkAbsentDialog(
 /**
  * Renders the UI represented by post management people controls for the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — PostManagementPeopleControls
+ *
+ * Handles the Compose/UI responsibility for post management people controls.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
  */
 fun PostManagementPeopleControls(
     selectedTab: PostManagementPeopleTab,
@@ -2401,6 +2712,14 @@ fun PostManagementPeopleControls(
  * Renders the post management group sync card card used in the organisation Manage Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
  */
+/**
+ * DETAILED BEHAVIOUR — PostManagementGroupSyncCard
+ *
+ * Renders the reusable Post Management Group Sync Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun PostManagementGroupSyncCard(
     groupExists: Boolean,
     eligibleCount: Int,
@@ -2492,6 +2811,14 @@ fun PostManagementGroupSyncCard(
  * Renders the post management people tab item item used in the organisation Manage Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
  */
+/**
+ * DETAILED BEHAVIOUR — PostManagementPeopleTabItem
+ *
+ * Renders the reusable Post Management People Tab Item portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun PostManagementPeopleTabItem(
     text: String,
     @DrawableRes iconRes: Int,
@@ -2534,6 +2861,14 @@ private fun PostManagementPeopleTabItem(
  * Renders the post management role filter chip chip used in the organisation Manage Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
  */
+/**
+ * DETAILED BEHAVIOUR — PostManagementRoleFilterChip
+ *
+ * Renders the reusable Post Management Role Filter Chip portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun PostManagementRoleFilterChip(
     text: String,
     selected: Boolean,
@@ -2563,6 +2898,14 @@ private fun PostManagementRoleFilterChip(
 /**
  * Renders the post management people role header header used in the organisation Manage Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — PostManagementPeopleRoleHeader
+ *
+ * Renders the reusable Post Management People Role Header portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
  */
 fun PostManagementPeopleRoleHeader(
     role: PostManagementRole,
@@ -2639,6 +2982,14 @@ fun PostManagementPeopleRoleHeader(
  * Renders the UI represented by post management remote role pill for the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — PostManagementRemoteRolePill
+ *
+ * Handles the Compose/UI responsibility for post management remote role pill.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun PostManagementRemoteRolePill(
     text: String,
     modifier: Modifier = Modifier
@@ -2655,6 +3006,14 @@ private fun PostManagementRemoteRolePill(
  * Renders the UI represented by post management application window pill for the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — PostManagementApplicationWindowPill
+ *
+ * Handles the Compose/UI responsibility for post management application window pill.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun PostManagementApplicationWindowPill(
     role: PostManagementRole,
     modifier: Modifier = Modifier
@@ -2670,6 +3029,14 @@ private fun PostManagementApplicationWindowPill(
 /**
  * Renders the post management person card card used in the organisation Manage Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — PostManagementPersonCard
+ *
+ * Renders the reusable Post Management Person Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
  */
 fun PostManagementPersonCard(
     person: PostManagementPerson,
@@ -2920,6 +3287,14 @@ fun PostManagementPersonCard(
  * Renders the UI represented by post management people empty state for the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — PostManagementPeopleEmptyState
+ *
+ * Handles the Compose/UI responsibility for post management people empty state.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun PostManagementPeopleEmptyState(
     selectedTab: PostManagementPeopleTab,
     hasFilters: Boolean,
@@ -2950,6 +3325,15 @@ fun PostManagementPeopleEmptyState(
 /**
  * Renders the post management profile preview dialog dialog used in the organisation Manage Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — PostManagementProfilePreviewDialog
+ *
+ * Renders the Post Management Profile Preview Dialog modal interaction and keeps temporary form/confirmation UI
+ * separate from the underlying server action.
+ *
+ * The confirm callback is only emitted after the dialog-side input/choice is in an acceptable state; the
+ * ViewModel/repository performs the real mutation.
  */
 fun PostManagementProfilePreviewDialog(
     person: PostManagementPerson,
@@ -3035,6 +3419,14 @@ fun PostManagementProfilePreviewDialog(
  * Renders the post management section card card used in the organisation Manage Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
  */
+/**
+ * DETAILED BEHAVIOUR — PostManagementSectionCard
+ *
+ * Renders the reusable Post Management Section Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun PostManagementSectionCard(
     title: String,
     subtitle: String? = null,
@@ -3076,6 +3468,14 @@ private fun PostManagementSectionCard(
  * Renders the UI represented by post management empty copy for the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — PostManagementEmptyCopy
+ *
+ * Handles the Compose/UI responsibility for post management empty copy.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun PostManagementEmptyCopy(text: String) {
     Text(
         text = text,
@@ -3089,6 +3489,14 @@ private fun PostManagementEmptyCopy(text: String) {
 /**
  * Renders the post management lifecycle badge badge used in the organisation Manage Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — PostManagementLifecycleBadge
+ *
+ * Renders the reusable Post Management Lifecycle Badge portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
  */
 private fun PostManagementLifecycleBadge(post: PostManagementPost) {
     val style = when (post.databaseStatus.uppercase(Locale.US)) {
@@ -3157,6 +3565,14 @@ private fun PostManagementLifecycleBadge(post: PostManagementPost) {
  * Holds the values represented by badge style as one strongly typed model.
  * It supports the Manage Post presentation layer without adding backend responsibilities to the screen.
  */
+/**
+ * DETAILED DECLARATION — BadgeStyle
+ *
+ * Domain/UI type for Badge Style used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 private data class BadgeStyle(
     val label: String,
     val container: Color,
@@ -3168,6 +3584,14 @@ private data class BadgeStyle(
 /**
  * Renders the UI represented by post management neutral pill for the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — PostManagementNeutralPill
+ *
+ * Handles the Compose/UI responsibility for post management neutral pill.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
  */
 private fun PostManagementNeutralPill(text: String) {
     Surface(
@@ -3190,6 +3614,14 @@ private fun PostManagementNeutralPill(text: String) {
 /**
  * Renders the UI represented by post management phase line for the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — PostManagementPhaseLine
+ *
+ * Handles the Compose/UI responsibility for post management phase line.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
  */
 private fun PostManagementPhaseLine(
     label: String,
@@ -3263,6 +3695,14 @@ private fun PostManagementPhaseLine(
  * Renders the post management phase badge badge used in the organisation Manage Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
  */
+/**
+ * DETAILED BEHAVIOUR — PostManagementPhaseBadge
+ *
+ * Renders the reusable Post Management Phase Badge portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun PostManagementPhaseBadge(
     timing: PostTimingState?,
     modifier: Modifier = Modifier
@@ -3304,6 +3744,14 @@ private fun PostManagementPhaseBadge(
  * Derives the string value used by the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — postManagementModeDrawable
+ *
+ * Handles the Compose/UI responsibility for post management mode drawable.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun String.postManagementModeDrawable(): Int = when (uppercase(Locale.US)) {
     "PHYSICAL" -> R.drawable.physical_event
     "REMOTE" -> R.drawable.remote_project
@@ -3314,6 +3762,14 @@ private fun String.postManagementModeDrawable(): Int = when (uppercase(Locale.US
 /**
  * Derives the string value used by the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — toPostManagementModeLabel
+ *
+ * Handles the Compose/UI responsibility for to post management mode label.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
  */
 private fun String.toPostManagementModeLabel(): String = when (uppercase(Locale.US)) {
     "PHYSICAL" -> "Physical"
@@ -3326,6 +3782,14 @@ private fun String.toPostManagementModeLabel(): String = when (uppercase(Locale.
  * Derives the string value used by the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — toApplicationMethodLabel
+ *
+ * Handles the Compose/UI responsibility for to application method label.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun String.toApplicationMethodLabel(): String = when (uppercase(Locale.US)) {
     "INSTANT_JOIN" -> "Instant Join"
     "REVIEW_APPLICANTS" -> "Review Applicants"
@@ -3335,6 +3799,14 @@ private fun String.toApplicationMethodLabel(): String = when (uppercase(Locale.U
 /**
  * Derives the string value used by the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — toCompletionLabel
+ *
+ * Handles the Compose/UI responsibility for to completion label.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
  */
 private fun String.toCompletionLabel(): String = when (uppercase(Locale.US)) {
     "IN_PROGRESS" -> "Joined"
@@ -3348,6 +3820,14 @@ private fun String.toCompletionLabel(): String = when (uppercase(Locale.US)) {
  * Derives the string value used by the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — toCompletionColor
+ *
+ * Handles the Compose/UI responsibility for to completion color.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun String.toCompletionColor(): Color = when (uppercase(Locale.US)) {
     "IN_PROGRESS" -> VolunteerLinkPrimaryGreen
     "NEEDS_REVIEW" -> VolunteerLinkInformation
@@ -3359,6 +3839,14 @@ private fun String.toCompletionColor(): Color = when (uppercase(Locale.US)) {
 /**
  * Derives the string value used by the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — toReadableDatabaseLabel
+ *
+ * Handles the Compose/UI responsibility for to readable database label.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
  */
 private fun String.toReadableDatabaseLabel(): String {
     return lowercase(Locale.US)
@@ -3374,6 +3862,14 @@ private fun String.toReadableDatabaseLabel(): String {
  * Returns the post management date range value required by the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — postManagementDateRange
+ *
+ * Handles the Compose/UI responsibility for post management date range.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun postManagementDateRange(start: String?, end: String?): String {
     if (start.isNullOrBlank() && end.isNullOrBlank()) return "Date not set"
     if (start.isNullOrBlank()) return end.toPostManagementShortDate()
@@ -3384,6 +3880,14 @@ private fun postManagementDateRange(start: String?, end: String?): String {
 /**
  * Derives the string value used by the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — toSixDigitPinDisplay
+ *
+ * Handles the Compose/UI responsibility for to six digit pin display.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
  */
 private fun String.toSixDigitPinDisplay(): String {
     val digits = filter(Char::isDigit).take(6)
@@ -3397,6 +3901,14 @@ private fun String.toSixDigitPinDisplay(): String {
 /**
  * Derives the int value used by the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — toVerifiedTimeLabel
+ *
+ * Handles the Compose/UI responsibility for to verified time label.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
  */
 private fun Int.toVerifiedTimeLabel(): String {
     val safeMinutes = coerceAtLeast(0)
@@ -3412,6 +3924,14 @@ private fun Int.toVerifiedTimeLabel(): String {
 /**
  * Derives the string value used by the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — toPostManagementShortDate
+ *
+ * Handles the Compose/UI responsibility for to post management short date.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
  */
 private fun String?.toPostManagementShortDate(): String {
     val value = this?.takeIf { it.isNotBlank() } ?: return "Date not set"
@@ -3441,6 +3961,14 @@ private fun String?.toPostManagementShortDate(): String {
  * Derives the string value used by the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — toPostManagementDateTime
+ *
+ * Handles the Compose/UI responsibility for to post management date time.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun String?.toPostManagementDateTime(): String {
     val value = this?.takeIf { it.isNotBlank() } ?: return "Date not set"
     val datePart = value.substringBefore("T")
@@ -3456,6 +3984,14 @@ private fun String?.toPostManagementDateTime(): String {
 /**
  * Derives the string value used by the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — toPostManagementTime
+ *
+ * Handles the Compose/UI responsibility for to post management time.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
  */
 private fun String.toPostManagementTime(): String {
     val parts = split(":")

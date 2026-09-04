@@ -1,11 +1,21 @@
 package com.example.volunteerlink.organisation.create.steps
 
-// FILE OVERVIEW:
-/*
- * ReviewSummaryPostSections contains presentation code for the organisation Create/Edit Post flow.
- * It focuses on rendering state and forwarding user actions through callbacks/ViewModels,
- * keeping database access and business rules outside the composables where possible.
- */
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Provides a reusable section used by the Create Post wizard for Review Summary Post Sections.
+//
+// The composables read CreatePostUiState/CreatePostDraft values and emit callbacks; they do not call Supabase
+// directly.
+//
+// Validation messages are supplied from CreatePostViewModel/CreatePostValidator so the same business rules apply
+// regardless of which UI component displays the field.
+//
+// Breaking large steps into section files keeps layout code readable while the ViewModel remains the single owner
+// of mutable workflow state.
+//
+// Architectural layer: Compose presentation layer.
+// ============================================================================
 
 
 import android.content.Context
@@ -71,6 +81,14 @@ import java.util.Locale
 /**
  * Renders the review post preview card card used in the organisation Create/Edit Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — ReviewPostPreviewCard
+ *
+ * Renders the reusable Review Post Preview Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
  */
 fun ReviewPostPreviewCard(
     uiState: CreatePostUiState
@@ -244,6 +262,14 @@ fun ReviewPostPreviewCard(
  * Renders the review post details card card used in the organisation Create/Edit Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
  */
+/**
+ * DETAILED BEHAVIOUR — ReviewPostDetailsCard
+ *
+ * Renders the reusable Review Post Details Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun ReviewPostDetailsCard(
     uiState: CreatePostUiState
 ) {
@@ -327,6 +353,17 @@ fun ReviewPostDetailsCard(
 /**
  * Loads a small review preview instead of decoding the original photo at full size.
  * This keeps the summary card lightweight even when the organiser selects a large image.
+ */
+/**
+ * DETAILED BEHAVIOUR — loadReviewThumbnail
+ *
+ * Handles the Compose/UI responsibility for load review thumbnail.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ *
+ * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without leaving
+ * the UI in an assumed-success state.
  */
 fun loadReviewThumbnail(
     context: Context,
