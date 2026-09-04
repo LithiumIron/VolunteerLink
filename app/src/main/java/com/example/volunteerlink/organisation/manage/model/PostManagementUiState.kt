@@ -27,6 +27,15 @@ data class OrganisationPostManagementUiState(
     val remoteReviewFinalizeSucceeded: Boolean = false,
     val isUpdatingApplicant: Boolean = false,
     val applicantActionMessage: String? = null,
+    val isLoadingPostGroup: Boolean = false,
+    val isAddingPostGroupMembers: Boolean = false,
+    val postGroupConversationId: String? = null,
+    val postGroupEligibleCount: Int = 0,
+    val postGroupActiveMemberCount: Int = 0,
+    val postGroupMissingCount: Int = 0,
+    val postGroupHasStarted: Boolean = false,
+    val postGroupCanAdd: Boolean = false,
+    val postGroupActionMessage: String? = null,
     val remoteReviewSession: PostManagementRemoteReviewSession = PostManagementRemoteReviewSession()
 )
 

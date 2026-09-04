@@ -2157,6 +2157,93 @@ fun PostManagementPeopleControls(
 }
 
 @Composable
+fun PostManagementGroupSyncCard(
+    groupExists: Boolean,
+    eligibleCount: Int,
+    activeMemberCount: Int,
+    missingCount: Int,
+    hasStarted: Boolean,
+    canAdd: Boolean,
+    isLoading: Boolean,
+    isAdding: Boolean,
+    actionMessage: String?,
+    onAddAll: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    OrganisationSectionSurface(modifier = modifier, contentPadding = 16.dp) {
+        OrganisationSectionHeader(
+            title = "Event group",
+            subtitle = if (groupExists) {
+                "Add accepted volunteers who are still missing."
+            } else {
+                "The group is created only when you press the button."
+            }
+        )
+
+        Text(
+            text = when {
+                isLoading -> "Checking group members…"
+                !groupExists -> "No event group created"
+                else -> "$activeMemberCount of $eligibleCount accepted volunteers added"
+            },
+            modifier = Modifier.padding(top = 12.dp),
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = VolunteerLinkTextPrimary
+        )
+
+        Text(
+            text = when {
+                hasStarted -> "The event has started, so group membership is locked."
+                !groupExists && eligibleCount == 0 ->
+                    "You can create the group now with only your organisation."
+                !groupExists -> "$eligibleCount accepted volunteer${if (eligibleCount == 1) " will" else "s will"} be added."
+                missingCount == 0 -> "Every currently accepted volunteer is already in the group."
+                else -> "$missingCount accepted volunteer${if (missingCount == 1) " is" else "s are"} not in the group yet."
+            },
+            modifier = Modifier.padding(top = 4.dp),
+            fontSize = 13.sp,
+            lineHeight = 18.sp,
+            color = VolunteerLinkTextSecondary
+        )
+
+        Button(
+            onClick = onAddAll,
+            enabled = canAdd && !isLoading && !isAdding,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 14.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = VolunteerLinkPrimaryGreen),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Text(
+                text = when {
+                    isAdding -> "Updating group…"
+                    !groupExists -> "Create group and add all"
+                    missingCount > 0 -> "Add all missing volunteers"
+                    else -> "Group is up to date"
+                },
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        actionMessage?.let {
+            Text(
+                text = it,
+                modifier = Modifier.padding(top = 10.dp),
+                fontSize = 13.sp,
+                color = if (it.contains("unable", ignoreCase = true) ||
+                    it.contains("unavailable", ignoreCase = true)) {
+                    VolunteerLinkError
+                } else {
+                    VolunteerLinkSuccess
+                }
+            )
+        }
+    }
+}
+
+@Composable
 private fun PostManagementPeopleTabItem(
     text: String,
     @DrawableRes iconRes: Int,
@@ -2334,6 +2421,7 @@ fun PostManagementPersonCard(
     onRequestMarkAbsent: (PostManagementPerson, String) -> Unit = { _, _ -> },
     onViewRemoteSubmission: (PostManagementPerson, PostManagementRemoteSubmission) -> Unit = { _, _ -> },
     onViewProfile: (PostManagementPerson) -> Unit,
+    onMessage: (PostManagementPerson) -> Unit = {},
     onViewApplication: (PostManagementPerson) -> Unit = {},
     onToggleShortlist: (PostManagementPerson) -> Unit,
     modifier: Modifier = Modifier
@@ -2439,7 +2527,8 @@ fun PostManagementPersonCard(
 
                 OrganisationMessageButton(
                     personName = person.fullName,
-                    modifier = Modifier.padding(start = 6.dp)
+                    modifier = Modifier.padding(start = 6.dp),
+                    onClick = { onMessage(person) }
                 )
 
                 person.eventSharedPhone
