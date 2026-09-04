@@ -13,6 +13,7 @@ interface MessageListener {
 object ChatData {
 
     var messageListener: MessageListener? = null
+    val partnershipAttention = mutableStateOf(0)
 
     // Which role the demo is currently running as. Toggled from the Role select screen
     // and again from each Profile / Manage screen ("Switch account" button).
@@ -150,6 +151,7 @@ object ChatData {
     fun replaceChats(chats: List<ChatRoom>) {
         allChats.clear()
         allChats.addAll(chats)
+        rebuildMessageIndex()
     }
 
     fun replaceMessages(
@@ -161,6 +163,7 @@ object ChatData {
         chat.messages.clear()
         chat.messages.addAll(messages)
         chat.readCounts[currentRole.value] = messages.size
+        rebuildMessageIndex()
     }
 
     // Filters the chat with the newest message appears at the top of the list.
@@ -519,6 +522,13 @@ object ChatData {
     // Ensure every message is added to the map when created
     private fun addMessageToIndex(message: ChatMessage) {
         allMessagesById[message.id] = message
+    }
+
+    fun rebuildMessageIndex() {
+        allMessagesById.clear()
+        allChats.forEach { chat ->
+            chat.messages.forEach(::addMessageToIndex)
+        }
     }
 
     // Helper to find a message anywhere
