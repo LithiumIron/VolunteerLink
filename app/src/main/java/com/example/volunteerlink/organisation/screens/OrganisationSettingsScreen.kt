@@ -46,6 +46,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -114,8 +115,11 @@ fun OrganisationSettingScreen(
     onBackSelected: () -> Unit,
     onEditProfileSelected: () -> Unit,
     onLoggedOut: () -> Unit,
-    onRefresh: () -> Unit = {}   // NEW — refetches profile data, same as OrganisationProfileScreen's onRefresh
+    onRefresh: () -> Unit = {}
 ){
+    LaunchedEffect(Unit) {
+        onRefresh()
+    }
     val scope = rememberCoroutineScope()
     var isLoggingOut by remember { mutableStateOf(false) }
     var showLogoutConfirmation by rememberSaveable { mutableStateOf(false) }

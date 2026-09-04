@@ -304,10 +304,7 @@ fun OrganisationProfileScreen(
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
-        // =====================================================
         // VERIFICATION STATUS
-        // =====================================================
-
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -339,16 +336,10 @@ fun OrganisationProfileScreen(
             }
         }
 
-        // =====================================================
         // PARTNERSHIP PROFILE
-        // =====================================================
-
         OrganisationPartnershipSection(profileData = data)
 
-        // =====================================================
         // RECENTLY CREATED EVENTS
-        // =====================================================
-
         Column(
             modifier = Modifier
                 .fillMaxWidth()
