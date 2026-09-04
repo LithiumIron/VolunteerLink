@@ -1,5 +1,7 @@
 package com.example.volunteerlink.data
 
+// Central rule for deciding whether an application is still open for a role.
+
 import com.example.volunteerlink.data.time.AppClock
 import com.example.volunteerlink.model.VolunteerOpportunityEvent
 import com.example.volunteerlink.model.VolunteerOpportunityRole

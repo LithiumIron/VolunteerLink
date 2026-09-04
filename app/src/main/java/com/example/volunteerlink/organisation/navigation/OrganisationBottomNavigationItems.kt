@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.navigation
 
+// FILE OVERVIEW:
+/*
+ * OrganisationBottomNavigationItems contains route/navigation definitions for the organisation navigation flow.
+ * Centralising destinations and route wiring keeps screen transitions consistent and avoids
+ * embedding NavController logic inside reusable screen sections.
+ */
+
+
 import androidx.compose.ui.unit.dp
 import com.example.volunteerlink.R
 import com.example.volunteerlink.navigation.BottomNavItem

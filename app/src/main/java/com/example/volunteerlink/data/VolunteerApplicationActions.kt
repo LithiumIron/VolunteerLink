@@ -1,5 +1,7 @@
 package com.example.volunteerlink.data
 
+// Sends one application request at a time and keeps an outbox record until the server replies.
+
 import android.content.Context
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
@@ -35,6 +37,7 @@ object VolunteerApplicationActions {
         check(!prefs.contains(storageKey)) {
             "An earlier request for this event is waiting for confirmation. Sync before trying again."
         }
+        // Create one idempotent payload. The request ID lets the server recognise a retry.
         val payload = buildJsonObject {
             put("p_request_id", UUID.randomUUID().toString()); put("p_post_id", post); put("p_role_id", role)
             putJsonArray("p_answers") { answers.forEach { answer -> add(buildJsonObject { put("answer", answer) }) } }
@@ -42,7 +45,9 @@ object VolunteerApplicationActions {
             put("p_previous_status", previousStatus?.let(::JsonPrimitive) ?: JsonNull)
             put("p_previous_created_at", previousCreatedAt?.let(::JsonPrimitive) ?: JsonNull)
         }
+        // Save before sending so an interrupted request can be retried through Sync.
         withContext(Dispatchers.IO) { check(prefs.edit().putString(storageKey, payload.toString()).commit()) { "Unable to save your request on this device. Nothing was submitted." } }
+        // Returning null tells the ViewModel to show an offline Pending item.
         if (!VolunteerOnline.available(context)) return@withLock null
         send(context, account, storageKey, payload)
     }
@@ -51,6 +56,7 @@ object VolunteerApplicationActions {
         val account = supabase.auth.currentUserOrNull()?.id ?: return@withLock
         val pending = preferences(context).all.filterKeys { it.startsWith("$account|") }
         if (pending.isNotEmpty()) VolunteerOnline.requireConnection(context, "sync your applications")
+        // Reuse each stored payload instead of creating another application request.
         for ((storageKey, raw) in pending) {
             send(context, account, storageKey, Json.parseToJsonElement(raw as String).jsonObject)
         }

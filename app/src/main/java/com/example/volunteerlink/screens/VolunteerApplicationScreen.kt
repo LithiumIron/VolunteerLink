@@ -1,6 +1,8 @@
 ﻿
 package com.example.volunteerlink.screens
 
+// Controls the application flow: form validation, profile review, server submission and success feedback.
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -38,6 +40,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -66,6 +69,8 @@ import com.example.volunteerlink.ui.theme.VolunteerLinkSurface
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextPrimary
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextSecondary
 import com.example.volunteerlink.ui.theme.VolunteerLinkWarning
+import kotlinx.coroutines.launch
+
 
 @Composable
 fun VolunteerApplicationScreen(
@@ -73,13 +78,16 @@ fun VolunteerApplicationScreen(
     volunteerRoleId: Int,
     onBackSelected: () -> Unit,
     onReturnHomeSelected: () -> Unit,
+    onJoinGroupChat: suspend (String) -> Unit,
     volunteerOpportunityViewModel:
         VolunteerOpportunityViewModel
 ) {
+    // Observe loading and error states while an application action is running.
     val opportunityUiState by
         volunteerOpportunityViewModel.uiState
             .collectAsStateWithLifecycle()
 
+    // Read the selected event and role from the shared session data.
     val volunteerOpportunityEvent =
         VolunteerOpportunitySessionStore.findEventById(
             volunteerEventId
@@ -91,6 +99,7 @@ fun VolunteerApplicationScreen(
             roleId = volunteerRoleId
         )
 
+    // Stop safely when an old navigation link points to data that no longer exists.
     if (
         volunteerOpportunityEvent == null ||
         volunteerOpportunityRole == null
@@ -101,6 +110,7 @@ fun VolunteerApplicationScreen(
         return
     }
 
+    // This local flag changes the screen from the form to the success page after server success.
     var applicationWasSubmitted by
     rememberSaveable(
         volunteerEventId,
@@ -127,6 +137,7 @@ fun VolunteerApplicationScreen(
                         VolunteerApplicationStatus.CANCELLED
             }
 
+    // Choose one visible state: success, existing record, review dialog, or application form.
     when {
         applicationWasSubmitted -> {
             VolunteerApplicationSuccessScreen(
@@ -135,7 +146,9 @@ fun VolunteerApplicationScreen(
                 volunteerOpportunityRole =
                     volunteerOpportunityRole,
                 onReturnHomeSelected =
-                    onReturnHomeSelected
+                    onReturnHomeSelected,
+                onJoinGroupChat = onJoinGroupChat
+
             )
         }
 
@@ -241,6 +254,7 @@ private fun VolunteerApplicationFormScreen(
             .roleApplicationMethod ==
                 VolunteerRoleApplicationMethod
                     .INSTANT_JOIN
+
 
     Column(
         modifier = Modifier
@@ -849,13 +863,24 @@ private fun VolunteerApplicationSuccessScreen(
     VolunteerOpportunityEvent,
     volunteerOpportunityRole:
     VolunteerOpportunityRole,
-    onReturnHomeSelected: () -> Unit
+    onReturnHomeSelected: () -> Unit,
+    onJoinGroupChat: suspend (String) -> Unit
 ) {
     val applicationIsInstantJoin =
         volunteerOpportunityRole
             .roleApplicationMethod ==
                 VolunteerRoleApplicationMethod
                     .INSTANT_JOIN
+
+    val scope = rememberCoroutineScope()
+
+    var isJoiningGroupChat by rememberSaveable {
+        mutableStateOf(false)
+    }
+
+    var joinGroupChatError by rememberSaveable {
+        mutableStateOf<String?>(null)
+    }
 
     Column(
         modifier = Modifier
@@ -959,23 +984,63 @@ private fun VolunteerApplicationSuccessScreen(
         )
 
         Button(
-            onClick = onReturnHomeSelected,
+            onClick = {
+                if (!applicationIsInstantJoin) {
+                    onReturnHomeSelected()
+                    return@Button
+                }
+
+                val postId = volunteerOpportunityEvent.eventDatabaseId
+
+                if (postId.isBlank()) {
+                    joinGroupChatError =
+                        "This event is still loading. Please try again shortly."
+                    return@Button
+                }
+
+                scope.launch {
+                    isJoiningGroupChat = true
+                    joinGroupChatError = null
+
+                    runCatching {
+                        onJoinGroupChat(postId)
+                    }.onFailure { error ->
+                        joinGroupChatError =
+                            error.message
+                                ?: "Could not join the event group chat."
+                    }
+
+                    isJoiningGroupChat = false
+                }
+            },
+            enabled = !isJoiningGroupChat,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(50.dp),
             shape = RoundedCornerShape(11.dp),
-            colors =
-                ButtonDefaults.buttonColors(
-                    containerColor =
-                        VolunteerLinkPrimaryGreen,
-                    contentColor =
-                        Color.White
-                )
+            colors = ButtonDefaults.buttonColors(
+                containerColor = VolunteerLinkPrimaryGreen,
+                contentColor = Color.White
+            )
         ) {
             Text(
-                text = "Return to Home",
+                text = when {
+                    !applicationIsInstantJoin -> "Return to Home"
+                    isJoiningGroupChat -> "Joining Group Chat..."
+                    else -> "Join Group Chat"
+                },
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold
+            )
+        }
+
+        joinGroupChatError?.let { error ->
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = error,
+                color = VolunteerLinkError,
+                fontSize = 12.sp
             )
         }
     }

@@ -1,5 +1,7 @@
 package com.example.volunteerlink.screens
 
+// Displays recorded attendance and explains the 48-hour attendance-review rule.
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
@@ -18,6 +20,7 @@ import com.example.volunteerlink.ui.theme.*
 @Composable
 internal fun VolunteerAttendanceHistorySection(event: VolunteerOpportunityEvent, role: VolunteerOpportunityRole,
     data: VolunteerAttendanceData?, now: Long, onHelp: (String) -> Unit) {
+    // Rebuild the attendance view only when its input data or the app time changes.
     var expanded by remember(event.eventId, role.roleId) { mutableStateOf(false) }
     val result = remember(event, role, data, now) {
         runCatching { VolunteerAttendanceHistory.build(event, role, data?.records, data?.days.orEmpty(), now) }
@@ -25,6 +28,7 @@ internal fun VolunteerAttendanceHistorySection(event: VolunteerOpportunityEvent,
     val rows = result.getOrNull()
     HorizontalDivider(color = VolunteerLinkBorderColour)
     Text("Daily attendance", fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold, color = VolunteerLinkTextPrimary)
+    // Do not guess attendance when the schedule data is invalid or unavailable.
     if (rows == null) {
         VolunteerDetailNotice("The daily schedule could not be verified. Refresh online or ask the organiser to check the dates and hours.")
         return
@@ -59,6 +63,7 @@ internal fun VolunteerAttendanceHistorySection(event: VolunteerOpportunityEvent,
                 if (present || day.state == VolunteerAttendanceDayState.DATE_REVIEW) {
                     VolunteerDetailText("Recorded: ${VolunteerAttendanceHistory.recordedTime(day.recordedAt, event.eventTimeZone)}", secondary = true)
                 }
+                // A missing record can be appealed only during the 48-hour review period.
                 if (day.ended && day.state in setOf(VolunteerAttendanceDayState.NO_RECORD, VolunteerAttendanceDayState.ABSENT)) {
                     if (day.withinReviewWindow) {
                         VolunteerDetailText("No check-in was recorded. Contact the organiser within 48 hours if this is an attendance error.", secondary = true)

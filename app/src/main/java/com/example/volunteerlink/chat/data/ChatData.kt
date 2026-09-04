@@ -147,9 +147,19 @@ object ChatData {
         }
     }
 
-    fun replaceChats(chats: List<ChatRoom>) {
+    fun replaceChats(
+        chats: List<ChatRoom>
+    ) {
         allChats.clear()
         allChats.addAll(chats)
+
+        allMessagesById.clear()
+
+        chats.forEach { chat ->
+            chat.messages.forEach { message ->
+                allMessagesById[message.id] = message
+            }
+        }
     }
 
     fun replaceMessages(
@@ -158,8 +168,17 @@ object ChatData {
     ) {
         val chat = chatById(chatId) ?: return
 
+        chat.messages.forEach { oldMessage ->
+            allMessagesById.remove(oldMessage.id)
+        }
+
         chat.messages.clear()
         chat.messages.addAll(messages)
+
+        messages.forEach { message ->
+            allMessagesById[message.id] = message
+        }
+
         chat.readCounts[currentRole.value] = messages.size
     }
 

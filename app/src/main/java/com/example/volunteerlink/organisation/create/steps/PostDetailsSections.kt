@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.create.steps
 
+// FILE OVERVIEW:
+/*
+ * PostDetailsSections contains presentation code for the organisation Create/Edit Post flow.
+ * It focuses on rendering state and forwarding user actions through callbacks/ViewModels,
+ * keeping database access and business rules outside the composables where possible.
+ */
+
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -45,6 +53,8 @@ fun PhysicalEventDetailsSection(
     val draft = uiState.draft
     val errors = uiState.visibleErrors
     val editPolicy = uiState.editPolicy
+    val canEditPhysicalDates = uiState.impactWeaveDraftId == null &&
+        (!uiState.isExistingPostEdit || editPolicy?.canEditPhysicalDates != false)
     val canEditPhysicalCore = uiState.impactWeaveDraftId == null &&
         (!uiState.isExistingPostEdit || editPolicy?.canEditPhysicalCore != false)
     val canEditMeetingPoint = !uiState.isExistingPostEdit || editPolicy?.canEditPhysicalMeetingPoint != false
@@ -74,8 +84,8 @@ fun PhysicalEventDetailsSection(
         title = "Event Schedule",
         subtitle = if (uiState.impactWeaveDraftId != null) {
             "Final schedule from Impact Weave. Reschedule from the partnership plan before entering Create Post."
-        } else if (uiState.isExistingPostEdit && !canEditPhysicalCore) {
-            "Current event dates and times are fixed for this post."
+        } else if (uiState.isExistingPostEdit && !canEditPhysicalDates) {
+            "Published event dates are final and cannot be changed."
         } else {
             "Choose when the physical event will take place. Start dates must be at least 7 days from today."
         }
@@ -91,10 +101,16 @@ fun PhysicalEventDetailsSection(
                 title = "Final partnership schedule",
                 message = "Dates and times are locked to the schedule accepted by partner organisations."
             )
-        } else if (uiState.isExistingPostEdit && !canEditPhysicalCore) {
+        } else if (uiState.isExistingPostEdit && !canEditPhysicalDates) {
             EditRestrictionNotice(
-                title = "Schedule locked",
-                message = "Dates and times are fixed because volunteers or the event lifecycle already depend on them."
+                title = "Event dates locked",
+                message = "Physical and Hybrid event dates become final once the post is published."
+            )
+        }
+        if (uiState.isExistingPostEdit && !canEditPhysicalCore) {
+            EditRestrictionNotice(
+                title = "Time editing locked",
+                message = "Event time can no longer be changed because volunteers or the event lifecycle already depend on it."
             )
         }
         Text(
@@ -111,7 +127,7 @@ fun PhysicalEventDetailsSection(
                 title = "One Day",
                 selected = !draft.isMultiDayPhysicalEvent,
                 onClick = { viewModel.updateIsMultiDay(false) },
-                enabled = canEditPhysicalCore,
+                enabled = canEditPhysicalDates,
                 modifier = Modifier.weight(1f)
             )
 
@@ -119,7 +135,7 @@ fun PhysicalEventDetailsSection(
                 title = "Multiple Days",
                 selected = draft.isMultiDayPhysicalEvent,
                 onClick = { viewModel.updateIsMultiDay(true) },
-                enabled = canEditPhysicalCore,
+                enabled = canEditPhysicalDates,
                 modifier = Modifier.weight(1f)
             )
         }
@@ -135,7 +151,7 @@ fun PhysicalEventDetailsSection(
                     minimumDateMillis = minimumStartDateMillis,
                     errorMessage = physicalStartDateError,
                     onDateSelected = viewModel::updatePhysicalStartDate,
-                    enabled = canEditPhysicalCore,
+                    enabled = canEditPhysicalDates,
                     modifier = Modifier.weight(1f)
                 )
 
@@ -149,7 +165,7 @@ fun PhysicalEventDetailsSection(
                     minimumDateMillis = minimumEndDate,
                     errorMessage = errors.physicalEndDate,
                     onDateSelected = viewModel::updatePhysicalEndDate,
-                    enabled = canEditPhysicalCore,
+                    enabled = canEditPhysicalDates,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -160,7 +176,7 @@ fun PhysicalEventDetailsSection(
                 minimumDateMillis = minimumStartDateMillis,
                 errorMessage = physicalStartDateError,
                 onDateSelected = viewModel::updatePhysicalStartDate,
-                enabled = canEditPhysicalCore
+                enabled = canEditPhysicalDates
             )
         }
 
@@ -212,7 +228,7 @@ fun PhysicalEventDetailsSection(
         subtitle = if (uiState.impactWeaveDraftId != null) {
             "Confirmed partnership venue. This location is locked."
         } else {
-            "Select a real location from Geoapify so its address and coordinates can be saved later."
+            "Search broadly for an area, venue, building, street or address. Select a Geoapify result so its coordinates can be saved."
         }
     ) {
         if (uiState.isExistingPostEdit && (!canEditPhysicalCore || !canEditMeetingPoint)) {
@@ -232,6 +248,7 @@ fun PhysicalEventDetailsSection(
             isSearching = uiState.isLocationSearching,
             searchError = uiState.locationSearchError,
             validationError = errors.physicalLocation,
+            placeholder = "Search an area, venue or address",
             onQueryChanged = viewModel::onLocationQueryChanged,
             onLocationSelected = viewModel::onLocationSelected,
             onClearLocation = viewModel::clearLocation,
@@ -496,6 +513,10 @@ fun HybridVolunteerRequirementSection(
 }
 
 @Composable
+/**
+ * Renders the UI represented by duration option for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun DurationOption(
     title: String,
     selected: Boolean,
@@ -538,6 +559,10 @@ private fun DurationOption(
 }
 
 @Composable
+/**
+ * Renders the UI represented by submission mode option for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun SubmissionModeOption(
     title: String,
     description: String,

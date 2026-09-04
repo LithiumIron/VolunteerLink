@@ -1,5 +1,7 @@
 package com.example.volunteerlink.data
 
+// Loads a read-only profile summary so the volunteer can check what an organisation will review.
+
 import android.content.Context
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.from

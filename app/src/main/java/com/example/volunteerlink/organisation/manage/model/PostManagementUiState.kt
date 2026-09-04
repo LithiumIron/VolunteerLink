@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.manage.model
 
+// FILE OVERVIEW:
+/*
+ * PostManagementUiState groups the data structures used by the organisation Manage Post flow.
+ * These models make state explicit and allow the UI, ViewModel and repository layers to exchange
+ * strongly typed values instead of passing unrelated parameters throughout the feature.
+ */
+
+
 import com.example.volunteerlink.data.post.PostTimingState
 import com.example.volunteerlink.data.post.RoleApplicationCutoffReason
 import com.example.volunteerlink.data.post.RoleApplicationWindowState
@@ -14,6 +22,9 @@ data class OrganisationPostManagementUiState(
     val lastSyncedAtEpochMillis: Long? = null,
     val isRefreshing: Boolean = false,
     val errorMessage: String? = null,
+    val isPublishingDraft: Boolean = false,
+    val draftPublishMessage: String? = null,
+    val draftPublishError: String? = null,
     val isStartingAttendance: Boolean = false,
     val isUpdatingAttendance: Boolean = false,
     val attendanceActionMessage: String? = null,
@@ -82,6 +93,10 @@ data class PostManagementPost(
 }
 
 @Serializable
+/**
+ * Holds the values represented by post management impact weave partner as one strongly typed model.
+ * It keeps related Manage Post values together so callers do not pass disconnected fields around.
+ */
 data class PostManagementImpactWeavePartner(
     val organisationId: String,
     val organisationName: String,
@@ -89,6 +104,10 @@ data class PostManagementImpactWeavePartner(
 )
 
 @Serializable
+/**
+ * Holds the values represented by post management impact weave contribution as one strongly typed model.
+ * It keeps related Manage Post values together so callers do not pass disconnected fields around.
+ */
 data class PostManagementImpactWeaveContribution(
     val supportType: String,
     val needResourceName: String,
@@ -98,6 +117,10 @@ data class PostManagementImpactWeaveContribution(
 )
 
 @Serializable
+/**
+ * Holds the values represented by post management physical details as one strongly typed model.
+ * It keeps related Manage Post values together so callers do not pass disconnected fields around.
+ */
 data class PostManagementPhysicalDetails(
     val startDate: String,
     val endDate: String,
@@ -111,6 +134,10 @@ data class PostManagementPhysicalDetails(
 )
 
 @Serializable
+/**
+ * Holds the values represented by post management remote details as one strongly typed model.
+ * It keeps related Manage Post values together so callers do not pass disconnected fields around.
+ */
 data class PostManagementRemoteDetails(
     val startDate: String,
     val endDate: String,
@@ -141,6 +168,10 @@ data class PostManagementRemoteSubmission(
 )
 
 @Serializable
+/**
+ * Holds the values represented by post management schedule item as one strongly typed model.
+ * It keeps related Manage Post values together so callers do not pass disconnected fields around.
+ */
 data class PostManagementScheduleItem(
     val scheduleItemId: String,
     val scheduleType: String,
@@ -154,6 +185,10 @@ data class PostManagementScheduleItem(
 )
 
 @Serializable
+/**
+ * Holds the values represented by post management role as one strongly typed model.
+ * It keeps related Manage Post values together so callers do not pass disconnected fields around.
+ */
 data class PostManagementRole(
     val roleTemplateId: String,
     val roleName: String,
@@ -173,6 +208,10 @@ data class PostManagementRole(
 
 
 @Serializable
+/**
+ * Holds the values represented by post management person as one strongly typed model.
+ * It keeps related Manage Post values together so callers do not pass disconnected fields around.
+ */
 data class PostManagementPerson(
     val userId: String,
     val fullName: String,
@@ -254,6 +293,10 @@ data class PostManagementPhysicalAttendance(
     val defaultSelectedDate: String? = null,
     val volunteerSummaries: List<PostManagementVolunteerAttendanceSummary> = emptyList()
 ) {
+    /**
+     * Derives the summary for value used by the organisation Manage Post flow.
+     * Keeping this transformation near the model makes the data flow easier to understand.
+     */
     fun summaryFor(person: PostManagementPerson): PostManagementVolunteerAttendanceSummary? {
         return volunteerSummaries.firstOrNull {
             it.userId == person.userId &&
@@ -263,6 +306,10 @@ data class PostManagementPhysicalAttendance(
 }
 
 @Serializable
+/**
+ * Holds the values represented by post management volunteer attendance summary as one strongly typed model.
+ * It keeps related Manage Post values together so callers do not pass disconnected fields around.
+ */
 data class PostManagementVolunteerAttendanceSummary(
     val userId: String,
     val roleTemplateId: String,
@@ -273,12 +320,20 @@ data class PostManagementVolunteerAttendanceSummary(
     val checkedInToday: Boolean,
     val dateStatuses: List<PostManagementVolunteerAttendanceDateStatus> = emptyList()
 ) {
+    /**
+     * Derives the status for value used by the organisation Manage Post flow.
+     * Keeping this transformation near the model makes the data flow easier to understand.
+     */
     fun statusFor(eventDate: String): PostManagementVolunteerAttendanceDateStatus? {
         return dateStatuses.firstOrNull { it.eventDate == eventDate }
     }
 }
 
 @Serializable
+/**
+ * Holds the values represented by post management volunteer attendance date status as one strongly typed model.
+ * It keeps related Manage Post values together so callers do not pass disconnected fields around.
+ */
 data class PostManagementVolunteerAttendanceDateStatus(
     val eventDate: String,
     val expected: Boolean,
@@ -357,12 +412,20 @@ enum class PostManagementPhysicalReviewStage {
 }
 
 @Serializable
+/**
+ * Lists the supported values represented by post management pending decision type.
+ * It keeps related Manage Post values together so callers do not pass disconnected fields around.
+ */
 enum class PostManagementPendingDecisionType {
     COMPLETED,
     NOT_COMPLETED
 }
 
 @Serializable
+/**
+ * Lists the supported values represented by post management pending decision source.
+ * It keeps related Manage Post values together so callers do not pass disconnected fields around.
+ */
 enum class PostManagementPendingDecisionSource {
     FULL_ATTENDANCE,
     PARTIAL_ATTENDANCE,
@@ -370,6 +433,10 @@ enum class PostManagementPendingDecisionSource {
 }
 
 @Serializable
+/**
+ * Holds the values represented by post management pending review decision as one strongly typed model.
+ * It keeps related Manage Post values together so callers do not pass disconnected fields around.
+ */
 data class PostManagementPendingReviewDecision(
     val roleTemplateId: String,
     val userId: String,
@@ -379,6 +446,10 @@ data class PostManagementPendingReviewDecision(
 )
 
 @Serializable
+/**
+ * Holds the values represented by post management physical review session as one strongly typed model.
+ * It keeps related Manage Post values together so callers do not pass disconnected fields around.
+ */
 data class PostManagementPhysicalReviewSession(
     val stage: PostManagementPhysicalReviewStage = PostManagementPhysicalReviewStage.ATTENDANCE,
     val decisions: List<PostManagementPendingReviewDecision> = emptyList(),
@@ -391,6 +462,10 @@ data class PostManagementPhysicalReviewSession(
     val hasUnfinishedReview: Boolean
         get() = touched || decisions.isNotEmpty() || feedbackByUserId.isNotEmpty()
 
+    /**
+     * Derives the decision for value used by the organisation Manage Post flow.
+     * Keeping this transformation near the model makes the data flow easier to understand.
+     */
     fun decisionFor(roleTemplateId: String, userId: String): PostManagementPendingReviewDecision? {
         return decisions.firstOrNull {
             it.roleTemplateId == roleTemplateId && it.userId == userId
@@ -408,6 +483,10 @@ enum class PostManagementRemoteReviewStage {
 }
 
 @Serializable
+/**
+ * Lists the supported values represented by post management remote submission decision type.
+ * It keeps related Manage Post values together so callers do not pass disconnected fields around.
+ */
 enum class PostManagementRemoteSubmissionDecisionType {
     ACCEPT,
     REQUEST_REVISION,
@@ -415,6 +494,10 @@ enum class PostManagementRemoteSubmissionDecisionType {
 }
 
 @Serializable
+/**
+ * Lists the supported values represented by post management remote missing action.
+ * It keeps related Manage Post values together so callers do not pass disconnected fields around.
+ */
 enum class PostManagementRemoteMissingAction {
     GIVE_MORE_TIME,
     CONTINUE_WITHOUT_WORK
@@ -433,6 +516,10 @@ data class PostManagementRemoteMissingDecision(
 )
 
 @Serializable
+/**
+ * Holds the values represented by post management remote submission decision as one strongly typed model.
+ * It keeps related Manage Post values together so callers do not pass disconnected fields around.
+ */
 data class PostManagementRemoteSubmissionDecision(
     val itemKey: String,
     val submissionId: String,
@@ -472,6 +559,10 @@ data class PostManagementRemoteReview(
     val participants: List<PostManagementPerson> = emptyList(),
     val canEdit: Boolean = true
 ) {
+    /**
+     * Derives the item for value used by the organisation Manage Post flow.
+     * Keeping this transformation near the model makes the data flow easier to understand.
+     */
     fun itemFor(person: PostManagementPerson): PostManagementRemoteReviewItem? {
         return if (submissionMode.equals("SHARED_TEAM", ignoreCase = true)) {
             items.firstOrNull { it.isShared }
@@ -510,12 +601,24 @@ data class PostManagementRemoteReviewSession(
             !newEndDate.isNullOrBlank() ||
             feedbackByParticipation.isNotEmpty()
 
+    /**
+     * Derives the submission decision for value used by the organisation Manage Post flow.
+     * Keeping this transformation near the model makes the data flow easier to understand.
+     */
     fun submissionDecisionFor(itemKey: String): PostManagementRemoteSubmissionDecision? =
         submissionDecisions.firstOrNull { it.itemKey == itemKey }
 
+    /**
+     * Derives the missing action for value used by the organisation Manage Post flow.
+     * Keeping this transformation near the model makes the data flow easier to understand.
+     */
     fun missingActionFor(itemKey: String): PostManagementRemoteMissingAction? =
         missingActions[itemKey]
 }
 
+/**
+ * Derives the remote review participation key value used by the organisation Manage Post flow.
+ * Keeping this transformation near the model makes the data flow easier to understand.
+ */
 fun remoteReviewParticipationKey(roleTemplateId: String, userId: String): String =
     "$roleTemplateId::$userId"

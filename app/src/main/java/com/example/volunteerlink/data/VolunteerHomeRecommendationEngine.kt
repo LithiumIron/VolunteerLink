@@ -1,6 +1,8 @@
 
 package com.example.volunteerlink.data
 
+// Ranks suitable events for the Home "For You" section using volunteer and event information.
+
 import com.example.volunteerlink.model.VolunteerApplicationStatus
 import com.example.volunteerlink.model.VolunteerOpportunityApplication
 import com.example.volunteerlink.model.VolunteerOpportunityEvent
@@ -114,12 +116,14 @@ object VolunteerHomeRecommendationEngine {
         currentSkillPathLevels: Map<String, Int> = emptyMap(),
         nowMillis: Long = com.example.volunteerlink.data.time.AppClock.nowMillis()
     ): List<VolunteerHomeRecommendation> {
+        // Completed work is evidence of experience, so it has the strongest effect on matching.
         val completedApplications =
             volunteerApplications.filter { application ->
                 application.applicationStatus ==
                     VolunteerApplicationStatus.COMPLETED
             }
 
+        // Combine completed paths and verified levels to avoid recommending only beginner work.
         val experiencedPaths =
             buildSet {
                 completedApplications
@@ -167,6 +171,7 @@ object VolunteerHomeRecommendationEngine {
                 .map(String::matchKey)
                 .toSet()
 
+        // Start with events that are normally visible, then rank only open suitable opportunities.
         return VolunteerHomeFeedEngine
             .filter(
                 events = volunteerOpportunityEvents,

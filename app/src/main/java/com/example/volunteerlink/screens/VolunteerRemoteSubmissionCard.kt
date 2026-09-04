@@ -1,5 +1,7 @@
 package com.example.volunteerlink.screens
 
+// UI for selecting and submitting the required file for a remote project role.
+
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult

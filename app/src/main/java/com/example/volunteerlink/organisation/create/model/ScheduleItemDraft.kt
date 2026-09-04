@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.create.model
 
+// FILE OVERVIEW:
+/*
+ * ScheduleItemDraft groups the data structures used by the organisation Create/Edit Post flow.
+ * These models make state explicit and allow the UI, ViewModel and repository layers to exchange
+ * strongly typed values instead of passing unrelated parameters throughout the feature.
+ */
+
+
 /** The two optional Step 4 schedule sections kept in the reduced project scope. */
 enum class ScheduleType(
     val displayName: String,

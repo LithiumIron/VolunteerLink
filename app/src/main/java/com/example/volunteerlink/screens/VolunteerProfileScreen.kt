@@ -1,5 +1,7 @@
 package com.example.volunteerlink.screens
 
+// Shows the volunteer profile summary and links to profile editing and account settings.
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable

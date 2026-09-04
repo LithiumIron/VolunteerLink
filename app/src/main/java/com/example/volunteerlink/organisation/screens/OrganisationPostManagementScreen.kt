@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.screens
 
+// FILE OVERVIEW:
+/*
+ * OrganisationPostManagementScreen contains presentation code for the organisation Manage Post flow.
+ * It focuses on rendering state and forwarding user actions through callbacks/ViewModels,
+ * keeping database access and business rules outside the composables where possible.
+ */
+
+
 import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Context
@@ -48,6 +56,10 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.volunteerlink.data.post.DraftAttentionType
+import com.example.volunteerlink.data.post.PostMode
+import com.example.volunteerlink.data.post.PostTimingEvaluator
+import com.example.volunteerlink.data.post.PostTimingInput
 import com.example.volunteerlink.data.post.PostTimingState
 import com.example.volunteerlink.organisation.components.OrganisationOfflineStatusCard
 import com.example.volunteerlink.organisation.manage.model.PostManagementPerson
@@ -156,6 +168,10 @@ fun OrganisationPostManagementScreen(
     val hasUnfinishedReview = reviewSession.hasUnfinishedReview || remoteReviewSession.hasUnfinishedReview
     var confirmLeaveReview by rememberSaveable { mutableStateOf(false) }
 
+    /**
+     * Derives the discard and leave value used by the organisation Manage Post flow.
+     * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+     */
     fun discardAndLeave() {
         viewModel.discardReviewSessions()
         onBack()
@@ -197,6 +213,9 @@ fun OrganisationPostManagementScreen(
             isShowingCachedData = uiState.isShowingCachedData,
             lastSyncedAtEpochMillis = uiState.lastSyncedAtEpochMillis,
             isRefreshing = uiState.isRefreshing,
+            isPublishingDraft = uiState.isPublishingDraft,
+            draftPublishMessage = uiState.draftPublishMessage,
+            draftPublishError = uiState.draftPublishError,
             isLoadingPostGroup = uiState.isLoadingPostGroup,
             isAddingPostGroupMembers = uiState.isAddingPostGroupMembers,
             postGroupConversationId = uiState.postGroupConversationId,
@@ -207,6 +226,7 @@ fun OrganisationPostManagementScreen(
             postGroupCanAdd = uiState.postGroupCanAdd,
             postGroupActionMessage = uiState.postGroupActionMessage,
             onSyncSelected = viewModel::refresh,
+            onPublishDraft = viewModel::publishSavedDraft,
             onAddAllToGroup = viewModel::addAllAcceptedVolunteersToGroup,
             onBack = {
                 if (hasUnfinishedReview) confirmLeaveReview = true else onBack()
@@ -405,6 +425,10 @@ fun OrganisationPostManagementScreen(
 }
 
 @Composable
+/**
+ * Renders the organisation post management content content block used in the organisation Manage Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun OrganisationPostManagementContent(
     post: PostManagementPost,
     selectedTabName: String,
@@ -423,6 +447,9 @@ private fun OrganisationPostManagementContent(
     isShowingCachedData: Boolean,
     lastSyncedAtEpochMillis: Long?,
     isRefreshing: Boolean,
+    isPublishingDraft: Boolean,
+    draftPublishMessage: String?,
+    draftPublishError: String?,
     isLoadingPostGroup: Boolean,
     isAddingPostGroupMembers: Boolean,
     postGroupConversationId: String?,
@@ -433,6 +460,7 @@ private fun OrganisationPostManagementContent(
     postGroupCanAdd: Boolean,
     postGroupActionMessage: String?,
     onSyncSelected: () -> Unit,
+    onPublishDraft: () -> Unit,
     onAddAllToGroup: () -> Unit,
     onBack: () -> Unit,
     onEdit: () -> Unit,
@@ -549,8 +577,39 @@ private fun OrganisationPostManagementContent(
                 post.remoteTimingState == PostTimingState.PAST ||
                     post.databaseStatus.equals("COMPLETED", ignoreCase = true)
             )
-    val showReview = showPhysicalReview || showRemoteReview
-    val showPeople = !showReview || post.mode.equals("HYBRID", ignoreCase = true)
+    val normalizedDatabaseStatus = post.databaseStatus.trim().uppercase(Locale.US)
+    val isDraft = normalizedDatabaseStatus == "DRAFT"
+    val showReview = !isDraft && (showPhysicalReview || showRemoteReview)
+    val showPeople = !isDraft &&
+        (!showReview || post.mode.equals("HYBRID", ignoreCase = true))
+
+    val draftAttention = if (isDraft) {
+        PostMode.fromDatabaseValue(post.mode)?.let { mode ->
+            PostTimingEvaluator.evaluateDraftAttention(
+                input = PostTimingInput(
+                    mode = mode,
+                    physicalStartDate = post.physical?.startDate,
+                    physicalEndDate = post.physical?.endDate,
+                    remoteStartDate = post.remote?.startDate,
+                    remoteEndDate = post.remote?.effectiveEndDate
+                )
+            )
+        }
+    } else {
+        null
+    }
+    val draftPublishBlockMessage = when (draftAttention?.type) {
+        DraftAttentionType.START_TOO_SOON ->
+            "The volunteering start is less than 7 days away. Edit the start date before publishing."
+        DraftAttentionType.START_DATE_PASSED ->
+            "The volunteering start date has passed. Edit the date before publishing."
+        else -> null
+    }
+    val effectiveSelectedTab = if (isDraft) {
+        PostManagementTab.OVERVIEW
+    } else {
+        selectedTab
+    }
 
     var selectedHybridReviewSideName by rememberSaveable(post.postId) {
         mutableStateOf(
@@ -576,8 +635,10 @@ private fun OrganisationPostManagementContent(
         }
     }
 
-    LaunchedEffect(showReview, showPeople) {
-        if (!showPeople && selectedTabName == PostManagementTab.PEOPLE.name) {
+    LaunchedEffect(isDraft, showReview, showPeople) {
+        if (isDraft && selectedTabName != PostManagementTab.OVERVIEW.name) {
+            onSelectedTabNameChange(PostManagementTab.OVERVIEW.name)
+        } else if (!showPeople && selectedTabName == PostManagementTab.PEOPLE.name) {
             onSelectedTabNameChange(if (showReview) PostManagementTab.REVIEW.name else PostManagementTab.OVERVIEW.name)
         } else if (!showReview && selectedTabName == PostManagementTab.REVIEW.name) {
             onSelectedTabNameChange(if (showPeople) PostManagementTab.PEOPLE.name else PostManagementTab.OVERVIEW.name)
@@ -586,7 +647,7 @@ private fun OrganisationPostManagementContent(
 
     val shouldPollAttendance =
         !isShowingCachedData &&
-            selectedTab == PostManagementTab.PEOPLE &&
+            effectiveSelectedTab == PostManagementTab.PEOPLE &&
             selectedPeopleTab == PostManagementPeopleTab.VOLUNTEERS &&
             physicalAttendance != null
 
@@ -697,7 +758,8 @@ private fun OrganisationPostManagementContent(
             }
         }
 
-    val showEdit = !isShowingCachedData && when (post.databaseStatus.uppercase(Locale.US)) {
+    val showEdit = !isShowingCachedData && when (normalizedDatabaseStatus) {
+        "DRAFT" -> true
         "COMPLETED", "CANCELLED" -> false
         else -> post.timingState != PostTimingState.PAST
     }
@@ -711,7 +773,8 @@ private fun OrganisationPostManagementContent(
         PostManagementTopBar(
             onBack = onBack,
             onEdit = onEdit,
-            showEdit = showEdit
+            showEdit = showEdit,
+            showEditAttention = isDraft && draftAttention?.needsAttention == true
         )
 
         LazyColumn(
@@ -738,6 +801,18 @@ private fun OrganisationPostManagementContent(
                 PostManagementSummaryCard(post)
             }
 
+            if (!draftPublishMessage.isNullOrBlank()) {
+                item(key = "draft_publish_success") {
+                    Text(
+                        text = draftPublishMessage,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = VolunteerLinkPrimaryGreen
+                    )
+                }
+            }
+
             if (!remoteReviewActionMessage.isNullOrBlank() && !showRemoteReview) {
                 item(key = "remote_review_saved_message") {
                     Text(
@@ -752,18 +827,37 @@ private fun OrganisationPostManagementContent(
 
             item(key = "post_tabs") {
                 PostManagementMainTabs(
-                    selected = selectedTab,
-                    pendingApplicantCount = openApplicants.size,
+                    selected = effectiveSelectedTab,
+                    pendingApplicantCount = if (isDraft) 0 else openApplicants.size,
                     showPeopleTab = showPeople,
                     showReviewTab = showReview,
                     onSelected = { onSelectedTabNameChange(it.name) }
                 )
             }
 
-            when (selectedTab) {
+            when (effectiveSelectedTab) {
                 PostManagementTab.OVERVIEW -> {
                     item(key = "overview") {
                         PostManagementOverview(post)
+                    }
+
+                    if (isDraft) {
+                        item(key = "draft_publish_action") {
+                            PostManagementDraftPublishSection(
+                                isPublishing = isPublishingDraft,
+                                blockMessage = draftPublishBlockMessage
+                                    ?: if (isShowingCachedData) {
+                                        "Reconnect to the internet before publishing this draft."
+                                    } else {
+                                        null
+                                    },
+                                errorMessage = draftPublishError,
+                                enabled = !isShowingCachedData &&
+                                    draftPublishBlockMessage == null &&
+                                    !isPublishingDraft,
+                                onPublish = onPublishDraft
+                            )
+                        }
                     }
                 }
 
@@ -1407,6 +1501,10 @@ private fun OrganisationPostManagementContent(
     }
 }
 
+/**
+ * Creates the remote submission download intent used by the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun createRemoteSubmissionDownloadIntent(filePath: String): Intent {
     val fileName = filePath.substringAfterLast('/')
         .takeIf { it.isNotBlank() }
@@ -1419,6 +1517,10 @@ private fun createRemoteSubmissionDownloadIntent(filePath: String): Intent {
     }
 }
 
+/**
+ * Saves the remote submission file for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun saveRemoteSubmissionFile(
     context: Context,
     destination: Uri,
@@ -1433,6 +1535,10 @@ private fun saveRemoteSubmissionFile(
     }
 }
 
+/**
+ * Derives the remote submission mime type value used by the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun remoteSubmissionMimeType(fileName: String): String {
     val extension = fileName.substringAfterLast('.', "")
     return MimeTypeMap.getSingleton()
@@ -1440,6 +1546,10 @@ private fun remoteSubmissionMimeType(fileName: String): String {
         ?: "application/octet-stream"
 }
 
+/**
+ * Opens the remote submission file in the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun openRemoteSubmissionFile(
     context: Context,
     filePath: String,
@@ -1473,6 +1583,10 @@ private fun openRemoteSubmissionFile(
     }
 }
 
+/**
+ * Opens the remote submission url in the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun openRemoteSubmissionUrl(
     context: Context,
     url: String
@@ -1486,6 +1600,10 @@ private fun openRemoteSubmissionUrl(
     }
 }
 
+/**
+ * Derives the post management post value used by the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun PostManagementPost.isRemoteResubmission(
     submission: PostManagementRemoteSubmission
 ): Boolean {

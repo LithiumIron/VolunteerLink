@@ -1,6 +1,8 @@
 
 package com.example.volunteerlink.screens
 
+// Coordinates UI actions with repositories and exposes loading, errors and refreshed dashboard state.
+
 import android.app.Application
 import android.content.Context
 import android.net.ConnectivityManager
@@ -291,6 +293,7 @@ class VolunteerOpportunityViewModel(
         confirmedPrevious: VolunteerOpportunityApplication? = null,
         onSuccess: () -> Unit
     ) {
+        // Prevent a second tap from sending the same application request twice.
         if (mutableUiState.value.isApplicationActionRunning) return
         val event = VolunteerOpportunitySessionStore.findEventById(eventId)
         val role = VolunteerOpportunitySessionStore.findRoleById(eventId, roleId)
@@ -298,11 +301,13 @@ class VolunteerOpportunityViewModel(
             mutableUiState.update { it.copy(applicationActionError = "Role details are unavailable. Sync and try again.") }
             return
         }
+        // Check dates and application availability again before contacting the server.
         if (!com.example.volunteerlink.data.VolunteerApplicationWindow.canApply(event, role)) {
             mutableUiState.update { it.copy(applicationActionError =
                 com.example.volunteerlink.data.VolunteerApplicationWindow.reason(event, role)) }
             return
         }
+        // A volunteer can only keep one active role in the same event.
         val other = VolunteerOpportunitySessionStore.activeApplicationForEvent(eventId)
             ?.takeIf { it.applicationRoleId != roleId }
         if (other != confirmedPrevious) {
@@ -319,6 +324,7 @@ class VolunteerOpportunityViewModel(
             mutableUiState.update { it.copy(applicationActionError = "Your current role has started. It can no longer be cancelled or changed.") }
             return
         }
+        // A cancelled record is allowed to be submitted again, but it must be online.
         val reapply = VolunteerOpportunitySessionStore.volunteerApplications.any {
             it.applicationEventId == eventId && it.applicationRoleId == roleId &&
                 it.applicationStatus == VolunteerApplicationStatus.CANCELLED
@@ -332,6 +338,7 @@ class VolunteerOpportunityViewModel(
                     previousRole?.roleTemplateId, other?.applicationStatus?.name, other?.applicationCreatedAtRaw,
                     onlineOnly
                 )
+                // No connection: keep a local Pending record only. It does not reserve a place.
                 if (result == null) {
                     VolunteerOpportunitySessionStore.addOfflinePendingApplication(
                         VolunteerOpportunityApplication(
@@ -352,9 +359,11 @@ class VolunteerOpportunityViewModel(
                     finishLocalAction()
                     mutableUiState.update { it.copy(lastApplicationResult = "Waiting to sync. Nothing has been accepted yet. No place is reserved. Connect and Sync to receive your application result.") }
                     onSuccess()
+                // The server rejected the request, so keep the current application unchanged.
                 } else if (!result.success) {
                     mutableUiState.update { it.copy(isApplicationActionRunning = false, applicationActionError =
                         result.message + if (other != null) " This attempt did not cancel your previous role." else "") }
+                // Refresh the shared session so all screens show the server's latest status.
                 } else {
                     mutableUiState.update { it.copy(lastApplicationResult = result.message) }
                     try { refreshAfterAction() }

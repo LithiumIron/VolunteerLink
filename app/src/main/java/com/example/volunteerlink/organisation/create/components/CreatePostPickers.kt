@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.create.components
 
+// FILE OVERVIEW:
+/*
+ * CreatePostPickers contains presentation code for the organisation Create/Edit Post flow.
+ * It focuses on rendering state and forwarding user actions through callbacks/ViewModels,
+ * keeping database access and business rules outside the composables where possible.
+ */
+
+
 import android.app.DatePickerDialog
 import android.content.Intent
 import android.graphics.BitmapFactory
@@ -55,7 +63,8 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withContext
+
 import com.example.volunteerlink.ui.theme.CreateGreen
 
 /**
@@ -88,7 +97,7 @@ fun DateSelectionField(
         enabled = enabled,
         onClick = {
             // Keep an outdated date visible in the form so the organiser can
-            // see what needs fixing, but open the picker on the first valid
+            // keep the current invalid value visible, while opening the picker on the first valid
             // date instead of focusing a now-disabled day.
             val initialDate = selectedDateMillis
                 ?.takeIf { selected ->
@@ -128,6 +137,10 @@ fun DateSelectionField(
 }
 
 @Composable
+/**
+ * Renders the time selection field input field used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun TimeSelectionField(
     label: String,
     selectedTimeMinutes: Int?,
@@ -166,6 +179,10 @@ fun TimeSelectionField(
     }
 }
 
+/**
+ * Formats the date used by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun formatDate(dateMillis: Long?): String {
     if (dateMillis == null) return ""
 
@@ -175,6 +192,10 @@ private fun formatDate(dateMillis: Long?): String {
     ).format(Date(dateMillis))
 }
 
+/**
+ * Formats the time used by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun formatTime(minutesAfterMidnight: Int?): String {
     if (minutesAfterMidnight == null) return ""
 
@@ -189,6 +210,10 @@ fun formatTime(minutesAfterMidnight: Int?): String {
     ).format(calendar.time)
 }
 
+/**
+ * Returns the minimum create post start date millis value required by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun minimumCreatePostStartDateMillis(): Long {
     return CreatePostValidator.minimumStartDateMillis()
 }
@@ -370,6 +395,10 @@ private fun KeyboardTimeInputDialog(
 }
 
 @Composable
+/**
+ * Renders the UI represented by time period option for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun TimePeriodOption(
     text: String,
     selected: Boolean,
@@ -512,6 +541,10 @@ fun ThumbnailPickerSection(
 }
 
 @Composable
+/**
+ * Renders the UI represented by remember image bitmap for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun rememberImageBitmap(
     uri: Uri
 ): androidx.compose.runtime.State<ImageBitmap?> {
@@ -533,6 +566,10 @@ private fun rememberImageBitmap(
     }
 }
 
+/**
+ * Returns the display name used by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun getDisplayName(
     context: android.content.Context,
     uri: Uri

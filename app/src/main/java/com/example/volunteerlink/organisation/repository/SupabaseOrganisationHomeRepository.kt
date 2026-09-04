@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.repository
 
+// FILE OVERVIEW:
+/*
+ * SupabaseOrganisationHomeRepository defines or implements data access used by the organisation Home dashboard flow.
+ * Repository code keeps Supabase/RPC/storage details away from the composables and ViewModels
+ * so UI code can work with application models instead of backend-specific responses.
+ */
+
+
 import com.example.volunteerlink.data.supabase
 import com.example.volunteerlink.organisation.home.model.OrganisationHomeParticipation
 import com.example.volunteerlink.organisation.home.model.OrganisationHomePost
@@ -22,6 +30,10 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 
 @Serializable
+/**
+ * Holds the values represented by partner post summary row as one strongly typed model.
+ * It keeps backend-facing work behind the Home dashboard repository boundary.
+ */
 data class PartnerPostSummaryRow(
     @SerialName("post_id") val postId: String,
     @SerialName("owner_organisation_name") val ownerOrganisationName: String,
@@ -37,6 +49,10 @@ data class PartnerPostSummaryRow(
 )
 
 @Serializable
+/**
+ * Holds the values represented by impact weave attention row as one strongly typed model.
+ * It keeps backend-facing work behind the Home dashboard repository boundary.
+ */
 private data class ImpactWeaveAttentionRow(
     @SerialName("draft_id") val draftId: String,
     val title: String,
@@ -57,6 +73,10 @@ private data class ImpactWeaveAttentionRow(
  */
 class SupabaseOrganisationHomeRepository : OrganisationHomeRepository {
 
+    /**
+     * Loads the partner posts needed by the organisation Home dashboard flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     override suspend fun loadPartnerPosts(): List<PartnerPostSummary> {
         val response = supabase.postgrest.rpc("organisation_list_partner_posts")
         return Json { ignoreUnknownKeys = true }
@@ -78,6 +98,10 @@ class SupabaseOrganisationHomeRepository : OrganisationHomeRepository {
             }
     }
 
+    /**
+     * Loads the home snapshot needed by the organisation Home dashboard flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     override suspend fun loadHomeSnapshot(
         organisationId: String
     ): OrganisationHomeSnapshot {
@@ -317,6 +341,10 @@ class SupabaseOrganisationHomeRepository : OrganisationHomeRepository {
         }
     }
 
+    /**
+     * Derives the json object value used by the organisation Home dashboard flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     private fun JsonObject.relatedObjects(key: String): List<JsonObject> {
         return when (val element = this[key]) {
             is JsonArray -> element.mapNotNull { it as? JsonObject }
@@ -325,11 +353,19 @@ class SupabaseOrganisationHomeRepository : OrganisationHomeRepository {
         }
     }
 
+    /**
+     * Derives the json object value used by the organisation Home dashboard flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     private fun JsonObject.requiredText(key: String): String {
         return optionalText(key)
             ?: error("Missing required Supabase field: $key")
     }
 
+    /**
+     * Derives the json object value used by the organisation Home dashboard flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     private fun JsonObject.optionalText(key: String): String? {
         val element: JsonElement = this[key] ?: return null
         if (element is JsonNull) return null

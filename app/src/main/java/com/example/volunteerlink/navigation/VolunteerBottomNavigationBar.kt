@@ -31,6 +31,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.volunteerlink.R
+import com.example.volunteerlink.chat.data.ChatData
+import com.example.volunteerlink.chat.data.Role
 import com.example.volunteerlink.ui.theme.VolunteerLinkBorderColour
 import com.example.volunteerlink.ui.theme.VolunteerLinkPrimaryGreen
 import com.example.volunteerlink.ui.theme.VolunteerLinkSoftGreenSurface
@@ -51,6 +53,9 @@ fun VolunteerBottomNavigationBar(
         navigationRoute: String
     ) -> Unit
 ) {
+    val showChatNotification = ChatData.chatsForCurrentRole().any { chat ->
+        (chat.readCounts[Role.APPLICANT] ?: 0) < chat.messages.size
+    }
     val volunteerBottomNavigationItems =
         listOf(
             VolunteerBottomNavigationItem(
@@ -157,6 +162,8 @@ fun VolunteerBottomNavigationBar(
                                 volunteerBottomNavigationItem,
                             navigationItemIsSelected =
                                 navigationItemIsSelected,
+                            showNotification = showChatNotification &&
+                                volunteerBottomNavigationItem.navigationLabel == "Chats",
                             onNavigationItemSelected = {
                                 onVolunteerNavigationItemSelected(
                                     volunteerBottomNavigationItem
@@ -175,6 +182,7 @@ private fun RowScope.VolunteerFloatingNavigationItem(
     volunteerBottomNavigationItem:
     VolunteerBottomNavigationItem,
     navigationItemIsSelected: Boolean,
+    showNotification: Boolean,
     onNavigationItemSelected: () -> Unit
 ) {
     val navigationContentColour =
@@ -234,6 +242,15 @@ private fun RowScope.VolunteerFloatingNavigationItem(
                 ),
                 tint = navigationContentColour
             )
+
+            if (showNotification) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .size(9.dp)
+                        .background(Color(0xFFE05B4F), CircleShape)
+                )
+            }
         }
 
         Text(

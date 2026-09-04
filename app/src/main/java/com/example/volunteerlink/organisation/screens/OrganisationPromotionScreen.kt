@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.screens
 
+// FILE OVERVIEW:
+/*
+ * OrganisationPromotionScreen contains presentation code for the organisation promotion management flow.
+ * It focuses on rendering state and forwarding user actions through callbacks/ViewModels,
+ * keeping database access and business rules outside the composables where possible.
+ */
+
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -18,6 +26,10 @@ import com.example.volunteerlink.organisation.viewmodel.PromotionPaymentMethod
 import com.example.volunteerlink.organisation.viewmodel.PromotionStep
 
 @Composable
+/**
+ * Renders the organisation promotion screen screen used in the organisation promotion management flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun OrganisationPromotionScreen(
     onBack: () -> Unit,
     manageViewModel: OrganisationManageViewModel = viewModel(),

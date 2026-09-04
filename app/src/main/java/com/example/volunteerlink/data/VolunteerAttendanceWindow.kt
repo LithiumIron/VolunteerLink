@@ -1,5 +1,7 @@
 package com.example.volunteerlink.data
 
+// Calculates whether check-in or attendance review is available at the current app time.
+
 import com.example.volunteerlink.model.VolunteerOpportunityEvent
 import com.example.volunteerlink.model.VolunteerOpportunityRole
 import java.text.SimpleDateFormat

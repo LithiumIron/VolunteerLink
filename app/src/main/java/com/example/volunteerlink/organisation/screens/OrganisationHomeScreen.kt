@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.screens
 
+// FILE OVERVIEW:
+/*
+ * OrganisationHomeScreen contains presentation code for the organisation Home dashboard flow.
+ * It focuses on rendering state and forwarding user actions through callbacks/ViewModels,
+ * keeping database access and business rules outside the composables where possible.
+ */
+
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -54,10 +62,13 @@ fun OrganisationHomeScreen(
     onOrganisationProfileSelected: () -> Unit = {},   // NEW
     viewModel: OrganisationHomeViewModel = viewModel()
 ) {
+    // Collect StateFlow with lifecycle awareness so the dashboard redraws only while the screen is active.
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     val lifecycleOwner = LocalLifecycleOwner.current
     var hasHandledFirstResume by rememberSaveable { mutableStateOf(false) }
+    // Refresh after returning to Home so counts/alerts reflect actions completed on other screens.
+    // The first ON_RESUME is ignored because the ViewModel already performs its initial load.
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
@@ -83,6 +94,10 @@ fun OrganisationHomeScreen(
 }
 
 @Composable
+/**
+ * Renders the organisation home content content block used in the organisation Home dashboard flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun OrganisationHomeContent(
     uiState: OrganisationHomeUiState,
     onViewAllPosts: () -> Unit,
@@ -91,6 +106,7 @@ private fun OrganisationHomeContent(
     onRetry: () -> Unit,
     onOrganisationProfileSelected: () -> Unit   // NEW
 ) {
+    // A single UI state drives the three screen modes: loading, error, or dashboard content.
     when {
         uiState.isLoading -> {
             Column(
@@ -144,6 +160,7 @@ private fun OrganisationHomeContent(
         }
 
         else -> {
+            // LazyColumn keeps the dashboard efficient while allowing independent sections to appear only when needed.
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()

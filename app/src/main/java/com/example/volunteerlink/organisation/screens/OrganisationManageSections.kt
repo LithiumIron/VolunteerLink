@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.screens
 
+// FILE OVERVIEW:
+/*
+ * OrganisationManageSections contains presentation code for the organisation Manage Post flow.
+ * It focuses on rendering state and forwarding user actions through callbacks/ViewModels,
+ * keeping database access and business rules outside the composables where possible.
+ */
+
+
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -79,6 +87,10 @@ fun OrganisationManageHeader(
 }
 
 @Composable
+/**
+ * Renders the organisation manage sub header header used in the organisation Manage Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun OrganisationManageSubHeader(
     title: String,
     onBack: () -> Unit
@@ -151,6 +163,10 @@ fun ManageModuleChoiceCard(
 }
 
 @Composable
+/**
+ * Renders the UI represented by manage post section selector for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun ManagePostSectionSelector(
     selected: ManagePostSection,
     activeCount: Int,
@@ -164,6 +180,10 @@ fun ManagePostSectionSelector(
     onSelected: (ManagePostSection) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    /**
+     * Holds the values represented by tab item as one strongly typed model.
+     * It supports the Manage Post presentation layer without adding backend responsibilities to the screen.
+     */
     data class TabItem(
         val section: ManagePostSection,
         val label: String,
@@ -231,6 +251,10 @@ fun ManagePostSectionSelector(
 }
 
 @Composable
+/**
+ * Renders the manage active group header header used in the organisation Manage Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun ManageActiveGroupHeader(
     title: String,
     count: Int,
@@ -255,6 +279,10 @@ fun ManageActiveGroupHeader(
 }
 
 @Composable
+/**
+ * Renders the UI represented by manage section overview for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun ManageSectionOverview(
     title: String,
     detail: String? = null,
@@ -497,6 +525,10 @@ fun ManageVolunteerPostCard(
 }
 
 @Composable
+/**
+ * Returns the manage empty section message used by the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun ManageEmptySectionMessage(
     title: String,
     message: String,
@@ -511,6 +543,10 @@ fun ManageEmptySectionMessage(
 }
 
 @Composable
+/**
+ * Renders the UI represented by manage hybrid phase line for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun ManageHybridPhaseLine(
     label: String,
     timing: PostTimingState?,
@@ -538,6 +574,10 @@ private fun ManageHybridPhaseLine(
     )
 }
 
+/**
+ * Derives the string value used by the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun String.manageModeDrawable(): Int = when (uppercase(Locale.US)) {
     "PHYSICAL" -> R.drawable.physical_event
     "REMOTE" -> R.drawable.remote_project
@@ -545,6 +585,10 @@ private fun String.manageModeDrawable(): Int = when (uppercase(Locale.US)) {
     else -> R.drawable.manage
 }
 
+/**
+ * Derives the string value used by the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun String.toManageModeLabel(): String = when (uppercase(Locale.US)) {
     "PHYSICAL" -> "Physical"
     "REMOTE" -> "Remote"
@@ -552,6 +596,10 @@ private fun String.toManageModeLabel(): String = when (uppercase(Locale.US)) {
     else -> lowercase(Locale.US).replaceFirstChar { it.titlecase(Locale.US) }
 }
 
+/**
+ * Returns the manage lifecycle label used by the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun manageLifecycleLabel(post: ManagePostItem, section: ManagePostSection): String = when (section) {
     ManagePostSection.DRAFTS -> "DRAFT"
     ManagePostSection.REVIEW -> "REVIEW"
@@ -565,6 +613,10 @@ private fun manageLifecycleLabel(post: ManagePostItem, section: ManagePostSectio
     }
 }
 
+/**
+ * Derives the manage lifecycle color value used by the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun manageLifecycleColor(post: ManagePostItem, section: ManagePostSection): Color = when (section) {
     ManagePostSection.REVIEW -> VolunteerLinkInformation
     ManagePostSection.COMPLETED -> VolunteerLinkPrimaryGreen
@@ -576,6 +628,10 @@ private fun manageLifecycleColor(post: ManagePostItem, section: ManagePostSectio
     }
 }
 
+/**
+ * Returns the manage timeline text used by the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun manageTimelineText(post: ManagePostItem): String {
     return if (post.mode.equals("HYBRID", true)) {
         val remote = manageDateRange(post.remoteStartDate, post.remoteEndDate)
@@ -586,6 +642,10 @@ private fun manageTimelineText(post: ManagePostItem): String {
     }
 }
 
+/**
+ * Returns the manage date range value required by the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun manageDateRange(start: String?, end: String?): String {
     val startText = manageShortDate(start)
     val endText = manageShortDate(end)
@@ -597,6 +657,10 @@ private fun manageDateRange(start: String?, end: String?): String {
     }
 }
 
+/**
+ * Returns the manage short date value required by the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun manageShortDate(value: String?): String {
     if (value.isNullOrBlank()) return ""
     return runCatching {

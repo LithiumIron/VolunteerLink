@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.create.steps
 
+// FILE OVERVIEW:
+/*
+ * RoleSettingsSections contains presentation code for the organisation Create/Edit Post flow.
+ * It focuses on rendering state and forwarding user actions through callbacks/ViewModels,
+ * keeping database access and business rules outside the composables where possible.
+ */
+
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -49,7 +57,8 @@ import com.example.volunteerlink.organisation.create.model.RemoteSubmissionMode
 import com.example.volunteerlink.organisation.create.model.RoleApplicationMethod
 import com.example.volunteerlink.organisation.create.model.SelectedRoleDraft
 import com.example.volunteerlink.organisation.create.model.VolunteerRoleLevel
-import com.example.volunteerlink.organisation.create.model.VolunteerRoleMode
+import com.example.volunteerlink.organisation.create.model.VolunteerRoleMode
+
 import com.example.volunteerlink.ui.theme.RoleSettingsBorder
 import com.example.volunteerlink.ui.theme.RoleSettingsOrange
 import com.example.volunteerlink.ui.theme.RoleSettingsOrangeBackground
@@ -57,6 +66,10 @@ import com.example.volunteerlink.ui.theme.RoleSettingsPurple
 import com.example.volunteerlink.ui.theme.RoleSettingsPurpleBackground
 
 @Composable
+/**
+ * Renders the role information section section used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun RoleInformationSection(
     template: CreateRoleTemplate
 ) {
@@ -97,6 +110,10 @@ fun RoleInformationSection(
 }
 
 @Composable
+/**
+ * Renders the skills practised section section used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun SkillsPractisedSection(
     template: CreateRoleTemplate,
     selectedRole: SelectedRoleDraft,
@@ -179,6 +196,10 @@ fun SkillsPractisedSection(
 }
 
 @Composable
+/**
+ * Renders the required skills section section used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun RequiredSkillsSection(
     template: CreateRoleTemplate,
     selectedRole: SelectedRoleDraft,
@@ -267,6 +288,10 @@ fun RequiredSkillsSection(
 }
 
 @Composable
+/**
+ * Renders the responsibilities section section used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun ResponsibilitiesSection(
     responsibilities: List<String>,
     enabled: Boolean = true,
@@ -338,6 +363,10 @@ fun ResponsibilitiesSection(
 }
 
 @Composable
+/**
+ * Renders the applicant method section section used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun ApplicantMethodSection(
     template: CreateRoleTemplate,
     selectedRole: SelectedRoleDraft,
@@ -516,6 +545,10 @@ fun ApplicantMethodSection(
 }
 
 @Composable
+/**
+ * Renders the UI represented by application method option for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun ApplicationMethodOption(
     method: RoleApplicationMethod,
     description: String,
@@ -611,6 +644,10 @@ fun ApplicationMethodOption(
 }
 
 @Composable
+/**
+ * Renders the role submission and notes section section used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun RoleSubmissionAndNotesSection(
     draft: CreatePostDraft,
     template: CreateRoleTemplate,
@@ -822,6 +859,10 @@ fun RoleSettingsSectionCard(
 }
 
 @Composable
+/**
+ * Renders the role identity card card used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun RoleIdentityCard(
     template: CreateRoleTemplate,
     selectedRole: SelectedRoleDraft
@@ -878,6 +919,10 @@ fun RoleIdentityCard(
 }
 
 @Composable
+/**
+ * Renders the role overview card card used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun RoleOverviewCard(
     template: CreateRoleTemplate,
     selectedRole: SelectedRoleDraft,
@@ -988,6 +1033,10 @@ fun RoleOverviewCard(
 }
 
 @Composable
+/**
+ * Renders the role level badge badge used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun RoleLevelBadge(level: VolunteerRoleLevel) {
     val background: Color
     val foreground: Color
@@ -1024,6 +1073,10 @@ fun RoleLevelBadge(level: VolunteerRoleLevel) {
 }
 
 @Composable
+/**
+ * Renders the role application method badge badge used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun RoleApplicationMethodBadge(method: RoleApplicationMethod) {
     Surface(
         shape = RoundedCornerShape(999.dp),
@@ -1040,6 +1093,10 @@ fun RoleApplicationMethodBadge(method: RoleApplicationMethod) {
 }
 
 @Composable
+/**
+ * Renders the practised skill row row used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun PractisedSkillRow(
     skill: CreateRoleSkill,
     checked: Boolean,
@@ -1100,6 +1157,10 @@ fun PractisedSkillRow(
 }
 
 @Composable
+/**
+ * Renders the required skill card card used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun RequiredSkillCard(
     skill: CreateRoleSkill,
     isPractised: Boolean,
@@ -1261,6 +1322,10 @@ fun RequiredSkillCard(
     }
 }
 
+/**
+ * Returns the role area icon res value required by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun roleAreaIconRes(roleArea: String): Int {
     return when (roleArea) {
         "General Event Support" -> R.drawable.role_general_support

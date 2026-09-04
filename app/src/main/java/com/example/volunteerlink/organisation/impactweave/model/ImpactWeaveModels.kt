@@ -1,8 +1,20 @@
 package com.example.volunteerlink.organisation.impactweave.model
 
+// FILE OVERVIEW:
+/*
+ * ImpactWeaveModels groups the data structures used by the organisation Impact Weave and partnership flow.
+ * These models make state explicit and allow the UI, ViewModel and repository layers to exchange
+ * strongly typed values instead of passing unrelated parameters throughout the feature.
+ */
+
+
 import com.example.volunteerlink.data.location.LocationSuggestion
 import com.example.volunteerlink.organisation.create.model.VolunteerPostCategory
 
+/**
+ * Lists the supported values represented by impact weave mode.
+ * It keeps related Impact Weave and partnership values together so callers do not pass disconnected fields around.
+ */
 enum class ImpactWeaveMode(
     val displayName: String,
     val description: String
@@ -17,6 +29,10 @@ enum class ImpactWeaveMode(
     )
 }
 
+/**
+ * Lists the supported values represented by impact weave duration.
+ * It keeps related Impact Weave and partnership values together so callers do not pass disconnected fields around.
+ */
 enum class ImpactWeaveDuration(
     val displayName: String
 ) {
@@ -24,6 +40,10 @@ enum class ImpactWeaveDuration(
     MULTIPLE_DAYS("Multiple days")
 }
 
+/**
+ * Lists the supported values represented by impact weave page.
+ * It keeps related Impact Weave and partnership values together so callers do not pass disconnected fields around.
+ */
 enum class ImpactWeavePage {
     LIST,
     ACTIVITY_PLAN,
@@ -32,6 +52,10 @@ enum class ImpactWeavePage {
     MATCH_RESULTS
 }
 
+/**
+ * Holds the values represented by impact weave need draft as one strongly typed model.
+ * It keeps related Impact Weave and partnership values together so callers do not pass disconnected fields around.
+ */
 data class ImpactWeaveNeedDraft(
     val needId: Int,
     val originalText: String,
@@ -52,6 +76,10 @@ data class ImpactWeaveNeedDraft(
         }
 }
 
+/**
+ * Holds the values represented by impact weave draft as one strongly typed model.
+ * It keeps related Impact Weave and partnership values together so callers do not pass disconnected fields around.
+ */
 data class ImpactWeaveDraft(
     val draftId: Int,
     val databaseDraftId: String? = null,
@@ -111,11 +139,19 @@ data class ImpactWeaveSupportCandidate(
     val distanceKm: Double? = null
 )
 
+/**
+ * Holds the values represented by impact weave matching input as one strongly typed model.
+ * It keeps related Impact Weave and partnership values together so callers do not pass disconnected fields around.
+ */
 data class ImpactWeaveMatchingInput(
     val needs: List<ImpactWeaveDatabaseNeed>,
     val candidates: List<ImpactWeaveSupportCandidate>
 )
 
+/**
+ * Holds the values represented by impact weave need match result as one strongly typed model.
+ * It keeps related Impact Weave and partnership values together so callers do not pass disconnected fields around.
+ */
 data class ImpactWeaveNeedMatchResult(
     val need: ImpactWeaveDatabaseNeed,
     /** Direct matches that are actually counted toward potential coverage. */
@@ -127,6 +163,10 @@ data class ImpactWeaveNeedMatchResult(
     val usesWiderVenueArea: Boolean = false
 )
 
+/**
+ * Holds the values represented by impact weave match results as one strongly typed model.
+ * It keeps related Impact Weave and partnership values together so callers do not pass disconnected fields around.
+ */
 data class ImpactWeaveMatchResults(
     val draftId: String,
     val needResults: List<ImpactWeaveNeedMatchResult>,
@@ -138,6 +178,10 @@ data class ImpactWeaveMatchResults(
 
 
 
+/**
+ * Holds the values represented by impact weave active plan as one strongly typed model.
+ * It keeps related Impact Weave and partnership values together so callers do not pass disconnected fields around.
+ */
 data class ImpactWeaveActivePlan(
     val draftId: String,
     val category: VolunteerPostCategory? = null,
@@ -156,6 +200,10 @@ data class ImpactWeaveActivePlan(
 )
 
 
+/**
+ * Holds the values represented by impact weave partnership item state as one strongly typed model.
+ * It keeps related Impact Weave and partnership values together so callers do not pass disconnected fields around.
+ */
 data class ImpactWeavePartnershipItemState(
     val needId: String,
     val supportId: String?,
@@ -166,6 +214,10 @@ data class ImpactWeavePartnershipItemState(
     val capacityProvided: Int? = null
 )
 
+/**
+ * Holds the values represented by impact weave partnership state as one strongly typed model.
+ * It keeps related Impact Weave and partnership values together so callers do not pass disconnected fields around.
+ */
 data class ImpactWeavePartnershipState(
     val invitationId: String,
     val organisationId: String,
@@ -175,6 +227,10 @@ data class ImpactWeavePartnershipState(
     val items: List<ImpactWeavePartnershipItemState> = emptyList()
 )
 
+/**
+ * Holds the values represented by impact weave ui state as one strongly typed model.
+ * It keeps related Impact Weave and partnership values together so callers do not pass disconnected fields around.
+ */
 data class ImpactWeaveUiState(
     val page: ImpactWeavePage = ImpactWeavePage.LIST,
     val activePlans: List<ImpactWeaveActivePlan> = emptyList(),
@@ -195,6 +251,10 @@ data class ImpactWeaveUiState(
     val planChangeSuccess: String? = null
 )
 
+/**
+ * Holds the values represented by impact weave post prefill as one strongly typed model.
+ * It keeps related Impact Weave and partnership values together so callers do not pass disconnected fields around.
+ */
 data class ImpactWeavePostPrefill(
     val draftId: String,
     val category: VolunteerPostCategory,
@@ -209,6 +269,10 @@ data class ImpactWeavePostPrefill(
     val partners: List<ImpactWeavePostPartner> = emptyList()
 )
 
+/**
+ * Holds the values represented by impact weave post partner as one strongly typed model.
+ * It keeps related Impact Weave and partnership values together so callers do not pass disconnected fields around.
+ */
 data class ImpactWeavePostPartner(
     val organisationName: String,
     val contributionSummary: String

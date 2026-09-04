@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.navigation
 
+// FILE OVERVIEW:
+/*
+ * OrganisationNavigationHost contains route/navigation definitions for the organisation navigation flow.
+ * Centralising destinations and route wiring keeps screen transitions consistent and avoids
+ * embedding NavController logic inside reusable screen sections.
+ */
+
+
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
@@ -55,6 +63,7 @@ import com.example.volunteerlink.organisation.screens.OrganisationViewPartnerPro
 import com.example.volunteerlink.organisation.screens.OrganisationViewVolunteerProfileScreen
 import com.example.volunteerlink.organisation.screens.OrganisationVolunteerCertificateScreen
 import com.example.volunteerlink.organisation.screens.OrganisationPromotionScreen
+
 import com.example.volunteerlink.organisation.home.model.HomeAttentionType
 import com.example.volunteerlink.organisation.screens.OrganisationSettingScreen
 import com.example.volunteerlink.chat.repository.SupabaseChatRepository
@@ -110,6 +119,10 @@ fun OrganisationNavigationHost(
         showBackLogoutConfirmation = true
     }
 
+    /**
+     * Navigates the bottom for the organisation organisation navigation flow.
+     * Centralising the route behaviour keeps every caller consistent.
+     */
     fun navigateBottom(route: String) {
         navController.navigate(route) {
             popUpTo(OrganisationNavigationRoutes.HOME) {
@@ -191,6 +204,10 @@ fun OrganisationNavigationHost(
                 AppBottomNavigationBar(
                     items = organisationBottomNavigationItems,
                     currentRoute = bottomBarRoute,
+                    showChatNotification =
+                        ChatData.chatsForCurrentRole().any {
+                            (it.readCounts[Role.ORGANISATION] ?: 0) < it.messages.size
+                        },
                     onItemClick = { item ->
                         if (item.route != currentRoute) {
                             if (
@@ -213,13 +230,7 @@ fun OrganisationNavigationHost(
             route = "organisation_root_navigation_graph",
             modifier = Modifier
                 .fillMaxSize()
-                .then(
-                    if (currentRoute == OrganisationNavigationRoutes.CHATS) {
-                        Modifier
-                    } else {
-                        Modifier.padding(innerPadding)
-                    }
-                )
+                .padding(innerPadding)
         ) {
             composable(OrganisationNavigationRoutes.HOME) {
                 OrganisationHomeScreen(
@@ -535,6 +546,7 @@ fun OrganisationNavigationHost(
                     }
                 )
             }
+
 
             composable(
                 route = OrganisationNavigationRoutes.PARTNERSHIP_CHAT_ROOM,

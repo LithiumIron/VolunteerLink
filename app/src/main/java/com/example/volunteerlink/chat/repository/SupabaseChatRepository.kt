@@ -36,6 +36,8 @@ data class LoadedChatData(
     val chats: List<ChatRoom>
 )
 
+private const val FORWARDED_MARKER = "\u2063"
+
 object SupabaseChatRepository {
 
     suspend fun loadForSignedInUser(
@@ -128,6 +130,21 @@ object SupabaseChatRepository {
         ).decodeAs<PostGroupStatus>()
     }
 
+    suspend fun joinMyInstantEventChat(
+        postId: String
+    ): String {
+        require(postId.isNotBlank()) {
+            "This event does not have a database ID yet."
+        }
+
+        return supabase.postgrest.rpc(
+            function = "join_my_instant_event_chat",
+            parameters = buildJsonObject {
+                put("p_post_id", JsonPrimitive(postId))
+            }
+        ).decodeAs<String>()
+    }
+
     suspend fun openVolunteerDirectChat(postId: String, volunteerUserId: String): String {
         return supabase.postgrest.rpc(
             function = "organisation_open_volunteer_direct_chat",
@@ -173,6 +190,54 @@ object SupabaseChatRepository {
         ).decodeAs<String>()
     }
 
+    suspend fun forwardMessage(
+        sourceMessageId: String,
+        targetConversationId: String
+    ): String {
+        return supabase.postgrest.rpc(
+            function = "forward_conversation_message",
+            parameters = buildJsonObject {
+                put(
+                    "p_source_message_id",
+                    JsonPrimitive(sourceMessageId)
+                )
+
+                put(
+                    "p_target_conversation_id",
+                    JsonPrimitive(targetConversationId)
+                )
+            }
+        ).decodeAs<String>()
+    }
+
+    suspend fun leaveConversation(
+        conversationId: String
+    ): String {
+        return supabase.postgrest.rpc(
+            function = "leave_conversation",
+            parameters = buildJsonObject {
+                put(
+                    "p_conversation_id",
+                    JsonPrimitive(conversationId)
+                )
+            }
+        ).decodeAs<String>()
+    }
+
+    suspend fun deleteConversationForMe(
+        conversationId: String
+    ): String {
+        return supabase.postgrest.rpc(
+            function = "delete_conversation_for_me",
+            parameters = buildJsonObject {
+                put(
+                    "p_conversation_id",
+                    JsonPrimitive(conversationId)
+                )
+            }
+        ).decodeAs<String>()
+    }
+
     private suspend fun loadMessages(
         chatId: String
     ): List<ChatMessage> {
@@ -190,6 +255,14 @@ object SupabaseChatRepository {
             .map { row ->
                 val messageType = row.messageType.uppercase()
 
+                val isForwarded = row.body.startsWith(FORWARDED_MARKER)
+
+                val visibleBody = if (isForwarded) {
+                    row.body.removePrefix(FORWARDED_MARKER)
+                } else {
+                    row.body
+                }
+
                 ChatMessage(
                     id = row.messageId,
                     senderId = row.senderUserId,
@@ -205,7 +278,7 @@ object SupabaseChatRepository {
                     } else {
                         0xFFB8B8B8
                     },
-                    text = row.body,
+                    text = visibleBody,
                     sentAtMillis = row.sentAt.toEpochMillis(),
                     imageUri = if (messageType == "IMAGE") {
                         row.attachmentPath
@@ -230,7 +303,13 @@ object SupabaseChatRepository {
                     fileName = row.attachmentName,
                     fileMimeType = row.attachmentMimeType,
                     replyToId = row.replyToMessageId,
-                    isEdited = row.editedAt != null
+                    forwardedFromChatId = if (isForwarded) {
+                        "forwarded"
+                    } else {
+                        null
+                    },
+                    isEdited = row.editedAt != null,
+
                 )
             }
     }
@@ -283,21 +362,35 @@ private data class EventChatRow(
 )
 
 private fun EventChatRow.toLatestMessage(): ChatMessage {
+    val isForwarded =
+        latestBody.orEmpty().startsWith(FORWARDED_MARKER)
+
+    val visibleBody = if (isForwarded) {
+        latestBody.orEmpty().removePrefix(FORWARDED_MARKER)
+    } else {
+        latestBody.orEmpty()
+    }
     val type = latestMessageType.orEmpty().uppercase()
     return ChatMessage(
         id = latestMessageId.orEmpty(),
         senderId = latestSenderUserId.orEmpty(),
         senderName = latestSenderName ?: "VolunteerLink user",
         senderInitial = latestSenderInitial ?: "V",
-        text = latestBody.orEmpty(),
-        sentAtMillis = latestSentAt?.toEpochMillis() ?: 0L,
+        text = visibleBody,
+        sentAtMillis = latestSentAt?.toEpochMillis()
+            ?: System.currentTimeMillis(),
         imageUri = latestAttachmentPath.takeIf { type == "IMAGE" },
         videoUri = latestAttachmentPath.takeIf { type == "VIDEO" },
         audioUri = latestAttachmentPath.takeIf { type == "AUDIO" },
         fileUri = latestAttachmentPath.takeIf { type == "FILE" },
         fileName = latestAttachmentName,
         fileMimeType = latestAttachmentMimeType,
-        isEdited = latestEditedAt != null
+        isEdited = latestEditedAt != null,
+        forwardedFromChatId = if (isForwarded) {
+            "forwarded"
+        } else {
+            null
+        }
     )
 }
 
@@ -347,18 +440,40 @@ private fun String.toChatRole(): Role =
     }
 
 private fun String.toEpochMillis(): Long {
+    val timestampWithOffset = trim()
+        .replace(
+            Regex("""Z$"""),
+            "+0000"
+        )
+        .replace(
+            Regex("""([+-]\d{2}):(\d{2})$"""),
+            "$1$2"
+        )
+
+    val normalizedTimestamp = timestampWithOffset.replace(
+        Regex("""\.(\d{1,9})(?=[+-]\d{4}$)""")
+    ) { match ->
+        "." +
+                match.groupValues[1]
+                    .take(3)
+                    .padEnd(3, '0')
+    }
+
     val patterns = listOf(
-        "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
-        "yyyy-MM-dd'T'HH:mm:ssXXX",
-        "yyyy-MM-dd HH:mm:ssXXX",
-        "yyyy-MM-dd HH:mm:ss.SSSXXX"
+        "yyyy-MM-dd'T'HH:mm:ss.SSSZ",
+        "yyyy-MM-dd'T'HH:mm:ssZ",
+        "yyyy-MM-dd HH:mm:ss.SSSZ",
+        "yyyy-MM-dd HH:mm:ssZ"
     )
 
     return patterns.firstNotNullOfOrNull { pattern ->
         runCatching {
-            SimpleDateFormat(pattern, Locale.US).apply {
+            SimpleDateFormat(
+                pattern,
+                Locale.US
+            ).apply {
                 timeZone = TimeZone.getTimeZone("UTC")
-            }.parse(this)?.time
+            }.parse(normalizedTimestamp)?.time
         }.getOrNull()
     } ?: System.currentTimeMillis()
 }

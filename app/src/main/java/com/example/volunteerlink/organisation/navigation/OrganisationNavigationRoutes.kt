@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.navigation
 
+// FILE OVERVIEW:
+/*
+ * OrganisationNavigationRoutes contains route/navigation definitions for the organisation navigation flow.
+ * Centralising destinations and route wiring keeps screen transitions consistent and avoids
+ * embedding NavController logic inside reusable screen sections.
+ */
+
+
 /** Main destinations for the Organisation side of VolunteerLink. */
 object OrganisationNavigationRoutes {
     const val HOME = "organisation_home"
@@ -22,6 +30,15 @@ object OrganisationNavigationRoutes {
         "organisation_create_from_impact_weave/{impactWeaveDraftId}"
     const val CHATS = "organisation_chats"
     const val CHAT_ID_ARGUMENT = "chatId"
+    const val PARENT_CHAT_ID_ARGUMENT = "parentChatId"
+
+    const val CREATE_EVENT_CHAT_GROUP =
+        "organisation_create_event_chat_group/{$PARENT_CHAT_ID_ARGUMENT}"
+
+    fun createEventChatGroup(
+        parentChatId: String
+    ): String =
+        "organisation_create_event_chat_group/$parentChatId"
 
     const val CHAT_ROOM =
         "organisation_chat_room/{$CHAT_ID_ARGUMENT}"
@@ -35,12 +52,24 @@ object OrganisationNavigationRoutes {
     const val EDIT_PROFILE = "organisation_edit_profile"
     const val SETTINGS = "organisation_settings"
 
+    /**
+     * Derives the manage post detail value used by the organisation organisation navigation flow.
+     * Centralising the route behaviour keeps every caller consistent.
+     */
     fun managePostDetail(postId: String): String =
         "organisation_manage_post/$postId"
 
+    /**
+     * Derives the manage post edit value used by the organisation organisation navigation flow.
+     * Centralising the route behaviour keeps every caller consistent.
+     */
     fun managePostEdit(postId: String): String =
         "organisation_manage_post/$postId/edit"
 
+    /**
+     * Derives the manage applicant review value used by the organisation organisation navigation flow.
+     * Centralising the route behaviour keeps every caller consistent.
+     */
     fun manageApplicantReview(
         postId: String,
         roleTemplateId: String,
@@ -48,9 +77,17 @@ object OrganisationNavigationRoutes {
     ): String =
         "organisation_manage_post/$postId/applicant/$roleTemplateId/$userId"
 
+    /**
+     * Derives the view volunteer profile value used by the organisation organisation navigation flow.
+     * Centralising the route behaviour keeps every caller consistent.
+     */
     fun viewVolunteerProfile(postId: String, userId: String): String =
         "organisation_view_volunteer_profile/$postId/$userId"
 
+    /**
+     * Derives the view volunteer certificate value used by the organisation organisation navigation flow.
+     * Centralising the route behaviour keeps every caller consistent.
+     */
     fun viewVolunteerCertificate(
         userId: String,
         postId: String,
@@ -58,18 +95,38 @@ object OrganisationNavigationRoutes {
     ): String =
         "organisation_view_volunteer_certificate/$userId/$postId/$roleTemplateId"
 
+    /**
+     * Derives the view partner profile value used by the organisation organisation navigation flow.
+     * Centralising the route behaviour keeps every caller consistent.
+     */
     fun viewPartnerProfile(organisationId: String): String =
         "organisation_view_partner_profile/$organisationId"
 
+    /**
+     * Derives the chat room value used by the organisation organisation navigation flow.
+     * Centralising the route behaviour keeps every caller consistent.
+     */
     fun chatRoom(chatId: String): String =
         "organisation_chat_room/$chatId"
 
+    /**
+     * Derives the partnership chat room value used by the organisation organisation navigation flow.
+     * Centralising the route behaviour keeps every caller consistent.
+     */
     fun partnershipChatRoom(chatId: String): String =
         "organisation_partnership_chat_room/$chatId"
 
+    /**
+     * Creates the from impact weave used by the organisation organisation navigation flow.
+     * Centralising the route behaviour keeps every caller consistent.
+     */
     fun createFromImpactWeave(draftId: String): String =
         "organisation_create_from_impact_weave/$draftId"
 
+    /**
+     * Groups the info for the organisation organisation navigation flow.
+     * Centralising the route behaviour keeps every caller consistent.
+     */
     fun groupInfo(chatId: String): String =
         "organisation_group_info/$chatId"
 }

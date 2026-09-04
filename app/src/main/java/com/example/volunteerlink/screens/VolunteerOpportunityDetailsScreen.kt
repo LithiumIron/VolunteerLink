@@ -1,6 +1,8 @@
 
 package com.example.volunteerlink.screens
 
+// Displays event-level information and passes the selected role into the role-details flow.
+
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -103,6 +105,8 @@ fun VolunteerOpportunityDetailsScreen(
     ) -> Unit
 ) {
     val context = LocalContext.current
+    // The same ViewModel is shared with application screens so save/apply errors are
+    // displayed consistently even when the volunteer navigates back to this page.
     val actionState by opportunityViewModel.uiState.collectAsStateWithLifecycle()
     androidx.compose.runtime.LaunchedEffect(volunteerEventId) {
         opportunityViewModel.clearApplicationActionError()
@@ -114,11 +118,14 @@ fun VolunteerOpportunityDetailsScreen(
     var isLoadingOrganisationPreview by remember { mutableStateOf(false) }
     val previewScope = rememberCoroutineScope()
 
+    // Event objects are loaded once into the Volunteer session store. Navigation passes
+    // compact IDs instead of serialising the entire event through the route.
     val volunteerOpportunityEvent =
         VolunteerOpportunitySessionStore.findEventById(
             volunteerEventId
         )
 
+    // A deleted/expired event or stale deep link must show a safe recovery screen.
     if (volunteerOpportunityEvent == null) {
         VolunteerOpportunityNotFoundScreen(
             onBackSelected = onBackSelected
@@ -167,6 +174,8 @@ fun VolunteerOpportunityDetailsScreen(
                         onLocationSelected(volunteerOpportunityEvent.eventId)
                     },
                     onOrganisationSelected = {
+                        // Load the small public profile only when requested, rather than
+                        // fetching every organisation profile while Home is composing.
                         showOrganisationPreview = true
                         if (organisationPreviewProfile?.organisationId !=
                             volunteerOpportunityEvent.eventOrganisationId

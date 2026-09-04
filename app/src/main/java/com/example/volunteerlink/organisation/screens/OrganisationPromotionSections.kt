@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.screens
 
+// FILE OVERVIEW:
+/*
+ * OrganisationPromotionSections contains presentation code for the organisation promotion management flow.
+ * It focuses on rendering state and forwarding user actions through callbacks/ViewModels,
+ * keeping database access and business rules outside the composables where possible.
+ */
+
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -79,6 +87,10 @@ import java.util.Locale
 
 
 @Composable
+/**
+ * Renders the promotion post selection screen screen used in the organisation promotion management flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun PromotionPostSelectionScreen(
     isLoading: Boolean,
     errorMessage: String?,
@@ -211,6 +223,10 @@ fun PromotionPostSelectionScreen(
 }
 
 @Composable
+/**
+ * Renders the promotion package screen screen used in the organisation promotion management flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun PromotionPackageScreen(
     post: ManagePostItem,
     selectedPackage: PromotionPackage?,
@@ -332,6 +348,10 @@ fun PromotionPackageScreen(
 }
 
 @Composable
+/**
+ * Renders the promotion review screen screen used in the organisation promotion management flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun PromotionReviewScreen(
     post: ManagePostItem,
     promotionPackage: PromotionPackage,
@@ -431,6 +451,10 @@ fun PromotionReviewScreen(
 }
 
 @Composable
+/**
+ * Renders the promotion payment method screen screen used in the organisation promotion management flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun PromotionPaymentMethodScreen(
     postTitle: String,
     promotionPackage: PromotionPackage,
@@ -510,6 +534,10 @@ fun PromotionPaymentMethodScreen(
 }
 
 @Composable
+/**
+ * Renders the promotion touch ngo screen screen used in the organisation promotion management flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun PromotionTouchNGoScreen(
     post: ManagePostItem,
     promotionPackage: PromotionPackage,
@@ -614,6 +642,10 @@ fun PromotionTouchNGoScreen(
 }
 
 @Composable
+/**
+ * Renders the promotion card payment screen screen used in the organisation promotion management flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun PromotionCardPaymentScreen(
     postTitle: String,
     promotionPackage: PromotionPackage,
@@ -823,6 +855,10 @@ fun PromotionCardPaymentScreen(
 }
 
 @Composable
+/**
+ * Renders the promotion payment success screen screen used in the organisation promotion management flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun PromotionPaymentSuccessScreen(
     promotion: PromotionPurchase,
     onDone: () -> Unit
@@ -927,6 +963,10 @@ fun PromotionPaymentSuccessScreen(
 }
 
 @Composable
+/**
+ * Renders the UI represented by promotion page for the organisation promotion management flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun PromotionPage(
     title: String,
     subtitle: String,
@@ -1016,6 +1056,10 @@ fun PromotionPage(
 }
 
 @Composable
+/**
+ * Renders the UI represented by promotion centered state for the organisation promotion management flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun PromotionCenteredState(content: @Composable ColumnScope.() -> Unit) {
     Column(
         modifier = Modifier
@@ -1028,6 +1072,10 @@ fun PromotionCenteredState(content: @Composable ColumnScope.() -> Unit) {
 }
 
 @Composable
+/**
+ * Renders the promotion post card card used in the organisation promotion management flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun PromotionPostCard(
     post: ManagePostItem,
     promotion: PromotionRecord?,
@@ -1154,6 +1202,10 @@ fun PromotionPostCard(
 }
 
 @Composable
+/**
+ * Renders the promotion selected post summary summary block used in the organisation promotion management flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun PromotionSelectedPostSummary(post: ManagePostItem) {
     PromotionSectionCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1183,6 +1235,10 @@ fun PromotionSelectedPostSummary(post: ManagePostItem) {
 }
 
 @Composable
+/**
+ * Renders the promotion package card card used in the organisation promotion management flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun PromotionPackageCard(
     option: PromotionPackage,
     selected: Boolean,
@@ -1292,6 +1348,10 @@ fun PromotionPackageCard(
 }
 
 @Composable
+/**
+ * Renders the promotion payment choice card card used in the organisation promotion management flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun PromotionPaymentChoiceCard(
     title: String,
     subtitle: String,
@@ -1355,7 +1415,15 @@ fun PromotionPaymentChoiceCard(
     }
 }
 
+/**
+ * Groups the shared values and helper behaviour represented by card number visual transformation.
+ * It supports the promotion management presentation layer without adding backend responsibilities to the screen.
+ */
 object CardNumberVisualTransformation : VisualTransformation {
+    /**
+     * Filters the current data for the organisation promotion management flow.
+     * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+     */
     override fun filter(text: AnnotatedString): TransformedText {
         val raw = text.text.take(16)
         val formatted = buildString {
@@ -1366,6 +1434,10 @@ object CardNumberVisualTransformation : VisualTransformation {
         }
 
         val offsetMapping = object : OffsetMapping {
+            /**
+             * Derives the original to transformed value used by the organisation promotion management flow.
+             * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+             */
             override fun originalToTransformed(offset: Int): Int {
                 val safeOffset = offset.coerceIn(0, raw.length)
                 return safeOffset + when {
@@ -1376,6 +1448,10 @@ object CardNumberVisualTransformation : VisualTransformation {
                 }
             }
 
+            /**
+             * Derives the transformed to original value used by the organisation promotion management flow.
+             * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+             */
             override fun transformedToOriginal(offset: Int): Int {
                 val safeOffset = offset.coerceIn(0, formatted.length)
                 return (safeOffset - when {
@@ -1391,7 +1467,15 @@ object CardNumberVisualTransformation : VisualTransformation {
     }
 }
 
+/**
+ * Groups the shared values and helper behaviour represented by card expiry visual transformation.
+ * It supports the promotion management presentation layer without adding backend responsibilities to the screen.
+ */
 object CardExpiryVisualTransformation : VisualTransformation {
+    /**
+     * Filters the current data for the organisation promotion management flow.
+     * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+     */
     override fun filter(text: AnnotatedString): TransformedText {
         val raw = text.text.take(4)
         val formatted = if (raw.length <= 2) {
@@ -1401,11 +1485,19 @@ object CardExpiryVisualTransformation : VisualTransformation {
         }
 
         val offsetMapping = object : OffsetMapping {
+            /**
+             * Derives the original to transformed value used by the organisation promotion management flow.
+             * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+             */
             override fun originalToTransformed(offset: Int): Int {
                 val safeOffset = offset.coerceIn(0, raw.length)
                 return if (safeOffset <= 2) safeOffset else safeOffset + 1
             }
 
+            /**
+             * Derives the transformed to original value used by the organisation promotion management flow.
+             * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+             */
             override fun transformedToOriginal(offset: Int): Int {
                 val safeOffset = offset.coerceIn(0, formatted.length)
                 return (if (safeOffset <= 2) safeOffset else safeOffset - 1)
@@ -1418,6 +1510,10 @@ object CardExpiryVisualTransformation : VisualTransformation {
 }
 
 @Composable
+/**
+ * Renders the promotion payment field input field used in the organisation promotion management flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun PromotionPaymentField(
     value: String,
     onValueChange: (String) -> Unit,
@@ -1453,6 +1549,10 @@ fun PromotionPaymentField(
 }
 
 @Composable
+/**
+ * Renders the promotion primary button button used in the organisation promotion management flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun PromotionPrimaryButton(
     text: String,
     enabled: Boolean,
@@ -1488,6 +1588,10 @@ fun PromotionPrimaryButton(
 }
 
 @Composable
+/**
+ * Renders the promotion section card card used in the organisation promotion management flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun PromotionSectionCard(content: @Composable ColumnScope.() -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -1503,6 +1607,10 @@ fun PromotionSectionCard(content: @Composable ColumnScope.() -> Unit) {
 }
 
 @Composable
+/**
+ * Renders the promotion detail row row used in the organisation promotion management flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun PromotionDetailRow(label: String, value: String) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -1527,6 +1635,10 @@ fun PromotionDetailRow(label: String, value: String) {
 }
 
 @Composable
+/**
+ * Renders the UI represented by promotion divider for the organisation promotion management flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun PromotionDivider() {
     HorizontalDivider(
         modifier = Modifier.padding(vertical = 12.dp),
@@ -1535,6 +1647,10 @@ fun PromotionDivider() {
 }
 
 @Composable
+/**
+ * Renders the UI represented by fake payment qr for the organisation promotion management flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun FakePaymentQr(
     payload: String,
     modifier: Modifier = Modifier
@@ -1579,6 +1695,10 @@ fun FakePaymentQr(
     }
 }
 
+/**
+ * Derives the draw scope value used by the organisation promotion management flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun DrawScope.drawFinder(column: Int, row: Int, cell: Float) {
     drawRect(
         color = Color.Black,
@@ -1597,6 +1717,10 @@ fun DrawScope.drawFinder(column: Int, row: Int, cell: Float) {
     )
 }
 
+/**
+ * Checks whether the in is finder for the organisation promotion management flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun isInFinder(column: Int, row: Int, modules: Int): Boolean {
     val topLeft = column in 0..6 && row in 0..6
     val topRight = column in (modules - 7)..(modules - 1) && row in 0..6
@@ -1604,9 +1728,17 @@ fun isInFinder(column: Int, row: Int, modules: Int): Boolean {
     return topLeft || topRight || bottomLeft
 }
 
+/**
+ * Formats the price used by the organisation promotion management flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun formatPrice(value: Double): String =
     String.format(Locale.US, "RM%.2f", value)
 
+/**
+ * Formats the display date used by the organisation promotion management flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun formatDisplayDate(value: String): String {
     if (value.isBlank()) return "—"
     val input = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply { isLenient = false }
@@ -1616,6 +1748,10 @@ fun formatDisplayDate(value: String): String {
     }.getOrDefault(value)
 }
 
+/**
+ * Formats the display date time used by the organisation promotion management flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun formatDisplayDateTime(value: Long): String {
     return SimpleDateFormat("d MMM yyyy, h:mm a", Locale.US).format(Date(value))
 }

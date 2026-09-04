@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.create.components
 
+// FILE OVERVIEW:
+/*
+ * CreatePostComponents contains presentation code for the organisation Create/Edit Post flow.
+ * It focuses on rendering state and forwarding user actions through callbacks/ViewModels,
+ * keeping database access and business rules outside the composables where possible.
+ */
+
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -47,6 +55,10 @@ import com.example.volunteerlink.organisation.create.model.VolunteerPostType
 
 
 @Composable
+/**
+ * Renders the UI represented by edit restriction notice for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun EditRestrictionNotice(
     title: String,
     message: String,
@@ -99,6 +111,10 @@ fun EditRestrictionNotice(
 }
 
 @Composable
+/**
+ * Renders the create section card card used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun CreateSectionCard(
     title: String,
     subtitle: String? = null,
@@ -142,6 +158,10 @@ fun CreateSectionCard(
 }
 
 @Composable
+/**
+ * Renders the post type card card used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun PostTypeCard(
     type: VolunteerPostType,
     iconRes: Int,
@@ -237,6 +257,10 @@ fun PostTypeCard(
 }
 
 @Composable
+/**
+ * Renders the category picker picker used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun CategoryPicker(
     selectedCategory: VolunteerPostCategory?,
     onCategorySelected: (VolunteerPostCategory) -> Unit,
@@ -326,6 +350,10 @@ fun CategoryPicker(
 }
 
 @Composable
+/**
+ * Renders the form selection field input field used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun FormSelectionField(
     label: String,
     value: String,
@@ -404,6 +432,10 @@ fun FormSelectionField(
 }
 
 @Composable
+/**
+ * Renders the volunteer capacity field input field used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun VolunteerCapacityField(
     value: Int?,
     onValueChanged: (String) -> Unit,
@@ -445,6 +477,10 @@ fun VolunteerCapacityField(
 }
 
 @Composable
+/**
+ * Returns the form error used by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun FormError(message: String?) {
     if (!message.isNullOrBlank()) {
         Text(

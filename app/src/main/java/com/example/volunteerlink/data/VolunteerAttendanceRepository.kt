@@ -1,5 +1,7 @@
 package com.example.volunteerlink.data
 
+// Reads attendance information from Supabase without changing organiser records.
+
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.postgrest
@@ -26,6 +28,8 @@ data class VolunteerAttendanceData(val records: List<VolunteerAttendanceRecord>,
 
 object VolunteerAttendanceRepository {
     suspend fun load(post: String, role: String, expectedAccount: String): VolunteerAttendanceData {
+        // Keep the account check at both ends of the request so a late response from a
+        // previous login cannot populate attendance for the next person using the phone.
         check(VolunteerRemoteSubmissionRepository.readyAccountId() == expectedAccount) { "Account changed. Reopen this application." }
         val profile = supabase.from("user_profiles").select(columns = Columns.raw("user_id")) {
             filter { eq("auth_user_id", expectedAccount); eq("account_type", "VOLUNTEER") }
@@ -44,6 +48,8 @@ object VolunteerAttendanceRepository {
     }
 
     suspend fun checkIn(post: String, role: String, pin: String, expectedAccount: String) {
+        // PIN validation and attendance recording happen in Supabase. The device only
+        // sends the volunteer's entered code; it never stores or compares the PIN locally.
         require(pin.matches(Regex("[0-9]{6}"))) { "Enter the six-digit code provided by the organisation." }
         check(VolunteerRemoteSubmissionRepository.readyAccountId() == expectedAccount) { "Account changed. Reopen this application." }
         supabase.postgrest.rpc("check_in_with_attendance_pin", buildJsonObject {

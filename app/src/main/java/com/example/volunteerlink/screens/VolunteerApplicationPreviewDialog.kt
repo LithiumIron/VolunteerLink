@@ -1,5 +1,7 @@
 package com.example.volunteerlink.screens
 
+// Final confirmation dialog. It shows read-only profile evidence before an application is sent.
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -26,6 +28,8 @@ fun VolunteerApplicationPreviewDialog(event: VolunteerOpportunityEvent, role: Vo
     var retry by remember { mutableIntStateOf(0) }
     var evidence by remember(account) { mutableStateOf<Map<String, VolunteerPreviewEvidence>?>(null) }
     var evidenceError by remember(account) { mutableStateOf<String?>(null) }
+    // Load verified skill evidence only after the profile preview identifies the volunteer.
+    // Evidence is read-only; it helps the volunteer review what the organiser can assess.
     LaunchedEffect(preview, retry) {
         evidence = null
         evidenceError = null
@@ -34,6 +38,8 @@ fun VolunteerApplicationPreviewDialog(event: VolunteerOpportunityEvent, role: Vo
         catch (e: CancellationException) { throw e }
         catch (_: Exception) { evidenceError = "Verified experience could not be loaded. Connect and retry; this does not mean you have no experience." }
     }
+    // Loading this dialog never submits an application. Submission happens only through
+    // onConfirm after the volunteer explicitly reviews profile information and answers.
     LaunchedEffect(account, retry) {
         error = null
         preview = null
@@ -64,6 +70,8 @@ fun VolunteerApplicationPreviewDialog(event: VolunteerOpportunityEvent, role: Vo
                 HorizontalDivider()
                 VolunteerDetailField("Relevant Skill Path", role.rolePrimarySkillPath)
                 VolunteerDetailText("Required: Level ${role.roleMinimumSkillPathLevel}", secondary = true)
+                // Show only evidence relevant to this role instead of overwhelming the
+                // volunteer with every Skill Path in their profile.
                 val relevant = evidence?.entries?.firstOrNull { it.key.equals(role.rolePrimarySkillPath, true) }?.value
                 if (relevant != null) {
                     VolunteerDetailText("Your level: ${relevant.level}")

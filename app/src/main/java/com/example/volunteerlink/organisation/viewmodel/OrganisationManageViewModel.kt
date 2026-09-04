@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.viewmodel
 
+// FILE OVERVIEW:
+/*
+ * OrganisationManageViewModel coordinates state and user actions for the organisation Manage Post flow.
+ * It translates UI events into validation/repository operations and exposes observable state
+ * back to Compose so the screen can stay declarative.
+ */
+
+
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -57,6 +65,10 @@ class OrganisationManageViewModel : ViewModel() {
         observeAppClock()
     }
 
+    /**
+     * Reloads the latest data for the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     fun refresh() {
         if (refreshInProgress) return
         refreshInProgress = true
@@ -165,6 +177,10 @@ class OrganisationManageViewModel : ViewModel() {
     private suspend fun resolveCurrentOrganisationId(): String =
         OrganisationSession.requireOrganisationId()
 
+    /**
+     * Derives the observe app clock value used by the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun observeAppClock() {
         viewModelScope.launch {
             AppClock.state.collect { clockState ->
@@ -174,6 +190,10 @@ class OrganisationManageViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Applies the snapshot used by the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun applySnapshot(snapshot: OrganisationHomeSnapshot) {
         val nowMillis = AppClock.nowMillis()
         val active = mutableListOf<ManagePostItem>()
@@ -352,6 +372,10 @@ class OrganisationManageViewModel : ViewModel() {
         )
     }
 
+    /**
+     * Builds the draft attention used by the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun buildDraftAttention(
         post: OrganisationHomePost,
         input: PostTimingInput?,
@@ -394,6 +418,10 @@ class OrganisationManageViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Builds the application attention used by the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun buildApplicationAttention(
         post: OrganisationHomePost,
         nowMillis: Long
@@ -434,6 +462,10 @@ class OrganisationManageViewModel : ViewModel() {
         )
     }
 
+    /**
+     * Derives the organisation home role value used by the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun OrganisationHomeRole.isReviewStillOpen(
         post: OrganisationHomePost,
         nowMillis: Long
@@ -449,6 +481,10 @@ class OrganisationManageViewModel : ViewModel() {
         ).isOpen
     }
 
+    /**
+     * Derives the organisation home post value used by the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun OrganisationHomePost.toTimingInput(): PostTimingInput? {
         val postMode = PostMode.fromDatabaseValue(mode) ?: return null
         return PostTimingInput(
@@ -460,6 +496,10 @@ class OrganisationManageViewModel : ViewModel() {
         )
     }
 
+    /**
+     * Derives the organisation home post value used by the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun OrganisationHomePost.toManageItem(
         timingState: PostTimingState?,
         nowMillis: Long,
@@ -505,6 +545,10 @@ class OrganisationManageViewModel : ViewModel() {
         )
     }
 
+    /**
+     * Derives the evaluate single period value used by the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun evaluateSinglePeriod(
         mode: PostMode,
         startDate: String?,
@@ -530,6 +574,10 @@ class OrganisationManageViewModel : ViewModel() {
         return PostTimingEvaluator.evaluatePostTiming(input, nowMillis)
     }
 
+    /**
+     * Returns the requested data used by the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun List<ManageAttentionItem>.sortedBySeverity(): List<ManageAttentionItem> {
         return sortedWith(
             compareBy<ManageAttentionItem> {
@@ -543,6 +591,10 @@ class OrganisationManageViewModel : ViewModel() {
         )
     }
 
+    /**
+     * Renders the manage post item item used in the organisation Manage Post flow.
+     * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+     */
     private fun ManagePostItem.highestSeverityRank(): Int {
         return attentionItems.maxOfOrNull {
             when (it.severity) {
@@ -554,6 +606,10 @@ class OrganisationManageViewModel : ViewModel() {
         } ?: 0
     }
 
+    /**
+     * Returns the latest date value required by the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun latestDate(first: String?, second: String?): String? {
         return when {
             first.isNullOrBlank() -> second
@@ -563,6 +619,10 @@ class OrganisationManageViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Formats the short date used by the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun formatShortDate(value: String): String {
         val parts = value.split("-")
         if (parts.size != 3) return value

@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.repository
 
+// FILE OVERVIEW:
+/*
+ * SupabaseOrganisationPostManagementRepository defines or implements data access used by the organisation Manage Post flow.
+ * Repository code keeps Supabase/RPC/storage details away from the composables and ViewModels
+ * so UI code can work with application models instead of backend-specific responses.
+ */
+
+
 import com.example.volunteerlink.data.supabase
 import com.example.volunteerlink.organisation.auth.OrganisationSession
 import com.example.volunteerlink.organisation.manage.model.PostManagementAttendanceDay
@@ -35,10 +43,16 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
 
 @Serializable
+/**
+ * Holds the values represented by post management event contact row as one strongly typed model.
+ * It keeps backend-facing work behind the Manage Post repository boundary.
+ */
 private data class PostManagementEventContactRow(
     @SerialName("user_id") val userId: String,
     @SerialName("shared_phone") val sharedPhone: String = "",
@@ -46,6 +60,10 @@ private data class PostManagementEventContactRow(
 )
 
 @Serializable
+/**
+ * Holds the values represented by impact weave post contribution row as one strongly typed model.
+ * It keeps backend-facing work behind the Manage Post repository boundary.
+ */
 private data class ImpactWeavePostContributionRow(
     @SerialName("impact_weave_draft_id") val impactWeaveDraftId: String,
     @SerialName("partner_organisation_id") val partnerOrganisationId: String,
@@ -60,10 +78,41 @@ private data class ImpactWeavePostContributionRow(
 /** Supabase reader for the Organisation Post Management detail screen. */
 class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementRepository {
 
+    /**
+     * Publishes the current Volunteer Post data after the required Manage Post checks pass.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    override suspend fun publishSavedDraft(postId: String, appNowMillis: Long) {
+        val organisation = OrganisationSession.requireContext()
+        require(organisation.isVerified) {
+            "Your organisation must be verified before publishing volunteer posts."
+        }
+
+        val appTimestamp = SimpleDateFormat(
+            "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+            Locale.US
+        ).format(Date(appNowMillis))
+        val appToday = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+            .format(Date(appNowMillis))
+
+        supabase.postgrest.rpc(
+            function = "organisation_publish_saved_draft",
+            parameters = buildJsonObject {
+                put("p_post_id", postId)
+                put("p_app_now", appTimestamp)
+                put("p_app_today", appToday)
+            }
+        )
+    }
+
     companion object {
         private const val REMOTE_SUBMISSION_BUCKET = "remote-submissions"
     }
 
+    /**
+     * Loads the post needed by the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     override suspend fun loadPost(postId: String): PostManagementPost {
         val organisationContext = OrganisationSession.requireContext()
         val organisationId = organisationContext.organisationId
@@ -492,6 +541,10 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
     }
 
 
+    /**
+     * Derives the download remote submission value used by the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     override suspend fun downloadRemoteSubmission(
         postId: String,
         filePath: String
@@ -511,6 +564,10 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
             .downloadAuthenticated(normalizedPath)
     }
 
+    /**
+     * Derives the review remote submission value used by the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     override suspend fun reviewRemoteSubmission(
         postId: String,
         submissionId: String,
@@ -546,6 +603,10 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
         )
     }
 
+    /**
+     * Saves the remote submission review stage for the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     override suspend fun saveRemoteSubmissionReviewStage(
         postId: String,
         decisions: List<PostManagementRemoteSubmissionDecision>,
@@ -602,6 +663,10 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
         )
     }
 
+    /**
+     * Finalises the remote review batch for the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     override suspend fun finalizeRemoteReviewBatch(
         postId: String,
         feedbackByParticipation: Map<String, String>
@@ -628,6 +693,10 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
         )
     }
 
+    /**
+     * Loads the physical attendance needed by the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     override suspend fun loadPhysicalAttendance(
         postId: String
     ): PostManagementAttendanceSnapshot {
@@ -683,6 +752,10 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
     }
 
 
+    /**
+     * Sets the applicant shortlisted used by the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     override suspend fun setApplicantShortlisted(
         postId: String,
         roleTemplateId: String,
@@ -702,16 +775,28 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
         )
     }
 
+    /**
+     * Derives the review applicant value used by the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     override suspend fun reviewApplicant(
         postId: String,
         roleTemplateId: String,
         userId: String,
-        decision: String
+        decision: String,
+        decisionNote: String?
     ) {
         requireOwnedPost(postId)
         val normalizedDecision = decision.trim().uppercase(Locale.US)
         require(normalizedDecision in setOf("ACCEPT", "DECLINE")) {
             "Applicant decision must be ACCEPT or DECLINE."
+        }
+
+        val normalizedDecisionNote = decisionNote?.trim().orEmpty()
+        if (normalizedDecision == "DECLINE") {
+            require(normalizedDecisionNote.isNotBlank()) {
+                "Enter a reason before declining this application."
+            }
         }
 
         supabase.postgrest.rpc(
@@ -721,10 +806,18 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
                 put("p_role_template_id", roleTemplateId)
                 put("p_user_id", userId)
                 put("p_decision", normalizedDecision)
+                put(
+                    "p_decision_note",
+                    if (normalizedDecision == "DECLINE") normalizedDecisionNote else ""
+                )
             }
         )
     }
 
+    /**
+     * Starts the physical attendance for the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     override suspend fun startPhysicalAttendance(postId: String) {
         requireOwnedPost(postId)
 
@@ -736,6 +829,10 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
         )
     }
 
+    /**
+     * Marks the volunteer present with its new state in the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     override suspend fun markVolunteerPresent(
         postId: String,
         eventDate: String,
@@ -755,6 +852,10 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
         )
     }
 
+    /**
+     * Marks the volunteer absent with its new state in the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     override suspend fun markVolunteerAbsent(
         postId: String,
         eventDate: String,
@@ -774,6 +875,10 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
         )
     }
 
+    /**
+     * Prepares the physical review for the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     override suspend fun preparePhysicalReview(postId: String) {
         requireOwnedPost(postId)
         supabase.postgrest.rpc(
@@ -782,6 +887,10 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
         )
     }
 
+    /**
+     * Derives the report physical review issue value used by the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     override suspend fun reportPhysicalReviewIssue(
         postId: String,
         roleTemplateId: String,
@@ -800,6 +909,10 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
         )
     }
 
+    /**
+     * Confirms the all ready physical in the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     override suspend fun completeAllReadyPhysical(postId: String) {
         requireOwnedPost(postId)
         supabase.postgrest.rpc(
@@ -808,6 +921,10 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
         )
     }
 
+    /**
+     * Finalises the physical volunteer for the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     override suspend fun finalizePhysicalVolunteer(
         postId: String,
         roleTemplateId: String,
@@ -828,6 +945,10 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
         )
     }
 
+    /**
+     * Saves the physical feedback for the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     override suspend fun savePhysicalFeedback(
         postId: String,
         userIds: List<String>,
@@ -846,6 +967,10 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
         )
     }
 
+    /**
+     * Finalises the physical review post for the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     override suspend fun finalizePhysicalReviewPost(postId: String) {
         requireOwnedPost(postId)
         supabase.postgrest.rpc(
@@ -854,6 +979,10 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
         )
     }
 
+    /**
+     * Finalises the physical review batch for the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     override suspend fun finalizePhysicalReviewBatch(
         postId: String,
         decisions: List<PostManagementPendingReviewDecision>,
@@ -877,7 +1006,7 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
                                 put("reason", JsonNull)
                             } else {
                                 // Current SQL uses `note`. Keep `reason` as the same transport
-                                // value too so an older deployed batch RPC cannot silently lose it.
+                                // value too so every batch review save keeps the selected decision consistently.
                                 put("note", reason)
                                 put("reason", reason)
                             }
@@ -896,6 +1025,10 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
         )
     }
 
+    /**
+     * Derives the require owned post value used by the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     private suspend fun requireOwnedPost(postId: String) {
         val organisationId = OrganisationSession.requireOrganisationId()
         val ownsPost = supabase
@@ -915,29 +1048,49 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
     }
 
 
+    /**
+     * Derives the json object value used by the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     private fun JsonObject.requiredText(key: String): String {
         return optionalText(key)
             ?: error("Missing required Supabase field: $key")
     }
 
+    /**
+     * Derives the json object value used by the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     private fun JsonObject.optionalText(key: String): String? {
         val element: JsonElement = this[key] ?: return null
         if (element is JsonNull) return null
         return runCatching { element.jsonPrimitive.contentOrNull }.getOrNull()
     }
 
+    /**
+     * Derives the json object value used by the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     private fun JsonObject.optionalBoolean(key: String): Boolean? {
         val element: JsonElement = this[key] ?: return null
         if (element is JsonNull) return null
         return runCatching { element.jsonPrimitive.booleanOrNull }.getOrNull()
     }
 
+    /**
+     * Derives the json object value used by the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     private fun JsonObject.optionalInt(key: String): Int? {
         val element: JsonElement = this[key] ?: return null
         if (element is JsonNull) return null
         return runCatching { element.jsonPrimitive.intOrNull }.getOrNull()
     }
 
+    /**
+     * Derives the json object value used by the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
     private fun JsonObject.requiredInt(key: String): Int {
         val value = this[key]
             ?.takeUnless { it is JsonNull }

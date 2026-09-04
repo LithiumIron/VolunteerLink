@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.viewmodel
 
+// FILE OVERVIEW:
+/*
+ * OrganisationHomeViewModel coordinates state and user actions for the organisation Home dashboard flow.
+ * It translates UI events into validation/repository operations and exposes observable state
+ * back to Compose so the screen can stay declarative.
+ */
+
+
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -141,6 +149,10 @@ class OrganisationHomeViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Applies the snapshot used by the organisation Home dashboard flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun applySnapshot(snapshot: OrganisationHomeSnapshot) {
         val nowMillis = AppClock.nowMillis()
 
@@ -283,6 +295,10 @@ class OrganisationHomeViewModel : ViewModel() {
         )
     }
 
+    /**
+     * Derives the organisation impact weave attention value used by the organisation Home dashboard flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun OrganisationImpactWeaveAttention.toHomeAttentionItem(): HomeAttentionItem {
         val type = when (attentionType.uppercase(Locale.ROOT)) {
             "READY" -> HomeAttentionType.IMPACT_WEAVE_READY
@@ -312,6 +328,10 @@ class OrganisationHomeViewModel : ViewModel() {
         )
     }
 
+    /**
+     * Builds the completion review attention used by the organisation Home dashboard flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun buildCompletionReviewAttention(
         post: OrganisationHomePost
     ): HomeAttentionItem {
@@ -325,6 +345,10 @@ class OrganisationHomeViewModel : ViewModel() {
         )
     }
 
+    /**
+     * Builds the application review attention used by the organisation Home dashboard flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun buildApplicationReviewAttention(
         post: OrganisationHomePost,
         nowMillis: Long
@@ -376,6 +400,10 @@ class OrganisationHomeViewModel : ViewModel() {
         )
     }
 
+    /**
+     * Derives the com value used by the organisation Home dashboard flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun com.example.volunteerlink.organisation.home.model.OrganisationHomeRole
             .isApplicationReviewStillOpen(
         post: OrganisationHomePost,
@@ -392,6 +420,10 @@ class OrganisationHomeViewModel : ViewModel() {
         ).isOpen
     }
 
+    /**
+     * Builds the draft attention used by the organisation Home dashboard flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun buildDraftAttention(
         post: OrganisationHomePost,
         input: PostTimingInput,
@@ -430,6 +462,10 @@ class OrganisationHomeViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Derives the organisation home post value used by the organisation Home dashboard flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun OrganisationHomePost.toTimingInput(): PostTimingInput? {
         val postMode = PostMode.fromDatabaseValue(mode) ?: return null
         return PostTimingInput(
@@ -441,6 +477,10 @@ class OrganisationHomeViewModel : ViewModel() {
         )
     }
 
+    /**
+     * Derives the organisation home post value used by the organisation Home dashboard flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun OrganisationHomePost.toHomePostItem(
         timingState: PostTimingState,
         nowMillis: Long
@@ -482,6 +522,10 @@ class OrganisationHomeViewModel : ViewModel() {
         )
     }
 
+    /**
+     * Derives the evaluate single period state value used by the organisation Home dashboard flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun evaluateSinglePeriodState(
         mode: PostMode,
         startDate: String?,
@@ -508,6 +552,10 @@ class OrganisationHomeViewModel : ViewModel() {
         )
     }
 
+    /**
+     * Formats the home date used by the organisation Home dashboard flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun formatHomeDate(value: String): String {
         val parts = value.split("-")
         if (parts.size != 3) return value
@@ -530,6 +578,10 @@ class OrganisationHomeViewModel : ViewModel() {
         return "$day $month"
     }
 
+    /**
+     * Returns the latest date value required by the organisation Home dashboard flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
     private fun latestDate(first: String?, second: String?): String? {
         return when {
             first.isNullOrBlank() -> second

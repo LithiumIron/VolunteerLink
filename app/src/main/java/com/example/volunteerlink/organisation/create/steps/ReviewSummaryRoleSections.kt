@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.create.steps
 
+// FILE OVERVIEW:
+/*
+ * ReviewSummaryRoleSections contains presentation code for the organisation Create/Edit Post flow.
+ * It focuses on rendering state and forwarding user actions through callbacks/ViewModels,
+ * keeping database access and business rules outside the composables where possible.
+ */
+
+
 import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.compose.foundation.BorderStroke
@@ -59,6 +67,10 @@ import java.util.Date
 import java.util.Locale
 
 @Composable
+/**
+ * Renders the review roles capacity section section used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun ReviewRolesCapacitySection(
     uiState: CreatePostUiState,
     onEdit: () -> Unit
@@ -123,6 +135,10 @@ fun ReviewRolesCapacitySection(
 
 
 @Composable
+/**
+ * Renders the review role settings section section used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun ReviewRoleSettingsSection(
     uiState: CreatePostUiState,
     onEdit: () -> Unit
@@ -204,6 +220,10 @@ fun ReviewRoleSettingsSection(
 
 
 @Composable
+/**
+ * Renders the UI represented by review capacity stats for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun ReviewCapacityStats(
     physicalCapacity: Int,
     remoteCapacity: Int,
@@ -246,6 +266,10 @@ fun ReviewCapacityStats(
 
 
 @Composable
+/**
+ * Renders the UI represented by review role group for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun ReviewRoleGroup(
     title: String,
     roles: List<SelectedRoleDraft>,
@@ -277,6 +301,10 @@ fun ReviewRoleGroup(
 
 
 @Composable
+/**
+ * Renders the review role capacity row row used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun ReviewRoleCapacityRow(
     roleName: String,
     capacity: Int,
@@ -317,6 +345,10 @@ fun ReviewRoleCapacityRow(
 
 
 @Composable
+/**
+ * Renders the review role settings card card used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun ReviewRoleSettingsCard(
     selectedRole: SelectedRoleDraft,
     template: CreateRoleTemplate?,
@@ -460,6 +492,10 @@ fun ReviewRoleSettingsCard(
 
 
 @Composable
+/**
+ * Renders the review skill row row used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun ReviewSkillRow(
     skillName: String,
     requiredExperience: Int?

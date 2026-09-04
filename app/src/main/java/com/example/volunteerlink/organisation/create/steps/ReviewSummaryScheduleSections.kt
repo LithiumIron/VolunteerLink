@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.create.steps
 
+// FILE OVERVIEW:
+/*
+ * ReviewSummaryScheduleSections contains presentation code for the organisation Create/Edit Post flow.
+ * It focuses on rendering state and forwarding user actions through callbacks/ViewModels,
+ * keeping database access and business rules outside the composables where possible.
+ */
+
+
 import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.compose.foundation.BorderStroke
@@ -59,6 +67,10 @@ import java.util.Date
 import java.util.Locale
 
 @Composable
+/**
+ * Renders the review schedule section section used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun ReviewScheduleSection(
     uiState: CreatePostUiState,
     onEdit: () -> Unit
@@ -141,6 +153,10 @@ fun ReviewScheduleSection(
 
 
 @Composable
+/**
+ * Renders the UI represented by review schedule stats for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun ReviewScheduleStats(
     physicalCount: Int,
     remoteCount: Int
@@ -164,6 +180,10 @@ fun ReviewScheduleStats(
 
 
 @Composable
+/**
+ * Renders the review schedule group card card used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun ReviewScheduleGroupCard(
     uiState: CreatePostUiState,
     type: ScheduleType,
@@ -238,6 +258,10 @@ fun ReviewScheduleGroupCard(
 
 
 @Composable
+/**
+ * Renders the review schedule item card card used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun ReviewScheduleItemCard(
     uiState: CreatePostUiState,
     item: ScheduleItemDraft,
@@ -334,6 +358,10 @@ fun ReviewScheduleItemCard(
 }
 
 
+/**
+ * Derives the review schedule summary line value used by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun reviewScheduleSummaryLine(
     item: ScheduleItemDraft
 ): String {

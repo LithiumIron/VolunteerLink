@@ -1,6 +1,8 @@
 
 package com.example.volunteerlink.data
 
+// Reads verified Skill Path progress and completion evidence for the volunteer.
+
 import com.example.volunteerlink.model.VolunteerSkill
 import com.example.volunteerlink.model.VolunteerSkillPath
 import com.example.volunteerlink.model.VolunteerSkillPathLevel
@@ -198,5 +200,4 @@ private data class VolunteerSkillPathProgressRow(
     @SerialName("updated_at")
     val updatedAt: String
 )
-
 

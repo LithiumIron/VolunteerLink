@@ -1,6 +1,8 @@
 
 package com.example.volunteerlink.screens
 
+// Filters the loaded event list locally as the volunteer types a search query.
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement

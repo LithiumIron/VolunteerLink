@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.create.model
 
+// FILE OVERVIEW:
+/*
+ * CreatePostUiState groups the data structures used by the organisation Create/Edit Post flow.
+ * These models make state explicit and allow the UI, ViewModel and repository layers to exchange
+ * strongly typed values instead of passing unrelated parameters throughout the feature.
+ */
+
+
 import com.example.volunteerlink.data.location.LocationSuggestion
 import com.example.volunteerlink.organisation.create.PostEditPolicy
 import com.example.volunteerlink.organisation.impactweave.model.ImpactWeavePostPartner
@@ -8,6 +16,10 @@ import com.example.volunteerlink.organisation.impactweave.model.ImpactWeavePostP
 /** Which database action the shared post editor represents. */
 sealed interface CreatePostEditorMode {
     data object NewPost : CreatePostEditorMode
+    /**
+     * Holds the values represented by existing post edit as one strongly typed model.
+     * It keeps related Create/Edit Post values together so callers do not pass disconnected fields around.
+     */
     data class ExistingPostEdit(val postId: String) : CreatePostEditorMode
 }
 
@@ -30,6 +42,10 @@ data class CreatePostErrors(
     val hybridPhysicalCapacity: String? = null,
     val hybridRemoteCapacity: String? = null
 ) {
+    /**
+     * Checks whether the current Create/Edit Post state has errors.
+     * Keeping this transformation near the model makes the data flow easier to understand.
+     */
     fun hasErrors(): Boolean {
         return listOf(
             postType,
@@ -58,6 +74,10 @@ data class RoleSelectionErrors(
     val physical: String? = null,
     val remote: String? = null
 ) {
+    /**
+     * Checks whether the current Create/Edit Post state has errors.
+     * Keeping this transformation near the model makes the data flow easier to understand.
+     */
     fun hasErrors(): Boolean {
         return general != null || physical != null || remote != null
     }
@@ -161,6 +181,10 @@ data class CreatePostUiState(
             RoleSelectionErrors()
         }
 
+    /**
+     * Checks whether the current Create/Edit Post state has unsaved input.
+     * Keeping this transformation near the model makes the data flow easier to understand.
+     */
     fun hasUnsavedInput(): Boolean {
         return draft.hasMeaningfulContent()
     }

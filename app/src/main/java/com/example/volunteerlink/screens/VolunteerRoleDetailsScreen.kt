@@ -1,6 +1,8 @@
 
 package com.example.volunteerlink.screens
 
+// Applies role-level eligibility checks and gives the volunteer the correct next action.
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -72,6 +74,8 @@ fun VolunteerRoleDetailsScreen(
     skillPathViewModel:
         VolunteerSkillPathViewModel = viewModel()
 ) {
+    // Use the shared business clock so eligibility follows the same test/real date
+    // rule as Home, application windows and attendance.
     val businessNow = volunteerBusinessTime()
     val volunteerOpportunityEvent =
         VolunteerOpportunitySessionStore.findEventById(
@@ -84,6 +88,8 @@ fun VolunteerRoleDetailsScreen(
             roleId = volunteerRoleId
         )
 
+    // A role may disappear after a dashboard refresh. Stop safely instead of showing
+    // a stale role or allowing navigation with an invalid ID.
     if (
         volunteerOpportunityEvent == null ||
         volunteerOpportunityRole == null
@@ -98,6 +104,8 @@ fun VolunteerRoleDetailsScreen(
         skillPathViewModel.uiState
             .collectAsStateWithLifecycle()
 
+    // Match the role's required path with the volunteer's verified progress. The role
+    // cannot infer eligibility from display text alone.
     val matchingVolunteerSkillPath =
         skillPathUiState.skillPaths
             .firstOrNull { skillPath ->
@@ -125,6 +133,8 @@ fun VolunteerRoleDetailsScreen(
                 volunteerOpportunityRole
                     .roleMinimumSkillPathLevel
 
+    // These flags drive the one primary action at the bottom: apply, reapply, view
+    // existing application, or explain why the role cannot be selected now.
     val volunteerHasApplied =
         VolunteerOpportunitySessionStore
             .hasApplicationForRole(
@@ -150,6 +160,8 @@ fun VolunteerRoleDetailsScreen(
     val activeOtherApplication =
         VolunteerOpportunitySessionStore.activeApplicationForEvent(volunteerEventId)
             ?.takeIf { application -> application.applicationRoleId != volunteerRoleId }
+    // Physical schedule conflict is calculated from existing applications and role
+    // schedules. Remote roles are intentionally not blocked by this check.
     val physicalConflict = com.example.volunteerlink.data.VolunteerPhysicalScheduleConflictEvaluator
         .firstFor(volunteerOpportunityEvent, volunteerOpportunityRole)
 

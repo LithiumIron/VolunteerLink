@@ -54,6 +54,8 @@ internal fun rememberVolunteerPromotionFeed(usingCachedDashboard: Boolean): Volu
     var entries by remember(account) { mutableStateOf(emptyList<VolunteerPromotion>()) }
     var failed by remember(account) { mutableStateOf(false) }
     var retry by remember { mutableIntStateOf(0) }
+    // Promotions are refreshed while Home is visible because a paid placement can end
+    // during the session. Cached/offline dashboards deliberately show no promotion.
     LaunchedEffect(account, owner, retry, usingCachedDashboard) {
         owner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             var untilNextRefresh = 0
@@ -95,6 +97,8 @@ internal fun VolunteerPromotionSection(events: List<VolunteerOpportunityEvent>, 
             Text("Paid promotion · Swipe to explore", fontSize = 12.sp, color = VolunteerLinkTextSecondary)
         }
         LazyRow(contentPadding = PaddingValues(horizontal = VolunteerLinkScreenHorizontalPadding), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            // Only events already passed through normal discovery rules reach this list.
+            // Promotion changes placement; it never bypasses availability or eligibility.
             items(events, key = { it.eventDatabaseId }) { event ->
                 Box(Modifier.width(cardWidth)) {
                     VolunteerHomeCompactCard(event, isPromoted = true, onVolunteerOpportunitySelected = { onSelected(event.eventId) })

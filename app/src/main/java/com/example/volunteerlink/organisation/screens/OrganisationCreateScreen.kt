@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.screens
 
+// FILE OVERVIEW:
+/*
+ * OrganisationCreateScreen contains presentation code for the organisation Create/Edit Post flow.
+ * It focuses on rendering state and forwarding user actions through callbacks/ViewModels,
+ * keeping database access and business rules outside the composables where possible.
+ */
+
+
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.BackHandler
@@ -43,14 +51,17 @@ fun OrganisationCreateScreen(
     impactWeaveDraftId: String? = null,
     viewModel: CreatePostViewModel = viewModel()
 ) {
+    // The CreatePostViewModel owns the complete five-step draft; this route only decides which step to display.
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
+    // Existing-post edit mode hydrates the same CreatePostDraft used by normal creation.
     LaunchedEffect(editPostId) {
         if (!editPostId.isNullOrBlank()) {
             viewModel.loadExistingPostForEdit(editPostId)
         }
     }
+    // Impact Weave conversion also reuses the normal wizard, but starts from confirmed partnership prefill data.
     LaunchedEffect(impactWeaveDraftId) {
         impactWeaveDraftId?.takeIf { it.isNotBlank() }
             ?.let(viewModel::loadImpactWeaveForCreate)
@@ -58,6 +69,11 @@ fun OrganisationCreateScreen(
     var showDiscardDialog by remember { mutableStateOf(false) }
     var hasRequestedLocationPermission by rememberSaveable { mutableStateOf(false) }
 
+    /**
+     * Loads the location bias needed by the organisation Create/Edit Post flow.
+     * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+     */
+    // Approximate device location only biases Geoapify ranking; the search itself remains global.
     fun loadLocationBias() {
         DeviceLocationHelper.getApproximateCurrentLocation(context) { location ->
             if (location != null) {
@@ -102,6 +118,7 @@ fun OrganisationCreateScreen(
         }
     }
 
+    // Protect user-entered work: leaving Create asks for confirmation only when unsaved input exists.
     val requestExit: () -> Unit = {
         if (viewModel.hasUnsavedInput()) {
             showDiscardDialog = true
@@ -110,6 +127,7 @@ fun OrganisationCreateScreen(
         }
     }
 
+    // Back navigation is wizard-aware and also understands Review-edit mode and successful save/publish states.
     val requestBack: () -> Unit = {
         if (uiState.publishedPostId != null || uiState.savedDraftPostId != null || uiState.updatedPostId != null) {
             onExitCreate()
@@ -166,24 +184,24 @@ fun OrganisationCreateScreen(
         OrganisationModulePage(
             title = "Changes Saved",
             message =
-                "Post ${uiState.updatedPostId} was updated successfully. " +
+                "Your changes were saved successfully. " +
                     "Use Back to return to Post Management."
         )
     } else if (uiState.savedDraftPostId != null) {
         OrganisationModulePage(
             title = "Draft Saved",
             message =
-                "Post ${uiState.savedDraftPostId} was saved as a draft and is not published yet. " +
+                "Your volunteer post was saved as a draft and is not published yet. " +
                     "Use Back to return to the Organisation area."
         )
     } else if (uiState.publishedPostId != null) {
         OrganisationModulePage(
             title = "Volunteer Post Published",
             message =
-                "Post ${uiState.publishedPostId} was published successfully. " +
+                "Your volunteer post was published successfully. " +
                     "Use Back to return to the Organisation area."
         )
-    } else when (uiState.currentStep) {
+    } else /* Normal wizard rendering: each number maps to one reusable Create Post step. */ when (uiState.currentStep) {
         1 -> {
             PostDetailsStep(
                 uiState = uiState,

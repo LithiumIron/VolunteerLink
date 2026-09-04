@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.create.steps
 
+// FILE OVERVIEW:
+/*
+ * ScheduleStep contains presentation code for the organisation Create/Edit Post flow.
+ * It focuses on rendering state and forwarding user actions through callbacks/ViewModels,
+ * keeping database access and business rules outside the composables where possible.
+ */
+
+
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -74,6 +82,10 @@ fun ScheduleStep(
 }
 
 @Composable
+/**
+ * Renders the UI represented by schedule overview for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun ScheduleOverview(
     uiState: CreatePostUiState,
     viewModel: CreatePostViewModel,
@@ -99,10 +111,22 @@ fun ScheduleOverview(
     val overviewListState = rememberLazyListState()
 
     val editPolicy = uiState.editPolicy
+    /**
+     * Checks whether the schedule can be edited in the current organisation Create/Edit Post state.
+     * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+     */
     fun scheduleCanEdit(itemId: String): Boolean =
         !uiState.isExistingPostEdit || editPolicy?.schedulePolicies?.get(itemId)?.canEdit != false
+    /**
+     * Checks whether the schedule can be deleted in the current organisation Create/Edit Post state.
+     * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+     */
     fun scheduleCanDelete(itemId: String): Boolean =
         !uiState.isExistingPostEdit || editPolicy?.schedulePolicies?.get(itemId)?.canRemove != false
+    /**
+     * Returns the schedule locked reason used by the organisation Create/Edit Post flow.
+     * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+     */
     fun scheduleLockedReason(itemId: String): String? =
         if (uiState.isExistingPostEdit) editPolicy?.schedulePolicies?.get(itemId)?.reason else null
 
@@ -441,6 +465,10 @@ fun ScheduleOverview(
 }
 
 @Composable
+/**
+ * Renders the schedule item editor screen screen used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun ScheduleItemEditorScreen(
     uiState: CreatePostUiState,
     item: ScheduleItemDraft,
@@ -595,6 +623,10 @@ fun ScheduleItemEditorScreen(
 }
 
 @Composable
+/**
+ * Renders the paused schedule draft card card used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun PausedScheduleDraftCard(
     item: ScheduleItemDraft,
     isEditingExisting: Boolean,
@@ -651,6 +683,10 @@ private fun PausedScheduleDraftCard(
 }
 
 @Composable
+/**
+ * Renders the schedule header header used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun ScheduleHeader(
     onBack: () -> Unit,
     isEditingFromReview: Boolean
@@ -688,6 +724,10 @@ fun ScheduleHeader(
 }
 
 @Composable
+/**
+ * Renders the schedule editor header header used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun ScheduleEditorHeader(
     item: ScheduleItemDraft,
     isEditingExisting: Boolean,
@@ -739,6 +779,10 @@ fun ScheduleEditorHeader(
 }
 
 @Composable
+/**
+ * Renders the optional schedule info card card used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun OptionalScheduleInfoCard() {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -774,6 +818,10 @@ fun OptionalScheduleInfoCard() {
 }
 
 @Composable
+/**
+ * Renders the schedule error card card used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun ScheduleErrorCard(message: String) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -791,6 +839,10 @@ fun ScheduleErrorCard(message: String) {
 }
 
 @Composable
+/**
+ * Renders the schedule warning card card used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 fun ScheduleWarningCard(message: String) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -807,6 +859,10 @@ fun ScheduleWarningCard(message: String) {
     }
 }
 
+/**
+ * Formats the schedule date used by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun formatScheduleDate(dateMillis: Long): String {
     return SimpleDateFormat(
         "dd MMM yyyy",
@@ -814,6 +870,10 @@ fun formatScheduleDate(dateMillis: Long): String {
     ).format(Date(dateMillis))
 }
 
+/**
+ * Derives the schedule sections for post type value used by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun scheduleSectionsForPostType(
     postType: VolunteerPostType?
 ): List<ScheduleType> {

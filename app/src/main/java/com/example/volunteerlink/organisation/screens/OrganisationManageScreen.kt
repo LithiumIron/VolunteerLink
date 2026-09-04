@@ -1,5 +1,13 @@
 package com.example.volunteerlink.organisation.screens
 
+// FILE OVERVIEW:
+/*
+ * OrganisationManageScreen contains presentation code for the organisation Manage Post flow.
+ * It focuses on rendering state and forwarding user actions through callbacks/ViewModels,
+ * keeping database access and business rules outside the composables where possible.
+ */
+
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -47,10 +55,13 @@ fun OrganisationManageScreen(
     onPromotionsClick: () -> Unit,
     viewModel: OrganisationManageViewModel = viewModel()
 ) {
+    // Observe management counts, attention indicators and cached-state information from the ViewModel.
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     val lifecycleOwner = LocalLifecycleOwner.current
     var hasHandledFirstResume by rememberSaveable { mutableStateOf(false) }
+    // Reload Manage after returning from Post Management, Impact Weave, reviews or promotions.
+    // This prevents stale counts after the organisation performs an action on a child screen.
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
@@ -82,6 +93,10 @@ fun OrganisationManageScreen(
 }
 
 @Composable
+/**
+ * Renders the manage landing content content block used in the organisation Manage Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun ManageLandingContent(
     uiState: OrganisationManageUiState,
     onVolunteerPostsClick: () -> Unit,
@@ -200,6 +215,10 @@ private fun ManageLandingContent(
     }
 }
 
+/**
+ * Renders the build post summary summary block used in the organisation Manage Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun buildPostSummary(uiState: OrganisationManageUiState): String {
     return buildList {
         add("${uiState.activePosts.size} active")
@@ -213,6 +232,10 @@ private fun buildPostSummary(uiState: OrganisationManageUiState): String {
     }.joinToString(" · ")
 }
 
+/**
+ * Renders the build manage attention summary summary block used in the organisation Manage Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun buildManageAttentionSummary(uiState: OrganisationManageUiState): String {
     val alertPosts = uiState.attentionPostCount
     val reviewPosts = uiState.reviewAttentionPostCount
@@ -226,8 +249,16 @@ private fun buildManageAttentionSummary(uiState: OrganisationManageUiState): Str
     }
 }
 
+/**
+ * Derives the post word value used by the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 private fun postWord(count: Int): String = if (count == 1) "post" else "posts"
 
+/**
+ * Renders the build impact weave attention summary summary block used in the organisation Manage Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
 private fun buildImpactWeaveAttentionSummary(
     uiState: OrganisationManageUiState
 ): String? {
@@ -241,6 +272,10 @@ private fun buildImpactWeaveAttentionSummary(
 }
 
 @Composable
+/**
+ * Renders the UI represented by manage loading state for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun ManageLoadingState() {
     Column(
         modifier = Modifier
@@ -261,6 +296,10 @@ fun ManageLoadingState() {
 }
 
 @Composable
+/**
+ * Renders the UI represented by manage error state for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
 fun ManageErrorState(
     message: String?,
     onRetry: () -> Unit

@@ -1,6 +1,8 @@
 
 package com.example.volunteerlink.screens
 
+// Presents verified Skill Path levels, progress and related completed volunteer work.
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -85,6 +87,7 @@ fun VolunteerSkillPathScreen(
     skillPathViewModel:
         VolunteerSkillPathViewModel = viewModel()
 ) {
+    // Collect one UI state object so loading, error and content states stay mutually exclusive.
     val skillPathUiState by
         skillPathViewModel.uiState
             .collectAsStateWithLifecycle()
@@ -94,6 +97,7 @@ fun VolunteerSkillPathScreen(
             mutableStateOf("All")
         }
 
+    // The filter changes only what is displayed; it does not change stored Skill Path progress.
     val modeFilters =
         listOf(
             "All",
@@ -101,6 +105,7 @@ fun VolunteerSkillPathScreen(
             "Remote"
         )
 
+    // Build the list for the selected mode before Compose renders the cards.
     val visibleSkillPaths =
         skillPathUiState.skillPaths
             .filter { volunteerSkillPath ->

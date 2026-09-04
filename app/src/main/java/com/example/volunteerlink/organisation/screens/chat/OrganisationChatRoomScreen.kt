@@ -163,6 +163,9 @@ fun OrganisationChatRoomScreen(
     var replyingTo by remember { mutableStateOf<ChatMessage?>(null) }
     var forwardingMessage by remember { mutableStateOf<ChatMessage?>(null) }
     var showForwardChatSelector by remember { mutableStateOf(false) }
+    var forwardError by remember {
+        mutableStateOf<String?>(null)
+    }
 
     var highlightedMessageId by remember { mutableStateOf<String?>(null) }
     var highlightJob by remember { mutableStateOf<Job?>(null) }
@@ -569,8 +572,12 @@ fun OrganisationChatRoomScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(Color.White)
+                    .imePadding()
                     .navigationBarsPadding()
-                    .padding(horizontal = 10.dp, vertical = 8.dp),  // Note: background removed, moved to Column
+                    .padding(
+                        horizontal = 10.dp,
+                        vertical = 8.dp
+                    ),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
@@ -952,6 +959,14 @@ fun OrganisationChatRoomScreen(
             title = { Text("Forward to...") },
             text = {
                 Column {
+                    forwardError?.let { error ->
+                        Text(
+                            text = error,
+                            color = Color(0xFFB3261E),
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                    }
                     // Only show chats the current user has access to
                     val availableChats = ChatData.chatsForCurrentRole()
                     availableChats.forEach { chat ->
@@ -961,11 +976,34 @@ fun OrganisationChatRoomScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable {
-                                        forwardingMessage?.let { msg ->
-                                            ChatData.forwardMessage(msg, chat.id)
+                                        val messageToForward = forwardingMessage ?: return@clickable
+
+                                        scope.launch {
+                                            forwardError = null
+
+                                            runCatching {
+                                                SupabaseChatRepository.forwardMessage(
+                                                    sourceMessageId = messageToForward.id,
+                                                    targetConversationId = chat.id
+                                                )
+
+                                                SupabaseChatRepository.loadMessagesForChat(
+                                                    chat.id
+                                                )
+                                            }.onSuccess { updatedTargetMessages ->
+                                                ChatData.replaceMessages(
+                                                    chatId = chat.id,
+                                                    messages = updatedTargetMessages
+                                                )
+
+                                                forwardingMessage = null
+                                                showForwardChatSelector = false
+                                            }.onFailure { error ->
+                                                forwardError =
+                                                    error.message
+                                                        ?: "Could not forward this message."
+                                            }
                                         }
-                                        forwardingMessage = null
-                                        showForwardChatSelector = false
                                     }
                                     .padding(vertical = 10.dp)
                             )

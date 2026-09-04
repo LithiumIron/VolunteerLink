@@ -56,9 +56,11 @@ fun clockTime(epochMillis: Long): String = clockFormatter.format(java.util.Date(
  * more than a minute has passed. Pass a ticking [nowMillis] from the caller (see ChatRoomScreen's
  * periodic tick) so a message rolls over automatically without needing any other recomposition.
  */
-fun messageTimeLabel(sentAtMillis: Long, nowMillis: Long = System.currentTimeMillis()): String {
-    val elapsed = nowMillis - sentAtMillis
-    return if (elapsed in 0..59_999L) "Now · ${clockTime(sentAtMillis)}" else clockTime(sentAtMillis)
+fun messageTimeLabel(
+    sentAtMillis: Long,
+    nowMillis: Long = System.currentTimeMillis()
+): String {
+    return clockTime(sentAtMillis)
 }
 
 /** A person in a chat room - used to render the member list on the Group Info screen. */
