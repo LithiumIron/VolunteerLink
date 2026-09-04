@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -26,12 +27,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.volunteerlink.ui.theme.VolunteerLinkPrimaryGreen
+import com.example.volunteerlink.ui.theme.VolunteerLinkSoftGreenSurface
+import com.example.volunteerlink.ui.theme.VolunteerLinkTextSecondary
 
 /**
  * Represents one destination inside the shared bottom navigation bar.
@@ -67,7 +73,7 @@ fun AppBottomNavigationBar(
     showChatNotification: Boolean = false
 ) {
 
-    Surface(
+    Box(
         modifier = modifier
             .fillMaxWidth()
             .navigationBarsPadding()
@@ -76,39 +82,34 @@ fun AppBottomNavigationBar(
                 end = 10.dp,
                 bottom = 8.dp
             )
-            .height(82.dp),
-
-        shape = RoundedCornerShape(26.dp),
-
-        // Original prototype-style navigation background.
-        color = Color(0xFFF7FAF5),
-
-        shadowElevation = 12.dp,
-        tonalElevation = 0.dp,
-
-        border = BorderStroke(
-            width = 1.2.dp,
-            color = Color(0xFF71836B)
-        )
     ) {
-
-        Row(
+        Surface(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 5.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .fillMaxWidth()
+                .height(72.dp),
+            shape = RoundedCornerShape(22.dp),
+            color = VolunteerLinkSoftGreenSurface.copy(alpha = 0.94f),
+            border = BorderStroke(
+                width = 1.dp,
+                color = VolunteerLinkPrimaryGreen.copy(alpha = 0.55f)
+            ),
+            shadowElevation = 10.dp,
+            tonalElevation = 3.dp
         ) {
-
-            items.forEach { item ->
-
-                BottomNavigationItem(
-                    item = item,
-                    selected = currentRoute == item.route,
-                    showNotification = showChatNotification && item.label == "Chats",
-                    onClick = {
-                        onItemClick(item)
-                    }
-                )
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 4.dp, vertical = 5.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                items.forEach { item ->
+                    BottomNavigationItem(
+                        item = item,
+                        selected = currentRoute == item.route,
+                        showNotification = showChatNotification && item.label == "Chats",
+                        onClick = { onItemClick(item) }
+                    )
+                }
             }
         }
     }
@@ -128,39 +129,31 @@ private fun RowScope.BottomNavigationItem(
     onClick: () -> Unit
 ) {
 
-    val interactionSource = remember {
-        MutableInteractionSource()
+    val navigationContentColour = if (selected) {
+        VolunteerLinkPrimaryGreen
+    } else {
+        VolunteerLinkTextSecondary.copy(alpha = 0.78f)
     }
 
     Column(
         modifier = Modifier
             .weight(1f)
-            .fillMaxHeight()
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
-                enabled = !selected,
-                onClick = onClick
-            ),
+            .fillMaxSize()
+            .clip(RoundedCornerShape(17.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 2.dp, vertical = 2.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-
-        Spacer(
-            modifier = Modifier.height(8.dp)
-        )
-
-        // Rounded selected indicator behind the icon.
         Box(
             modifier = Modifier
-                .width(52.dp)
-                .height(38.dp)
+                .size(37.dp)
                 .background(
                     color = if (selected) {
-                        Color(0xFFD4E6CC)
+                        VolunteerLinkPrimaryGreen.copy(alpha = 0.14f)
                     } else {
                         Color.Transparent
                     },
-                    shape = RoundedCornerShape(19.dp)
+                    shape = CircleShape
                 ),
             contentAlignment = Alignment.Center
         ) {
@@ -171,43 +164,32 @@ private fun RowScope.BottomNavigationItem(
                 ),
                 contentDescription = item.label,
                 modifier = Modifier.size(item.iconSize),
-                tint = if (selected) {
-                    Color(0xFF2A4A1E)
-                } else {
-                    Color(0xFF263824)
-                }
+                tint = navigationContentColour
             )
 
             if (showNotification) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(top = 3.dp, end = 7.dp)
                         .size(9.dp)
-                        .background(Color(0xFFE05B4F), RoundedCornerShape(50))
+                        .background(Color(0xFFE05B4F), CircleShape)
                 )
             }
         }
 
-        Spacer(
-            modifier = Modifier.height(2.dp)
-        )
-
         Text(
             text = item.label.uppercase(),
-            fontSize = 10.sp,
+            modifier = Modifier.fillMaxWidth(),
+            fontSize = 8.sp,
+            lineHeight = 9.sp,
             fontWeight = if (selected) {
                 FontWeight.Bold
             } else {
                 FontWeight.Medium
             },
-            letterSpacing = 0.3.sp,
-            color = if (selected) {
-                Color(0xFF2A4A1E)
-            } else {
-                Color(0xFF263824)
-            },
-            maxLines = 1
+            color = navigationContentColour,
+            maxLines = 1,
+            textAlign = TextAlign.Center
         )
     }
 }

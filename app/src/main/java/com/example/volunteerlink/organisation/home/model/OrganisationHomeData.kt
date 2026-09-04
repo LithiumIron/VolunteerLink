@@ -35,6 +35,7 @@ import kotlinx.serialization.Serializable
 data class OrganisationHomeSnapshot(
     val organisationId: String,
     val organisationName: String,
+    val profileImageUrl: String? = null,
     val posts: List<OrganisationHomePost>,
     val impactWeaveAttention: List<OrganisationImpactWeaveAttention> = emptyList()
 )

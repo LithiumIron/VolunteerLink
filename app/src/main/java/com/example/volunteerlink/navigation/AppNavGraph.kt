@@ -8,6 +8,7 @@ import androidx.navigation.compose.rememberNavController
 import com.example.volunteerlink.organisation.navigation.OrganisationNavigationHost
 import com.example.volunteerlink.organisation.OrganisationSignInScreen
 import com.example.volunteerlink.organisation.OrganisationSignUpScreen
+import com.example.volunteerlink.organisation.auth.OrganisationSessionStore
 import com.example.volunteerlink.screens.UserTypeSelectionScreen
 import com.example.volunteerlink.screens.VolunteerSignInScreen
 import com.example.volunteerlink.screens.VolunteerSignUpScreen
@@ -103,6 +104,9 @@ fun AppNavGraph(
                     navController.navigate(AppRoutes.ORGANISATION_SIGNUP)
                 },
                 onSignedIn = {
+                    // A process can survive logout and a second login. Remove the
+                    // previous organisation's profile before showing the new Home.
+                    OrganisationSessionStore.clearProfileData()
                     // Clear out any stale Organisation entry from a
                     // PREVIOUS session first — otherwise switching accounts
                     // reuses its ViewModelStore and Home keeps showing the
@@ -124,6 +128,7 @@ fun AppNavGraph(
                     navController.popBackStack()
                 },
                 onSignedUp = {
+                    OrganisationSessionStore.clearProfileData()
                     navController.popBackStack(AppRoutes.ORGANISATION, inclusive = true)
                     navController.navigate(AppRoutes.ORGANISATION) {
                         popUpTo(AppRoutes.ORGANISATION_SIGNUP) {
@@ -139,7 +144,7 @@ fun AppNavGraph(
             OrganisationNavigationHost(
                 onLoggedOut = {
                     navController.navigate(AppRoutes.USER_TYPE_SELECTION) {
-                        popUpTo(AppRoutes.VOLUNTEER) {
+                        popUpTo(AppRoutes.ORGANISATION) {
                             inclusive = true
                         }
 

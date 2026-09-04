@@ -29,31 +29,34 @@ val organisationBottomNavigationItems = listOf(
     BottomNavItem(
         route = OrganisationNavigationRoutes.HOME,
         label = "Home",
-        iconRes = R.drawable.ic_volunteer_home,
-        iconSize = 27.dp
+        // Use an outline icon like the other unselected Organisation tabs.
+        // The shared volunteer PNG is a solid silhouette, so it looks selected
+        // even after its tint changes to the unselected colour.
+        iconRes = R.drawable.ic_organisation_home,
+        iconSize = 25.dp
     ),
     BottomNavItem(
         route = OrganisationNavigationRoutes.MANAGE,
         label = "Manage",
         iconRes = R.drawable.manage,
-        iconSize = 30.dp
+        iconSize = 27.dp
     ),
     BottomNavItem(
         route = OrganisationNavigationRoutes.CREATE,
         label = "Create",
         iconRes = R.drawable.create,
-        iconSize = 30.dp
+        iconSize = 27.dp
     ),
     BottomNavItem(
         route = OrganisationNavigationRoutes.CHATS,
         label = "Chats",
         iconRes = R.drawable.chat,
-        iconSize = 28.dp
+        iconSize = 27.dp
     ),
     BottomNavItem(
         route = OrganisationNavigationRoutes.PROFILE,
         label = "Profile",
         iconRes = R.drawable.profile,
-        iconSize = 29.dp
+        iconSize = 27.dp
     )
 )

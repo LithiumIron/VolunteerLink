@@ -273,6 +273,8 @@ data class PostManagementRole(
     val roleName: String,
     val roleMode: String,
     val defaultLevel: String,
+    val skillPathId: String = "",
+    val skillPathName: String = "",
     val capacity: Int,
     val applicationMethod: String,
     val roleNotes: String? = null,

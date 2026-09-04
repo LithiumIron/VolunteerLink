@@ -74,7 +74,11 @@ import com.example.volunteerlink.organisation.components.OrganisationOfflineStat
 import com.example.volunteerlink.organisation.manage.model.PostManagementPerson
 import com.example.volunteerlink.organisation.manage.model.PostManagementPost
 import com.example.volunteerlink.organisation.manage.model.PostManagementRole
+import com.example.volunteerlink.organisation.repository.OrganisationReadOnlyProfileRepository
+import com.example.volunteerlink.organisation.repository.OrganisationViewedVolunteerProfile
 import com.example.volunteerlink.organisation.viewmodel.OrganisationPostManagementViewModel
+import com.example.volunteerlink.screens.VolunteerDetailField
+import com.example.volunteerlink.screens.VolunteerDetailText
 import com.example.volunteerlink.ui.theme.VolunteerLinkBackground
 import com.example.volunteerlink.ui.theme.VolunteerLinkBorderColour
 import com.example.volunteerlink.ui.theme.VolunteerLinkError
@@ -129,8 +133,28 @@ fun OrganisationApplicantReviewScreen(
     }
 
     var pendingDecision by remember { mutableStateOf<String?>(null) }
+    var reviewedProfile by remember(postId, userId) {
+        mutableStateOf<OrganisationViewedVolunteerProfile?>(null)
+    }
+    var profileEvidenceError by remember(postId, userId) { mutableStateOf<String?>(null) }
+    var isLoadingProfileEvidence by remember(postId, userId) { mutableStateOf(true) }
     var declineReason by rememberSaveable(postId, roleTemplateId, userId) {
         mutableStateOf("")
+    }
+
+    LaunchedEffect(postId, userId) {
+        isLoadingProfileEvidence = true
+        profileEvidenceError = null
+        runCatching {
+            OrganisationReadOnlyProfileRepository.loadVolunteerProfile(userId, postId)
+                ?: error("The volunteer profile is unavailable.")
+        }.onSuccess {
+            reviewedProfile = it
+        }.onFailure {
+            reviewedProfile = null
+            profileEvidenceError = "Verified Skill Path experience could not be loaded."
+        }
+        isLoadingProfileEvidence = false
     }
 
     when {
@@ -150,6 +174,9 @@ fun OrganisationApplicantReviewScreen(
             post = post,
             role = role,
             person = person,
+            reviewedProfile = reviewedProfile,
+            profileEvidenceError = profileEvidenceError,
+            isLoadingProfileEvidence = isLoadingProfileEvidence,
             isSaving = uiState.isUpdatingApplicant,
             actionMessage = uiState.applicantActionMessage,
             isShowingCachedData = uiState.isShowingCachedData,
@@ -395,6 +422,9 @@ private fun OrganisationApplicantReviewContent(
     post: PostManagementPost,
     role: PostManagementRole,
     person: PostManagementPerson,
+    reviewedProfile: OrganisationViewedVolunteerProfile?,
+    profileEvidenceError: String?,
+    isLoadingProfileEvidence: Boolean,
     isSaving: Boolean,
     actionMessage: String?,
     isShowingCachedData: Boolean,
@@ -445,9 +475,70 @@ private fun OrganisationApplicantReviewContent(
                 )
             }
 
+            item(key = "application_profile_summary") {
+                HorizontalDivider(modifier = Modifier.padding(top = 18.dp))
+                Text(
+                    text = "Profile for organisation review",
+                    modifier = Modifier.padding(top = 16.dp),
+                    fontSize = 16.sp,
+                    lineHeight = 22.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = VolunteerLinkTextPrimary
+                )
+                Spacer(Modifier.height(10.dp))
+                VolunteerDetailField("Name", person.fullName)
+                VolunteerDetailField(
+                    "City",
+                    person.city?.takeIf { it.isNotBlank() } ?: "Not provided"
+                )
+                VolunteerDetailField(
+                    "About you",
+                    person.bio?.takeIf { it.isNotBlank() } ?: "Not provided"
+                )
+            }
+
+            item(key = "application_skill_path") {
+                HorizontalDivider(modifier = Modifier.padding(top = 18.dp))
+                Spacer(Modifier.height(14.dp))
+                VolunteerDetailField(
+                    "Relevant Skill Path",
+                    role.skillPathName.takeIf { it.isNotBlank() } ?: "Not available"
+                )
+                VolunteerDetailText(
+                    "Required: Level ${requiredSkillPathLevel(role.defaultLevel)}",
+                    secondary = true
+                )
+
+                val relevantEvidence = reviewedProfile?.skillPaths?.firstOrNull { path ->
+                    path.skillPathId == role.skillPathId ||
+                        path.name.equals(role.skillPathName, ignoreCase = true)
+                }
+                when {
+                    relevantEvidence != null -> {
+                        VolunteerDetailText("Current level: ${relevantEvidence.currentLevel}")
+                        VolunteerDetailText(
+                            "${relevantEvidence.verifiedAssignments} verified roles · " +
+                                formatVerifiedTime(relevantEvidence.verifiedMinutes)
+                        )
+                    }
+                    isLoadingProfileEvidence -> VolunteerDetailText(
+                        "Loading verified experience…",
+                        secondary = true
+                    )
+                    profileEvidenceError != null -> VolunteerDetailText(
+                        profileEvidenceError,
+                        secondary = true
+                    )
+                    else -> VolunteerDetailText(
+                        "No verified progress record was returned for this path.",
+                        secondary = true
+                    )
+                }
+            }
+
             item(key = "application_questions_heading") {
                 Text(
-                    text = "Application Questions",
+                    text = "Application Answers",
                     modifier = Modifier.padding(top = 20.dp),
                     fontSize = 17.sp,
                     fontWeight = FontWeight.Bold,
@@ -803,4 +894,15 @@ fun formatApplicationDate(raw: String): String {
         val formatter = SimpleDateFormat("d MMM yyyy", Locale.US)
         formatter.format(parser.parse(raw) ?: return@runCatching raw)
     }.getOrDefault(raw)
+}
+
+fun requiredSkillPathLevel(defaultLevel: String): Int = when (defaultLevel.uppercase(Locale.US)) {
+    "INTERMEDIATE" -> 2
+    "ADVANCED" -> 3
+    else -> 1
+}
+
+fun formatVerifiedTime(minutes: Int?): String {
+    if (minutes == null) return "Time not recorded"
+    return "${minutes / 60}h ${minutes % 60}m"
 }

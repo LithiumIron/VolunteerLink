@@ -356,6 +356,7 @@ class OrganisationHomeViewModel : ViewModel() {
         _uiState.value = OrganisationHomeUiState(
             isLoading = false,
             organisationName = snapshot.organisationName,
+            profileImageUrl = snapshot.profileImageUrl,
             ongoingCount = sortedOngoing.size,
             upcomingCount = sortedUpcoming.size,
             draftCount = draftCount,
@@ -762,4 +763,3 @@ class OrganisationHomeViewModel : ViewModel() {
         private const val TAG = "OrganisationHomeVM"
     }
 }
-

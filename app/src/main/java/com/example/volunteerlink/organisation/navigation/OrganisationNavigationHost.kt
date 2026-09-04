@@ -299,6 +299,9 @@ fun OrganisationNavigationHost(
                                 )
                             }
                         }
+                    },
+                    onOrganisationProfileSelected = {
+                        navigateBottom(OrganisationNavigationRoutes.PROFILE)
                     }
                 )
             }

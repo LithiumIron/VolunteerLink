@@ -2177,7 +2177,7 @@ class CreatePostViewModel : ViewModel() {
             } else {
                 selectedRole.requiredSkillExperience
                     .filter { (skillId, minimum) ->
-                        skillId in startingSkills && minimum in 1..5
+                        skillId in startingSkills && minimum in 1..8
                     }
             }
 
@@ -2562,7 +2562,7 @@ class CreatePostViewModel : ViewModel() {
             role.copy(
                 requiredSkillExperience =
                     role.requiredSkillExperience +
-                            (skillId to (current + change).coerceIn(1, 5))
+                            (skillId to (current + change).coerceIn(1, 8))
             )
         }
     }

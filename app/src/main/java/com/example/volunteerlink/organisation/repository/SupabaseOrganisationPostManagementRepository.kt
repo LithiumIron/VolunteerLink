@@ -375,7 +375,7 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
                 .from("role_templates")
                 .select(
                     columns = Columns.raw(
-                        "role_template_id,role_name,role_mode,default_level"
+                        "role_template_id,role_name,role_mode,default_level,skill_path_id"
                     )
                 ) {
                     filter { isIn("role_template_id", roleTemplateIds) }
@@ -385,6 +385,23 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
 
         val roleTemplatesById = roleTemplateRows.associateBy {
             it.requiredText("role_template_id")
+        }
+
+        val skillPathIds = roleTemplateRows
+            .map { it.requiredText("skill_path_id") }
+            .distinct()
+        val skillPathRows = if (skillPathIds.isEmpty()) {
+            emptyList()
+        } else {
+            supabase
+                .from("skill_paths")
+                .select(columns = Columns.raw("skill_path_id,name")) {
+                    filter { isIn("skill_path_id", skillPathIds) }
+                }
+                .decodeList<JsonObject>()
+        }
+        val skillPathNamesById = skillPathRows.associate { row ->
+            row.requiredText("skill_path_id") to row.requiredText("name")
         }
 
         val roles = roleRows.mapNotNull { roleRow ->
@@ -397,6 +414,9 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
                 roleName = template.requiredText("role_name"),
                 roleMode = template.requiredText("role_mode"),
                 defaultLevel = template.requiredText("default_level"),
+                skillPathId = template.requiredText("skill_path_id"),
+                skillPathName = skillPathNamesById[template.requiredText("skill_path_id")]
+                    ?: template.requiredText("skill_path_id"),
                 capacity = roleRow.requiredInt("capacity"),
                 applicationMethod = roleRow.requiredText("application_method"),
                 roleNotes = roleRow.optionalText("role_notes"),

@@ -248,7 +248,7 @@ fun RequiredSkillsSection(
         subtitle = if (template.defaultLevel == VolunteerRoleLevel.BEGINNER) {
             "Beginner roles stay open to volunteers without previous verified skill experience."
         } else {
-            "Required skills are also practised skills. Each requirement can ask for 1–5 verified experiences."
+            "Required skills are also practised skills. Each requirement can ask for 1–8 verified experiences."
         }
     ) {
         if (template.defaultLevel == VolunteerRoleLevel.BEGINNER) {
@@ -1414,7 +1414,7 @@ fun RequiredSkillCard(
 
                     OutlinedButton(
                         onClick = onIncreaseExperience,
-                        enabled = enabled && minimumExperience < 5,
+                        enabled = enabled && minimumExperience < 8,
                         modifier = Modifier.size(42.dp),
                         contentPadding = PaddingValues(0.dp),
                         shape = RoundedCornerShape(10.dp),

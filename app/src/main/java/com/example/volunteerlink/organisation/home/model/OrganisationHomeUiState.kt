@@ -34,6 +34,7 @@ import com.example.volunteerlink.data.post.PostTimingState
 data class OrganisationHomeUiState(
     val isLoading: Boolean = false,
     val organisationName: String = "",
+    val profileImageUrl: String? = null,
     val ongoingCount: Int = 0,
     val upcomingCount: Int = 0,
     val draftCount: Int = 0,

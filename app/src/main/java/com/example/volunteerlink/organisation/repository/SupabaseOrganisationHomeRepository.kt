@@ -192,7 +192,11 @@ class SupabaseOrganisationHomeRepository : OrganisationHomeRepository {
             // SUPABASE TABLE: organisations — organisation-specific identity, verification, public contact/location and partnership availability.
             // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
             .from("organisations")
-            .select(columns = Columns.raw("organisation_id,organisation_name")) {
+            .select(
+                columns = Columns.raw(
+                    "organisation_id,organisation_name,profile_image_path"
+                )
+            ) {
                 filter {
                     eq("organisation_id", organisationId)
                 }
@@ -411,6 +415,7 @@ class SupabaseOrganisationHomeRepository : OrganisationHomeRepository {
         return OrganisationHomeSnapshot(
             organisationId = organisationId,
             organisationName = organisationRow.requiredText("organisation_name"),
+            profileImageUrl = organisationRow.optionalText("profile_image_path"),
             posts = postsWithApplications,
             impactWeaveAttention = impactWeaveAttention
         )

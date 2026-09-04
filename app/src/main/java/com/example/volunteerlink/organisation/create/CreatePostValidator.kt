@@ -675,7 +675,7 @@ object CreatePostValidator {
             selectedRole.requiredSkillExperience.all { (skillId, minimum) ->
                 skillId in selectedSkillIds &&
                         skillId in allowedSkillIds &&
-                        minimum in 1..5
+                        minimum in 1..8
             }
 
         if (
@@ -684,7 +684,7 @@ object CreatePostValidator {
         ) {
             problems += "Beginner roles cannot require previous skill experience."
         } else if (!requiredSkillsValid) {
-            problems += "Required skills must also be practised and use 1 to 5 verified experiences."
+            problems += "Required skills must also be practised and use 1 to 8 verified experiences."
         }
 
         if (

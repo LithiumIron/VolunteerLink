@@ -205,7 +205,10 @@ private fun OrganisationHomeContent(
                     OrganisationHomeHeader(
                         organisationName = uiState.organisationName,
                         nowMillis = AppClock.nowMillis(),
-                        profileImageUrl = com.example.volunteerlink.organisation.auth.OrganisationSessionStore.profileData?.profileImageUrl,
+                        // The Home snapshot belongs to the organisation resolved for
+                        // this exact request. Do not read the shared profile cache here:
+                        // it can still contain the previous account during a login switch.
+                        profileImageUrl = uiState.profileImageUrl,
                         onAvatarSelected = onOrganisationProfileSelected
                     )
                 }
