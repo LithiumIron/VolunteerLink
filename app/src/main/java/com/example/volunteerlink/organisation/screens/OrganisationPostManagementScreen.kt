@@ -81,6 +81,7 @@ fun OrganisationPostManagementScreen(
     postId: String,
     onBack: () -> Unit,
     onEdit: () -> Unit,
+    onViewVolunteerProfile: (String) -> Unit = {},
     onViewApplication: (roleTemplateId: String, userId: String) -> Unit = { _, _ -> },
     returnToPeopleAfterApplicantReview: Boolean = false,
     openPeopleFromHome: Boolean = false,
@@ -200,6 +201,7 @@ fun OrganisationPostManagementScreen(
                 if (hasUnfinishedReview) confirmLeaveReview = true else onBack()
             },
             onEdit = onEdit,
+            onViewVolunteerProfile = onViewVolunteerProfile,
             onViewApplication = onViewApplication,
             onToggleShortlist = viewModel::toggleApplicantShortlist,
             onStartAttendance = viewModel::startPhysicalAttendance,
@@ -412,6 +414,7 @@ private fun OrganisationPostManagementContent(
     onSyncSelected: () -> Unit,
     onBack: () -> Unit,
     onEdit: () -> Unit,
+    onViewVolunteerProfile: (String) -> Unit,
     onViewApplication: (roleTemplateId: String, userId: String) -> Unit,
     onToggleShortlist: (PostManagementPerson) -> Unit,
     onStartAttendance: () -> Unit,
@@ -439,7 +442,6 @@ private fun OrganisationPostManagementContent(
 ) {
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var selectedRoleId by rememberSaveable { mutableStateOf<String?>(null) }
-    var selectedPerson by remember { mutableStateOf<PostManagementPerson?>(null) }
     var selectedAttendanceDate by rememberSaveable { mutableStateOf<String?>(null) }
     var absentConfirmationPerson by remember { mutableStateOf<PostManagementPerson?>(null) }
     var absentConfirmationDate by remember { mutableStateOf<String?>(null) }
@@ -981,7 +983,7 @@ private fun OrganisationPostManagementContent(
                                         selectedRemoteSubmissionPerson = selected
                                         remoteSubmissionFileError = null
                                     },
-                                    onViewProfile = { selectedPerson = it },
+                                    onViewProfile = { onViewVolunteerProfile(it.userId) },
                                     onViewApplication = { selected ->
                                         onViewApplication(
                                             selected.roleTemplateId,
@@ -1043,7 +1045,7 @@ private fun OrganisationPostManagementContent(
                                     absentConfirmationPerson = selected
                                     absentConfirmationDate = date
                                 },
-                                onViewProfile = { selectedPerson = it }
+                                onViewProfile = { onViewVolunteerProfile(it.userId) }
                             )
                         }
                     } else if (showSelectedRemote && remoteReview != null) {
@@ -1069,7 +1071,7 @@ private fun OrganisationPostManagementContent(
                                 onFeedbackChange = onSetRemoteFeedback,
                                 onStageChange = onRemoteReviewStageChange,
                                 onFinalize = onFinalizeRemoteReview,
-                                onViewProfile = { selectedPerson = it }
+                                onViewProfile = { onViewVolunteerProfile(it.userId) }
                             )
                         }
                     } else {
@@ -1085,12 +1087,6 @@ private fun OrganisationPostManagementContent(
         }
     }
 
-    selectedPerson?.let { person ->
-        PostManagementProfilePreviewDialog(
-            person = person,
-            onDismiss = { selectedPerson = null }
-        )
-    }
 
     selectedRemoteSubmission?.let { submission ->
         val isShared = submission.submissionType.equals("SHARED", ignoreCase = true)

@@ -20,6 +20,7 @@ import com.example.volunteerlink.organisation.impactweave.model.ImpactWeavePage
 fun OrganisationImpactWeaveScreen(
     onBack: () -> Unit,
     onCreatePost: (String) -> Unit,
+    onViewOrganisationProfile: (String) -> Unit = {},
     viewModel: ImpactWeaveViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -151,6 +152,7 @@ fun OrganisationImpactWeaveScreen(
                 onReschedule = viewModel::rescheduleActivePlan,
                 onDispose = viewModel::disposeActivePlan,
                 onCreatePost = onCreatePost,
+                onViewOrganisationProfile = onViewOrganisationProfile,
                 onClearPlanFeedback = viewModel::clearPlanChangeFeedback,
                 minimumStartDateMillis = minimumStartDateMillis,
                 minimumPostDateMillis = minimumPostDateMillis

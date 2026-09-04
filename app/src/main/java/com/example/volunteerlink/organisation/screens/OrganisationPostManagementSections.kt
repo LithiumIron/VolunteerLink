@@ -1,5 +1,7 @@
 package com.example.volunteerlink.organisation.screens
 
+import android.content.Intent
+import android.net.Uri
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -12,6 +14,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -20,6 +23,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Call
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -37,6 +42,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -44,6 +51,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import coil.compose.AsyncImage
 import com.example.volunteerlink.R
 import com.example.volunteerlink.organisation.components.OrganisationDivider
 import com.example.volunteerlink.organisation.components.OrganisationInfoStrip
@@ -2330,6 +2338,8 @@ fun PostManagementPersonCard(
     onToggleShortlist: (PostManagementPerson) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+
     Surface(
         modifier = modifier
             .fillMaxWidth()
@@ -2348,12 +2358,36 @@ fun PostManagementPersonCard(
                     color = VolunteerLinkSoftGreenSurface
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            painter = painterResource(R.drawable.person_placeholder),
-                            contentDescription = "View ${person.fullName} profile",
-                            modifier = Modifier.size(24.dp),
-                            tint = VolunteerLinkPrimaryGreen
+                        // Match the Volunteer Profile fallback exactly: initials stay
+                        // underneath the network image, so a missing or broken avatar
+                        // consistently shows e.g. "VT" instead of a separate drawable.
+                        Text(
+                            text = person.fullName
+                                .trim()
+                                .split(Regex("\\s+"))
+                                .filter { it.isNotBlank() }
+                                .take(2)
+                                .mapNotNull { it.firstOrNull()?.uppercaseChar() }
+                                .joinToString("")
+                                .ifBlank { "V" },
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = VolunteerLinkPrimaryGreen
                         )
+
+                        person.avatarPath
+                            ?.trim()
+                            ?.takeIf { it.isNotEmpty() && !it.equals("null", ignoreCase = true) }
+                            ?.let { safeAvatarPath ->
+                                AsyncImage(
+                                    model = safeAvatarPath,
+                                    contentDescription = "${person.fullName} profile picture",
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(CircleShape),
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
                     }
                 }
 
@@ -2407,6 +2441,31 @@ fun PostManagementPersonCard(
                     personName = person.fullName,
                     modifier = Modifier.padding(start = 6.dp)
                 )
+
+                person.eventSharedPhone
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let { sharedPhone ->
+                        IconButton(
+                            onClick = {
+                                context.startActivity(
+                                    Intent(
+                                        Intent.ACTION_DIAL,
+                                        Uri.parse("tel:${Uri.encode(sharedPhone)}")
+                                    )
+                                )
+                            },
+                            modifier = Modifier
+                                .padding(start = 2.dp)
+                                .size(38.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Call,
+                                contentDescription = "Call ${person.fullName}",
+                                modifier = Modifier.size(20.dp),
+                                tint = VolunteerLinkPrimaryGreen
+                            )
+                        }
+                    }
 
                 if (isApplicant) {
                     IconButton(

@@ -37,6 +37,14 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import java.util.Locale
 
+
+@Serializable
+private data class PostManagementEventContactRow(
+    @SerialName("user_id") val userId: String,
+    @SerialName("shared_phone") val sharedPhone: String = "",
+    @SerialName("phone_contact_until_label") val phoneContactUntilLabel: String? = null
+)
+
 @Serializable
 private data class ImpactWeavePostContributionRow(
     @SerialName("impact_weave_draft_id") val impactWeaveDraftId: String,
@@ -320,6 +328,21 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
         val profilesById = profileRows.associateBy { it.requiredText("user_id") }
         val rolesById = roles.associateBy { it.roleTemplateId }
 
+        // Phone numbers are never read directly from user_profiles here.
+        // The SECURITY DEFINER RPC only returns a number when this organisation
+        // owns the post, the volunteer is accepted and active, and that volunteer
+        // explicitly enabled phone sharing for this participation.
+        val eventContactsByUserId = runCatching {
+            supabase.postgrest.rpc(
+                function = "organisation_list_post_volunteer_event_contacts",
+                parameters = buildJsonObject { put("p_post_id", postId) }
+            ).decodeList<PostManagementEventContactRow>()
+                .associateBy { it.userId }
+        }.getOrElse {
+            it.printStackTrace()
+            emptyMap()
+        }
+
         val people = participationRows.mapNotNull { participationRow ->
             val userId = participationRow.requiredText("user_id")
             val roleTemplateId = participationRow.requiredText("role_template_id")
@@ -335,6 +358,8 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
                 city = profile?.optionalText("city"),
                 bio = profile?.optionalText("bio"),
                 avatarPath = profile?.optionalText("avatar_path"),
+                eventSharedPhone = eventContactsByUserId[userId]?.sharedPhone?.takeIf { it.isNotBlank() },
+                eventPhoneContactUntilLabel = eventContactsByUserId[userId]?.phoneContactUntilLabel,
                 roleTemplateId = roleTemplateId,
                 roleName = role.roleName,
                 roleMode = role.roleMode,

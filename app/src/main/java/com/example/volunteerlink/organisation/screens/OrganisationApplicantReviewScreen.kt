@@ -80,6 +80,7 @@ fun OrganisationApplicantReviewScreen(
     roleTemplateId: String,
     userId: String,
     onBack: () -> Unit,
+    onViewVolunteerProfile: (String) -> Unit = {},
     onDecisionSaved: () -> Unit = onBack,
     viewModel: OrganisationPostManagementViewModel = viewModel()
 ) {
@@ -98,7 +99,6 @@ fun OrganisationApplicantReviewScreen(
         candidate.roleTemplateId == roleTemplateId
     }
 
-    var showProfile by remember { mutableStateOf(false) }
     var pendingDecision by remember { mutableStateOf<String?>(null) }
 
     when {
@@ -125,18 +125,12 @@ fun OrganisationApplicantReviewScreen(
             isRefreshing = uiState.isRefreshing,
             onSyncSelected = viewModel::refresh,
             onBack = onBack,
-            onViewProfile = { showProfile = true },
+            onViewProfile = { onViewVolunteerProfile(person.userId) },
             onAccept = { pendingDecision = "ACCEPT" },
             onDecline = { pendingDecision = "DECLINE" }
         )
     }
 
-    if (showProfile && person != null) {
-        PostManagementProfilePreviewDialog(
-            person = person,
-            onDismiss = { showProfile = false }
-        )
-    }
 
     val decision = pendingDecision
     if (decision != null && person != null) {

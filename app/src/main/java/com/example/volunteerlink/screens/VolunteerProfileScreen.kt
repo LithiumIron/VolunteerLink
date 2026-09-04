@@ -158,28 +158,33 @@ fun VolunteerProfileScreen(
                     .background(VolunteerLinkSoftGreenSurface),
                 contentAlignment = Alignment.Center
             ) {
-                if (!profileImageUrl.isNullOrBlank()) {
-                    AsyncImage(
-                        model = profileImageUrl,
-                        contentDescription = "Profile Picture",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    Text(
-                        text = name
-                            .trim()
-                            .split(" ")
-                            .filter { it.isNotBlank() }
-                            .take(2)
-                            .mapNotNull { it.firstOrNull()?.uppercaseChar() }
-                            .joinToString("")
-                            .ifBlank { "V" },
-                        fontSize = 26.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = VolunteerLinkPrimaryGreen
-                    )
-                }
+                // Keep the normal initials underneath the image. This means a
+                // missing avatar and an old/broken avatar URL use the same fallback.
+                Text(
+                    text = name
+                        .trim()
+                        .split(Regex("\\s+"))
+                        .filter { it.isNotBlank() }
+                        .take(2)
+                        .mapNotNull { it.firstOrNull()?.uppercaseChar() }
+                        .joinToString("")
+                        .ifBlank { "V" },
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = VolunteerLinkPrimaryGreen
+                )
+
+                profileImageUrl
+                    ?.trim()
+                    ?.takeIf { it.isNotEmpty() && !it.equals("null", ignoreCase = true) }
+                    ?.let { safeImageUrl ->
+                        AsyncImage(
+                            model = safeImageUrl,
+                            contentDescription = "Profile Picture",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
             }
 
             Spacer(modifier = Modifier.width(14.dp))

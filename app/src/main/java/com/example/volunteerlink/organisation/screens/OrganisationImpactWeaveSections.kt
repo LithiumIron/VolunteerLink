@@ -1917,6 +1917,7 @@ fun ImpactWeaveMatchResultsScreen(
     onReschedule: (Long, Long, Int, Int) -> Unit,
     onDispose: () -> Unit,
     onCreatePost: (String) -> Unit,
+    onViewOrganisationProfile: (String) -> Unit,
     onClearPlanFeedback: () -> Unit,
     minimumStartDateMillis: Long,
     minimumPostDateMillis: Long
@@ -2132,7 +2133,10 @@ fun ImpactWeaveMatchResultsScreen(
                     items = partnershipRequests,
                     key = { "partnership_state_${it.invitationId}" }
                 ) { request ->
-                    ImpactWeavePartnershipStateCard(request)
+                    ImpactWeavePartnershipStateCard(
+                        request = request,
+                        onViewProfile = { onViewOrganisationProfile(request.organisationId) }
+                    )
                 }
             }
 
@@ -2194,6 +2198,7 @@ fun ImpactWeaveMatchResultsScreen(
                         partner = partner,
                         requestSent = false,
                         isSending = sendingOrganisationId == partner.organisationId,
+                        onViewProfile = { onViewOrganisationProfile(partner.organisationId) },
                         onRequestSupport = {
                             onClearRequestFeedback()
                             requestCandidate = partner.representativeCandidate
@@ -2223,7 +2228,10 @@ fun ImpactWeaveMatchResultsScreen(
                     items = alternativePartners,
                     key = { "alternative_${it.organisationId}" }
                 ) { partner ->
-                    AlternativePartnerOrganisationCard(partner)
+                    AlternativePartnerOrganisationCard(
+                        partner = partner,
+                        onViewProfile = { onViewOrganisationProfile(partner.organisationId) }
+                    )
                 }
             }
         }
@@ -2901,7 +2909,8 @@ private fun partnershipStatusSortOrder(status: String): Int = when (status.upper
 
 @Composable
 private fun ImpactWeavePartnershipStateCard(
-    request: ImpactWeavePartnershipState
+    request: ImpactWeavePartnershipState,
+    onViewProfile: () -> Unit
 ) {
     var showAllItems by remember(request.invitationId) { mutableStateOf(false) }
     val status = request.status.uppercase(Locale.ROOT)
@@ -2946,7 +2955,9 @@ private fun ImpactWeavePartnershipStateCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Surface(
-                    modifier = Modifier.size(44.dp),
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clickable(onClick = onViewProfile),
                     shape = CircleShape,
                     color = Color(0xFFE7F1E3)
                 ) {
@@ -2963,7 +2974,8 @@ private fun ImpactWeavePartnershipStateCard(
                 Column(
                     modifier = Modifier
                         .weight(1f)
-                        .padding(start = 12.dp),
+                        .padding(start = 12.dp)
+                        .clickable(onClick = onViewProfile),
                     verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     Text(
@@ -2977,6 +2989,12 @@ private fun ImpactWeavePartnershipStateCard(
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = if (accepted) FontWeight.SemiBold else FontWeight.Normal,
                         color = if (accepted) CreateGreen else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "View organisation profile ›",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = CreateGreen
                     )
                 }
 
@@ -3124,6 +3142,7 @@ private fun PartnerOrganisationMatchCard(
     partner: PartnerOrganisationMatchGroup,
     requestSent: Boolean,
     isSending: Boolean,
+    onViewProfile: () -> Unit,
     onRequestSupport: () -> Unit
 ) {
     Surface(
@@ -3141,7 +3160,9 @@ private fun PartnerOrganisationMatchCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Surface(
-                    modifier = Modifier.size(44.dp),
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clickable(onClick = onViewProfile),
                     shape = CircleShape,
                     color = Color(0xFFE7F1E3)
                 ) {
@@ -3163,7 +3184,8 @@ private fun PartnerOrganisationMatchCard(
                 Column(
                     modifier = Modifier
                         .weight(1f)
-                        .padding(start = 12.dp),
+                        .padding(start = 12.dp)
+                        .clickable(onClick = onViewProfile),
                     verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     Text(
@@ -3180,6 +3202,12 @@ private fun PartnerOrganisationMatchCard(
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "View organisation profile ›",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = CreateGreen
                     )
                 }
 
@@ -3336,7 +3364,8 @@ private fun PartnerOrganisationSupportLine(option: PartnerRequestOption) {
 
 @Composable
 private fun AlternativePartnerOrganisationCard(
-    partner: PartnerOrganisationMatchGroup
+    partner: PartnerOrganisationMatchGroup,
+    onViewProfile: () -> Unit
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -3348,11 +3377,25 @@ private fun AlternativePartnerOrganisationCard(
             modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text(
-                text = partner.organisationName,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onViewProfile),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = partner.organisationName,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "View profile ›",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = CreateGreen
+                )
+            }
             partner.options.forEach { option ->
                 Text(
                     text = "• ${option.needResult.need.resourceName}: ${option.candidate.resourceName} (${candidateAvailabilityLabel(option.candidate, option.needResult)})",

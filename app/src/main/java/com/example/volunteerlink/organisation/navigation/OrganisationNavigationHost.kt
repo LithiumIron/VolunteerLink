@@ -49,6 +49,9 @@ import com.example.volunteerlink.organisation.screens.OrganisationManageScreen
 import com.example.volunteerlink.organisation.screens.OrganisationPostManagementScreen
 import com.example.volunteerlink.organisation.screens.OrganisationVolunteerPostsScreen
 import com.example.volunteerlink.organisation.screens.OrganisationProfileScreen
+import com.example.volunteerlink.organisation.screens.OrganisationViewPartnerProfileScreen
+import com.example.volunteerlink.organisation.screens.OrganisationViewVolunteerProfileScreen
+import com.example.volunteerlink.organisation.screens.OrganisationVolunteerCertificateScreen
 import com.example.volunteerlink.organisation.screens.OrganisationPromotionScreen
 import com.example.volunteerlink.organisation.home.model.HomeAttentionType
 import com.example.volunteerlink.organisation.screens.OrganisationSettingScreen
@@ -159,6 +162,9 @@ fun OrganisationNavigationHost(
         bottomBar = {
             if (
                 currentRoute != OrganisationNavigationRoutes.MANAGE_APPLICANT_REVIEW &&
+                currentRoute != OrganisationNavigationRoutes.VIEW_VOLUNTEER_PROFILE &&
+                currentRoute != OrganisationNavigationRoutes.VIEW_VOLUNTEER_CERTIFICATE &&
+                currentRoute != OrganisationNavigationRoutes.VIEW_PARTNER_PROFILE &&
                 currentRoute != OrganisationNavigationRoutes.MANAGE_IMPACT_WEAVE &&
                 currentRoute != OrganisationNavigationRoutes.MANAGE_PROMOTIONS &&
                 currentRoute != OrganisationNavigationRoutes.EDIT_PROFILE &&
@@ -301,6 +307,11 @@ fun OrganisationNavigationHost(
                             OrganisationNavigationRoutes.managePostEdit(postId)
                         )
                     },
+                    onViewVolunteerProfile = { userId ->
+                        navController.navigate(
+                            OrganisationNavigationRoutes.viewVolunteerProfile(postId, userId)
+                        )
+                    },
                     onViewApplication = { roleTemplateId, userId ->
                         navController.navigate(
                             OrganisationNavigationRoutes.manageApplicantReview(
@@ -350,6 +361,11 @@ fun OrganisationNavigationHost(
                     roleTemplateId = roleTemplateId,
                     userId = userId,
                     onBack = { navController.popBackStack() },
+                    onViewVolunteerProfile = { profileUserId ->
+                        navController.navigate(
+                            OrganisationNavigationRoutes.viewVolunteerProfile(postId, profileUserId)
+                        )
+                    },
                     onDecisionSaved = {
                         // Tell the previous Manage Post destination which main tab
                         // must be shown after its applicant data refreshes.
@@ -361,12 +377,57 @@ fun OrganisationNavigationHost(
                 )
             }
 
+            composable(OrganisationNavigationRoutes.VIEW_VOLUNTEER_PROFILE) { backStackEntry ->
+                val postId = backStackEntry.arguments?.getString("postId").orEmpty()
+                val userId = backStackEntry.arguments?.getString("userId").orEmpty()
+                OrganisationViewVolunteerProfileScreen(
+                    postId = postId,
+                    userId = userId,
+                    onBack = { navController.popBackStack() },
+                    onCertificateSelected = { certificateUserId, certificatePostId, roleTemplateId ->
+                        navController.navigate(
+                            OrganisationNavigationRoutes.viewVolunteerCertificate(
+                                userId = certificateUserId,
+                                postId = certificatePostId,
+                                roleTemplateId = roleTemplateId
+                            )
+                        )
+                    }
+                )
+            }
+
+            composable(OrganisationNavigationRoutes.VIEW_VOLUNTEER_CERTIFICATE) { backStackEntry ->
+                val userId = backStackEntry.arguments?.getString("userId").orEmpty()
+                val postId = backStackEntry.arguments?.getString("postId").orEmpty()
+                val roleTemplateId = backStackEntry.arguments?.getString("roleTemplateId").orEmpty()
+
+                OrganisationVolunteerCertificateScreen(
+                    userId = userId,
+                    postId = postId,
+                    roleTemplateId = roleTemplateId,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(OrganisationNavigationRoutes.VIEW_PARTNER_PROFILE) { backStackEntry ->
+                val organisationId = backStackEntry.arguments?.getString("organisationId").orEmpty()
+                OrganisationViewPartnerProfileScreen(
+                    organisationId = organisationId,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
             composable(OrganisationNavigationRoutes.MANAGE_IMPACT_WEAVE) {
                 OrganisationImpactWeaveScreen(
                     onBack = { navController.popBackStack() },
                     onCreatePost = { draftId ->
                         navController.navigate(
                             OrganisationNavigationRoutes.createFromImpactWeave(draftId)
+                        )
+                    },
+                    onViewOrganisationProfile = { organisationId ->
+                        navController.navigate(
+                            OrganisationNavigationRoutes.viewPartnerProfile(organisationId)
                         )
                     },
                     viewModel = impactWeaveViewModel
