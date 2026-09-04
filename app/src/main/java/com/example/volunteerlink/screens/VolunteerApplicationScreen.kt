@@ -915,20 +915,83 @@ private fun VolunteerApplicationSuccessScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // ... existing success icon + title + description (keep as-is) ...
+        Surface(
+            modifier = Modifier.size(82.dp),
+            shape = CircleShape,
+            color = VolunteerLinkSoftGreenSurface
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Filled.CheckCircle,
+                    contentDescription = if (applicationIsInstantJoin) {
+                        "Role joined"
+                    } else {
+                        "Application submitted"
+                    },
+                    modifier = Modifier.size(52.dp),
+                    tint = VolunteerLinkSuccess
+                )
+            }
+        }
 
-        Spacer(modifier = Modifier.height(28.dp))
+        Spacer(modifier = Modifier.height(20.dp))
+
+        Text(
+            text = if (applicationIsInstantJoin) "You're in!" else "Application submitted",
+            fontSize = 23.sp,
+            fontWeight = FontWeight.Bold,
+            color = VolunteerLinkTextPrimary
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = if (applicationIsInstantJoin) {
+                "Your place as ${volunteerOpportunityRole.roleTitle} is confirmed."
+            } else {
+                "Your application for ${volunteerOpportunityRole.roleTitle} has been sent to ${volunteerOpportunityEvent.eventOrganisationName}."
+            },
+            fontSize = 13.sp,
+            lineHeight = 20.sp,
+            color = VolunteerLinkTextSecondary
+        )
+
+        Spacer(modifier = Modifier.height(18.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(1.dp, VolunteerLinkBorderColour),
+            colors = CardDefaults.cardColors(containerColor = VolunteerLinkSurface)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "What happens next",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = VolunteerLinkTextPrimary
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = when {
+                        applicationIsInstantJoin && isGroupChatCreated ->
+                            "Your place is confirmed. You can join the event group chat now."
+                        applicationIsInstantJoin ->
+                            "Your place is confirmed. The event group chat will appear after the organisation creates it."
+                        else ->
+                            "The organisation will review your application. You can follow the result in My Applications."
+                    },
+                    fontSize = 12.sp,
+                    lineHeight = 18.sp,
+                    color = VolunteerLinkTextSecondary
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
 
         if (applicationIsInstantJoin) {
             if (!isGroupChatCreated) {
-                // Chat has not been created by the organisation yet
-                Text(
-                    text = "Group chat is not created yet by the organisation.",
-                    fontSize = 13.sp,
-                    color = VolunteerLinkWarning,
-                    modifier = Modifier.padding(bottom = 12.dp)
-                )
-
                 Button(
                     onClick = onReturnHomeSelected,
                     modifier = Modifier
@@ -988,6 +1051,23 @@ private fun VolunteerApplicationSuccessScreen(
                         color = VolunteerLinkError,
                         fontSize = 12.sp
                     )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Button(
+                    onClick = onReturnHomeSelected,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    shape = RoundedCornerShape(11.dp),
+                    border = BorderStroke(1.dp, VolunteerLinkPrimaryGreen),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = VolunteerLinkSurface,
+                        contentColor = VolunteerLinkPrimaryGreen
+                    )
+                ) {
+                    Text("Return to Home", fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 }
             }
         } else {
