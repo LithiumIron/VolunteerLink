@@ -1,4 +1,4 @@
-
+﻿
 package com.example.volunteerlink.screens
 
 import androidx.compose.foundation.BorderStroke
@@ -22,7 +22,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -35,9 +34,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -83,10 +80,6 @@ fun VolunteerApplicationScreen(
         volunteerOpportunityViewModel.uiState
             .collectAsStateWithLifecycle()
 
-    androidx.compose.runtime.LaunchedEffect(volunteerEventId, volunteerRoleId) {
-        volunteerOpportunityViewModel.clearApplicationActionError()
-    }
-
     val volunteerOpportunityEvent =
         VolunteerOpportunitySessionStore.findEventById(
             volunteerEventId
@@ -126,62 +119,9 @@ fun VolunteerApplicationScreen(
                         volunteerRoleId
             }
 
-    val phoneContactIsRelevant =
-        existingApplication?.applicationStatus == VolunteerApplicationStatus.ACCEPTED &&
-            volunteerOpportunityEvent.eventDatabaseId.isNotBlank() &&
-            volunteerOpportunityRole.roleTemplateId.isNotBlank()
-
-    androidx.compose.runtime.LaunchedEffect(
-        volunteerOpportunityEvent.eventDatabaseId,
-        volunteerOpportunityRole.roleTemplateId,
-        phoneContactIsRelevant
-    ) {
-        if (phoneContactIsRelevant) {
-            volunteerOpportunityViewModel.loadEventPhoneContact(
-                postId = volunteerOpportunityEvent.eventDatabaseId,
-                roleTemplateId = volunteerOpportunityRole.roleTemplateId
-            )
-        } else {
-            volunteerOpportunityViewModel.clearEventPhoneContact()
-        }
-    }
-
-    val activeApplicationInPost =
-        VolunteerOpportunitySessionStore.activeApplicationForEvent(
-            volunteerEventId
-        )
-
-    val otherPendingApplication =
-        VolunteerOpportunitySessionStore.pendingApplicationForEvent(
-            volunteerEventId
-        )?.takeIf { application ->
-            application.applicationRoleId != volunteerRoleId
-        }
-
-    val otherActiveApplication = activeApplicationInPost?.takeIf { it.applicationRoleId != volunteerRoleId }
-    val applicationBlockedMessage: String? = when {
-        otherActiveApplication?.applicationDatabaseId?.startsWith("offline|") == true -> "Sync your earlier request before changing roles."
-        VolunteerOpportunitySessionStore.volunteerApplications.any {
-            it.applicationEventId == volunteerEventId && it.applicationStatus in setOf(
-                VolunteerApplicationStatus.COMPLETED, VolunteerApplicationStatus.NOT_COMPLETED)
-        } -> "Your participation is finalized. You cannot take a second role in this event."
-        else -> null
-    }
-
-    var pendingInstantSwitchAnswers by rememberSaveable {
-        mutableStateOf<List<String>?>(null)
-    }
-    var confirmedPrevious by androidx.compose.runtime.remember {
-        mutableStateOf<VolunteerOpportunityApplication?>(null)
-    }
-    var previewAnswers by rememberSaveable(volunteerEventId, volunteerRoleId) {
-        mutableStateOf<List<String>?>(null)
-    }
-
     when {
         applicationWasSubmitted -> {
             VolunteerApplicationSuccessScreen(
-                resultMessage = opportunityUiState.lastApplicationResult,
                 volunteerOpportunityEvent =
                     volunteerOpportunityEvent,
                 volunteerOpportunityRole =
@@ -191,7 +131,7 @@ fun VolunteerApplicationScreen(
             )
         }
 
-        existingApplication != null && existingApplication.applicationStatus != VolunteerApplicationStatus.CANCELLED -> {
+        existingApplication != null -> {
             VolunteerExistingApplicationScreen(
                 volunteerOpportunityEvent =
                     volunteerOpportunityEvent,
@@ -199,14 +139,6 @@ fun VolunteerApplicationScreen(
                     volunteerOpportunityRole,
                 volunteerApplication =
                     existingApplication,
-                phoneContactState = opportunityUiState.eventPhoneContact,
-                onPhoneContactEnabledChange = { enabled ->
-                    volunteerOpportunityViewModel.setEventPhoneContactEnabled(
-                        postId = volunteerOpportunityEvent.eventDatabaseId,
-                        roleTemplateId = volunteerOpportunityRole.roleTemplateId,
-                        enabled = enabled
-                    )
-                },
                 onBackSelected =
                     onBackSelected,
                 onReturnHomeSelected =
@@ -226,27 +158,12 @@ fun VolunteerApplicationScreen(
                     opportunityUiState
                         .isApplicationActionRunning,
                 serverErrorMessage =
-                    applicationBlockedMessage ?:
-                        opportunityUiState.applicationActionError ?: if (
-                            !com.example.volunteerlink.data.VolunteerApplicationWindow.canApply(
-                                volunteerOpportunityEvent,
-                                volunteerOpportunityRole
-                            )
-                        ) com.example.volunteerlink.data.VolunteerApplicationWindow.reason(
-                            volunteerOpportunityEvent,
-                            volunteerOpportunityRole
-                        ) else null,
-                submissionAllowed = applicationBlockedMessage == null,
-                onApplicationSubmitted = { submittedAnswers ->
-                    if (volunteerOpportunityRole.roleApplicationMethod == VolunteerRoleApplicationMethod.REVIEW_APPLICANTS) {
-                        previewAnswers = submittedAnswers
-                    } else if (
-                        otherActiveApplication != null
-                    ) {
-                        confirmedPrevious = otherActiveApplication
-                        pendingInstantSwitchAnswers = submittedAnswers
-                    } else {
-                        volunteerOpportunityViewModel.submitApplication(
+                    opportunityUiState
+                        .applicationActionError,
+                onApplicationSubmitted = {
+                        submittedAnswers ->
+                    volunteerOpportunityViewModel
+                        .submitApplication(
                             eventId = volunteerEventId,
                             roleId = volunteerRoleId,
                             answers = submittedAnswers,
@@ -254,83 +171,9 @@ fun VolunteerApplicationScreen(
                                 applicationWasSubmitted = true
                             }
                         )
-                    }
                 }
             )
         }
-    }
-
-    previewAnswers?.let { answers ->
-        VolunteerApplicationPreviewDialog(volunteerOpportunityEvent, volunteerOpportunityRole, answers,
-            opportunityUiState.isApplicationActionRunning, opportunityUiState.applicationActionError,
-            onBack = { previewAnswers = null }, onConfirm = {
-                if (otherActiveApplication != null) {
-                    confirmedPrevious = otherActiveApplication
-                    pendingInstantSwitchAnswers = answers
-                    previewAnswers = null
-                } else {
-                    volunteerOpportunityViewModel.submitApplication(volunteerEventId, volunteerRoleId, answers) {
-                        previewAnswers = null
-                        applicationWasSubmitted = true
-                    }
-                }
-            })
-    }
-
-    val switchAnswers = pendingInstantSwitchAnswers
-    if (switchAnswers != null && confirmedPrevious != null) {
-        AlertDialog(
-            titleContentColor = VolunteerLinkTextPrimary,
-            textContentColor = VolunteerLinkTextSecondary,
-            containerColor = Color.White,
-            onDismissRequest = {
-                pendingInstantSwitchAnswers = null
-            },
-            title = {
-                Text(
-                    text = "Change your role?"
-                )
-            },
-            text = {
-                Text(
-                    text =
-                        "Your current role is ${confirmedPrevious?.applicationRoleTitle}. " +
-                            "Changing to ${volunteerOpportunityRole.roleTitle} cancels that application and gives up any accepted place. " +
-                            (if (volunteerOpportunityRole.roleApplicationMethod == VolunteerRoleApplicationMethod.REVIEW_APPLICANTS)
-                                "The new role needs a fresh organisation review; acceptance is not guaranteed. "
-                            else "The new role is confirmed only if a place is still available. ") +
-                            "If this change fails, this request will not cancel your previous role. Internet connection is required."
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        pendingInstantSwitchAnswers = null
-                        volunteerOpportunityViewModel
-                            .submitApplication(
-                                eventId = volunteerEventId,
-                                roleId = volunteerRoleId,
-                                answers = switchAnswers,
-                                confirmedPrevious = confirmedPrevious,
-                                onSuccess = {
-                                    applicationWasSubmitted = true
-                                }
-                            )
-                    }
-                ) {
-                    Text("Confirm change")
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        pendingInstantSwitchAnswers = null
-                    }
-                ) {
-                    Text("Keep current role")
-                }
-            }
-        )
     }
 }
 
@@ -343,7 +186,6 @@ private fun VolunteerApplicationFormScreen(
     onBackSelected: () -> Unit,
     isSubmitting: Boolean,
     serverErrorMessage: String?,
-    submissionAllowed: Boolean,
     onApplicationSubmitted: (List<String>) -> Unit
 ) {
     val extraQuestions =
@@ -772,12 +614,7 @@ private fun VolunteerApplicationFormScreen(
                     PaddingValues(
                         horizontal = 16.dp
                     ),
-                enabled = !isSubmitting &&
-                    submissionAllowed &&
-                    com.example.volunteerlink.data.VolunteerApplicationWindow.canApply(
-                        volunteerOpportunityEvent,
-                        volunteerOpportunityRole
-                    )
+                enabled = !isSubmitting
             ) {
                 Text(
                     text =
@@ -786,7 +623,7 @@ private fun VolunteerApplicationFormScreen(
                         } else if (applicationIsInstantJoin) {
                             "Join Role"
                         } else {
-                            "Review Application"
+                            "Submit Application"
                         },
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold
@@ -963,7 +800,7 @@ private fun VolunteerApplicationRoleSummary(
 
             Text(
                 text =
-                    "${volunteerOpportunityEvent.eventDate}  •  " +
+                    "${volunteerOpportunityEvent.eventDate}  ΓÇó  " +
                             volunteerOpportunityEvent
                                 .eventTime,
                 fontSize = 11.sp,
@@ -994,7 +831,6 @@ private fun VolunteerApplicationRoleSummary(
 
 @Composable
 private fun VolunteerApplicationSuccessScreen(
-    resultMessage: String?,
     volunteerOpportunityEvent:
     VolunteerOpportunityEvent,
     volunteerOpportunityRole:
@@ -1036,9 +872,7 @@ private fun VolunteerApplicationSuccessScreen(
                     imageVector =
                         Icons.Filled.CheckCircle,
                     contentDescription =
-                        if (resultMessage?.startsWith("Waiting to sync") == true) {
-                            "Saved on device, waiting to sync"
-                        } else if (applicationIsInstantJoin) {
+                        if (applicationIsInstantJoin) {
                             "Role joined"
                         } else {
                             "Application submitted"
@@ -1056,9 +890,7 @@ private fun VolunteerApplicationSuccessScreen(
 
         Text(
             text =
-                if (resultMessage?.startsWith("Waiting to sync") == true) {
-                    "Waiting to sync"
-                } else if (applicationIsInstantJoin) {
+                if (applicationIsInstantJoin) {
                     "Role Joined"
                 } else {
                     "Application Submitted"
@@ -1074,9 +906,7 @@ private fun VolunteerApplicationSuccessScreen(
 
         Text(
             text =
-                if (resultMessage != null) {
-                    resultMessage
-                } else if (applicationIsInstantJoin) {
+                if (applicationIsInstantJoin) {
                     "Your place for " +
                             volunteerOpportunityRole
                                 .roleTitle +
@@ -1145,14 +975,11 @@ private fun VolunteerExistingApplicationScreen(
     VolunteerOpportunityRole,
     volunteerApplication:
     VolunteerOpportunityApplication,
-    phoneContactState: VolunteerEventPhoneContactUiState,
-    onPhoneContactEnabledChange: (Boolean) -> Unit,
     onBackSelected: () -> Unit,
     onReturnHomeSelected: () -> Unit
 ) {
-    val waitingToSync = volunteerApplication.applicationDatabaseId.startsWith("offline|")
     val statusText =
-        if (waitingToSync) "Waiting to sync" else when (
+        when (
             volunteerApplication.applicationStatus
         ) {
             VolunteerApplicationStatus.PENDING ->
@@ -1222,13 +1049,14 @@ private fun VolunteerExistingApplicationScreen(
         Column(
             modifier = Modifier
                 .weight(1f)
-                .verticalScroll(rememberScrollState())
                 .padding(
-                    horizontal = VolunteerLinkScreenHorizontalPadding,
-                    vertical = 24.dp
+                    horizontal =
+                        VolunteerLinkScreenHorizontalPadding
                 ),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Top
+            horizontalAlignment =
+                Alignment.CenterHorizontally,
+            verticalArrangement =
+                Arrangement.Center
         ) {
             Surface(
                 modifier = Modifier.size(76.dp),
@@ -1259,7 +1087,7 @@ private fun VolunteerExistingApplicationScreen(
             )
 
             Text(
-                text = if (waitingToSync) "Waiting to sync" else "Already Applied",
+                text = "Already Applied",
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
                 color = VolunteerLinkTextPrimary
@@ -1271,8 +1099,7 @@ private fun VolunteerExistingApplicationScreen(
 
             Text(
                 text =
-                    if (waitingToSync) "This request is saved on your device. No place is reserved. Connect and Sync to receive the server result."
-                    else "You already submitted an application " +
+                    "You already submitted an application " +
                             "for ${volunteerOpportunityRole.roleTitle}.",
                 fontSize = 13.sp,
                 lineHeight = 20.sp,
@@ -1402,121 +1229,6 @@ private fun VolunteerExistingApplicationScreen(
                 }
             }
 
-            if (
-                volunteerApplication.applicationStatus == VolunteerApplicationStatus.ACCEPTED &&
-                volunteerOpportunityRole.roleMode.uppercase() in setOf("PHYSICAL", "REMOTE")
-            ) {
-                Spacer(modifier = Modifier.height(14.dp))
-
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = VolunteerLinkSurface
-                    ),
-                    border = BorderStroke(
-                        width = 1.dp,
-                        color = VolunteerLinkBorderColour
-                    )
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Event phone contact",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = VolunteerLinkTextPrimary
-                                )
-                                Text(
-                                    text = "Allow ${volunteerOpportunityEvent.eventOrganisationName} to call the phone number on your profile while you are participating in this opportunity.",
-                                    modifier = Modifier.padding(top = 4.dp),
-                                    fontSize = 12.sp,
-                                    lineHeight = 17.sp,
-                                    color = VolunteerLinkTextSecondary
-                                )
-                            }
-
-                            Switch(
-                                checked = phoneContactState.enabled,
-                                onCheckedChange = onPhoneContactEnabledChange,
-                                enabled = phoneContactState.eligible &&
-                                    !phoneContactState.isLoading &&
-                                    !phoneContactState.isUpdating
-                            )
-                        }
-
-                        when {
-                            phoneContactState.isLoading -> {
-                                Text(
-                                    text = "Checking contact permission...",
-                                    modifier = Modifier.padding(top = 10.dp),
-                                    fontSize = 11.sp,
-                                    color = VolunteerLinkTextSecondary
-                                )
-                            }
-
-                            phoneContactState.errorMessage != null -> {
-                                Text(
-                                    text = phoneContactState.errorMessage,
-                                    modifier = Modifier.padding(top = 10.dp),
-                                    fontSize = 11.sp,
-                                    lineHeight = 16.sp,
-                                    color = VolunteerLinkError
-                                )
-                            }
-
-                            !phoneContactState.eligible -> {
-                                Text(
-                                    text = phoneContactState.reason
-                                        ?: "Phone sharing is not available for this opportunity.",
-                                    modifier = Modifier.padding(top = 10.dp),
-                                    fontSize = 11.sp,
-                                    lineHeight = 16.sp,
-                                    color = VolunteerLinkTextSecondary
-                                )
-                            }
-
-                            phoneContactState.enabled -> {
-                                Text(
-                                    text = buildString {
-                                        append("Your organiser can call you for this opportunity")
-                                        phoneContactState.availableUntilLabel
-                                            ?.takeIf { it.isNotBlank() }
-                                            ?.let { append(" until $it") }
-                                        append(". Access expires automatically.")
-                                    },
-                                    modifier = Modifier.padding(top = 10.dp),
-                                    fontSize = 11.sp,
-                                    lineHeight = 16.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = VolunteerLinkPrimaryGreen
-                                )
-                            }
-
-                            else -> {
-                                Text(
-                                    text = buildString {
-                                        append("Your phone number stays private unless you turn this on")
-                                        phoneContactState.availableUntilLabel
-                                            ?.takeIf { it.isNotBlank() }
-                                            ?.let { append(". If enabled, access lasts until $it") }
-                                        append(".")
-                                    },
-                                    modifier = Modifier.padding(top = 10.dp),
-                                    fontSize = 11.sp,
-                                    lineHeight = 16.sp,
-                                    color = VolunteerLinkTextSecondary
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
             Spacer(
                 modifier = Modifier.height(24.dp)
             )
@@ -1599,3 +1311,4 @@ private fun VolunteerApplicationNotFoundScreen(
         }
     }
 }
+
