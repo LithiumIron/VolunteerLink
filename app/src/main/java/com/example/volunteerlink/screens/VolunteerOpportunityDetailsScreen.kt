@@ -71,6 +71,8 @@ import com.example.volunteerlink.model.VolunteerApplicationStatus
 import com.example.volunteerlink.model.VolunteerOpportunityCategory
 import com.example.volunteerlink.model.VolunteerOpportunityEvent
 import com.example.volunteerlink.model.VolunteerOpportunityRole
+import com.example.volunteerlink.model.VolunteerOpportunityPartner
+import com.example.volunteerlink.model.VolunteerOpportunityPartnershipContribution
 import com.example.volunteerlink.model.VolunteerRoleApplicationFlow
 import com.example.volunteerlink.model.VolunteerRoleApplicationMethod
 import com.example.volunteerlink.ui.theme.VolunteerLinkBackground
@@ -191,6 +193,14 @@ fun VolunteerOpportunityDetailsScreen(
                     volunteerOpportunityEvent =
                         volunteerOpportunityEvent
                 )
+            }
+
+            if (volunteerOpportunityEvent.eventIsPartnershipPost) {
+                item(key = "opportunity_partnership_support") {
+                    VolunteerOpportunityPartnershipSection(
+                        volunteerOpportunityEvent = volunteerOpportunityEvent
+                    )
+                }
             }
 
             if (recommendedRoleId != -1) {
@@ -909,6 +919,145 @@ private fun VolunteerOpportunityRolesSection(
                     modifier = Modifier.height(10.dp)
                 )
             }
+    }
+}
+
+@Composable
+private fun VolunteerOpportunityPartnershipSection(
+    volunteerOpportunityEvent: VolunteerOpportunityEvent
+) {
+    val partners = volunteerOpportunityEvent.eventPartnershipPartners
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(
+                start = VolunteerLinkScreenHorizontalPadding,
+                end = VolunteerLinkScreenHorizontalPadding,
+                top = 12.dp
+            )
+    ) {
+        VolunteerOpportunitySectionTitle(
+            sectionTitle = "Partnership Support",
+            sectionSupportingText = "This activity is supported by partner organisations."
+        )
+
+        Spacer(modifier = Modifier.height(9.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = VolunteerLinkSurface
+            ),
+            border = BorderStroke(
+                width = 1.dp,
+                color = VolunteerLinkBorderColour
+            )
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = VolunteerLinkSoftGreenSurface,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = "Partner-supported activity",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = VolunteerLinkPrimaryGreen
+                        )
+                        Text(
+                            text = if (partners.isEmpty()) {
+                                "Partnership support details are not available right now."
+                            } else {
+                                "${partners.size} partner ${if (partners.size == 1) "organisation is" else "organisations are"} supporting this activity."
+                            },
+                            fontSize = 12.sp,
+                            lineHeight = 17.sp,
+                            color = VolunteerLinkTextSecondary
+                        )
+                    }
+                }
+
+                if (partners.isNotEmpty()) {
+                    partners.forEachIndexed { index, partner ->
+                        if (index > 0) {
+                            Spacer(modifier = Modifier.height(14.dp))
+                            HorizontalDivider(color = VolunteerLinkBorderColour)
+                        }
+
+                        Column(
+                            modifier = Modifier.padding(top = 14.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Text(
+                                text = partner.organisationName,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = VolunteerLinkTextPrimary
+                            )
+                            partner.contributions.forEach { contribution ->
+                                VolunteerOpportunityPartnershipContributionRow(contribution)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun VolunteerOpportunityPartnershipContributionRow(
+    contribution: VolunteerOpportunityPartnershipContribution
+) {
+    val amount = if (contribution.supportType.equals("VENUE", ignoreCase = true)) {
+        contribution.capacityProvided?.let { "Capacity $it" }
+    } else {
+        contribution.quantityProvided?.let { "×$it" }
+    }
+    val provider = contribution.providerResourceName
+        ?.takeIf { it.isNotBlank() }
+        ?: contribution.needResourceName
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.Top
+    ) {
+        Surface(
+            modifier = Modifier
+                .padding(top = 6.dp)
+                .size(7.dp),
+            shape = CircleShape,
+            color = VolunteerLinkPrimaryGreen
+        ) {}
+
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = 10.dp)
+        ) {
+            Text(
+                text = contribution.needResourceName,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = VolunteerLinkTextPrimary
+            )
+            Text(
+                text = listOfNotNull(provider, amount)
+                    .distinct()
+                    .joinToString(" · "),
+                modifier = Modifier.padding(top = 2.dp),
+                fontSize = 12.sp,
+                lineHeight = 17.sp,
+                color = VolunteerLinkTextSecondary
+            )
+        }
     }
 }
 

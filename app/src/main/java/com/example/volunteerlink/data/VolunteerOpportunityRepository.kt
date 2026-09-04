@@ -4,6 +4,8 @@ import com.example.volunteerlink.model.VolunteerApplicationStatus
 import com.example.volunteerlink.model.VolunteerOpportunityApplication
 import com.example.volunteerlink.model.VolunteerOpportunityCategory
 import com.example.volunteerlink.model.VolunteerOpportunityEvent
+import com.example.volunteerlink.model.VolunteerOpportunityPartner
+import com.example.volunteerlink.model.VolunteerOpportunityPartnershipContribution
 import com.example.volunteerlink.model.VolunteerOpportunityRole
 import com.example.volunteerlink.model.VolunteerRoleApplicationFlow
 import com.example.volunteerlink.model.VolunteerRoleApplicationMethod
@@ -63,6 +65,17 @@ object VolunteerOpportunityRepository {
             supabase.from("volunteer_posts")
                 .select()
                 .decodeList<VolunteerPostRow>()
+
+        val partnershipRowsByPostId = posts
+            .filter { !it.impactWeaveDraftId.isNullOrBlank() }
+            .associate { post ->
+                post.postId to runCatching {
+                    supabase.postgrest.rpc(
+                        function = "volunteer_get_post_partnership_support",
+                        parameters = buildJsonObject { put("p_post_id", post.postId) }
+                    ).decodeList<ImpactWeavePostContributionRow>()
+                }.getOrDefault(emptyList())
+            }
 
         val physicalDetails =
             supabase.from("physical_details")
@@ -134,6 +147,7 @@ object VolunteerOpportunityRepository {
             posts = posts,
             organisations = organisations,
             physicalDetails = physicalDetails,
+            impactWeavePartnerRowsByPostId = partnershipRowsByPostId,
             remoteDetails = remoteDetails,
             postRoles = postRoles,
             postRoleSkills = postRoleSkills,
@@ -414,6 +428,7 @@ object VolunteerOpportunityRepository {
         posts: List<VolunteerPostRow>,
         organisations: List<OrganisationRow>,
         physicalDetails: List<PhysicalDetailRow>,
+        impactWeavePartnerRowsByPostId: Map<String, List<ImpactWeavePostContributionRow>>,
         remoteDetails: List<RemoteDetailRow>,
         postRoles: List<PostRoleRow>,
         postRoleSkills: List<PostRoleSkillRow>,
@@ -650,6 +665,25 @@ object VolunteerOpportunityRepository {
 
                 val opportunityType =
                     post.mode.toDisplayWords()
+                val partnershipPartners = impactWeavePartnerRowsByPostId[post.postId]
+                    .orEmpty()
+                    .groupBy { it.partnerOrganisationId }
+                    .map { (partnerId, rows) ->
+                        VolunteerOpportunityPartner(
+                            organisationId = partnerId,
+                            organisationName = rows.first().partnerOrganisationName,
+                            contributions = rows.map { row ->
+                                VolunteerOpportunityPartnershipContribution(
+                                    supportType = row.supportType,
+                                    needResourceName = row.needResourceName,
+                                    providerResourceName = row.providerResourceName,
+                                    quantityProvided = row.quantityProvided,
+                                    capacityProvided = row.capacityProvided
+                                )
+                            }
+                        )
+                    }
+                    .sortedBy { it.organisationName.lowercase(Locale.ROOT) }
                 val startDate =
                     listOfNotNull(physical?.startDate, remote?.startDate).filter(String::isNotBlank).minOrNull().orEmpty()
                 val remainingRoleSpots =
@@ -694,6 +728,8 @@ object VolunteerOpportunityRepository {
                     eventRemoteEndDate = (remote?.newEndDate ?: remote?.endDate).orEmpty(),
                     eventRemoteOriginalEndDate = remote?.endDate.orEmpty(),
                     eventMeetingPoint = physical?.meetingPoint.orEmpty(),
+                    eventIsPartnershipPost = !post.impactWeaveDraftId.isNullOrBlank(),
+                    eventPartnershipPartners = partnershipPartners,
                     eventEndDate = formatDatabaseDate(
                         listOfNotNull(physical?.endDate, remote?.newEndDate ?: remote?.endDate).maxOrNull() ?: startDate
                     ),
@@ -1066,6 +1102,18 @@ private fun statusMessage(
     }
 
 @Serializable
+private data class ImpactWeavePostContributionRow(
+    @SerialName("impact_weave_draft_id") val impactWeaveDraftId: String,
+    @SerialName("partner_organisation_id") val partnerOrganisationId: String,
+    @SerialName("partner_organisation_name") val partnerOrganisationName: String,
+    @SerialName("support_type") val supportType: String,
+    @SerialName("need_resource_name") val needResourceName: String,
+    @SerialName("provider_resource_name") val providerResourceName: String? = null,
+    @SerialName("quantity_provided") val quantityProvided: Int? = null,
+    @SerialName("capacity_provided") val capacityProvided: Int? = null
+)
+
+@Serializable
 private data class OrganisationRow(
     @SerialName("organisation_id")
     val organisationId: String,
@@ -1094,7 +1142,9 @@ internal data class VolunteerPostRow(
     val status: String,
     @SerialName("thumbnail_path")
     val thumbnailPath: String? = null,
-    val category: String? = null
+    val category: String? = null,
+    @SerialName("impact_weave_draft_id")
+    val impactWeaveDraftId: String? = null
 )
 
 @Serializable

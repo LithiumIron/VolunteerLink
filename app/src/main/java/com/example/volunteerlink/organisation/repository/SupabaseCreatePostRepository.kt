@@ -68,13 +68,15 @@ class SupabaseCreatePostRepository : CreatePostRepository {
     override suspend fun publishPost(
         draft: CreatePostDraft,
         roleCatalogue: List<CreateRoleTemplate>,
-        thumbnail: PublishThumbnail?
+        thumbnail: PublishThumbnail?,
+        impactWeaveDraftId: String?
     ): SavedPostResult {
         return savePost(
             draft = draft,
             roleCatalogue = roleCatalogue,
             thumbnail = thumbnail,
-            publishAfterSave = true
+            publishAfterSave = true,
+            impactWeaveDraftId = impactWeaveDraftId
         )
     }
 
@@ -82,7 +84,8 @@ class SupabaseCreatePostRepository : CreatePostRepository {
         draft: CreatePostDraft,
         roleCatalogue: List<CreateRoleTemplate>,
         thumbnail: PublishThumbnail?,
-        publishAfterSave: Boolean
+        publishAfterSave: Boolean,
+        impactWeaveDraftId: String? = null
     ): SavedPostResult {
         val organisation = OrganisationSession.requireContext()
         require(organisation.isVerified) {
@@ -145,6 +148,13 @@ class SupabaseCreatePostRepository : CreatePostRepository {
                 }
             )
 
+            if (!impactWeaveDraftId.isNullOrBlank()) {
+                SupabaseImpactWeaveRepository().completeConversion(
+                    draftId = impactWeaveDraftId,
+                    postId = postId
+                )
+            }
+
             return SavedPostResult(
                 postId = postId,
                 thumbnailPath = uploadedThumbnailPath
@@ -157,6 +167,17 @@ class SupabaseCreatePostRepository : CreatePostRepository {
             }
 
             createdPostId?.let { postId ->
+                if (!impactWeaveDraftId.isNullOrBlank()) {
+                    runCatching {
+                        supabase.postgrest.rpc(
+                            function = "organisation_prepare_failed_impact_weave_post_cleanup",
+                            parameters = buildJsonObject {
+                                put("p_draft_id", impactWeaveDraftId)
+                                put("p_post_id", postId)
+                            }
+                        )
+                    }
+                }
                 runCatching {
                     supabase.postgrest.rpc(
                         function = "organisation_delete_created_draft",

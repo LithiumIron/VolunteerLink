@@ -27,6 +27,15 @@ data class OrganisationPostManagementUiState(
     val remoteReviewFinalizeSucceeded: Boolean = false,
     val isUpdatingApplicant: Boolean = false,
     val applicantActionMessage: String? = null,
+    val isLoadingPostGroup: Boolean = false,
+    val isAddingPostGroupMembers: Boolean = false,
+    val postGroupConversationId: String? = null,
+    val postGroupEligibleCount: Int = 0,
+    val postGroupActiveMemberCount: Int = 0,
+    val postGroupMissingCount: Int = 0,
+    val postGroupHasStarted: Boolean = false,
+    val postGroupCanAdd: Boolean = false,
+    val postGroupActionMessage: String? = null,
     val remoteReviewSession: PostManagementRemoteReviewSession = PostManagementRemoteReviewSession()
 )
 
@@ -43,6 +52,8 @@ data class PostManagementPost(
     val mode: String,
     val databaseStatus: String,
     val category: String? = null,
+    val impactWeaveDraftId: String? = null,
+    val impactWeavePartners: List<PostManagementImpactWeavePartner> = emptyList(),
     val physical: PostManagementPhysicalDetails? = null,
     val remote: PostManagementRemoteDetails? = null,
     val schedules: List<PostManagementScheduleItem> = emptyList(),
@@ -69,6 +80,22 @@ data class PostManagementPost(
             it.applicationStatus.equals("ACCEPTED", ignoreCase = true)
         }
 }
+
+@Serializable
+data class PostManagementImpactWeavePartner(
+    val organisationId: String,
+    val organisationName: String,
+    val contributions: List<PostManagementImpactWeaveContribution> = emptyList()
+)
+
+@Serializable
+data class PostManagementImpactWeaveContribution(
+    val supportType: String,
+    val needResourceName: String,
+    val providerResourceName: String? = null,
+    val quantityProvided: Int? = null,
+    val capacityProvided: Int? = null
+)
 
 @Serializable
 data class PostManagementPhysicalDetails(
@@ -152,6 +179,8 @@ data class PostManagementPerson(
     val city: String? = null,
     val bio: String? = null,
     val avatarPath: String? = null,
+    val eventSharedPhone: String? = null,
+    val eventPhoneContactUntilLabel: String? = null,
     val roleTemplateId: String,
     val roleName: String,
     val roleMode: String,

@@ -18,6 +18,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -68,6 +70,7 @@ fun VolunteerProfileScreen(
     val name = profileData?.fullName ?: "Loading..."
     val email = profileData?.email ?: "Loading..."
     val bio = profileData?.bio ?: ""
+    val city = profileData?.city ?: ""
     val memberSince = profileData?.memberSince ?: "Loading..."
     val profileImageUrl = profileData?.profileImageUrl
     val verifiedHours = profileData?.verifiedHours ?: 0
@@ -158,28 +161,33 @@ fun VolunteerProfileScreen(
                     .background(VolunteerLinkSoftGreenSurface),
                 contentAlignment = Alignment.Center
             ) {
-                if (!profileImageUrl.isNullOrBlank()) {
-                    AsyncImage(
-                        model = profileImageUrl,
-                        contentDescription = "Profile Picture",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    Text(
-                        text = name
-                            .trim()
-                            .split(" ")
-                            .filter { it.isNotBlank() }
-                            .take(2)
-                            .mapNotNull { it.firstOrNull()?.uppercaseChar() }
-                            .joinToString("")
-                            .ifBlank { "V" },
-                        fontSize = 26.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = VolunteerLinkPrimaryGreen
-                    )
-                }
+                // Keep the normal initials underneath the image. This means a
+                // missing avatar and an old/broken avatar URL use the same fallback.
+                Text(
+                    text = name
+                        .trim()
+                        .split(Regex("\\s+"))
+                        .filter { it.isNotBlank() }
+                        .take(2)
+                        .mapNotNull { it.firstOrNull()?.uppercaseChar() }
+                        .joinToString("")
+                        .ifBlank { "V" },
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = VolunteerLinkPrimaryGreen
+                )
+
+                profileImageUrl
+                    ?.trim()
+                    ?.takeIf { it.isNotEmpty() && !it.equals("null", ignoreCase = true) }
+                    ?.let { safeImageUrl ->
+                        AsyncImage(
+                            model = safeImageUrl,
+                            contentDescription = "Profile Picture",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
             }
 
             Spacer(modifier = Modifier.width(14.dp))
@@ -220,6 +228,31 @@ fun VolunteerProfileScreen(
                     contentDescription = "Edit Profile",
                     tint = VolunteerLinkPrimaryGreen,
                     modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+
+        // City shown as a small icon + text row, same full-width treatment
+        // as bio/member-since below the header.
+        if (city.isNotBlank()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 20.dp, end = 20.dp, top = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.LocationOn,
+                    contentDescription = null,
+                    tint = Color.Gray,
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = city,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Gray
                 )
             }
         }

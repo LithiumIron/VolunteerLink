@@ -1,5 +1,7 @@
 package com.example.volunteerlink.organisation.screens
 
+import android.content.Intent
+import android.net.Uri
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -12,6 +14,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -20,6 +23,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Call
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -37,6 +42,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -44,6 +51,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import coil.compose.AsyncImage
 import com.example.volunteerlink.R
 import com.example.volunteerlink.organisation.components.OrganisationDivider
 import com.example.volunteerlink.organisation.components.OrganisationInfoStrip
@@ -454,9 +462,117 @@ fun PostManagementOverview(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         OrganisationSectionSurface { PostManagementDetailsCard(post) }
+        if (!post.impactWeaveDraftId.isNullOrBlank()) {
+            OrganisationSectionSurface { PostManagementImpactWeaveCard(post) }
+        }
         OrganisationSectionSurface { PostManagementParticipationCard(post) }
         OrganisationSectionSurface { PostManagementRoleSection(post) }
         OrganisationSectionSurface { PostManagementScheduleSection(post) }
+    }
+}
+
+@Composable
+private fun PostManagementImpactWeaveCard(post: PostManagementPost) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        OrganisationSectionHeader(
+            title = "Impact Weave partnership",
+            subtitle = "This Volunteer Post was created from an Impact Weave collaboration."
+        )
+
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 10.dp),
+            shape = RoundedCornerShape(14.dp),
+            color = VolunteerLinkSoftGreenSurface
+        ) {
+            Column(
+                modifier = Modifier.padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "Created from Impact Weave",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = VolunteerLinkPrimaryGreen
+                )
+                Text(
+                    text = if (post.impactWeavePartners.isEmpty()) {
+                        "No accepted partner contribution is linked to this post."
+                    } else {
+                        "${post.impactWeavePartners.size} partner ${if (post.impactWeavePartners.size == 1) "organisation is" else "organisations are"} supporting this activity."
+                    },
+                    fontSize = 12.sp,
+                    lineHeight = 17.sp,
+                    color = VolunteerLinkTextSecondary
+                )
+            }
+        }
+
+        if (post.impactWeavePartners.isNotEmpty()) {
+            Column(
+                modifier = Modifier.padding(top = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                post.impactWeavePartners.forEachIndexed { index, partner ->
+                    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                        Text(
+                            text = partner.organisationName,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = VolunteerLinkTextPrimary
+                        )
+                        partner.contributions.forEach { contribution ->
+                            val amount = if (contribution.supportType.equals("VENUE", true)) {
+                                contribution.capacityProvided?.let { "Capacity $it" }
+                            } else {
+                                contribution.quantityProvided?.let { "×$it" }
+                            }
+                            val provider = contribution.providerResourceName
+                                ?.takeIf { it.isNotBlank() }
+                                ?: contribution.needResourceName
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.Top
+                            ) {
+                                Surface(
+                                    modifier = Modifier
+                                        .padding(top = 6.dp)
+                                        .size(6.dp),
+                                    shape = CircleShape,
+                                    color = VolunteerLinkPrimaryGreen
+                                ) {}
+                                Column(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .padding(start = 9.dp)
+                                ) {
+                                    Text(
+                                        text = contribution.needResourceName,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = VolunteerLinkTextPrimary
+                                    )
+                                    Text(
+                                        text = listOfNotNull(provider, amount)
+                                            .distinct()
+                                            .joinToString(" · "),
+                                        modifier = Modifier.padding(top = 2.dp),
+                                        fontSize = 12.sp,
+                                        lineHeight = 17.sp,
+                                        color = VolunteerLinkTextSecondary
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    if (index != post.impactWeavePartners.lastIndex) {
+                        OrganisationDivider()
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -2041,6 +2157,93 @@ fun PostManagementPeopleControls(
 }
 
 @Composable
+fun PostManagementGroupSyncCard(
+    groupExists: Boolean,
+    eligibleCount: Int,
+    activeMemberCount: Int,
+    missingCount: Int,
+    hasStarted: Boolean,
+    canAdd: Boolean,
+    isLoading: Boolean,
+    isAdding: Boolean,
+    actionMessage: String?,
+    onAddAll: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    OrganisationSectionSurface(modifier = modifier, contentPadding = 16.dp) {
+        OrganisationSectionHeader(
+            title = "Event group",
+            subtitle = if (groupExists) {
+                "Add accepted volunteers who are still missing."
+            } else {
+                "The group is created only when you press the button."
+            }
+        )
+
+        Text(
+            text = when {
+                isLoading -> "Checking group members…"
+                !groupExists -> "No event group created"
+                else -> "$activeMemberCount of $eligibleCount accepted volunteers added"
+            },
+            modifier = Modifier.padding(top = 12.dp),
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = VolunteerLinkTextPrimary
+        )
+
+        Text(
+            text = when {
+                hasStarted -> "The event has started, so group membership is locked."
+                !groupExists && eligibleCount == 0 ->
+                    "You can create the group now with only your organisation."
+                !groupExists -> "$eligibleCount accepted volunteer${if (eligibleCount == 1) " will" else "s will"} be added."
+                missingCount == 0 -> "Every currently accepted volunteer is already in the group."
+                else -> "$missingCount accepted volunteer${if (missingCount == 1) " is" else "s are"} not in the group yet."
+            },
+            modifier = Modifier.padding(top = 4.dp),
+            fontSize = 13.sp,
+            lineHeight = 18.sp,
+            color = VolunteerLinkTextSecondary
+        )
+
+        Button(
+            onClick = onAddAll,
+            enabled = canAdd && !isLoading && !isAdding,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 14.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = VolunteerLinkPrimaryGreen),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Text(
+                text = when {
+                    isAdding -> "Updating group…"
+                    !groupExists -> "Create group and add all"
+                    missingCount > 0 -> "Add all missing volunteers"
+                    else -> "Group is up to date"
+                },
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        actionMessage?.let {
+            Text(
+                text = it,
+                modifier = Modifier.padding(top = 10.dp),
+                fontSize = 13.sp,
+                color = if (it.contains("unable", ignoreCase = true) ||
+                    it.contains("unavailable", ignoreCase = true)) {
+                    VolunteerLinkError
+                } else {
+                    VolunteerLinkSuccess
+                }
+            )
+        }
+    }
+}
+
+@Composable
 private fun PostManagementPeopleTabItem(
     text: String,
     @DrawableRes iconRes: Int,
@@ -2218,10 +2421,13 @@ fun PostManagementPersonCard(
     onRequestMarkAbsent: (PostManagementPerson, String) -> Unit = { _, _ -> },
     onViewRemoteSubmission: (PostManagementPerson, PostManagementRemoteSubmission) -> Unit = { _, _ -> },
     onViewProfile: (PostManagementPerson) -> Unit,
+    onMessage: (PostManagementPerson) -> Unit = {},
     onViewApplication: (PostManagementPerson) -> Unit = {},
     onToggleShortlist: (PostManagementPerson) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+
     Surface(
         modifier = modifier
             .fillMaxWidth()
@@ -2240,12 +2446,36 @@ fun PostManagementPersonCard(
                     color = VolunteerLinkSoftGreenSurface
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            painter = painterResource(R.drawable.person_placeholder),
-                            contentDescription = "View ${person.fullName} profile",
-                            modifier = Modifier.size(24.dp),
-                            tint = VolunteerLinkPrimaryGreen
+                        // Match the Volunteer Profile fallback exactly: initials stay
+                        // underneath the network image, so a missing or broken avatar
+                        // consistently shows e.g. "VT" instead of a separate drawable.
+                        Text(
+                            text = person.fullName
+                                .trim()
+                                .split(Regex("\\s+"))
+                                .filter { it.isNotBlank() }
+                                .take(2)
+                                .mapNotNull { it.firstOrNull()?.uppercaseChar() }
+                                .joinToString("")
+                                .ifBlank { "V" },
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = VolunteerLinkPrimaryGreen
                         )
+
+                        person.avatarPath
+                            ?.trim()
+                            ?.takeIf { it.isNotEmpty() && !it.equals("null", ignoreCase = true) }
+                            ?.let { safeAvatarPath ->
+                                AsyncImage(
+                                    model = safeAvatarPath,
+                                    contentDescription = "${person.fullName} profile picture",
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(CircleShape),
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
                     }
                 }
 
@@ -2297,8 +2527,34 @@ fun PostManagementPersonCard(
 
                 OrganisationMessageButton(
                     personName = person.fullName,
-                    modifier = Modifier.padding(start = 6.dp)
+                    modifier = Modifier.padding(start = 6.dp),
+                    onClick = { onMessage(person) }
                 )
+
+                person.eventSharedPhone
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let { sharedPhone ->
+                        IconButton(
+                            onClick = {
+                                context.startActivity(
+                                    Intent(
+                                        Intent.ACTION_DIAL,
+                                        Uri.parse("tel:${Uri.encode(sharedPhone)}")
+                                    )
+                                )
+                            },
+                            modifier = Modifier
+                                .padding(start = 2.dp)
+                                .size(38.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Call,
+                                contentDescription = "Call ${person.fullName}",
+                                modifier = Modifier.size(20.dp),
+                                tint = VolunteerLinkPrimaryGreen
+                            )
+                        }
+                    }
 
                 if (isApplicant) {
                     IconButton(

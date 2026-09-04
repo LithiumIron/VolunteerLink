@@ -17,6 +17,19 @@ import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.JsonPrimitive
+
+@Serializable
+data class PostGroupStatus(
+    @SerialName("conversation_id") val conversationId: String? = null,
+    @SerialName("eligible_count") val eligibleCount: Int = 0,
+    @SerialName("active_member_count") val activeMemberCount: Int = 0,
+    @SerialName("missing_count") val missingCount: Int = 0,
+    @SerialName("added_count") val addedCount: Int = 0,
+    @SerialName("has_started") val hasStarted: Boolean = false,
+    @SerialName("can_add") val canAdd: Boolean = false
+)
 
 data class LoadedChatData(
     val profile: UserProfile,
@@ -68,6 +81,9 @@ object SupabaseChatRepository {
                 }
 
                 val chatMessages = mutableStateListOf<ChatMessage>()
+                first.latestMessageId?.let {
+                    chatMessages += first.toLatestMessage()
+                }
 
                 ChatRoom(
                     id = chatId,
@@ -79,7 +95,7 @@ object SupabaseChatRepository {
                     readCounts = mutableStateMapOf(
                         viewerRole to chatMessages.size
                     ),
-                    isGroup = true
+                    isGroup = first.isGroup
                 )
             }
             .sortedByDescending { chat ->
@@ -96,6 +112,65 @@ object SupabaseChatRepository {
         chatId: String
     ): List<ChatMessage> {
         return loadMessages(chatId)
+    }
+
+    suspend fun loadPostGroupStatus(postId: String): PostGroupStatus {
+        return supabase.postgrest.rpc(
+            function = "organisation_get_post_group_status",
+            parameters = buildJsonObject { put("p_post_id", JsonPrimitive(postId)) }
+        ).decodeAs<PostGroupStatus>()
+    }
+
+    suspend fun addAllAcceptedVolunteers(postId: String): PostGroupStatus {
+        return supabase.postgrest.rpc(
+            function = "organisation_add_all_to_post_group",
+            parameters = buildJsonObject { put("p_post_id", JsonPrimitive(postId)) }
+        ).decodeAs<PostGroupStatus>()
+    }
+
+    suspend fun openVolunteerDirectChat(postId: String, volunteerUserId: String): String {
+        return supabase.postgrest.rpc(
+            function = "organisation_open_volunteer_direct_chat",
+            parameters = buildJsonObject {
+                put("p_post_id", JsonPrimitive(postId))
+                put("p_volunteer_user_id", JsonPrimitive(volunteerUserId))
+            }
+        ).decodeAs<String>()
+    }
+
+    suspend fun sendMessage(
+        conversationId: String,
+        text: String,
+        replyToMessageId: String? = null
+    ): String {
+        return supabase.postgrest.rpc(
+            function = "send_conversation_message",
+            parameters = buildJsonObject {
+                put("p_conversation_id", JsonPrimitive(conversationId))
+                put("p_message_text", JsonPrimitive(text.trim()))
+                put("p_message_type", JsonPrimitive("TEXT"))
+                replyToMessageId?.let {
+                    put("p_reply_to_message_id", JsonPrimitive(it))
+                }
+            }
+        ).decodeAs<String>()
+    }
+
+    suspend fun editMessage(messageId: String, text: String): String {
+        return supabase.postgrest.rpc(
+            function = "edit_conversation_message",
+            parameters = buildJsonObject {
+                put("p_message_id", JsonPrimitive(messageId))
+                put("p_message_text", JsonPrimitive(text.trim()))
+            }
+        ).decodeAs<String>()
+    }
+
+    suspend fun deleteMessage(messageId: String): String {
+        return supabase.postgrest.rpc(
+            function = "delete_conversation_message",
+            parameters = buildJsonObject { put("p_message_id", JsonPrimitive(messageId)) }
+        ).decodeAs<String>()
     }
 
     private suspend fun loadMessages(
@@ -176,7 +251,7 @@ private data class EventChatRow(
     val chatId: String,
 
     @SerialName("post_id")
-    val postId: String,
+    val postId: String? = null,
 
     val title: String,
     val description: String,
@@ -191,8 +266,40 @@ private data class EventChatRow(
     val memberRole: String,
 
     @SerialName("member_initial")
-    val memberInitial: String
+    val memberInitial: String,
+
+    @SerialName("is_group") val isGroup: Boolean = true,
+    @SerialName("latest_message_id") val latestMessageId: String? = null,
+    @SerialName("latest_sender_user_id") val latestSenderUserId: String? = null,
+    @SerialName("latest_sender_name") val latestSenderName: String? = null,
+    @SerialName("latest_sender_initial") val latestSenderInitial: String? = null,
+    @SerialName("latest_body") val latestBody: String? = null,
+    @SerialName("latest_message_type") val latestMessageType: String? = null,
+    @SerialName("latest_attachment_path") val latestAttachmentPath: String? = null,
+    @SerialName("latest_attachment_name") val latestAttachmentName: String? = null,
+    @SerialName("latest_attachment_mime_type") val latestAttachmentMimeType: String? = null,
+    @SerialName("latest_sent_at") val latestSentAt: String? = null,
+    @SerialName("latest_edited_at") val latestEditedAt: String? = null
 )
+
+private fun EventChatRow.toLatestMessage(): ChatMessage {
+    val type = latestMessageType.orEmpty().uppercase()
+    return ChatMessage(
+        id = latestMessageId.orEmpty(),
+        senderId = latestSenderUserId.orEmpty(),
+        senderName = latestSenderName ?: "VolunteerLink user",
+        senderInitial = latestSenderInitial ?: "V",
+        text = latestBody.orEmpty(),
+        sentAtMillis = latestSentAt?.toEpochMillis() ?: 0L,
+        imageUri = latestAttachmentPath.takeIf { type == "IMAGE" },
+        videoUri = latestAttachmentPath.takeIf { type == "VIDEO" },
+        audioUri = latestAttachmentPath.takeIf { type == "AUDIO" },
+        fileUri = latestAttachmentPath.takeIf { type == "FILE" },
+        fileName = latestAttachmentName,
+        fileMimeType = latestAttachmentMimeType,
+        isEdited = latestEditedAt != null
+    )
+}
 
 @Serializable
 private data class EventChatMessageRow(

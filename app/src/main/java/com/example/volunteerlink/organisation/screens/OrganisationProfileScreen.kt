@@ -228,11 +228,11 @@ fun OrganisationProfileScreen(
         }
 
         // Description, location and member-since now sit full-width below
-        // the header row, instead of squeezed into the narrow column
-        // beside the logo.
-        if (data.description.isNotBlank()) {
+// the header row, instead of squeezed into the narrow column
+// beside the logo.
+        if (data.bio.isNotBlank()) {
             Text(
-                text = data.description,
+                text = data.bio,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(start = 20.dp, end = 20.dp, top = 10.dp),

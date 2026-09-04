@@ -14,6 +14,10 @@ private data class UserProfileRow(
     val fullName: String? = null,
     val phone: String? = null,
     val bio: String? = null,
+    val city: String? = null,
+    @SerialName("state_region")
+    val stateRegion: String? = null,
+    val country: String? = null,
     @SerialName("avatar_path")
     val avatarPath: String? = null,
     @SerialName("created_at")
@@ -57,6 +61,9 @@ object VolunteerProfileRepository {
                 fullName = profile.fullName ?: "",
                 email = currentUser.email ?: "",
                 bio = profile.bio ?: "",
+                city = profile.city ?: "",
+                stateRegion = profile.stateRegion ?: "",
+                country = profile.country ?: "",
                 phone = profile.phone ?: "",
                 memberSince = profile.createdAt?.take(10) ?: "",
                 profileImageUrl = profile.avatarPath,
@@ -77,6 +84,9 @@ object VolunteerProfileRepository {
         name: String,
         phone: String,
         bio: String,
+        city: String,
+        stateRegion: String,
+        country: String,
         profileImageUrl: String?
     ): Boolean {
         val currentUser = supabase.auth.currentUserOrNull()
@@ -85,8 +95,6 @@ object VolunteerProfileRepository {
             return false
         }
 
-        android.util.Log.d("VL_UPDATE", "Attempting update for auth_user_id=${currentUser.id}")
-
         return try {
             val updatedRows = supabase
                 .from("user_profiles")
@@ -94,6 +102,9 @@ object VolunteerProfileRepository {
                     set("full_name", name)
                     set("phone", phone)
                     set("bio", bio)
+                    set("city", city)
+                    set("state_region", stateRegion)
+                    set("country", country)
                     set("avatar_path", profileImageUrl)
                 }) {
                     filter { eq("auth_user_id", currentUser.id) }
@@ -101,14 +112,7 @@ object VolunteerProfileRepository {
                 }
                 .decodeList<Map<String, kotlinx.serialization.json.JsonElement>>()
 
-            android.util.Log.d("VL_UPDATE", "Rows updated: ${updatedRows.size}")
-
             if (updatedRows.isEmpty()) {
-                android.util.Log.e(
-                    "VL_UPDATE",
-                    "0 rows matched auth_user_id=${currentUser.id}. " +
-                            "Check RLS UPDATE policy, or that a user_profiles row exists for this user."
-                )
                 return false
             }
 
@@ -119,6 +123,9 @@ object VolunteerProfileRepository {
                         fullName = name,
                         phone = phone,
                         bio = bio,
+                        city = city,
+                        stateRegion = stateRegion,
+                        country = country,
                         profileImageUrl = profileImageUrl
                     )
                 )

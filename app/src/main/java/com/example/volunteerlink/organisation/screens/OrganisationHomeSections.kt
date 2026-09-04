@@ -407,6 +407,11 @@ private fun HomeAttentionItem.attentionKindLabel(): String = when (type) {
     HomeAttentionType.POST_COMPLETION_REVIEW -> "CLOSE-OUT"
     HomeAttentionType.DRAFT_START_TOO_SOON,
     HomeAttentionType.DRAFT_START_DATE_PASSED -> "DRAFT"
+    HomeAttentionType.IMPACT_WEAVE_READY,
+    HomeAttentionType.IMPACT_WEAVE_DEADLINE_SOON,
+    HomeAttentionType.IMPACT_WEAVE_DEADLINE_PASSED,
+    HomeAttentionType.IMPACT_WEAVE_ACTIVITY_PASSED,
+    HomeAttentionType.IMPACT_WEAVE_PROGRESS -> "IMPACT WEAVE"
 }
 
 private fun HomeAttentionItem.severityLabel(): String = when (severity) {

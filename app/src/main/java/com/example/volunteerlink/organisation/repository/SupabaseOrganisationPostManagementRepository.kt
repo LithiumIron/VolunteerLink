@@ -6,6 +6,8 @@ import com.example.volunteerlink.organisation.manage.model.PostManagementAttenda
 import com.example.volunteerlink.organisation.manage.model.PostManagementAttendanceRecord
 import com.example.volunteerlink.organisation.manage.model.PostManagementAttendanceSnapshot
 import com.example.volunteerlink.organisation.manage.model.PostManagementEvaluation
+import com.example.volunteerlink.organisation.manage.model.PostManagementImpactWeavePartner
+import com.example.volunteerlink.organisation.manage.model.PostManagementImpactWeaveContribution
 import com.example.volunteerlink.organisation.manage.model.PostManagementPerson
 import com.example.volunteerlink.organisation.manage.model.PostManagementPhysicalDetails
 import com.example.volunteerlink.organisation.manage.model.PostManagementPost
@@ -20,6 +22,8 @@ import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.storage.storage
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -32,6 +36,26 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import java.util.Locale
+
+
+@Serializable
+private data class PostManagementEventContactRow(
+    @SerialName("user_id") val userId: String,
+    @SerialName("shared_phone") val sharedPhone: String = "",
+    @SerialName("phone_contact_until_label") val phoneContactUntilLabel: String? = null
+)
+
+@Serializable
+private data class ImpactWeavePostContributionRow(
+    @SerialName("impact_weave_draft_id") val impactWeaveDraftId: String,
+    @SerialName("partner_organisation_id") val partnerOrganisationId: String,
+    @SerialName("partner_organisation_name") val partnerOrganisationName: String,
+    @SerialName("support_type") val supportType: String,
+    @SerialName("need_resource_name") val needResourceName: String,
+    @SerialName("provider_resource_name") val providerResourceName: String? = null,
+    @SerialName("quantity_provided") val quantityProvided: Int? = null,
+    @SerialName("capacity_provided") val capacityProvided: Int? = null
+)
 
 /** Supabase reader for the Organisation Post Management detail screen. */
 class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementRepository {
@@ -55,7 +79,7 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
             .from("volunteer_posts")
             .select(
                 columns = Columns.raw(
-                    "post_id,organisation_id,title,description,mode,status,category"
+                    "post_id,organisation_id,title,description,mode,status,category,impact_weave_draft_id"
                 )
             ) {
                 filter {
@@ -66,6 +90,35 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
             .decodeList<JsonObject>()
             .firstOrNull()
             ?: error("Volunteer post $postId does not belong to this organisation.")
+
+        val impactWeaveDraftId = postRow.optionalText("impact_weave_draft_id")
+        val impactWeavePartners = if (impactWeaveDraftId.isNullOrBlank()) {
+            emptyList()
+        } else {
+            runCatching {
+                supabase.postgrest.rpc(
+                    function = "organisation_get_post_impact_weave_partners",
+                    parameters = buildJsonObject { put("p_post_id", postId) }
+                ).decodeList<ImpactWeavePostContributionRow>()
+                    .groupBy { it.partnerOrganisationId }
+                    .map { (partnerId, rows) ->
+                        PostManagementImpactWeavePartner(
+                            organisationId = partnerId,
+                            organisationName = rows.first().partnerOrganisationName,
+                            contributions = rows.map { row ->
+                                PostManagementImpactWeaveContribution(
+                                    supportType = row.supportType,
+                                    needResourceName = row.needResourceName,
+                                    providerResourceName = row.providerResourceName,
+                                    quantityProvided = row.quantityProvided,
+                                    capacityProvided = row.capacityProvided
+                                )
+                            }
+                        )
+                    }
+                    .sortedBy { it.organisationName.lowercase(Locale.ROOT) }
+            }.getOrDefault(emptyList())
+        }
 
         val physicalRow = supabase
             .from("physical_details")
@@ -275,6 +328,21 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
         val profilesById = profileRows.associateBy { it.requiredText("user_id") }
         val rolesById = roles.associateBy { it.roleTemplateId }
 
+        // Phone numbers are never read directly from user_profiles here.
+        // The SECURITY DEFINER RPC only returns a number when this organisation
+        // owns the post, the volunteer is accepted and active, and that volunteer
+        // explicitly enabled phone sharing for this participation.
+        val eventContactsByUserId = runCatching {
+            supabase.postgrest.rpc(
+                function = "organisation_list_post_volunteer_event_contacts",
+                parameters = buildJsonObject { put("p_post_id", postId) }
+            ).decodeList<PostManagementEventContactRow>()
+                .associateBy { it.userId }
+        }.getOrElse {
+            it.printStackTrace()
+            emptyMap()
+        }
+
         val people = participationRows.mapNotNull { participationRow ->
             val userId = participationRow.requiredText("user_id")
             val roleTemplateId = participationRow.requiredText("role_template_id")
@@ -290,6 +358,8 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
                 city = profile?.optionalText("city"),
                 bio = profile?.optionalText("bio"),
                 avatarPath = profile?.optionalText("avatar_path"),
+                eventSharedPhone = eventContactsByUserId[userId]?.sharedPhone?.takeIf { it.isNotBlank() },
+                eventPhoneContactUntilLabel = eventContactsByUserId[userId]?.phoneContactUntilLabel,
                 roleTemplateId = roleTemplateId,
                 roleName = role.roleName,
                 roleMode = role.roleMode,
@@ -321,6 +391,8 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
             mode = postRow.requiredText("mode"),
             databaseStatus = postRow.requiredText("status"),
             category = postRow.optionalText("category"),
+            impactWeaveDraftId = impactWeaveDraftId,
+            impactWeavePartners = impactWeavePartners,
             physical = physicalRow?.let {
                 PostManagementPhysicalDetails(
                     startDate = it.requiredText("start_date"),

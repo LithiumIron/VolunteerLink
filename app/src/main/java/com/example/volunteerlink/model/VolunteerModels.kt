@@ -57,6 +57,22 @@ data class VolunteerOpportunityRole(
 )
 
 @Serializable
+data class VolunteerOpportunityPartnershipContribution(
+    val supportType: String = "",
+    val needResourceName: String = "",
+    val providerResourceName: String? = null,
+    val quantityProvided: Int? = null,
+    val capacityProvided: Int? = null
+)
+
+@Serializable
+data class VolunteerOpportunityPartner(
+    val organisationId: String = "",
+    val organisationName: String = "",
+    val contributions: List<VolunteerOpportunityPartnershipContribution> = emptyList()
+)
+
+@Serializable
 enum class VolunteerOpportunityCategory {
     SPORTS,
     COMMUNITY,
@@ -110,6 +126,8 @@ data class VolunteerOpportunityEvent(
     val eventRemoteEndDate: String = "",
     val eventRemoteOriginalEndDate: String = "",
     val eventMeetingPoint: String = "",
+    val eventIsPartnershipPost: Boolean = false,
+    val eventPartnershipPartners: List<VolunteerOpportunityPartner> = emptyList(),
     // Retained for older cached payload compatibility. New application checks are role-specific.
     val eventApplicationStartDate: String = ""
 )

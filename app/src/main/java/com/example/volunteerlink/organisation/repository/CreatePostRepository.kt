@@ -55,6 +55,7 @@ interface CreatePostRepository {
     suspend fun publishPost(
         draft: CreatePostDraft,
         roleCatalogue: List<CreateRoleTemplate>,
-        thumbnail: PublishThumbnail?
+        thumbnail: PublishThumbnail?,
+        impactWeaveDraftId: String? = null
     ): SavedPostResult
 }

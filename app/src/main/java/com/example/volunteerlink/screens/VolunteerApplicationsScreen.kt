@@ -38,9 +38,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -342,6 +344,30 @@ fun VolunteerApplicationDetailsScreen(
                 )
             }
 
+    val phoneContactIsRelevant =
+        volunteerApplication.applicationStatus == VolunteerApplicationStatus.ACCEPTED &&
+            volunteerOpportunityEvent != null &&
+            volunteerOpportunityRole != null &&
+            volunteerOpportunityEvent.eventDatabaseId.isNotBlank() &&
+            volunteerOpportunityRole.roleTemplateId.isNotBlank() &&
+            volunteerOpportunityRole.roleMode.uppercase() in setOf("PHYSICAL", "REMOTE")
+
+    LaunchedEffect(
+        volunteerApplication.applicationDatabaseId,
+        volunteerOpportunityEvent?.eventDatabaseId,
+        volunteerOpportunityRole?.roleTemplateId,
+        phoneContactIsRelevant
+    ) {
+        if (phoneContactIsRelevant) {
+            volunteerOpportunityViewModel.loadEventPhoneContact(
+                postId = volunteerOpportunityEvent!!.eventDatabaseId,
+                roleTemplateId = volunteerOpportunityRole!!.roleTemplateId
+            )
+        } else {
+            volunteerOpportunityViewModel.clearEventPhoneContact()
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -429,6 +455,23 @@ fun VolunteerApplicationDetailsScreen(
                 item(key = "my_role_arrangements") {
                     VolunteerRoleInformationCard(volunteerOpportunityEvent, volunteerOpportunityRole, includeTasks = true)
                 }
+
+                if (phoneContactIsRelevant) {
+                    item(key = "event_phone_contact") {
+                        VolunteerApplicationEventPhoneContactCard(
+                            organisationName = volunteerOpportunityEvent.eventOrganisationName,
+                            phoneContactState = opportunityUiState.eventPhoneContact,
+                            onEnabledChange = { enabled ->
+                                volunteerOpportunityViewModel.setEventPhoneContactEnabled(
+                                    postId = volunteerOpportunityEvent.eventDatabaseId,
+                                    roleTemplateId = volunteerOpportunityRole.roleTemplateId,
+                                    enabled = enabled
+                                )
+                            }
+                        )
+                    }
+                }
+
                 if (volunteerOpportunityRole.roleMode == "PHYSICAL" &&
                     volunteerApplication.applicationStatus in listOf(
                         VolunteerApplicationStatus.ACCEPTED, VolunteerApplicationStatus.COMPLETED,
@@ -1733,3 +1776,83 @@ private fun VolunteerApplicationDetailsNotFoundScreen(
         }
     }
 }
+
+@Composable
+private fun VolunteerApplicationEventPhoneContactCard(
+    organisationName: String,
+    phoneContactState: VolunteerEventPhoneContactUiState,
+    onEnabledChange: (Boolean) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = VolunteerLinkSurface),
+        border = BorderStroke(1.dp, VolunteerLinkBorderColour)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Opportunity phone contact",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = VolunteerLinkTextPrimary
+                    )
+                    Text(
+                        text = "Allow $organisationName to call the phone number on your profile while this accepted participation is active.",
+                        modifier = Modifier.padding(top = 4.dp),
+                        fontSize = 12.sp,
+                        lineHeight = 17.sp,
+                        color = VolunteerLinkTextSecondary
+                    )
+                }
+
+                Switch(
+                    checked = phoneContactState.enabled,
+                    onCheckedChange = onEnabledChange,
+                    enabled = phoneContactState.eligible &&
+                        !phoneContactState.isLoading &&
+                        !phoneContactState.isUpdating
+                )
+            }
+
+            val statusText = when {
+                phoneContactState.isLoading -> "Checking contact permission..."
+                phoneContactState.errorMessage != null -> phoneContactState.errorMessage
+                !phoneContactState.eligible -> phoneContactState.reason
+                    ?: "Phone sharing is not available for this opportunity."
+                phoneContactState.enabled -> buildString {
+                    append("Your organiser can call you")
+                    phoneContactState.availableUntilLabel
+                        ?.takeIf { it.isNotBlank() }
+                        ?.let { append(" until $it") }
+                    append(". You can switch this off at any time.")
+                }
+                else -> buildString {
+                    append("Your phone number stays private unless you turn this on")
+                    phoneContactState.availableUntilLabel
+                        ?.takeIf { it.isNotBlank() }
+                        ?.let { append(". If enabled, access lasts until $it") }
+                    append(".")
+                }
+            }
+
+            Text(
+                text = statusText.orEmpty(),
+                modifier = Modifier.padding(top = 10.dp),
+                fontSize = 11.sp,
+                lineHeight = 16.sp,
+                fontWeight = if (phoneContactState.enabled) FontWeight.SemiBold else FontWeight.Normal,
+                color = when {
+                    phoneContactState.errorMessage != null -> VolunteerLinkError
+                    phoneContactState.enabled -> VolunteerLinkPrimaryGreen
+                    else -> VolunteerLinkTextSecondary
+                }
+            )
+        }
+    }
+}
+

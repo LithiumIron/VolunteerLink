@@ -19,6 +19,7 @@ import com.example.volunteerlink.organisation.home.model.HomeAttentionType
 import com.example.volunteerlink.organisation.home.model.HomePostItem
 import com.example.volunteerlink.organisation.home.model.OrganisationHomePost
 import com.example.volunteerlink.organisation.home.model.OrganisationHomeSnapshot
+import com.example.volunteerlink.organisation.home.model.OrganisationImpactWeaveAttention
 import com.example.volunteerlink.organisation.home.model.OrganisationHomeUiState
 import com.example.volunteerlink.organisation.repository.OrganisationHomeRepository
 import com.example.volunteerlink.organisation.repository.SupabaseOrganisationHomeRepository
@@ -26,6 +27,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 /**
  * Prepares everything Organisation Home needs to display.
@@ -217,6 +219,10 @@ class OrganisationHomeViewModel : ViewModel() {
 
         }
 
+        snapshot.impactWeaveAttention.forEach { impactAttention ->
+            attentionItems += impactAttention.toHomeAttentionItem()
+        }
+
         val sortedOngoing = ongoingPosts.sortedWith(
             compareBy<HomePostItem> { it.endDate.orEmpty() }
                 .thenBy { it.title }
@@ -274,6 +280,35 @@ class OrganisationHomeViewModel : ViewModel() {
                     "upcoming=${sortedUpcoming.size}, drafts=$draftCount, " +
                     "attention=${sortedAttention.size}, " +
                     "applicationReview=$reviewAttentionCount"
+        )
+    }
+
+    private fun OrganisationImpactWeaveAttention.toHomeAttentionItem(): HomeAttentionItem {
+        val type = when (attentionType.uppercase(Locale.ROOT)) {
+            "READY" -> HomeAttentionType.IMPACT_WEAVE_READY
+            "DEADLINE_SOON" -> HomeAttentionType.IMPACT_WEAVE_DEADLINE_SOON
+            "DEADLINE_PASSED" -> HomeAttentionType.IMPACT_WEAVE_DEADLINE_PASSED
+            "ACTIVITY_PASSED" -> HomeAttentionType.IMPACT_WEAVE_ACTIVITY_PASSED
+            "PROGRESS" -> HomeAttentionType.IMPACT_WEAVE_PROGRESS
+            else -> HomeAttentionType.IMPACT_WEAVE_DEADLINE_SOON
+        }
+        val mappedSeverity = when (severity.uppercase(Locale.ROOT)) {
+            "URGENT" -> HomeAttentionSeverity.URGENT
+            "WARNING" -> HomeAttentionSeverity.WARNING
+            "NEEDS_REVIEW" -> HomeAttentionSeverity.NEEDS_REVIEW
+            else -> HomeAttentionSeverity.REVIEW
+        }
+        val readableStatus = status.lowercase(Locale.ROOT)
+            .replaceFirstChar { it.titlecase(Locale.ROOT) }
+
+        return HomeAttentionItem(
+            type = type,
+            severity = mappedSeverity,
+            postId = draftId,
+            postTitle = title,
+            contextLabel = "Impact Weave · $readableStatus",
+            message = message,
+            daysRemaining = daysRemaining
         )
     }
 

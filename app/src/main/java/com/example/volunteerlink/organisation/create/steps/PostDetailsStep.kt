@@ -60,8 +60,10 @@ fun PostDetailsStep(
     val errors = uiState.visibleErrors
     val editPolicy = uiState.editPolicy
     val isExistingEdit = uiState.isExistingPostEdit
-    val canChangePostType = !isExistingEdit || editPolicy?.postStatus == "DRAFT"
-    val canEditSharedInfo = !isExistingEdit || editPolicy?.canEditSharedPostInfo != false
+    val isImpactWeavePost = uiState.impactWeaveDraftId != null
+    val canChangePostType = !isImpactWeavePost && (!isExistingEdit || editPolicy?.postStatus == "DRAFT")
+    val canEditSharedInfo = !isImpactWeavePost && (!isExistingEdit || editPolicy?.canEditSharedPostInfo != false)
+    val canEditThumbnail = !isExistingEdit || editPolicy?.canEditSharedPostInfo != false
     val listState = rememberLazyListState()
 
     // Draft warnings on Home should remain obvious after opening Edit Post.
@@ -257,6 +259,32 @@ fun PostDetailsStep(
             }
         }
 
+        if (isImpactWeavePost) {
+            item {
+                CreateSectionCard(
+                    title = "Impact Weave partnership",
+                    subtitle = "The agreed activity details, schedule and venue are final. Add volunteer roles and capacity without changing the partnership agreement."
+                ) {
+                    uiState.impactWeavePartners.forEach { partner ->
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color(0xFFF1F7EE)
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(partner.organisationName, fontWeight = FontWeight.SemiBold, color = CreateGreen)
+                                Text(
+                                    partner.contributionSummary,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         if (hasDraftDateAttention) {
             item {
                 EditRestrictionNotice(
@@ -417,7 +445,7 @@ fun PostDetailsStep(
                     ThumbnailPickerSection(
                         thumbnailUri = draft.thumbnailUri,
                         onThumbnailChanged = viewModel::updateThumbnailUri,
-                        enabled = canEditSharedInfo
+                        enabled = canEditThumbnail
                     )
                 }
             }

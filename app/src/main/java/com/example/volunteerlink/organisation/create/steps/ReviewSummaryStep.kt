@@ -19,6 +19,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.Surface
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,7 +47,8 @@ fun ReviewSummaryStep(
     onEditStep: (Int) -> Unit,
     onSaveDraft: () -> Unit,
     onPublish: () -> Unit,
-    onSaveChanges: () -> Unit = {}
+    onSaveChanges: () -> Unit = {},
+    allowSaveDraft: Boolean = true
 ) {
     Column(
         modifier = Modifier
@@ -75,6 +78,35 @@ fun ReviewSummaryStep(
             if (uiState.scheduleEditorDraft != null) {
                 item {
                     ReviewPausedScheduleBanner()
+                }
+            }
+
+            if (uiState.impactWeaveDraftId != null) {
+                item {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        color = Color(0xFFEAF4E6),
+                        border = BorderStroke(1.dp, Color(0xFFC5DABC))
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(7.dp)
+                        ) {
+                            Text("Impact Weave support", fontWeight = FontWeight.Bold, color = CreateGreen)
+                            Text(
+                                "This post keeps the final partnership schedule and venue.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            uiState.impactWeavePartners.forEach { partner ->
+                                Text(
+                                    "${partner.organisationName}: ${partner.contributionSummary}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
@@ -140,7 +172,8 @@ fun ReviewSummaryStep(
                 },
                 onSaveDraft = onSaveDraft,
                 onPublish = onPublish,
-                onSaveChanges = onSaveChanges
+                onSaveChanges = onSaveChanges,
+                allowSaveDraft = allowSaveDraft
             )
         }
     }
@@ -156,7 +189,8 @@ fun ReviewSummaryActions(
     errorMessage: String?,
     onSaveDraft: () -> Unit,
     onPublish: () -> Unit,
-    onSaveChanges: () -> Unit
+    onSaveChanges: () -> Unit,
+    allowSaveDraft: Boolean = true
 ) {
     val isBusy = isSavingDraft || isPublishing || isSavingChanges
 
@@ -193,21 +227,19 @@ fun ReviewSummaryActions(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                OutlinedButton(
-                    onClick = onSaveDraft,
-                    enabled = !isBusy,
-                    modifier = Modifier.weight(1f),
-                    border = BorderStroke(1.dp, CreateGreen)
-                ) {
-                    Text(
-                        text = if (isSavingDraft) "Saving Draft..." else "Save as Draft",
-                        color = if (isBusy) {
-                            CreateGreen.copy(alpha = 0.38f)
-                        } else {
-                            CreateGreen
-                        },
-                        fontWeight = FontWeight.SemiBold
-                    )
+                if (allowSaveDraft) {
+                    OutlinedButton(
+                        onClick = onSaveDraft,
+                        enabled = !isBusy,
+                        modifier = Modifier.weight(1f),
+                        border = BorderStroke(1.dp, CreateGreen)
+                    ) {
+                        Text(
+                            text = if (isSavingDraft) "Saving Draft..." else "Save as Draft",
+                            color = if (isBusy) CreateGreen.copy(alpha = 0.38f) else CreateGreen,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                 }
 
                 Button(

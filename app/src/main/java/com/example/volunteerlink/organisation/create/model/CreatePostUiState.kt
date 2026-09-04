@@ -2,6 +2,7 @@ package com.example.volunteerlink.organisation.create.model
 
 import com.example.volunteerlink.data.location.LocationSuggestion
 import com.example.volunteerlink.organisation.create.PostEditPolicy
+import com.example.volunteerlink.organisation.impactweave.model.ImpactWeavePostPartner
 
 
 /** Which database action the shared post editor represents. */
@@ -68,6 +69,10 @@ data class RoleSelectionErrors(
  */
 data class CreatePostUiState(
     val draft: CreatePostDraft = CreatePostDraft(),
+    val impactWeaveDraftId: String? = null,
+    val isLoadingImpactWeave: Boolean = false,
+    val impactWeaveLoadError: String? = null,
+    val impactWeavePartners: List<ImpactWeavePostPartner> = emptyList(),
 
     // The same Step 1-5 editor is reused by Manage > Edit.
     val editorMode: CreatePostEditorMode = CreatePostEditorMode.NewPost,

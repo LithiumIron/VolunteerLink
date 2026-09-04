@@ -23,10 +23,12 @@ import com.example.volunteerlink.organisation.create.model.VolunteerPostCategory
 import com.example.volunteerlink.organisation.create.model.VolunteerPostType
 import com.example.volunteerlink.organisation.create.model.VolunteerRoleLevel
 import com.example.volunteerlink.organisation.create.model.VolunteerRoleMode
+import com.example.volunteerlink.organisation.impactweave.model.ImpactWeaveMode
 import com.example.volunteerlink.organisation.repository.CreatePostRepository
 import com.example.volunteerlink.organisation.repository.ExistingPostEditData
 import com.example.volunteerlink.organisation.repository.PublishThumbnail
 import com.example.volunteerlink.organisation.repository.SupabaseCreatePostRepository
+import com.example.volunteerlink.organisation.repository.SupabaseImpactWeaveRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -51,6 +53,7 @@ class CreatePostViewModel : ViewModel() {
     private val locationService = GeoapifyLocationService()
     private val createPostRepository: CreatePostRepository =
         SupabaseCreatePostRepository()
+    private val impactWeaveRepository = SupabaseImpactWeaveRepository()
 
     private val _uiState = MutableStateFlow(CreatePostUiState())
     val uiState = _uiState.asStateFlow()
@@ -63,6 +66,55 @@ class CreatePostViewModel : ViewModel() {
     // snapshot privately so unsaved-change checks and final conflict checks do
     // not become UI responsibilities.
     private var originalExistingPost: ExistingPostEditData? = null
+
+    fun loadImpactWeaveForCreate(draftId: String) {
+        if (_uiState.value.impactWeaveDraftId == draftId ||
+            _uiState.value.isLoadingImpactWeave
+        ) return
+
+        _uiState.value = CreatePostUiState(
+            impactWeaveDraftId = draftId,
+            isLoadingImpactWeave = true
+        )
+        viewModelScope.launch {
+            try {
+                val prefill = impactWeaveRepository.loadPostPrefill(draftId)
+                _uiState.value = CreatePostUiState(
+                    draft = CreatePostDraft(
+                        postType = when (prefill.mode) {
+                            ImpactWeaveMode.PHYSICAL ->
+                                VolunteerPostType.PHYSICAL
+                            ImpactWeaveMode.HYBRID ->
+                                VolunteerPostType.HYBRID
+                        },
+                        category = prefill.category,
+                        title = prefill.title,
+                        description = prefill.description,
+                        isMultiDayPhysicalEvent = prefill.startDateMillis != prefill.endDateMillis,
+                        physicalStartDateMillis = prefill.startDateMillis,
+                        physicalEndDateMillis = prefill.endDateMillis,
+                        physicalStartTimeMinutes = prefill.startTimeMinutes,
+                        physicalEndTimeMinutes = prefill.endTimeMinutes,
+                        physicalLocationQuery = prefill.location.displayName,
+                        physicalLocation = prefill.location,
+                        remoteStartDateMillis = prefill.startDateMillis,
+                        remoteDueDateMillis = prefill.endDateMillis
+                    ),
+                    impactWeaveDraftId = draftId,
+                    impactWeavePartners = prefill.partners,
+                    isLoadingImpactWeave = false,
+                    isPostTypeCommitted = true
+                )
+            } catch (exception: Exception) {
+                if (exception is CancellationException) throw exception
+                _uiState.value = CreatePostUiState(
+                    impactWeaveDraftId = draftId,
+                    isLoadingImpactWeave = false,
+                    impactWeaveLoadError = safeImpactWeaveLoadError(exception.message.orEmpty())
+                )
+            }
+        }
+    }
 
     fun loadExistingPostForEdit(postId: String) {
         val currentMode = _uiState.value.editorMode
@@ -101,8 +153,7 @@ class CreatePostViewModel : ViewModel() {
                 _uiState.value = CreatePostUiState(
                     editorMode = CreatePostEditorMode.ExistingPostEdit(postId),
                     isLoadingExistingPost = false,
-                    existingPostLoadError = e.message ?:
-                        "Could not load this post for editing."
+                    existingPostLoadError = e.message ?: "Could not load this post for editing."
                 )
             }
         }
@@ -122,6 +173,22 @@ class CreatePostViewModel : ViewModel() {
         if (!_uiState.value.isExistingPostEdit || allowed) return true
         _uiState.update { it.copy(editRestrictionMessage = message) }
         return false
+    }
+
+    private fun allowImpactWeaveFieldEdit(message: String): Boolean {
+        if (_uiState.value.impactWeaveDraftId == null) return true
+        _uiState.update { it.copy(editRestrictionMessage = message) }
+        return false
+    }
+
+    private fun safeImpactWeaveLoadError(raw: String): String = when {
+        raw.contains("POST_REQUIRES_7_DAYS", true) ->
+            "This activity starts in less than 7 days. Reschedule it in Impact Weave before creating a post."
+        raw.contains("CONFIRMED_VENUE_REQUIRED", true) ->
+            "A partner venue must be confirmed before creating this post."
+        raw.contains("PARTNER_RECONFIRMATION_REQUIRED", true) ->
+            "A partner must reconfirm the changed schedule before creating this post."
+        else -> "Could not prepare this Impact Weave plan for Create Post. Please return and try again."
     }
 
     private fun rolePolicy(roleTemplateId: String) =
@@ -212,26 +279,41 @@ class CreatePostViewModel : ViewModel() {
     }
 
     fun updateCategory(category: VolunteerPostCategory) {
-        if (!allowEdit(_uiState.value.editPolicy?.canEditSharedPostInfo != false,
-                "Category is locked because this opportunity has already started.")) return
+        if (!allowImpactWeaveFieldEdit("Impact Weave activity details are final here. Edit them from the Impact Weave plan.")) return
+        if (!allowEdit(
+                _uiState.value.editPolicy?.canEditSharedPostInfo != false,
+                "Category is locked because this opportunity has already started."
+            )
+        ) return
         updateDraft { it.copy(category = category) }
     }
 
     fun updateTitle(title: String) {
-        if (!allowEdit(_uiState.value.editPolicy?.canEditSharedPostInfo != false,
-                "Title is locked because this opportunity has already started.")) return
+        if (!allowImpactWeaveFieldEdit("Impact Weave activity details are final here. Edit them from the Impact Weave plan.")) return
+        if (!allowEdit(
+                _uiState.value.editPolicy?.canEditSharedPostInfo != false,
+                "Title is locked because this opportunity has already started."
+            )
+        ) return
         updateDraft { it.copy(title = title.take(120)) }
     }
 
     fun updateDescription(description: String) {
-        if (!allowEdit(_uiState.value.editPolicy?.canEditSharedPostInfo != false,
-                "Description is locked because this opportunity has already started.")) return
+        if (!allowImpactWeaveFieldEdit("Impact Weave activity details are final here. Edit them from the Impact Weave plan.")) return
+        if (!allowEdit(
+                _uiState.value.editPolicy?.canEditSharedPostInfo != false,
+                "Description is locked because this opportunity has already started."
+            )
+        ) return
         updateDraft { it.copy(description = description.take(2000)) }
     }
 
     fun updateThumbnailUri(uri: String?) {
-        if (!allowEdit(_uiState.value.editPolicy?.canEditSharedPostInfo != false,
-                "Thumbnail is locked because this opportunity has already started.")) return
+        if (!allowEdit(
+                _uiState.value.editPolicy?.canEditSharedPostInfo != false,
+                "Thumbnail is locked because this opportunity has already started."
+            )
+        ) return
         updateDraft { it.copy(thumbnailUri = uri) }
     }
 
@@ -240,8 +322,12 @@ class CreatePostViewModel : ViewModel() {
     // ---------------------------------------------------------------------
 
     fun updateIsMultiDay(isMultiDay: Boolean) {
-        if (!allowEdit(_uiState.value.editPolicy?.canEditPhysicalCore != false,
-                "Physical schedule dates are locked for this post.")) return
+        if (!allowImpactWeaveFieldEdit("The agreed Impact Weave schedule is final and cannot be changed in Create Post.")) return
+        if (!allowEdit(
+                _uiState.value.editPolicy?.canEditPhysicalCore != false,
+                "Physical schedule dates are locked for this post."
+            )
+        ) return
         updateDraft { draft ->
             val startDate = draft.physicalStartDateMillis
 
@@ -254,6 +340,7 @@ class CreatePostViewModel : ViewModel() {
                             draft.physicalEndDateMillis > startDate -> {
                         draft.physicalEndDateMillis
                     }
+
                     else -> CreatePostValidator.nextDayMillis(startDate)
                 }
             }
@@ -266,8 +353,12 @@ class CreatePostViewModel : ViewModel() {
     }
 
     fun updatePhysicalStartDate(dateMillis: Long) {
-        if (!allowEdit(_uiState.value.editPolicy?.canEditPhysicalCore != false,
-                "Physical start date is locked because volunteers already depend on it or the activity has started.")) return
+        if (!allowImpactWeaveFieldEdit("The agreed Impact Weave schedule is final and cannot be changed in Create Post.")) return
+        if (!allowEdit(
+                _uiState.value.editPolicy?.canEditPhysicalCore != false,
+                "Physical start date is locked because volunteers already depend on it or the activity has started."
+            )
+        ) return
         updateDraft { draft ->
             val normalizedDate = CreatePostValidator.startOfDayMillis(dateMillis)
 
@@ -287,8 +378,12 @@ class CreatePostViewModel : ViewModel() {
     }
 
     fun updatePhysicalEndDate(dateMillis: Long) {
-        if (!allowEdit(_uiState.value.editPolicy?.canEditPhysicalCore != false,
-                "Physical end date is locked because volunteers already depend on it or the activity has started.")) return
+        if (!allowImpactWeaveFieldEdit("The agreed Impact Weave schedule is final and cannot be changed in Create Post.")) return
+        if (!allowEdit(
+                _uiState.value.editPolicy?.canEditPhysicalCore != false,
+                "Physical end date is locked because volunteers already depend on it or the activity has started."
+            )
+        ) return
         updateDraft { draft ->
             draft.copy(
                 physicalEndDateMillis =
@@ -298,8 +393,12 @@ class CreatePostViewModel : ViewModel() {
     }
 
     fun updatePhysicalStartTime(hour: Int, minute: Int) {
-        if (!allowEdit(_uiState.value.editPolicy?.canEditPhysicalCore != false,
-                "Physical event time is locked for this post.")) return
+        if (!allowImpactWeaveFieldEdit("The agreed Impact Weave schedule is final and cannot be changed in Create Post.")) return
+        if (!allowEdit(
+                _uiState.value.editPolicy?.canEditPhysicalCore != false,
+                "Physical event time is locked for this post."
+            )
+        ) return
         val startMinutes = hour * 60 + minute
 
         updateDraft { draft ->
@@ -317,8 +416,14 @@ class CreatePostViewModel : ViewModel() {
      * Returns an error for the time dialog. Invalid end times are not saved.
      */
     fun updatePhysicalEndTime(hour: Int, minute: Int): String? {
-        if (!allowEdit(_uiState.value.editPolicy?.canEditPhysicalCore != false,
-                "Physical event time is locked for this post.")) return "Physical event time is locked for this post."
+        if (!allowImpactWeaveFieldEdit("The agreed Impact Weave schedule is final and cannot be changed in Create Post.")) {
+            return "The agreed Impact Weave schedule is final."
+        }
+        if (!allowEdit(
+                _uiState.value.editPolicy?.canEditPhysicalCore != false,
+                "Physical event time is locked for this post."
+            )
+        ) return "Physical event time is locked for this post."
         val endMinutes = hour * 60 + minute
         val error = CreatePostValidator.endTimeError(
             startTimeMinutes = _uiState.value.draft.physicalStartTimeMinutes,
@@ -353,14 +458,20 @@ class CreatePostViewModel : ViewModel() {
     }
 
     fun updateMeetingPoint(text: String) {
-        if (!allowEdit(_uiState.value.editPolicy?.canEditPhysicalMeetingPoint != false,
-                "Meeting point can no longer be changed because the Physical phase has started.")) return
+        if (!allowEdit(
+                _uiState.value.editPolicy?.canEditPhysicalMeetingPoint != false,
+                "Meeting point can no longer be changed because the Physical phase has started."
+            )
+        ) return
         updateDraft { it.copy(meetingPoint = text.take(250)) }
     }
 
     fun updatePhysicalVolunteerCapacity(text: String) {
-        if (!allowEdit(_uiState.value.editPolicy?.canEditPhysicalCapacity != false,
-                "Physical capacity can no longer be changed.")) return
+        if (!allowEdit(
+                _uiState.value.editPolicy?.canEditPhysicalCapacity != false,
+                "Physical capacity can no longer be changed."
+            )
+        ) return
         updateDraft { draft ->
             draft.copy(
                 physicalVolunteerCapacity = parsePositiveNumber(text)
@@ -378,8 +489,12 @@ class CreatePostViewModel : ViewModel() {
     }
 
     fun onLocationQueryChanged(query: String) {
-        if (!allowEdit(_uiState.value.editPolicy?.canEditPhysicalCore != false,
-                "Physical location is locked for this post.")) return
+        if (!allowImpactWeaveFieldEdit("The confirmed partnership venue is locked for this post.")) return
+        if (!allowEdit(
+                _uiState.value.editPolicy?.canEditPhysicalCore != false,
+                "Physical location is locked for this post."
+            )
+        ) return
         locationSearchJob?.cancel()
 
         updateDraft { draft ->
@@ -463,8 +578,12 @@ class CreatePostViewModel : ViewModel() {
     }
 
     fun onLocationSelected(location: LocationSuggestion) {
-        if (!allowEdit(_uiState.value.editPolicy?.canEditPhysicalCore != false,
-                "Physical location is locked for this post.")) return
+        if (!allowImpactWeaveFieldEdit("The confirmed partnership venue is locked for this post.")) return
+        if (!allowEdit(
+                _uiState.value.editPolicy?.canEditPhysicalCore != false,
+                "Physical location is locked for this post."
+            )
+        ) return
         locationSearchJob?.cancel()
 
         updateDraft { draft ->
@@ -486,8 +605,12 @@ class CreatePostViewModel : ViewModel() {
     }
 
     fun clearLocation() {
-        if (!allowEdit(_uiState.value.editPolicy?.canEditPhysicalCore != false,
-                "Physical location is locked for this post.")) return
+        if (!allowImpactWeaveFieldEdit("The confirmed partnership venue is locked for this post.")) return
+        if (!allowEdit(
+                _uiState.value.editPolicy?.canEditPhysicalCore != false,
+                "Physical location is locked for this post."
+            )
+        ) return
         locationSearchJob?.cancel()
 
         updateDraft { draft ->
@@ -511,8 +634,11 @@ class CreatePostViewModel : ViewModel() {
     // ---------------------------------------------------------------------
 
     fun updateRemoteStartDate(dateMillis: Long) {
-        if (!allowEdit(_uiState.value.editPolicy?.canEditRemoteStart != false,
-                "Remote start date is locked because Remote volunteers already depend on it or the phase has started.")) return
+        if (!allowEdit(
+                _uiState.value.editPolicy?.canEditRemoteStart != false,
+                "Remote start date is locked because Remote volunteers already depend on it or the phase has started."
+            )
+        ) return
         updateDraft { draft ->
             val normalizedDate = CreatePostValidator.startOfDayMillis(dateMillis)
 
@@ -530,12 +656,16 @@ class CreatePostViewModel : ViewModel() {
                 policy?.canEditRemoteDueDate != false,
                 policy?.remoteDueDateLockedReason
                     ?: "Remote due date can no longer be changed."
-            )) return
+            )
+        ) return
 
         val normalizedDate = CreatePostValidator.startOfDayMillis(dateMillis)
         policy?.minimumRemoteDueDateMillis?.let { minimum ->
             if (_uiState.value.isExistingPostEdit && normalizedDate < minimum) {
-                allowEdit(false, "The Remote due date can be extended, but it cannot be shortened after volunteers have joined or Individual work has been submitted.")
+                allowEdit(
+                    false,
+                    "The Remote due date can be extended, but it cannot be shortened after volunteers have joined or Individual work has been submitted."
+                )
                 return
             }
         }
@@ -545,8 +675,11 @@ class CreatePostViewModel : ViewModel() {
     }
 
     fun updateRemoteVolunteerCapacity(text: String) {
-        if (!allowEdit(_uiState.value.editPolicy?.canEditRemoteCapacity != false,
-                "Remote capacity can no longer be changed.")) return
+        if (!allowEdit(
+                _uiState.value.editPolicy?.canEditRemoteCapacity != false,
+                "Remote capacity can no longer be changed."
+            )
+        ) return
         updateDraft { draft ->
             draft.copy(
                 remoteVolunteerCapacity = parsePositiveNumber(text)
@@ -555,16 +688,22 @@ class CreatePostViewModel : ViewModel() {
     }
 
     fun updateRemoteSubmissionMode(mode: RemoteSubmissionMode) {
-        if (!allowEdit(_uiState.value.editPolicy?.canEditRemoteSubmissionSetup != false,
-                "Remote submission setup is locked because active Remote applicants, joined volunteers, or submitted work depend on it.")) return
+        if (!allowEdit(
+                _uiState.value.editPolicy?.canEditRemoteSubmissionSetup != false,
+                "Remote submission setup is locked because active Remote applicants, joined volunteers, or submitted work depend on it."
+            )
+        ) return
         updateDraft { draft ->
             draft.copy(remoteSubmissionMode = mode)
         }
     }
 
     fun updateSharedDeliverable(text: String) {
-        if (!allowEdit(_uiState.value.editPolicy?.canEditRemoteSubmissionSetup != false,
-                "Shared deliverable is locked because active Remote applicants, joined volunteers, or submitted work depend on it.")) return
+        if (!allowEdit(
+                _uiState.value.editPolicy?.canEditRemoteSubmissionSetup != false,
+                "Shared deliverable is locked because active Remote applicants, joined volunteers, or submitted work depend on it."
+            )
+        ) return
         updateDraft { draft ->
             draft.copy(sharedDeliverable = text.take(500))
         }
@@ -575,8 +714,11 @@ class CreatePostViewModel : ViewModel() {
     // ---------------------------------------------------------------------
 
     fun updateHybridPhysicalVolunteerCapacity(text: String) {
-        if (!allowEdit(_uiState.value.editPolicy?.canEditPhysicalCapacity != false,
-                "Physical capacity can no longer be changed.")) return
+        if (!allowEdit(
+                _uiState.value.editPolicy?.canEditPhysicalCapacity != false,
+                "Physical capacity can no longer be changed."
+            )
+        ) return
         updateDraft { draft ->
             draft.copy(
                 hybridPhysicalVolunteerCapacity = parsePositiveNumber(text)
@@ -585,8 +727,11 @@ class CreatePostViewModel : ViewModel() {
     }
 
     fun updateHybridRemoteVolunteerCapacity(text: String) {
-        if (!allowEdit(_uiState.value.editPolicy?.canEditRemoteCapacity != false,
-                "Remote capacity can no longer be changed.")) return
+        if (!allowEdit(
+                _uiState.value.editPolicy?.canEditRemoteCapacity != false,
+                "Remote capacity can no longer be changed."
+            )
+        ) return
         updateDraft { draft ->
             draft.copy(
                 hybridRemoteVolunteerCapacity = parsePositiveNumber(text)
@@ -771,8 +916,11 @@ class CreatePostViewModel : ViewModel() {
             VolunteerRoleMode.PHYSICAL -> current.editPolicy?.canAddPhysicalRole != false
             VolunteerRoleMode.REMOTE -> current.editPolicy?.canAddRemoteRole != false
         }
-        if (!allowEdit(canAddRole,
-                "New ${template.roleMode.displayName} roles can no longer be added to this post.")) return
+        if (!allowEdit(
+                canAddRole,
+                "New ${template.roleMode.displayName} roles can no longer be added to this post."
+            )
+        ) return
 
         if (!roleMatchesPostType(template.roleMode, current.draft.postType)) {
             return
@@ -816,8 +964,12 @@ class CreatePostViewModel : ViewModel() {
 
     fun removeRole(roleTemplateId: String) {
         val policy = rolePolicy(roleTemplateId)
-        if (!allowEdit(policy?.canRemove != false,
-                policy?.selectionLockedReason ?: "This role cannot be removed because past or current application/volunteer records depend on it.")) return
+        if (!allowEdit(
+                policy?.canRemove != false,
+                policy?.selectionLockedReason
+                    ?: "This role cannot be removed because past or current application/volunteer records depend on it."
+            )
+        ) return
         updateStepTwoDraft { draft ->
             draft.copy(
                 selectedRoles = draft.selectedRoles.filterNot {
@@ -838,8 +990,11 @@ class CreatePostViewModel : ViewModel() {
 
     fun increaseRoleCapacity(roleTemplateId: String) {
         val policy = rolePolicy(roleTemplateId)
-        if (!allowEdit(policy?.canChangeCapacity != false,
-                "Capacity for this role is locked because applications are closed.")) return
+        if (!allowEdit(
+                policy?.canChangeCapacity != false,
+                "Capacity for this role is locked because applications are closed."
+            )
+        ) return
         val current = _uiState.value
         val template = current.roleCatalogue.firstOrNull {
             it.roleTemplateId == roleTemplateId
@@ -873,8 +1028,11 @@ class CreatePostViewModel : ViewModel() {
 
     fun decreaseRoleCapacity(roleTemplateId: String) {
         val policy = rolePolicy(roleTemplateId)
-        if (!allowEdit(policy?.canChangeCapacity != false,
-                "Capacity for this role is locked because applications are closed.")) return
+        if (!allowEdit(
+                policy?.canChangeCapacity != false,
+                "Capacity for this role is locked because applications are closed."
+            )
+        ) return
         val minimum = policy?.minimumCapacity ?: 1
         updateStepTwoDraft { draft ->
             draft.copy(
@@ -897,8 +1055,11 @@ class CreatePostViewModel : ViewModel() {
         text: String
     ) {
         val policy = rolePolicy(roleTemplateId)
-        if (!allowEdit(policy?.canChangeCapacity != false,
-                "Capacity for this role is locked because applications are closed.")) return
+        if (!allowEdit(
+                policy?.canChangeCapacity != false,
+                "Capacity for this role is locked because applications are closed."
+            )
+        ) return
         val requestedCapacity = text
             .filter { it.isDigit() }
             .take(4)
@@ -1185,8 +1346,11 @@ class CreatePostViewModel : ViewModel() {
         roleTemplateId: String,
         skillId: String
     ) {
-        if (!allowEdit(rolePolicy(roleTemplateId)?.canChangeSkills != false,
-                "Skills are locked because active applicants or joined volunteers depend on them.")) return
+        if (!allowEdit(
+                rolePolicy(roleTemplateId)?.canChangeSkills != false,
+                "Skills are locked because active applicants or joined volunteers depend on them."
+            )
+        ) return
         val current = _uiState.value
         val template = current.roleCatalogue.firstOrNull {
             it.roleTemplateId == roleTemplateId
@@ -1246,8 +1410,11 @@ class CreatePostViewModel : ViewModel() {
         roleTemplateId: String,
         skillId: String
     ) {
-        if (!allowEdit(rolePolicy(roleTemplateId)?.canChangeSkills != false,
-                "Required skills are locked because active applicants or joined volunteers depend on them.")) return
+        if (!allowEdit(
+                rolePolicy(roleTemplateId)?.canChangeSkills != false,
+                "Required skills are locked because active applicants or joined volunteers depend on them."
+            )
+        ) return
         val current = _uiState.value
         val template = current.roleCatalogue.firstOrNull {
             it.roleTemplateId == roleTemplateId
@@ -1323,8 +1490,11 @@ class CreatePostViewModel : ViewModel() {
         skillId: String,
         change: Int
     ) {
-        if (!allowEdit(rolePolicy(roleTemplateId)?.canChangeSkills != false,
-                "Required experience is locked because active applicants or joined volunteers depend on it.")) return
+        if (!allowEdit(
+                rolePolicy(roleTemplateId)?.canChangeSkills != false,
+                "Required experience is locked because active applicants or joined volunteers depend on it."
+            )
+        ) return
         updateRoleConfiguration(roleTemplateId) { role ->
             val current = role.requiredSkillExperience[skillId]
                 ?: return@updateRoleConfiguration role
@@ -1338,8 +1508,11 @@ class CreatePostViewModel : ViewModel() {
     }
 
     fun addResponsibility(roleTemplateId: String) {
-        if (!allowEdit(rolePolicy(roleTemplateId)?.canChangeResponsibilities != false,
-                "Responsibilities are locked because an active applicant, joined volunteer, or activity history depends on them.")) return
+        if (!allowEdit(
+                rolePolicy(roleTemplateId)?.canChangeResponsibilities != false,
+                "Responsibilities are locked because an active applicant, joined volunteer, or activity history depends on them."
+            )
+        ) return
         updateRoleConfiguration(roleTemplateId) { role ->
             if (role.responsibilities.lastOrNull()?.isBlank() == true) {
                 role
@@ -1356,8 +1529,11 @@ class CreatePostViewModel : ViewModel() {
         index: Int,
         text: String
     ) {
-        if (!allowEdit(rolePolicy(roleTemplateId)?.canChangeResponsibilities != false,
-                "Responsibilities are locked because an active applicant, joined volunteer, or activity history depends on them.")) return
+        if (!allowEdit(
+                rolePolicy(roleTemplateId)?.canChangeResponsibilities != false,
+                "Responsibilities are locked because an active applicant, joined volunteer, or activity history depends on them."
+            )
+        ) return
         updateRoleConfiguration(roleTemplateId) { role ->
             if (index !in role.responsibilities.indices) {
                 return@updateRoleConfiguration role
@@ -1375,8 +1551,11 @@ class CreatePostViewModel : ViewModel() {
         roleTemplateId: String,
         index: Int
     ) {
-        if (!allowEdit(rolePolicy(roleTemplateId)?.canChangeResponsibilities != false,
-                "Responsibilities are locked because an active applicant, joined volunteer, or activity history depends on them.")) return
+        if (!allowEdit(
+                rolePolicy(roleTemplateId)?.canChangeResponsibilities != false,
+                "Responsibilities are locked because an active applicant, joined volunteer, or activity history depends on them."
+            )
+        ) return
         updateRoleConfiguration(roleTemplateId) { role ->
             if (index !in role.responsibilities.indices) {
                 return@updateRoleConfiguration role
@@ -1402,8 +1581,11 @@ class CreatePostViewModel : ViewModel() {
         roleTemplateId: String,
         method: RoleApplicationMethod
     ) {
-        if (!allowEdit(rolePolicy(roleTemplateId)?.canChangeApplicationMethod != false,
-                "Application method is locked because active applicants, joined volunteers, or historical screening answers depend on it.")) return
+        if (!allowEdit(
+                rolePolicy(roleTemplateId)?.canChangeApplicationMethod != false,
+                "Application method is locked because active applicants, joined volunteers, or historical screening answers depend on it."
+            )
+        ) return
         updateRoleConfiguration(roleTemplateId) { role ->
             role.copy(
                 applicationMethod = method,
@@ -1419,8 +1601,11 @@ class CreatePostViewModel : ViewModel() {
     }
 
     fun addScreeningQuestion(roleTemplateId: String) {
-        if (!allowEdit(rolePolicy(roleTemplateId)?.canChangeScreeningQuestions != false,
-                "Screening questions are locked because active applicants or historical answers depend on them.")) return
+        if (!allowEdit(
+                rolePolicy(roleTemplateId)?.canChangeScreeningQuestions != false,
+                "Screening questions are locked because active applicants or historical answers depend on them."
+            )
+        ) return
         updateRoleConfiguration(roleTemplateId) { role ->
             if (
                 role.applicationMethod != RoleApplicationMethod.REVIEW_APPLICANTS ||
@@ -1441,8 +1626,11 @@ class CreatePostViewModel : ViewModel() {
         index: Int,
         text: String
     ) {
-        if (!allowEdit(rolePolicy(roleTemplateId)?.canChangeScreeningQuestions != false,
-                "Screening questions are locked because active applicants or historical answers depend on them.")) return
+        if (!allowEdit(
+                rolePolicy(roleTemplateId)?.canChangeScreeningQuestions != false,
+                "Screening questions are locked because active applicants or historical answers depend on them."
+            )
+        ) return
         updateRoleConfiguration(roleTemplateId) { role ->
             if (index !in role.screeningQuestions.indices) {
                 return@updateRoleConfiguration role
@@ -1460,8 +1648,11 @@ class CreatePostViewModel : ViewModel() {
         roleTemplateId: String,
         index: Int
     ) {
-        if (!allowEdit(rolePolicy(roleTemplateId)?.canChangeScreeningQuestions != false,
-                "Screening questions are locked because active applicants or historical answers depend on them.")) return
+        if (!allowEdit(
+                rolePolicy(roleTemplateId)?.canChangeScreeningQuestions != false,
+                "Screening questions are locked because active applicants or historical answers depend on them."
+            )
+        ) return
         updateRoleConfiguration(roleTemplateId) { role ->
             role.copy(
                 screeningQuestions = role.screeningQuestions
@@ -1474,8 +1665,11 @@ class CreatePostViewModel : ViewModel() {
         roleTemplateId: String,
         text: String
     ) {
-        if (!allowEdit(rolePolicy(roleTemplateId)?.canChangeRoleNotes != false,
-                "Role notes can no longer be changed because this volunteering phase has started.")) return
+        if (!allowEdit(
+                rolePolicy(roleTemplateId)?.canChangeRoleNotes != false,
+                "Role notes can no longer be changed because this volunteering phase has started."
+            )
+        ) return
         updateRoleConfiguration(roleTemplateId) { role ->
             role.copy(roleNotes = text.take(400))
         }
@@ -1485,8 +1679,11 @@ class CreatePostViewModel : ViewModel() {
         roleTemplateId: String,
         text: String
     ) {
-        if (!allowEdit(rolePolicy(roleTemplateId)?.canChangeIndividualDeliverable != false,
-                "The Remote deliverable is locked because an active applicant, joined volunteer, or submitted work depends on it.")) return
+        if (!allowEdit(
+                rolePolicy(roleTemplateId)?.canChangeIndividualDeliverable != false,
+                "The Remote deliverable is locked because an active applicant, joined volunteer, or submitted work depends on it."
+            )
+        ) return
         updateRoleConfiguration(roleTemplateId) { role ->
             role.copy(
                 individualSubmissionRequirement = text.take(500)
@@ -1497,8 +1694,11 @@ class CreatePostViewModel : ViewModel() {
     fun updateSharedSubmissionResponsibleRole(
         roleTemplateId: String
     ) {
-        if (!allowEdit(_uiState.value.editPolicy?.canEditRemoteSubmissionSetup != false,
-                "The responsible Remote role is locked because active Remote applicants, joined volunteers, or submitted work depend on it.")) return
+        if (!allowEdit(
+                _uiState.value.editPolicy?.canEditRemoteSubmissionSetup != false,
+                "The responsible Remote role is locked because active Remote applicants, joined volunteers, or submitted work depend on it."
+            )
+        ) return
         val current = _uiState.value
         if (current.draft.remoteSubmissionMode != RemoteSubmissionMode.SHARED_TEAM) {
             return
@@ -1890,8 +2090,11 @@ class CreatePostViewModel : ViewModel() {
      * overlap validation runs only when Save is pressed.
      */
     fun addPhysicalScheduleItem(dateMillis: Long): String? {
-        if (!allowEdit(_uiState.value.editPolicy?.canAddPhysicalSchedule != false,
-                "New Physical schedule items can no longer be added to this post.")) return null
+        if (!allowEdit(
+                _uiState.value.editPolicy?.canAddPhysicalSchedule != false,
+                "New Physical schedule items can no longer be added to this post."
+            )
+        ) return null
         val current = _uiState.value
         val pausedDraft = current.scheduleEditorDraft
         if (pausedDraft != null) {
@@ -1942,8 +2145,11 @@ class CreatePostViewModel : ViewModel() {
 
     /** Starts a new date-based Remote milestone editor. */
     fun addRemoteScheduleItem(): String? {
-        if (!allowEdit(_uiState.value.editPolicy?.canAddRemoteSchedule != false,
-                "New Remote schedule items can no longer be added to this post.")) return null
+        if (!allowEdit(
+                _uiState.value.editPolicy?.canAddRemoteSchedule != false,
+                "New Remote schedule items can no longer be added to this post."
+            )
+        ) return null
         val current = _uiState.value
         val pausedDraft = current.scheduleEditorDraft
         if (pausedDraft != null) {
@@ -2004,8 +2210,12 @@ class CreatePostViewModel : ViewModel() {
 
     fun removeScheduleItem(itemId: String) {
         val schedulePolicy = _uiState.value.editPolicy?.schedulePolicies?.get(itemId)
-        if (!allowEdit(schedulePolicy?.canRemove != false,
-                schedulePolicy?.reason ?: "This schedule item is part of the post's history and cannot be removed.")) return
+        if (!allowEdit(
+                schedulePolicy?.canRemove != false,
+                schedulePolicy?.reason
+                    ?: "This schedule item is part of the post's history and cannot be removed."
+            )
+        ) return
         updateStepFourDraft { draft ->
             draft.copy(
                 scheduleItems = draft.scheduleItems.filterNot { item ->
@@ -2137,6 +2347,7 @@ class CreatePostViewModel : ViewModel() {
         }
         return null
     }
+
     fun updateScheduleEditorAppliesToAll(appliesToAll: Boolean) {
         val current = _uiState.value
         val item = current.scheduleEditorDraft ?: return
@@ -2283,6 +2494,7 @@ class CreatePostViewModel : ViewModel() {
         }
         return true
     }
+
     /** Used by the overview to mark only saved items invalidated by earlier steps. */
     fun getScheduleItemValidationMessage(itemId: String): String? {
         val current = _uiState.value
@@ -2296,6 +2508,7 @@ class CreatePostViewModel : ViewModel() {
             roleCatalogue = current.roleCatalogue
         )
     }
+
     /**
      * Copies one complete Physical day to another event date.
      * The copied activities receive new local draft IDs. Remote items on the
@@ -2322,9 +2535,9 @@ class CreatePostViewModel : ViewModel() {
 
         val sourceItems = current.draft.scheduleItems.filter { item ->
             item.scheduleType == ScheduleType.PHYSICAL &&
-                item.scheduleDateMillis?.let(
-                    CreatePostValidator::startOfDayMillis
-                ) == sourceDate
+                    item.scheduleDateMillis?.let(
+                        CreatePostValidator::startOfDayMillis
+                    ) == sourceDate
         }
 
         if (sourceItems.isEmpty()) {
@@ -2355,9 +2568,9 @@ class CreatePostViewModel : ViewModel() {
         val keptItems = if (replaceExisting) {
             current.draft.scheduleItems.filterNot { item ->
                 item.scheduleType == ScheduleType.PHYSICAL &&
-                    item.scheduleDateMillis?.let(
-                        CreatePostValidator::startOfDayMillis
-                    ) == targetDate
+                        item.scheduleDateMillis?.let(
+                            CreatePostValidator::startOfDayMillis
+                        ) == targetDate
             }
         } else {
             current.draft.scheduleItems
@@ -2405,9 +2618,9 @@ class CreatePostViewModel : ViewModel() {
         val date = CreatePostValidator.startOfDayMillis(dateMillis)
         return _uiState.value.draft.scheduleItems.any { item ->
             item.scheduleType == ScheduleType.PHYSICAL &&
-                item.scheduleDateMillis?.let(
-                    CreatePostValidator::startOfDayMillis
-                ) == date
+                    item.scheduleDateMillis?.let(
+                        CreatePostValidator::startOfDayMillis
+                    ) == date
         }
     }
 
@@ -2416,9 +2629,9 @@ class CreatePostViewModel : ViewModel() {
         val date = CreatePostValidator.startOfDayMillis(dateMillis)
         val items = current.draft.scheduleItems.filter { item ->
             item.scheduleType == ScheduleType.PHYSICAL &&
-                item.scheduleDateMillis?.let(
-                    CreatePostValidator::startOfDayMillis
-                ) == date
+                    item.scheduleDateMillis?.let(
+                        CreatePostValidator::startOfDayMillis
+                    ) == date
         }
 
         return items.isNotEmpty() && items.all { item ->
@@ -2532,6 +2745,7 @@ class CreatePostViewModel : ViewModel() {
                 VolunteerPostType.REMOTE -> VolunteerRoleMode.REMOTE
                 VolunteerPostType.HYBRID ->
                     state.roleModeFilter ?: VolunteerRoleMode.PHYSICAL
+
                 null -> state.roleModeFilter
             }
             val sections = availableScheduleSections(state.draft.postType)
@@ -2607,6 +2821,7 @@ class CreatePostViewModel : ViewModel() {
                 VolunteerPostType.REMOTE -> VolunteerRoleMode.REMOTE
                 VolunteerPostType.HYBRID ->
                     current.roleModeFilter ?: VolunteerRoleMode.PHYSICAL
+
                 null -> current.roleModeFilter
             }
 
@@ -2708,11 +2923,13 @@ class CreatePostViewModel : ViewModel() {
             return
         }
 
-        _uiState.update { it.copy(
-            isSavingChanges = true,
-            saveChangesError = null,
-            editRestrictionMessage = null
-        ) }
+        _uiState.update {
+            it.copy(
+                isSavingChanges = true,
+                saveChangesError = null,
+                editRestrictionMessage = null
+            )
+        }
 
         viewModelScope.launch {
             try {
@@ -2737,12 +2954,14 @@ class CreatePostViewModel : ViewModel() {
                         VolunteerRoleMode.REMOTE -> latestPolicy.canAddRemoteRole
                     }
                     if (!allowed) {
-                        _uiState.update { it.copy(
-                            isSavingChanges = false,
-                            editPolicy = latestPolicy,
-                            saveChangesError =
-                                "A new ${modeForRole.displayName} role can no longer be added because the post lifecycle changed while you were editing."
-                        ) }
+                        _uiState.update {
+                            it.copy(
+                                isSavingChanges = false,
+                                editPolicy = latestPolicy,
+                                saveChangesError =
+                                    "A new ${modeForRole.displayName} role can no longer be added because the post lifecycle changed while you were editing."
+                            )
+                        }
                         return@launch
                     }
                 }
@@ -2756,12 +2975,14 @@ class CreatePostViewModel : ViewModel() {
                         ScheduleType.REMOTE -> latestPolicy.canAddRemoteSchedule
                     }
                     if (!allowed) {
-                        _uiState.update { it.copy(
-                            isSavingChanges = false,
-                            editPolicy = latestPolicy,
-                            saveChangesError =
-                                "A new ${newItem.scheduleType.displayName} item can no longer be added because the post lifecycle changed while you were editing."
-                        ) }
+                        _uiState.update {
+                            it.copy(
+                                isSavingChanges = false,
+                                editPolicy = latestPolicy,
+                                saveChangesError =
+                                    "A new ${newItem.scheduleType.displayName} item can no longer be added because the post lifecycle changed while you were editing."
+                            )
+                        }
                         return@launch
                     }
                 }
@@ -2772,31 +2993,37 @@ class CreatePostViewModel : ViewModel() {
                     policy = latestPolicy
                 )
                 if (unsafeChange != null) {
-                    _uiState.update { it.copy(
-                        isSavingChanges = false,
-                        editPolicy = latestPolicy,
-                        saveChangesError = unsafeChange
-                    ) }
+                    _uiState.update {
+                        it.copy(
+                            isSavingChanges = false,
+                            editPolicy = latestPolicy,
+                            saveChangesError = unsafeChange
+                        )
+                    }
                     return@launch
                 }
 
                 if (latest.draft.physicalStartDateMillis != edited.physicalStartDateMillis) {
                     CreatePostValidator.minimumLeadTimeError(edited.physicalStartDateMillis)
                         ?.let { message ->
-                            _uiState.update { it.copy(
-                                isSavingChanges = false,
-                                saveChangesError = message
-                            ) }
+                            _uiState.update {
+                                it.copy(
+                                    isSavingChanges = false,
+                                    saveChangesError = message
+                                )
+                            }
                             return@launch
                         }
                 }
                 if (latest.draft.remoteStartDateMillis != edited.remoteStartDateMillis) {
                     CreatePostValidator.minimumLeadTimeError(edited.remoteStartDateMillis)
                         ?.let { message ->
-                            _uiState.update { it.copy(
-                                isSavingChanges = false,
-                                saveChangesError = message
-                            ) }
+                            _uiState.update {
+                                it.copy(
+                                    isSavingChanges = false,
+                                    saveChangesError = message
+                                )
+                            }
                             return@launch
                         }
                 }
@@ -2813,18 +3040,22 @@ class CreatePostViewModel : ViewModel() {
                 )
 
                 originalExistingPost = latest.copy(draft = edited)
-                _uiState.update { it.copy(
-                    isSavingChanges = false,
-                    saveChangesError = null,
-                    updatedPostId = result.postId
-                ) }
+                _uiState.update {
+                    it.copy(
+                        isSavingChanges = false,
+                        saveChangesError = null,
+                        updatedPostId = result.postId
+                    )
+                }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 e.printStackTrace()
-                _uiState.update { it.copy(
-                    isSavingChanges = false,
-                    saveChangesError = e.message ?: "Could not save these changes."
-                ) }
+                _uiState.update {
+                    it.copy(
+                        isSavingChanges = false,
+                        saveChangesError = e.message ?: "Could not save these changes."
+                    )
+                }
             }
         }
     }
@@ -2862,6 +3093,12 @@ class CreatePostViewModel : ViewModel() {
     ) {
         val current = _uiState.value
         if (current.isSavingDraft || current.isPublishing) return
+        if (current.impactWeaveDraftId != null) {
+            _uiState.update {
+                it.copy(saveDraftError = "Impact Weave plans publish directly and cannot create a separate post draft.")
+            }
+            return
+        }
         if (!validateScheduleForContinue()) return
 
         val dateWarning = CreatePostValidator
@@ -3021,7 +3258,8 @@ class CreatePostViewModel : ViewModel() {
                 val result = createPostRepository.publishPost(
                     draft = snapshot.draft,
                     roleCatalogue = snapshot.roleCatalogue,
-                    thumbnail = thumbnail
+                    thumbnail = thumbnail,
+                    impactWeaveDraftId = snapshot.impactWeaveDraftId
                 )
 
                 // Publishing is complete, so the editable draft is cleared.
@@ -3170,7 +3408,7 @@ class CreatePostViewModel : ViewModel() {
 
             if (error != null) {
                 val unchangedExistingItem = contextUnchanged &&
-                    originalItemsById[item.draftId] == item
+                        originalItemsById[item.draftId] == item
                 if (!unchangedExistingItem) return error
             }
         }
@@ -3210,14 +3448,14 @@ class CreatePostViewModel : ViewModel() {
         original: CreatePostDraft
     ): Boolean {
         return current.postType == original.postType &&
-            current.physicalStartDateMillis == original.physicalStartDateMillis &&
-            current.physicalEndDateMillis == original.physicalEndDateMillis &&
-            current.physicalStartTimeMinutes == original.physicalStartTimeMinutes &&
-            current.physicalEndTimeMinutes == original.physicalEndTimeMinutes &&
-            current.physicalLocation == original.physicalLocation &&
-            current.remoteStartDateMillis == original.remoteStartDateMillis &&
-            current.remoteDueDateMillis == original.remoteDueDateMillis &&
-            current.selectedRoles.map { it.roleTemplateId }.toSet() ==
+                current.physicalStartDateMillis == original.physicalStartDateMillis &&
+                current.physicalEndDateMillis == original.physicalEndDateMillis &&
+                current.physicalStartTimeMinutes == original.physicalStartTimeMinutes &&
+                current.physicalEndTimeMinutes == original.physicalEndTimeMinutes &&
+                current.physicalLocation == original.physicalLocation &&
+                current.remoteStartDateMillis == original.remoteStartDateMillis &&
+                current.remoteDueDateMillis == original.remoteDueDateMillis &&
+                current.selectedRoles.map { it.roleTemplateId }.toSet() ==
                 original.selectedRoles.map { it.roleTemplateId }.toSet()
     }
 
@@ -3281,8 +3519,12 @@ class CreatePostViewModel : ViewModel() {
         transform: (ScheduleItemDraft) -> ScheduleItemDraft
     ) {
         val policy = currentSchedulePolicy()
-        if (!allowEdit(policy?.canEdit != false,
-                policy?.reason ?: "This schedule item is part of the post's history and cannot be changed.")) return
+        if (!allowEdit(
+                policy?.canEdit != false,
+                policy?.reason
+                    ?: "This schedule item is part of the post's history and cannot be changed."
+            )
+        ) return
         _uiState.update { state ->
             val item = state.scheduleEditorDraft ?: return@update state
             state.copy(
@@ -3355,6 +3597,7 @@ class CreatePostViewModel : ViewModel() {
                 ScheduleType.PHYSICAL,
                 ScheduleType.REMOTE
             )
+
             null -> emptyList()
         }
     }
@@ -3407,6 +3650,7 @@ class CreatePostViewModel : ViewModel() {
             )
         }
     }
+
     /**
      * Step 2 can remove a role after Step 4 has already been configured. Keep
      * saved schedule targets inside the current selected role set so stale

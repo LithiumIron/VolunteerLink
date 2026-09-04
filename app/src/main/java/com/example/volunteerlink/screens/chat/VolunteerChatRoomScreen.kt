@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.Forward
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Reply
@@ -92,6 +93,7 @@ import com.example.volunteerlink.chat.data.ChatMessage
 import com.example.volunteerlink.chat.data.Role
 import com.example.volunteerlink.chat.data.meSenderId
 import com.example.volunteerlink.chat.data.messageTimeLabel
+import com.example.volunteerlink.chat.repository.SupabaseChatRepository
 import com.example.volunteerlink.ui.theme.BubbleGreen
 import com.example.volunteerlink.ui.theme.CardBeige
 import com.example.volunteerlink.ui.theme.DeepGreen
@@ -366,7 +368,7 @@ fun VolunteerChatRoomScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .weight(1f)
-                    .clickable { onOpenGroupInfo() }
+                    .clickable(enabled = chat?.isGroup == true) { onOpenGroupInfo() }
             ) {
                 Box(
                     modifier = Modifier
@@ -375,7 +377,7 @@ fun VolunteerChatRoomScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        Icons.Filled.Group,
+                        if (chat?.isGroup == false) Icons.Filled.Person else Icons.Filled.Group,
                         contentDescription = null,
                         tint = DeepGreen,
                         modifier = Modifier.size(18.dp)
@@ -392,7 +394,8 @@ fun VolunteerChatRoomScreen(
                         fontSize = 16.sp
                     )
                     Text(
-                        "${chat?.members?.size ?: 0} members",
+                        if (chat?.isGroup == false) "Private message"
+                        else "${chat?.members?.size ?: 0} members",
                         color = CardBeige.copy(alpha = 0.8f),
                         fontSize = 11.sp
                     )
@@ -657,12 +660,27 @@ fun VolunteerChatRoomScreen(
                     modifier = Modifier.clickable {
                         if (draft.isNotBlank()) {
                             // ✅ IMPORTANT: Pass replyToId and clear replyingTo
-                            ChatData.sendMessage(chat.id, draft, replyToId = replyingTo?.id)
+                            val textToSend = draft
+                            val replyId = replyingTo?.id
                             draft = ""
                             replyingTo = null
 
                             scope.launch {
-                                listState.animateScrollToItem(chat.messages.size - 1)
+                                runCatching {
+                                    SupabaseChatRepository.sendMessage(
+                                        conversationId = chat.id,
+                                        text = textToSend,
+                                        replyToMessageId = replyId
+                                    )
+                                    SupabaseChatRepository.loadMessagesForChat(chat.id)
+                                }.onSuccess { messages ->
+                                    ChatData.replaceMessages(chat.id, messages)
+                                    if (messages.isNotEmpty()) {
+                                        listState.animateScrollToItem(messages.lastIndex)
+                                    }
+                                }.onFailure {
+                                    draft = textToSend
+                                }
                             }
                         }
                     }
@@ -871,8 +889,13 @@ fun VolunteerChatRoomScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        ChatData.deleteMessage(chatId, message.id)
                         deleteConfirmationMessage = null
+                        scope.launch {
+                            runCatching {
+                                SupabaseChatRepository.deleteMessage(message.id)
+                                SupabaseChatRepository.loadMessagesForChat(chatId)
+                            }.onSuccess { ChatData.replaceMessages(chatId, it) }
+                        }
                     }
                 ) {
                     Text("Delete", color = Color.Red)
@@ -900,8 +923,14 @@ fun VolunteerChatRoomScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        ChatData.editMessage(chatId, message.id, editDraft)
+                        val replacement = editDraft
                         editingMessage = null
+                        scope.launch {
+                            runCatching {
+                                SupabaseChatRepository.editMessage(message.id, replacement)
+                                SupabaseChatRepository.loadMessagesForChat(chatId)
+                            }.onSuccess { ChatData.replaceMessages(chatId, it) }
+                        }
                     }
                 ) {
                     Text("Save")

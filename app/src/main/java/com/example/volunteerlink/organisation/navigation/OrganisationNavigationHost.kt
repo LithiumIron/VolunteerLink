@@ -3,6 +3,7 @@ package com.example.volunteerlink.organisation.navigation
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.widget.Toast
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
@@ -49,6 +50,9 @@ import com.example.volunteerlink.organisation.screens.OrganisationManageScreen
 import com.example.volunteerlink.organisation.screens.OrganisationPostManagementScreen
 import com.example.volunteerlink.organisation.screens.OrganisationVolunteerPostsScreen
 import com.example.volunteerlink.organisation.screens.OrganisationProfileScreen
+import com.example.volunteerlink.organisation.screens.OrganisationViewPartnerProfileScreen
+import com.example.volunteerlink.organisation.screens.OrganisationViewVolunteerProfileScreen
+import com.example.volunteerlink.organisation.screens.OrganisationVolunteerCertificateScreen
 import com.example.volunteerlink.organisation.screens.OrganisationPromotionScreen
 import com.example.volunteerlink.organisation.home.model.HomeAttentionType
 import com.example.volunteerlink.organisation.screens.OrganisationSettingScreen
@@ -60,8 +64,9 @@ import androidx.navigation.navArgument
 import com.example.volunteerlink.chat.data.ChatData
 import com.example.volunteerlink.chat.data.Role
 
-import com.example.volunteerlink.organisation.screens.chat.OrganisationChatListScreen
+import com.example.volunteerlink.organisation.screens.chat.OrganisationChatsHubScreen
 import com.example.volunteerlink.organisation.screens.chat.OrganisationChatRoomScreen
+import com.example.volunteerlink.organisation.screens.chat.OrganisationPartnershipChatRoomScreen
 import com.example.volunteerlink.organisation.screens.chat.OrganisationGroupInfoScreen
 import kotlinx.coroutines.launch
 
@@ -83,6 +88,7 @@ fun OrganisationNavigationHost(
 ) {
     val navController = rememberNavController()
     val context = LocalContext.current
+    val navigationScope = rememberCoroutineScope()
     val impactWeaveViewModel: ImpactWeaveViewModel = viewModel()
 
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
@@ -158,11 +164,15 @@ fun OrganisationNavigationHost(
         bottomBar = {
             if (
                 currentRoute != OrganisationNavigationRoutes.MANAGE_APPLICANT_REVIEW &&
+                currentRoute != OrganisationNavigationRoutes.VIEW_VOLUNTEER_PROFILE &&
+                currentRoute != OrganisationNavigationRoutes.VIEW_VOLUNTEER_CERTIFICATE &&
+                currentRoute != OrganisationNavigationRoutes.VIEW_PARTNER_PROFILE &&
                 currentRoute != OrganisationNavigationRoutes.MANAGE_IMPACT_WEAVE &&
                 currentRoute != OrganisationNavigationRoutes.MANAGE_PROMOTIONS &&
                 currentRoute != OrganisationNavigationRoutes.EDIT_PROFILE &&
                 currentRoute != OrganisationNavigationRoutes.SETTINGS &&
                 currentRoute != OrganisationNavigationRoutes.CHAT_ROOM &&
+                currentRoute != OrganisationNavigationRoutes.PARTNERSHIP_CHAT_ROOM &&
                 currentRoute != OrganisationNavigationRoutes.GROUP_INFO
             ) {
                 AppBottomNavigationBar(
@@ -240,6 +250,16 @@ fun OrganisationNavigationHost(
                                     ?.savedStateHandle
                                     ?.set(OPEN_REVIEW_FROM_HOME, true)
                             }
+
+                            HomeAttentionType.IMPACT_WEAVE_READY,
+                            HomeAttentionType.IMPACT_WEAVE_DEADLINE_SOON,
+                            HomeAttentionType.IMPACT_WEAVE_DEADLINE_PASSED,
+                            HomeAttentionType.IMPACT_WEAVE_ACTIVITY_PASSED,
+                            HomeAttentionType.IMPACT_WEAVE_PROGRESS -> {
+                                navController.navigate(
+                                    OrganisationNavigationRoutes.MANAGE_IMPACT_WEAVE
+                                )
+                            }
                         }
                     }
                 )
@@ -288,6 +308,35 @@ fun OrganisationNavigationHost(
                         navController.navigate(
                             OrganisationNavigationRoutes.managePostEdit(postId)
                         )
+                    },
+                    onViewVolunteerProfile = { userId ->
+                        navController.navigate(
+                            OrganisationNavigationRoutes.viewVolunteerProfile(postId, userId)
+                        )
+                    },
+                    onMessageVolunteer = { userId ->
+                        navigationScope.launch {
+                            runCatching {
+                                val conversationId = SupabaseChatRepository
+                                    .openVolunteerDirectChat(postId, userId)
+                                val loaded = SupabaseChatRepository.loadForSignedInUser(
+                                    viewerRole = Role.ORGANISATION
+                                )
+                                ChatData.updateSignedInProfile(Role.ORGANISATION, loaded.profile)
+                                ChatData.replaceChats(loaded.chats)
+                                conversationId
+                            }.onSuccess { conversationId ->
+                                navController.navigate(
+                                    OrganisationNavigationRoutes.chatRoom(conversationId)
+                                )
+                            }.onFailure { exception ->
+                                Toast.makeText(
+                                    context,
+                                    exception.message ?: "Unable to open the private message.",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        }
                     },
                     onViewApplication = { roleTemplateId, userId ->
                         navController.navigate(
@@ -338,6 +387,11 @@ fun OrganisationNavigationHost(
                     roleTemplateId = roleTemplateId,
                     userId = userId,
                     onBack = { navController.popBackStack() },
+                    onViewVolunteerProfile = { profileUserId ->
+                        navController.navigate(
+                            OrganisationNavigationRoutes.viewVolunteerProfile(postId, profileUserId)
+                        )
+                    },
                     onDecisionSaved = {
                         // Tell the previous Manage Post destination which main tab
                         // must be shown after its applicant data refreshes.
@@ -349,10 +403,68 @@ fun OrganisationNavigationHost(
                 )
             }
 
+            composable(OrganisationNavigationRoutes.VIEW_VOLUNTEER_PROFILE) { backStackEntry ->
+                val postId = backStackEntry.arguments?.getString("postId").orEmpty()
+                val userId = backStackEntry.arguments?.getString("userId").orEmpty()
+                OrganisationViewVolunteerProfileScreen(
+                    postId = postId,
+                    userId = userId,
+                    onBack = { navController.popBackStack() },
+                    onCertificateSelected = { certificateUserId, certificatePostId, roleTemplateId ->
+                        navController.navigate(
+                            OrganisationNavigationRoutes.viewVolunteerCertificate(
+                                userId = certificateUserId,
+                                postId = certificatePostId,
+                                roleTemplateId = roleTemplateId
+                            )
+                        )
+                    }
+                )
+            }
+
+            composable(OrganisationNavigationRoutes.VIEW_VOLUNTEER_CERTIFICATE) { backStackEntry ->
+                val userId = backStackEntry.arguments?.getString("userId").orEmpty()
+                val postId = backStackEntry.arguments?.getString("postId").orEmpty()
+                val roleTemplateId = backStackEntry.arguments?.getString("roleTemplateId").orEmpty()
+
+                OrganisationVolunteerCertificateScreen(
+                    userId = userId,
+                    postId = postId,
+                    roleTemplateId = roleTemplateId,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(OrganisationNavigationRoutes.VIEW_PARTNER_PROFILE) { backStackEntry ->
+                val organisationId = backStackEntry.arguments?.getString("organisationId").orEmpty()
+                OrganisationViewPartnerProfileScreen(
+                    organisationId = organisationId,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
             composable(OrganisationNavigationRoutes.MANAGE_IMPACT_WEAVE) {
                 OrganisationImpactWeaveScreen(
                     onBack = { navController.popBackStack() },
+                    onCreatePost = { draftId ->
+                        navController.navigate(
+                            OrganisationNavigationRoutes.createFromImpactWeave(draftId)
+                        )
+                    },
+                    onViewOrganisationProfile = { organisationId ->
+                        navController.navigate(
+                            OrganisationNavigationRoutes.viewPartnerProfile(organisationId)
+                        )
+                    },
                     viewModel = impactWeaveViewModel
+                )
+            }
+
+            composable(OrganisationNavigationRoutes.CREATE_FROM_IMPACT_WEAVE) { backStackEntry ->
+                OrganisationCreateScreen(
+                    impactWeaveDraftId = backStackEntry.arguments
+                        ?.getString("impactWeaveDraftId"),
+                    onExitCreate = { navController.popBackStack() }
                 )
             }
 
@@ -396,13 +508,36 @@ fun OrganisationNavigationHost(
                     }
                 }
 
-                OrganisationChatListScreen(
+                OrganisationChatsHubScreen(
                     role = Role.ORGANISATION,
-                    onOpenChat = { chatId ->
+                    onOpenEventChat = { chatId ->
                         navController.navigate(
                             OrganisationNavigationRoutes.chatRoom(chatId)
                         )
+                    },
+                    onOpenPartnershipChat = { conversationId ->
+                        navController.navigate(
+                            OrganisationNavigationRoutes.partnershipChatRoom(conversationId)
+                        )
                     }
+                )
+            }
+
+            composable(
+                route = OrganisationNavigationRoutes.PARTNERSHIP_CHAT_ROOM,
+                arguments = listOf(
+                    navArgument(OrganisationNavigationRoutes.CHAT_ID_ARGUMENT) {
+                        type = NavType.StringType
+                    }
+                )
+            ) { entry ->
+                val conversationId = entry.arguments
+                    ?.getString(OrganisationNavigationRoutes.CHAT_ID_ARGUMENT)
+                    .orEmpty()
+
+                OrganisationPartnershipChatRoomScreen(
+                    conversationId = conversationId,
+                    onBack = { navController.popBackStack() }
                 )
             }
 

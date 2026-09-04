@@ -10,6 +10,8 @@ import com.example.volunteerlink.data.post.PostTimingState
 import com.example.volunteerlink.data.post.RoleApplicationWindowEvaluator
 import com.example.volunteerlink.data.post.RoleApplicationWindowInput
 import com.example.volunteerlink.data.time.AppClock
+import com.example.volunteerlink.chat.repository.PostGroupStatus
+import com.example.volunteerlink.chat.repository.SupabaseChatRepository
 import com.example.volunteerlink.organisation.data.OrganisationLocalStorage
 import com.example.volunteerlink.organisation.manage.model.OrganisationPostManagementUiState
 import com.example.volunteerlink.organisation.manage.model.PostManagementFeedbackGroup
@@ -989,6 +991,7 @@ class OrganisationPostManagementViewModel : ViewModel() {
                     isRefreshing = false
                 )
                 applyTiming(post)
+                refreshPostGroupStatus(postId)
             } catch (exception: Exception) {
                 Log.e(TAG, "Could not load post management data.", exception)
 
@@ -1010,6 +1013,71 @@ class OrganisationPostManagementViewModel : ViewModel() {
                 refreshInProgress = false
             }
         }
+    }
+
+    fun addAllAcceptedVolunteersToGroup() {
+        val postId = loadedPostId ?: return
+        val state = _uiState.value
+        if (state.isAddingPostGroupMembers || !state.postGroupCanAdd) return
+
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                isAddingPostGroupMembers = true,
+                postGroupActionMessage = null
+            )
+            runCatching {
+                SupabaseChatRepository.addAllAcceptedVolunteers(postId)
+            }.onSuccess { status ->
+                applyPostGroupStatus(
+                    status = status,
+                    message = when {
+                        status.addedCount == 1 -> "1 volunteer was added to the event group."
+                        status.addedCount > 1 -> "${status.addedCount} volunteers were added to the event group."
+                        state.postGroupConversationId == null -> "Event group created. You are currently its only member."
+                        status.missingCount == 0 -> "Every accepted volunteer is already in the event group."
+                        else -> null
+                    }
+                )
+            }.onFailure { exception ->
+                Log.e(TAG, "Could not update the event group.", exception)
+                _uiState.value = _uiState.value.copy(
+                    isAddingPostGroupMembers = false,
+                    postGroupActionMessage = exception.message
+                        ?: "Unable to update the event group."
+                )
+            }
+        }
+    }
+
+    private suspend fun refreshPostGroupStatus(postId: String) {
+        _uiState.value = _uiState.value.copy(isLoadingPostGroup = true)
+        runCatching {
+            SupabaseChatRepository.loadPostGroupStatus(postId)
+        }.onSuccess { status ->
+            if (loadedPostId == postId) applyPostGroupStatus(status)
+        }.onFailure { exception ->
+            Log.w(TAG, "Could not load event group status.", exception)
+            if (loadedPostId == postId) {
+                _uiState.value = _uiState.value.copy(
+                    isLoadingPostGroup = false,
+                    postGroupActionMessage = "Event group status is temporarily unavailable."
+                )
+            }
+        }
+    }
+
+    private fun applyPostGroupStatus(status: PostGroupStatus, message: String? = null) {
+        _uiState.value = _uiState.value.copy(
+            isLoadingPostGroup = false,
+            isAddingPostGroupMembers = false,
+            postGroupConversationId = status.conversationId,
+            postGroupEligibleCount = status.eligibleCount,
+            postGroupActiveMemberCount = status.activeMemberCount,
+            postGroupMissingCount = status.missingCount,
+            postGroupHasStarted = status.hasStarted,
+            postGroupCanAdd = status.canAdd,
+            postGroupActionMessage = message
+        )
     }
 
     /**
@@ -1339,7 +1407,16 @@ class OrganisationPostManagementViewModel : ViewModel() {
             remoteReviewFinalizeSucceeded = _uiState.value.remoteReviewFinalizeSucceeded,
             remoteReviewSession = _uiState.value.remoteReviewSession,
             isUpdatingApplicant = _uiState.value.isUpdatingApplicant,
-            applicantActionMessage = _uiState.value.applicantActionMessage
+            applicantActionMessage = _uiState.value.applicantActionMessage,
+            isLoadingPostGroup = currentState.isLoadingPostGroup,
+            isAddingPostGroupMembers = currentState.isAddingPostGroupMembers,
+            postGroupConversationId = currentState.postGroupConversationId,
+            postGroupEligibleCount = currentState.postGroupEligibleCount,
+            postGroupActiveMemberCount = currentState.postGroupActiveMemberCount,
+            postGroupMissingCount = currentState.postGroupMissingCount,
+            postGroupHasStarted = currentState.postGroupHasStarted,
+            postGroupCanAdd = currentState.postGroupCanAdd,
+            postGroupActionMessage = currentState.postGroupActionMessage
         )
     }
 

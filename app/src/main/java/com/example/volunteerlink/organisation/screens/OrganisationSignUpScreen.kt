@@ -41,6 +41,16 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
+import com.example.volunteerlink.data.location.CurrentLocationResolver
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,6 +62,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -62,12 +73,43 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 // OrganisationSignUpOptions.kt (same package, no import needed).
 
 
+/**
+ * Drives the Create Account button's enabled state directly — no error
+ * message is shown for missing/invalid fields; the button simply stays
+ * disabled until every required field passes. Location fields are
+ * intentionally not required here — they're optional in signUp() too.
+ */
+private fun isOrganisationSignUpFormValid(
+    organisationName: String,
+    organisationType: String,
+    email: String,
+    phone: String,
+    password: String
+): Boolean {
+    return organisationName.isNotBlank() &&
+            organisationType.isNotBlank() &&
+            email.isNotBlank() &&
+            isValidPhoneNumberLocal(phone.trim()) &&
+            password.length >= 6
+}
+
+// Mirrors OrganisationAuthViewModel's private isValidPhoneNumber() exactly,
+// so this screen-level check never disagrees with what signUp() itself
+// will accept.
+private fun isValidPhoneNumberLocal(phone: String): Boolean {
+    val cleaned = phone.replace(Regex("[\\s\\-()]"), "")
+    val isLocalFormat = cleaned.matches(Regex("^0\\d{8,9}$"))
+    val isCountryCodeFormat = cleaned.matches(Regex("^\\+?60\\d{8,9}$"))
+    return isLocalFormat || isCountryCodeFormat
+}
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OrganisationSignUpScreen(
     onBackSelected: () -> Unit,
     onSignedUp: () -> Unit,
+    onBackToLoginSelected: () -> Unit = onBackSelected,
     organisationAuthViewModel: OrganisationAuthViewModel = viewModel()
 ) {
 
@@ -81,6 +123,7 @@ fun OrganisationSignUpScreen(
     var showLocationDialog by rememberSaveable {
         mutableStateOf(false)
     }
+
 
     // ========================================================
     // FORM VALUES
@@ -116,6 +159,18 @@ fun OrganisationSignUpScreen(
 
     var organisationType by rememberSaveable {
         mutableStateOf("")
+    }
+
+    var showConfirmPasswordDialog by rememberSaveable {
+        mutableStateOf(false)
+    }
+
+    var confirmPassword by rememberSaveable {
+        mutableStateOf("")
+    }
+
+    var confirmPasswordError by rememberSaveable {
+        mutableStateOf<String?>(null)
     }
 
 
@@ -192,10 +247,22 @@ fun OrganisationSignUpScreen(
         uiState.isSubmitting ||
                 uiState.isCheckingSession
 
+    // Recomputed on every recomposition, so the button's enabled state
+    // updates live as the user types — no separate "check on click" step.
+    val isFormValid = isOrganisationSignUpFormValid(
+        organisationName = organisationName,
+        organisationType = organisationType,
+        email = email,
+        phone = phone,
+        password = password
+    )
+
 
     // ========================================================
     // MAIN SCREEN
     // ========================================================
+
+
 
     Column(
         modifier = Modifier
@@ -219,88 +286,63 @@ fun OrganisationSignUpScreen(
             )
         }
 
-
-        // ====================================================
-        // SCROLLABLE FORM
-        // ====================================================
-
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 28.dp),
-            verticalArrangement = Arrangement.Center
-        ) {
-
-            Text(
-                text = "Create an organisation account",
-                fontSize = 26.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
+        if (uiState.needsEmailConfirmation) {
+            EmailVerificationPendingContent(
+                email = uiState.pendingVerificationEmail.orEmpty(),
+                isResending = uiState.isResendingEmail,
+                errorMessage = uiState.errorMessage,
+                onResend = organisationAuthViewModel::resendVerificationEmail,
+                onChangeEmail = organisationAuthViewModel::changeEmail,
+                onBackToLogin = onBackToLoginSelected
             )
+        } else {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 28.dp),
+                verticalArrangement = Arrangement.Center
+            ) {
+                // ====================================================
+                // SCROLLABLE FORM
+                // ====================================================
 
-            Spacer(
-                Modifier.height(7.dp)
-            )
+                Text(
+                    text = "Create an organisation account",
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
 
-            Text(
-                text = "Post volunteer opportunities and review applicants.",
-                fontSize = 13.sp,
-                lineHeight = 19.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+                Spacer(
+                    Modifier.height(7.dp)
+                )
 
-            Spacer(
-                Modifier.height(26.dp)
-            )
+                Text(
+                    text = "Post volunteer opportunities and review applicants.",
+                    fontSize = 13.sp,
+                    lineHeight = 19.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
 
-
-            // =================================================
-            // ORGANISATION NAME
-            // =================================================
-
-            OutlinedTextField(
-                value = organisationName,
-                onValueChange = {
-                    organisationName = it
-                    organisationAuthViewModel.clearError()
-                },
-                modifier = Modifier.fillMaxWidth(),
-                label = {
-                    Text("Organisation name")
-                },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Filled.Business,
-                        contentDescription = null
-                    )
-                },
-                singleLine = true,
-                enabled = !isBusy,
-                shape = RoundedCornerShape(12.dp),
-                colors = organisationFieldColours()
-            )
+                Spacer(
+                    Modifier.height(26.dp)
+                )
 
 
-            Spacer(
-                Modifier.height(13.dp)
-            )
+                // =================================================
+                // ORGANISATION NAME
+                // =================================================
 
-
-            // =================================================
-            // ORGANISATION TYPE (tap to open a picker dialog)
-            // =================================================
-
-            Box {
                 OutlinedTextField(
-                    value = organisationType,
-                    onValueChange = {},
-                    readOnly = true,
-                    enabled = !isBusy,
-                    interactionSource = organisationTypeInteractionSource,
+                    value = organisationName,
+                    onValueChange = {
+                        organisationName = it
+                        organisationAuthViewModel.clearError()
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     label = {
-                        Text("Organisation type")
+                        Text("Organisation name")
                     },
                     leadingIcon = {
                         Icon(
@@ -308,598 +350,890 @@ fun OrganisationSignUpScreen(
                             contentDescription = null
                         )
                     },
-                    trailingIcon = {
-                        Text("›")
-                    },
-                    placeholder = {
-                        Text("Select organisation type")
-                    },
+                    singleLine = true,
+                    enabled = !isBusy,
                     shape = RoundedCornerShape(12.dp),
                     colors = organisationFieldColours()
                 )
 
-                if (showOrganisationTypeDialog) {
-                    AlertDialog(
-                        onDismissRequest = {
-                            showOrganisationTypeDialog = false
+
+                Spacer(
+                    Modifier.height(13.dp)
+                )
+
+
+                // =================================================
+                // ORGANISATION TYPE (tap to open a picker dialog)
+                // =================================================
+
+                Box {
+                    OutlinedTextField(
+                        value = organisationType,
+                        onValueChange = {},
+                        readOnly = true,
+                        enabled = !isBusy,
+                        interactionSource = organisationTypeInteractionSource,
+                        modifier = Modifier.fillMaxWidth(),
+                        label = {
+                            Text("Organisation type")
                         },
-                        title = {
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Filled.Business,
+                                contentDescription = null
+                            )
+                        },
+                        trailingIcon = {
+                            Text("›")
+                        },
+                        placeholder = {
                             Text("Select organisation type")
                         },
-                        text = {
-                            Column {
-                                OrganisationTypeOptions.forEach { option ->
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(vertical = 4.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        RadioButton(
-                                            selected = organisationType == option,
-                                            onClick = {
-                                                organisationType = option
-                                                showOrganisationTypeDialog = false
-                                            }
-                                        )
+                        shape = RoundedCornerShape(12.dp),
+                        colors = organisationFieldColours()
+                    )
 
-                                        Text(
-                                            text = option,
-                                            modifier = Modifier.padding(start = 8.dp)
-                                        )
+                    if (showOrganisationTypeDialog) {
+                        AlertDialog(
+                            onDismissRequest = {
+                                showOrganisationTypeDialog = false
+                            },
+                            title = {
+                                Text("Select organisation type")
+                            },
+                            text = {
+                                Column {
+                                    OrganisationTypeOptions.forEach { option ->
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 4.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            RadioButton(
+                                                selected = organisationType == option,
+                                                onClick = {
+                                                    organisationType = option
+                                                    showOrganisationTypeDialog = false
+                                                }
+                                            )
+
+                                            Text(
+                                                text = option,
+                                                modifier = Modifier.padding(start = 8.dp)
+                                            )
+                                        }
                                     }
                                 }
-                            }
-                        },
-                        confirmButton = {
-                            TextButton(
-                                onClick = {
-                                    showOrganisationTypeDialog = false
+                            },
+                            confirmButton = {
+                                TextButton(
+                                    onClick = {
+                                        showOrganisationTypeDialog = false
+                                    }
+                                ) {
+                                    Text("Done")
                                 }
-                            ) {
-                                Text("Done")
                             }
-                        }
-                    )
+                        )
+                    }
                 }
-            }
 
 
-            Spacer(
-                Modifier.height(13.dp)
-            )
+                Spacer(
+                    Modifier.height(13.dp)
+                )
 
 
-            // =================================================
-            // EMAIL
-            // =================================================
+                // =================================================
+                // EMAIL
+                // =================================================
 
-            OutlinedTextField(
-                value = email,
-                onValueChange = {
-                    email = it
-                    organisationAuthViewModel.clearError()
-                },
-                modifier = Modifier.fillMaxWidth(),
-                label = {
-                    Text("Login email")
-                },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Filled.Mail,
-                        contentDescription = null
-                    )
-                },
-                singleLine = true,
-                enabled = !isBusy,
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Email,
-                    imeAction = ImeAction.Next
-                ),
-                shape = RoundedCornerShape(12.dp),
-                colors = organisationFieldColours()
-            )
-
-
-            Spacer(
-                Modifier.height(13.dp)
-            )
-
-
-            // =================================================
-            // PHONE
-            // =================================================
-
-            OutlinedTextField(
-                value = phone,
-                onValueChange = {
-                    phone = it
-                    organisationAuthViewModel.clearError()
-                },
-                modifier = Modifier.fillMaxWidth(),
-                label = {
-                    Text("Contact phone")
-                },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Filled.Phone,
-                        contentDescription = null
-                    )
-                },
-                placeholder = {
-                    Text("e.g. 0123456789")
-                },
-                singleLine = true,
-                enabled = !isBusy,
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Phone,
-                    imeAction = ImeAction.Next
-                ),
-                shape = RoundedCornerShape(12.dp),
-                colors = organisationFieldColours()
-            )
-
-
-            Spacer(
-                Modifier.height(13.dp)
-            )
-
-
-            // =================================================
-            // LOCATION (tap to open a picker dialog with the
-            // country -> state/region -> location cascade)
-            // =================================================
-
-            Box {
                 OutlinedTextField(
-                    value = when {
-                        locationName.isNotEmpty() &&
-                                stateRegion.isNotEmpty() &&
-                                country.isNotEmpty() ->
-                            "$locationName, $stateRegion, $country"
-
-                        country.isNotEmpty() ->
-                            country
-
-                        else ->
-                            ""
+                    value = email,
+                    onValueChange = {
+                        email = it
+                        organisationAuthViewModel.clearError()
                     },
-                    onValueChange = {},
-                    readOnly = true,
-                    enabled = !isBusy,
-                    interactionSource = locationInteractionSource,
                     modifier = Modifier.fillMaxWidth(),
                     label = {
-                        Text("Location")
+                        Text("Login email")
                     },
                     leadingIcon = {
                         Icon(
-                            imageVector = Icons.Filled.LocationOn,
+                            imageVector = Icons.Filled.Mail,
                             contentDescription = null
                         )
                     },
-                    trailingIcon = {
-                        Text("›")
-                    },
-                    placeholder = {
-                        Text("Select location")
-                    },
+                    singleLine = true,
+                    enabled = !isBusy,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Email,
+                        imeAction = ImeAction.Next
+                    ),
                     shape = RoundedCornerShape(12.dp),
                     colors = organisationFieldColours()
                 )
 
-                if (showLocationDialog) {
 
-                    AlertDialog(
-                        onDismissRequest = {
-                            showLocationDialog = false
+                Spacer(
+                    Modifier.height(13.dp)
+                )
+
+
+                // =================================================
+                // PHONE
+                // =================================================
+
+                OutlinedTextField(
+                    value = phone,
+                    onValueChange = {
+                        phone = it
+                        organisationAuthViewModel.clearError()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = {
+                        Text("Contact phone")
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Filled.Phone,
+                            contentDescription = null
+                        )
+                    },
+                    placeholder = {
+                        Text("e.g. 0123456789")
+                    },
+                    singleLine = true,
+                    enabled = !isBusy,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Phone,
+                        imeAction = ImeAction.Next
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = organisationFieldColours()
+                )
+
+
+                Spacer(
+                    Modifier.height(13.dp)
+                )
+
+                // =================================================
+// USE CURRENT LOCATION (optional shortcut — manual
+// picker below still works exactly as before)
+// =================================================
+
+                val locationContext = LocalContext.current
+                val locationScope = rememberCoroutineScope()
+                var isResolvingCurrentLocation by rememberSaveable { mutableStateOf(false) }
+                var currentLocationMessage by rememberSaveable { mutableStateOf<String?>(null) }
+                var cancelCurrentLocationRequest by remember { mutableStateOf<(() -> Unit)?>(null) }
+
+                DisposableEffect(Unit) {
+                    onDispose { cancelCurrentLocationRequest?.invoke() }
+                }
+
+                fun beginCurrentLocationResolution() {
+                    if (!CurrentLocationResolver.isLocationEnabled(locationContext)) {
+                        isResolvingCurrentLocation = false
+                        currentLocationMessage = "Turn on your device's Location setting, then try again."
+                        return
+                    }
+                    cancelCurrentLocationRequest?.invoke()
+                    isResolvingCurrentLocation = true
+                    currentLocationMessage = "Getting your location…"
+                    cancelCurrentLocationRequest = CurrentLocationResolver.resolve(
+                        context = locationContext,
+                        countryStates = countryStates,
+                        scope = locationScope
+                    ) { outcome ->
+                        isResolvingCurrentLocation = false
+                        currentLocationMessage = outcome.message
+                        outcome.match?.let { match ->
+                            country = match.country
+                            stateRegion = match.stateRegion
+                            locationName = match.locationName
+                        }
+                    }
+                }
+
+                val currentLocationPermissionLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.RequestMultiplePermissions()
+                ) { permissions ->
+                    if (permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+                        permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+                    ) {
+                        beginCurrentLocationResolution()
+                    } else {
+                        isResolvingCurrentLocation = false
+                        currentLocationMessage = "Location permission was not granted."
+                    }
+                }
+
+                TextButton(
+                    onClick = {
+                        if (CurrentLocationResolver.hasLocationPermission(locationContext)) {
+                            beginCurrentLocationResolution()
+                        } else {
+                            isResolvingCurrentLocation = true
+                            currentLocationMessage = "Waiting for location permission…"
+                            currentLocationPermissionLauncher.launch(
+                                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+                            )
+                        }
+                    },
+                    enabled = !isBusy && !isResolvingCurrentLocation
+                ) {
+                    if (isResolvingCurrentLocation) {
+                        CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                    } else {
+                        Icon(Icons.Filled.MyLocation, contentDescription = null, modifier = Modifier.size(18.dp))
+                    }
+                    Spacer(Modifier.width(6.dp))
+                    Text(if (isResolvingCurrentLocation) "Locating..." else "Use current location")
+                }
+
+                currentLocationMessage?.let { message ->
+                    Text(
+                        text = message,
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+                }
+
+                // =================================================
+                // LOCATION (tap to open a picker dialog with the
+                // country -> state/region -> location cascade)
+                // =================================================
+
+                Box {
+                    OutlinedTextField(
+                        value = when {
+                            locationName.isNotEmpty() &&
+                                    stateRegion.isNotEmpty() &&
+                                    country.isNotEmpty() ->
+                                "$locationName, $stateRegion, $country"
+
+                            country.isNotEmpty() ->
+                                country
+
+                            else ->
+                                ""
                         },
-
-                        title = {
+                        onValueChange = {},
+                        readOnly = true,
+                        enabled = !isBusy,
+                        interactionSource = locationInteractionSource,
+                        modifier = Modifier.fillMaxWidth(),
+                        label = {
+                            Text("Location")
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Filled.LocationOn,
+                                contentDescription = null
+                            )
+                        },
+                        trailingIcon = {
+                            Text("›")
+                        },
+                        placeholder = {
                             Text("Select location")
                         },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = organisationFieldColours()
+                    )
 
-                        text = {
+                    if (showLocationDialog) {
 
-                            Column {
+                        AlertDialog(
+                            onDismissRequest = {
+                                showLocationDialog = false
+                            },
 
-                                // COUNTRY
+                            title = {
+                                Text("Select location")
+                            },
 
-                                Text(
-                                    text = "Country",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp
-                                )
+                            text = {
 
-                                Spacer(
-                                    Modifier.height(6.dp)
-                                )
+                                Column {
 
-                                ExposedDropdownMenuBox(
-                                    expanded = isCountryMenuExpanded,
-                                    onExpandedChange = {
-                                        isCountryMenuExpanded = it
-                                    }
-                                ) {
+                                    // COUNTRY
 
-                                    OutlinedTextField(
-                                        value = country,
-                                        onValueChange = {},
-                                        readOnly = true,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .menuAnchor(),
-                                        placeholder = {
-                                            Text("Select country")
-                                        },
-                                        trailingIcon = {
-                                            ExposedDropdownMenuDefaults.TrailingIcon(
-                                                expanded = isCountryMenuExpanded
-                                            )
-                                        },
-                                        singleLine = true
+                                    Text(
+                                        text = "Country",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp
                                     )
 
-                                    ExposedDropdownMenu(
+                                    Spacer(
+                                        Modifier.height(6.dp)
+                                    )
+
+                                    ExposedDropdownMenuBox(
                                         expanded = isCountryMenuExpanded,
-                                        onDismissRequest = {
-                                            isCountryMenuExpanded = false
+                                        onExpandedChange = {
+                                            isCountryMenuExpanded = it
                                         }
                                     ) {
 
-                                        countryStates.keys.forEach { selectedCountry ->
+                                        OutlinedTextField(
+                                            value = country,
+                                            onValueChange = {},
+                                            readOnly = true,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .menuAnchor(),
+                                            placeholder = {
+                                                Text("Select country")
+                                            },
+                                            trailingIcon = {
+                                                ExposedDropdownMenuDefaults.TrailingIcon(
+                                                    expanded = isCountryMenuExpanded
+                                                )
+                                            },
+                                            singleLine = true
+                                        )
 
-                                            DropdownMenuItem(
-                                                text = {
-                                                    Text(selectedCountry)
-                                                },
-                                                onClick = {
+                                        ExposedDropdownMenu(
+                                            expanded = isCountryMenuExpanded,
+                                            onDismissRequest = {
+                                                isCountryMenuExpanded = false
+                                            }
+                                        ) {
 
-                                                    country = selectedCountry
-                                                    stateRegion = ""
-                                                    locationName = ""
+                                            countryStates.keys.forEach { selectedCountry ->
 
-                                                    isCountryMenuExpanded = false
-                                                }
-                                            )
+                                                DropdownMenuItem(
+                                                    text = {
+                                                        Text(selectedCountry)
+                                                    },
+                                                    onClick = {
+
+                                                        country = selectedCountry
+                                                        stateRegion = ""
+                                                        locationName = ""
+
+                                                        isCountryMenuExpanded = false
+                                                    }
+                                                )
+                                            }
                                         }
                                     }
-                                }
 
 
-                                Spacer(
-                                    Modifier.height(16.dp)
-                                )
-
-
-                                // STATE / REGION
-
-                                Text(
-                                    text = "State / region",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp
-                                )
-
-                                Spacer(
-                                    Modifier.height(6.dp)
-                                )
-
-                                ExposedDropdownMenuBox(
-                                    expanded = isStateMenuExpanded,
-                                    onExpandedChange = {
-
-                                        if (country.isNotEmpty()) {
-                                            isStateMenuExpanded = it
-                                        }
-                                    }
-                                ) {
-
-                                    OutlinedTextField(
-                                        value = stateRegion,
-                                        onValueChange = {},
-                                        readOnly = true,
-                                        enabled = country.isNotEmpty(),
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .menuAnchor(),
-                                        placeholder = {
-                                            Text(
-                                                if (country.isEmpty())
-                                                    "Select country first"
-                                                else
-                                                    "Select state / region"
-                                            )
-                                        },
-                                        trailingIcon = {
-                                            ExposedDropdownMenuDefaults.TrailingIcon(
-                                                expanded = isStateMenuExpanded
-                                            )
-                                        },
-                                        singleLine = true
+                                    Spacer(
+                                        Modifier.height(16.dp)
                                     )
 
-                                    ExposedDropdownMenu(
+
+                                    // STATE / REGION
+
+                                    Text(
+                                        text = "State / region",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp
+                                    )
+
+                                    Spacer(
+                                        Modifier.height(6.dp)
+                                    )
+
+                                    ExposedDropdownMenuBox(
                                         expanded = isStateMenuExpanded,
-                                        onDismissRequest = {
-                                            isStateMenuExpanded = false
+                                        onExpandedChange = {
+
+                                            if (country.isNotEmpty()) {
+                                                isStateMenuExpanded = it
+                                            }
                                         }
                                     ) {
 
-                                        availableStates.forEach { selectedState ->
+                                        OutlinedTextField(
+                                            value = stateRegion,
+                                            onValueChange = {},
+                                            readOnly = true,
+                                            enabled = country.isNotEmpty(),
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .menuAnchor(),
+                                            placeholder = {
+                                                Text(
+                                                    if (country.isEmpty())
+                                                        "Select country first"
+                                                    else
+                                                        "Select state / region"
+                                                )
+                                            },
+                                            trailingIcon = {
+                                                ExposedDropdownMenuDefaults.TrailingIcon(
+                                                    expanded = isStateMenuExpanded
+                                                )
+                                            },
+                                            singleLine = true
+                                        )
 
-                                            DropdownMenuItem(
-                                                text = {
-                                                    Text(selectedState)
-                                                },
-                                                onClick = {
+                                        ExposedDropdownMenu(
+                                            expanded = isStateMenuExpanded,
+                                            onDismissRequest = {
+                                                isStateMenuExpanded = false
+                                            }
+                                        ) {
 
-                                                    stateRegion = selectedState
-                                                    locationName = ""
+                                            availableStates.forEach { selectedState ->
 
-                                                    isStateMenuExpanded = false
-                                                }
-                                            )
+                                                DropdownMenuItem(
+                                                    text = {
+                                                        Text(selectedState)
+                                                    },
+                                                    onClick = {
+
+                                                        stateRegion = selectedState
+                                                        locationName = ""
+
+                                                        isStateMenuExpanded = false
+                                                    }
+                                                )
+                                            }
+                                        }
+                                    }
+
+
+                                    Spacer(
+                                        Modifier.height(16.dp)
+                                    )
+
+
+                                    // LOCATION
+
+                                    Text(
+                                        text = "Location",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp
+                                    )
+
+                                    Spacer(
+                                        Modifier.height(6.dp)
+                                    )
+
+                                    ExposedDropdownMenuBox(
+                                        expanded = isLocationMenuExpanded,
+                                        onExpandedChange = {
+
+                                            if (stateRegion.isNotEmpty()) {
+                                                isLocationMenuExpanded = it
+                                            }
+                                        }
+                                    ) {
+
+                                        OutlinedTextField(
+                                            value = locationName,
+                                            onValueChange = {},
+                                            readOnly = true,
+                                            enabled = stateRegion.isNotEmpty(),
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .menuAnchor(),
+                                            placeholder = {
+                                                Text(
+                                                    if (stateRegion.isEmpty())
+                                                        "Select state first"
+                                                    else
+                                                        "Select location"
+                                                )
+                                            },
+                                            trailingIcon = {
+                                                ExposedDropdownMenuDefaults.TrailingIcon(
+                                                    expanded = isLocationMenuExpanded
+                                                )
+                                            },
+                                            singleLine = true
+                                        )
+
+                                        ExposedDropdownMenu(
+                                            expanded = isLocationMenuExpanded,
+                                            onDismissRequest = {
+                                                isLocationMenuExpanded = false
+                                            }
+                                        ) {
+
+                                            availableLocations.forEach { selectedLocation ->
+
+                                                DropdownMenuItem(
+                                                    text = {
+                                                        Text(selectedLocation)
+                                                    },
+                                                    onClick = {
+
+                                                        locationName = selectedLocation
+
+                                                        isLocationMenuExpanded = false
+                                                    }
+                                                )
+                                            }
                                         }
                                     }
                                 }
+                            },
 
+                            confirmButton = {
 
-                                Spacer(
-                                    Modifier.height(16.dp)
-                                )
+                                TextButton(
+                                    onClick = {
 
-
-                                // LOCATION
-
-                                Text(
-                                    text = "Location",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp
-                                )
-
-                                Spacer(
-                                    Modifier.height(6.dp)
-                                )
-
-                                ExposedDropdownMenuBox(
-                                    expanded = isLocationMenuExpanded,
-                                    onExpandedChange = {
-
-                                        if (stateRegion.isNotEmpty()) {
-                                            isLocationMenuExpanded = it
+                                        if (
+                                            country.isNotEmpty() &&
+                                            stateRegion.isNotEmpty() &&
+                                            locationName.isNotEmpty()
+                                        ) {
+                                            showLocationDialog = false
                                         }
                                     }
                                 ) {
-
-                                    OutlinedTextField(
-                                        value = locationName,
-                                        onValueChange = {},
-                                        readOnly = true,
-                                        enabled = stateRegion.isNotEmpty(),
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .menuAnchor(),
-                                        placeholder = {
-                                            Text(
-                                                if (stateRegion.isEmpty())
-                                                    "Select state first"
-                                                else
-                                                    "Select location"
-                                            )
-                                        },
-                                        trailingIcon = {
-                                            ExposedDropdownMenuDefaults.TrailingIcon(
-                                                expanded = isLocationMenuExpanded
-                                            )
-                                        },
-                                        singleLine = true
-                                    )
-
-                                    ExposedDropdownMenu(
-                                        expanded = isLocationMenuExpanded,
-                                        onDismissRequest = {
-                                            isLocationMenuExpanded = false
-                                        }
-                                    ) {
-
-                                        availableLocations.forEach { selectedLocation ->
-
-                                            DropdownMenuItem(
-                                                text = {
-                                                    Text(selectedLocation)
-                                                },
-                                                onClick = {
-
-                                                    locationName = selectedLocation
-
-                                                    isLocationMenuExpanded = false
-                                                }
-                                            )
-                                        }
-                                    }
+                                    Text("Done")
                                 }
-                            }
-                        },
+                            },
 
-                        confirmButton = {
+                            dismissButton = {
 
-                            TextButton(
-                                onClick = {
-
-                                    if (
-                                        country.isNotEmpty() &&
-                                        stateRegion.isNotEmpty() &&
-                                        locationName.isNotEmpty()
-                                    ) {
+                                TextButton(
+                                    onClick = {
                                         showLocationDialog = false
                                     }
+                                ) {
+                                    Text("Cancel")
                                 }
-                            ) {
-                                Text("Done")
                             }
-                        },
-
-                        dismissButton = {
-
-                            TextButton(
-                                onClick = {
-                                    showLocationDialog = false
-                                }
-                            ) {
-                                Text("Cancel")
-                            }
-                        }
-                    )
+                        )
+                    }
                 }
-            }
 
-
-            Spacer(
-                Modifier.height(13.dp)
-            )
-
-
-            // =================================================
-            // PASSWORD
-            // =================================================
-
-            OutlinedTextField(
-                value = password,
-                onValueChange = {
-                    password = it
-                    organisationAuthViewModel.clearError()
-                },
-                modifier = Modifier.fillMaxWidth(),
-                label = {
-                    Text("Password")
-                },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Filled.Lock,
-                        contentDescription = null
-                    )
-                },
-                singleLine = true,
-                enabled = !isBusy,
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Password,
-                    imeAction = ImeAction.Done
-                ),
-                shape = RoundedCornerShape(12.dp),
-                colors = organisationFieldColours()
-            )
-
-
-            // =================================================
-            // EMAIL CONFIRMATION MESSAGE
-            // =================================================
-
-            if (uiState.needsEmailConfirmation) {
 
                 Spacer(
-                    Modifier.height(11.dp)
+                    Modifier.height(13.dp)
                 )
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            shape = RoundedCornerShape(10.dp)
+
+                // =================================================
+                // PASSWORD
+                // =================================================
+
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = {
+                        password = it
+                        organisationAuthViewModel.clearError()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = {
+                        Text("Password")
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Filled.Lock,
+                            contentDescription = null
                         )
-                        .padding(12.dp)
-                ) {
+                    },
+                    singleLine = true,
+                    enabled = !isBusy,
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Password,
+                        imeAction = ImeAction.Done
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = organisationFieldColours()
+                )
+
+
+                // =================================================
+                // ERROR MESSAGE (from an actual Supabase submit)
+                // =================================================
+
+                uiState.errorMessage?.let { message ->
+
+                    Spacer(
+                        Modifier.height(11.dp)
+                    )
 
                     Text(
-                        text = "Account created. Check your email to confirm it, " +
-                                "then sign in.",
+                        text = message,
                         fontSize = 12.sp,
                         lineHeight = 17.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.error
                     )
                 }
-            }
 
-
-            // =================================================
-            // ERROR MESSAGE
-            // =================================================
-
-            uiState.errorMessage?.let { message ->
 
                 Spacer(
-                    Modifier.height(11.dp)
+                    Modifier.height(22.dp)
                 )
 
-                Text(
-                    text = message,
-                    fontSize = 12.sp,
-                    lineHeight = 17.sp,
-                    color = MaterialTheme.colorScheme.error
+
+                // =================================================
+                // CREATE ACCOUNT BUTTON
+                // =================================================
+                // Disabled until isFormValid is true — no separate
+                // validation-error message. This recomputes on every
+                // keystroke since isFormValid is derived state, so the
+                // button enables itself the moment the last required
+                // field becomes valid.
+
+                Button(
+                    onClick = {
+                        confirmPassword = ""
+                        confirmPasswordError = null
+                        showConfirmPasswordDialog = true
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                    enabled = !isBusy && isFormValid,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    )
+                ) {
+                    if (isBusy) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.height(22.dp),
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Text(
+                            text = "Create account",
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+
+                // =================================================
+                // BOTTOM SPACING
+                // =================================================
+
+                Spacer(
+                    Modifier.height(24.dp)
                 )
+
             }
+        }
 
 
-            Spacer(
-                Modifier.height(22.dp)
-            )
 
-
-            // =================================================
-            // CREATE ACCOUNT BUTTON
-            // =================================================
-
-            Button(
-                onClick = {
-
-                    organisationAuthViewModel.signUp(
-                        email = email,
-                        password = password,
-                        organisationName = organisationName,
-                        contactPhone = phone,
-                        locationName = locationName,
-                        stateRegion = stateRegion,
-                        country = country,
-                        organisationType = organisationType
-                    )
+        if (showConfirmPasswordDialog) {
+            AlertDialog(
+                onDismissRequest = {
+                    if (!isBusy) {
+                        showConfirmPasswordDialog = false
+                        confirmPassword = ""
+                        confirmPasswordError = null
+                    }
                 },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                enabled = !isBusy,
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
-                )
-            ) {
 
-                if (isBusy) {
-
-                    CircularProgressIndicator(
-                        modifier = Modifier.height(22.dp),
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        strokeWidth = 2.dp
-                    )
-
-                } else {
-
+                title = {
                     Text(
-                        text = "Create account",
+                        text = "Confirm password",
                         fontWeight = FontWeight.Bold
                     )
+                },
+
+                text = {
+                    Column {
+
+                        Text(
+                            text = "Please enter your password again to confirm your account.",
+                            fontSize = 14.sp,
+                            lineHeight = 20.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+
+                        Spacer(
+                            Modifier.height(16.dp)
+                        )
+
+                        OutlinedTextField(
+                            value = confirmPassword,
+                            onValueChange = {
+                                confirmPassword = it
+                                confirmPasswordError = null
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = {
+                                Text("Confirm password")
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Filled.Lock,
+                                    contentDescription = null
+                                )
+                            },
+                            singleLine = true,
+                            visualTransformation = PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Password,
+                                imeAction = ImeAction.Done
+                            ),
+                            isError = confirmPasswordError != null,
+                            supportingText = {
+                                confirmPasswordError?.let { error ->
+                                    Text(error)
+                                }
+                            },
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                    }
+                },
+
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+
+                            when {
+                                confirmPassword.isBlank() -> {
+                                    confirmPasswordError =
+                                        "Please confirm your password."
+                                }
+
+                                password != confirmPassword -> {
+                                    confirmPasswordError =
+                                        "Passwords do not match."
+                                }
+
+                                else -> {
+                                    showConfirmPasswordDialog = false
+                                    confirmPasswordError = null
+
+                                    organisationAuthViewModel.signUp(
+                                        email = email,
+                                        password = password,
+                                        organisationName = organisationName,
+                                        contactPhone = phone,
+                                        locationName = locationName,
+                                        stateRegion = stateRegion,
+                                        country = country,
+                                        organisationType = organisationType
+                                    )
+                                }
+                            }
+                        }
+                    ) {
+                        Text("Confirm")
+                    }
+                },
+
+                dismissButton = {
+                    TextButton(
+                        onClick = {
+                            showConfirmPasswordDialog = false
+                            confirmPassword = ""
+                            confirmPasswordError = null
+                        }
+                    ) {
+                        Text("Cancel")
+                    }
                 }
-            }
-
-
-            // =================================================
-            // BOTTOM SPACING
-            // =================================================
-
-            Spacer(
-                Modifier.height(24.dp)
             )
         }
+
+
     }
+}
+
+@Composable
+private fun EmailVerificationPendingContent(
+    email: String,
+    isResending: Boolean,
+    errorMessage: String?,
+    onResend: () -> Unit,
+    onChangeEmail: () -> Unit,
+    onBackToLogin: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 28.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Mail,
+            contentDescription = null,
+            modifier = Modifier.height(48.dp),
+            tint = MaterialTheme.colorScheme.primary
+        )
+
+        Spacer(Modifier.height(20.dp))
+
+        Text(
+            text = "Verification email sent!",
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+
+        Spacer(Modifier.height(8.dp))
+
+        Text(
+            text = "Check your inbox ($email) and click the confirmation " +
+                    "button to verify your email.",
+            fontSize = 14.sp,
+            lineHeight = 20.sp,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        errorMessage?.let { message ->
+            Spacer(Modifier.height(16.dp))
+            Text(
+                text = message,
+                fontSize = 12.sp,
+                lineHeight = 17.sp,
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.error
+            )
+        }
+
+        Spacer(Modifier.height(28.dp))
+
+        Button(
+            onClick = onResend,
+            enabled = !isResending,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(52.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            )
+        ) {
+            if (isResending) {
+                CircularProgressIndicator(
+                    modifier = Modifier.height(22.dp),
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    strokeWidth = 2.dp
+                )
+            } else {
+                Text("Resend email", fontWeight = FontWeight.Bold)
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        TextButton(onClick = onChangeEmail, enabled = !isResending) {
+            Text("Change email")
+        }
+
+        TextButton(onClick = onBackToLogin, enabled = !isResending) {
+            Text("Back to login")
+        }
+    }
+
 }

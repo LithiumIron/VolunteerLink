@@ -26,7 +26,6 @@ data class VolunteerAuthUiState(
     val isSubmitting: Boolean = false,
     val isAuthenticated: Boolean = false,
     val needsEmailConfirmation: Boolean = false,
-    val pendingAccountEmail: String? = null,
     val errorMessage: String? = null
 )
 
@@ -34,16 +33,16 @@ class VolunteerAuthViewModel(
     application: Application
 ) : AndroidViewModel(application) {
 
-    // Caches the auth.uid() of the last account that successfully passed
-    // confirmVolunteerProfile() while online. This is a UX convenience for
-    // offline continuity ONLY — it grants no data access by itself. Every
-    // real Supabase query still requires a valid session token and is
-    // gated by RLS regardless of this flag.
     private val offlineAccountPreferences =
         application.getSharedPreferences(
             "volunteer_offline_account",
             Context.MODE_PRIVATE
         )
+
+    // Must be initialized above init{} below — checkExistingSession()
+    // reads this and runs as part of construction.
+    private val rememberMePreferences =
+        VolunteerRememberMePreferences(application)
 
     private val mutableUiState =
         MutableStateFlow(VolunteerAuthUiState())
@@ -55,7 +54,7 @@ class VolunteerAuthViewModel(
         checkExistingSession()
     }
 
-    fun signIn(email: String, password: String) {
+    fun signIn(email: String, password: String, rememberMe: Boolean) {
         val normalizedEmail = email.trim()
         when {
             normalizedEmail.isBlank() -> {
@@ -84,6 +83,7 @@ class VolunteerAuthViewModel(
                 }
                 confirmVolunteerProfile()
                 rememberVerifiedVolunteer()
+                rememberMePreferences.setRememberMeEnabled(rememberMe)
                 mutableUiState.value =
                     VolunteerAuthUiState(
                         isCheckingSession = false,
@@ -105,7 +105,10 @@ class VolunteerAuthViewModel(
         fullName: String,
         email: String,
         phone: String,
-        password: String
+        password: String,
+        locationName: String? = null,
+        stateRegion: String? = null,
+        country: String? = null
     ) {
         val normalizedName = fullName.trim()
         val normalizedEmail = email.trim()
@@ -140,9 +143,6 @@ class VolunteerAuthViewModel(
             }
 
             try {
-                // Volunteer equivalent of the organisation trigger: an
-                // auth.users insert trigger reads this metadata and
-                // atomically creates the matching user_profiles row.
                 supabase.auth.signUpWith(Email) {
                     this.email = normalizedEmail
                     this.password = password
@@ -150,14 +150,15 @@ class VolunteerAuthViewModel(
                         put("volunteerlink_account_type", "VOLUNTEER")
                         put("full_name", normalizedName)
                         put("phone", normalizedPhone)
+                        locationName?.trim()?.ifBlank { null }?.let { put("city", it) }
+                        stateRegion?.trim()?.ifBlank { null }?.let { put("state_region", it) }
+                        country?.trim()?.ifBlank { null }?.let { put("country", it) }
                     }
                 }
 
                 val authUserId = supabase.auth.currentUserOrNull()?.id
 
                 if (authUserId == null) {
-                    // Email confirmation is enabled — the trigger already
-                    // created the profile row; sign-in works once confirmed.
                     mutableUiState.value = VolunteerAuthUiState(
                         isCheckingSession = false,
                         needsEmailConfirmation = true
@@ -167,10 +168,6 @@ class VolunteerAuthViewModel(
 
                 confirmVolunteerProfile()
 
-                // Sync phone into auth.users.phone too. Requires Phone auth
-                // + an SMS provider configured — don't let a failure here
-                // block account creation, since user_profiles.phone is
-                // already reliably captured via the signup trigger.
                 runCatching {
                     supabase.auth.updateUser {
                         this.phone = normalizedPhone
@@ -206,59 +203,9 @@ class VolunteerAuthViewModel(
         }
     }
 
-    /** User tapped "Continue" on the restored-session prompt. */
-    fun continueWithRestoredSession() {
-        viewModelScope.launch {
-            mutableUiState.update {
-                it.copy(isSigningIn = true, errorMessage = null)
-            }
-            try {
-                confirmVolunteerProfile()
-                rememberVerifiedVolunteer()
-                mutableUiState.value = VolunteerAuthUiState(
-                    isCheckingSession = false,
-                    isAuthenticated = true
-                )
-            } catch (exception: Exception) {
-                exception.printStackTrace()
-
-                // The confirm check itself failed because there's no
-                // network right now (not because the account was rejected).
-                // If this exact account was verified the last time we had
-                // a connection, let them continue rather than locking them
-                // out purely because signal dropped.
-                if (isNetworkRelated(exception) && isPreviouslyVerifiedVolunteer()) {
-                    mutableUiState.value = VolunteerAuthUiState(
-                        isCheckingSession = false,
-                        isAuthenticated = true
-                    )
-                    return@launch
-                }
-
-                runCatching { supabase.auth.signOut() }
-                mutableUiState.value = VolunteerAuthUiState(
-                    isCheckingSession = false,
-                    errorMessage = authErrorMessage(exception)
-                )
-            }
-        }
-    }
-
-    /** User tapped "Use a different account" on the restored-session prompt. */
-    fun useDifferentAccount() {
-        viewModelScope.launch {
-            runCatching { supabase.auth.signOut() }
-            mutableUiState.value = VolunteerAuthUiState(isCheckingSession = false)
-        }
-    }
-
     private fun checkExistingSession() {
         viewModelScope.launch {
             try {
-                // On Android, Auth first restores the persisted session from
-                // local storage. Reading currentUserOrNull() before that work
-                // finishes incorrectly sends an already signed-in volunteer
-                // back to the password form.
                 val restoredSessionStatus =
                     supabase.auth.sessionStatus
                         .first { sessionStatus ->
@@ -268,25 +215,37 @@ class VolunteerAuthViewModel(
 
                 when (restoredSessionStatus) {
                     is SessionStatus.Authenticated -> {
-                        // A session was restored from local storage — do NOT
-                        // sign the user in automatically. Ask first, so a
-                        // different account can be used instead without
-                        // needing to sign out manually.
-                        val restoredEmail =
-                            supabase.auth.currentUserOrNull()?.email
-                        mutableUiState.value =
-                            VolunteerAuthUiState(
-                                isCheckingSession = false,
-                                pendingAccountEmail = restoredEmail ?: "this account"
-                            )
+                        val accountType = fetchAccountType()
+
+                        if (accountType != null &&
+                            !accountType.equals("VOLUNTEER", ignoreCase = true)
+                        ) {
+                            // Restored session belongs to a different role
+                            // (e.g. Organisation). Leave it untouched —
+                            // not this screen's session to manage.
+                            mutableUiState.value =
+                                VolunteerAuthUiState(isCheckingSession = false)
+                        } else if (rememberMePreferences.isRememberMeEnabled()) {
+                            if (accountType != null) {
+                                rememberVerifiedVolunteer()
+                                mutableUiState.value = VolunteerAuthUiState(
+                                    isCheckingSession = false,
+                                    isAuthenticated = true
+                                )
+                            } else {
+                                mutableUiState.value = VolunteerAuthUiState(
+                                    isCheckingSession = false,
+                                    isAuthenticated = isPreviouslyVerifiedVolunteer()
+                                )
+                            }
+                        } else {
+                            runCatching { supabase.auth.signOut() }
+                            mutableUiState.value =
+                                VolunteerAuthUiState(isCheckingSession = false)
+                        }
                     }
 
                     is SessionStatus.RefreshFailure -> {
-                        // A session token exists but couldn't be refreshed —
-                        // almost always means no network right now. There's
-                        // no connection to show a meaningful email in a
-                        // dialog or to re-verify the profile, so fall back
-                        // directly to the cached offline flag instead.
                         mutableUiState.value =
                             VolunteerAuthUiState(
                                 isCheckingSession = false,
@@ -348,19 +307,27 @@ class VolunteerAuthViewModel(
         }
     }
 
+    private suspend fun fetchAccountType(): String? =
+        runCatching {
+            val authUserId = supabase.auth.currentUserOrNull()?.id
+                ?: return@runCatching null
+
+            supabase.from("user_profiles")
+                .select {
+                    filter {
+                        eq("auth_user_id", authUserId)
+                    }
+                }
+                .decodeList<VolunteerAccountTypeRow>()
+                .firstOrNull()
+                ?.accountType
+        }.getOrNull()
+
     private fun showError(message: String) {
         mutableUiState.update {
             it.copy(errorMessage = message)
         }
     }
-}
-
-private fun isNetworkRelated(exception: Exception): Boolean {
-    val message = exception.message.orEmpty()
-    return message.contains("network", ignoreCase = true) ||
-            message.contains("connect", ignoreCase = true) ||
-            message.contains("timeout", ignoreCase = true) ||
-            message.contains("unable to resolve host", ignoreCase = true)
 }
 
 private fun authErrorMessage(exception: Exception): String {
@@ -370,9 +337,6 @@ private fun authErrorMessage(exception: Exception): String {
                 message.contains("already exists", ignoreCase = true) ->
             "An account with this email already exists."
 
-        // Must come before the generic "invalid" check below — Supabase's
-        // rejected-domain error (e.g. example.com) also contains "invalid",
-        // and would otherwise get mislabelled as a wrong-password error.
         message.contains("email_address_invalid", ignoreCase = true) ||
                 (message.contains("invalid", ignoreCase = true) &&
                         message.contains("email", ignoreCase = true)) ->

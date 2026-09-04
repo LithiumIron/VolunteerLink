@@ -15,7 +15,15 @@ private data class UserProfileRow(
     @SerialName("user_id")
     val userId: String,
     @SerialName("avatar_path")
-    val avatarPath: String? = null
+    val avatarPath: String? = null,
+    // Bio/phone here are the sign-up-time, account-level fields edited on
+    // EditOrganisationProfileScreen — same user_profiles columns the
+    // volunteer side uses. Distinct from organisations.description /
+    // contact_phone, which are the public-facing fields edited in Settings.
+    @SerialName("bio")
+    val bio: String? = null,
+    @SerialName("phone")
+    val phone: String? = null
 )
 
 @Serializable
@@ -28,12 +36,12 @@ private data class OrganisationRow(
     val organisationName: String,
     @SerialName("organisation_type")
     val organisationType: String? = null,
-    @SerialName("description")
+    // Public-facing fields, edited from OrganisationSettingScreen.
     val description: String? = null,
-    @SerialName("contact_email")
-    val contactEmail: String? = null,
     @SerialName("contact_phone")
     val contactPhone: String? = null,
+    @SerialName("contact_email")
+    val contactEmail: String? = null,
     @SerialName("website_url")
     val websiteUrl: String? = null,
     @SerialName("profile_image_path")
@@ -136,10 +144,21 @@ data class OrganisationProfileData(
     val userId: String,
     val organisationName: String,
     val organisationType: String,
+
+    // ---- Public-facing (organisations table) — edited in Settings ----
     val description: String,
-    val loginEmail: String,
-    val contactEmail: String,
     val contactPhone: String,
+    val contactEmail: String,
+
+    // ---- Account-level (user_profiles table) — edited in EditProfile,
+    // same columns used at sign-up ----
+    val bio: String,
+    val registeredPhone: String,
+
+    // Real Supabase Auth login email — read-only everywhere, unrelated
+    // to contactEmail above.
+    val loginEmail: String,
+
     val websiteUrl: String,
     val locationName: String,
     val stateRegion: String,
@@ -224,9 +243,11 @@ object OrganisationProfileRepository {
                 organisationName = context.organisationName,
                 organisationType = organisation.organisationType ?: "",
                 description = organisation.description ?: "",
-                loginEmail = currentUser.email ?: "",
-                contactEmail = organisation.contactEmail ?: "",
                 contactPhone = organisation.contactPhone ?: "",
+                contactEmail = organisation.contactEmail ?: "",
+                bio = profile?.bio ?: "",
+                registeredPhone = profile?.phone ?: "",
+                loginEmail = currentUser.email ?: "",
                 websiteUrl = organisation.websiteUrl ?: "",
                 locationName = organisation.locationName ?: "",
                 stateRegion = organisation.stateRegion ?: "",
@@ -247,7 +268,6 @@ object OrganisationProfileRepository {
     suspend fun updateOpenToPartnership(openToPartnership: Boolean): Boolean {
         return try {
             val organisationId = OrganisationSession.requireOrganisationId()
-
             supabase
                 .from("organisations")
                 .update({
@@ -255,7 +275,6 @@ object OrganisationProfileRepository {
                 }) {
                     filter { eq("organisation_id", organisationId) }
                 }
-
             true
         } catch (e: Exception) {
             e.printStackTrace()
@@ -263,6 +282,27 @@ object OrganisationProfileRepository {
         }
     }
 
+    suspend fun requestEmailChange(newEmail: String): Boolean {
+        return try {
+            supabase.auth.updateUser {
+                email = newEmail.trim()
+            }
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    suspend fun refreshLoginEmail(): String? {
+        return try {
+            supabase.auth.refreshCurrentSession()
+            supabase.auth.currentUserOrNull()?.email
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
     suspend fun addSupport(
         supportDescription: String,
         supportType: String,
@@ -350,7 +390,6 @@ object OrganisationProfileRepository {
     suspend fun removeSupport(supportId: String): Boolean {
         return try {
             val organisationId = OrganisationSession.requireOrganisationId()
-
             supabase
                 .from("organisation_supports")
                 .delete {
@@ -359,7 +398,6 @@ object OrganisationProfileRepository {
                         eq("organisation_id", organisationId)
                     }
                 }
-
             true
         } catch (e: Exception) {
             e.printStackTrace()
@@ -367,11 +405,65 @@ object OrganisationProfileRepository {
         }
     }
 
+    // =========================================================
+    // SETTINGS SCREEN — public-facing fields on `organisations`
+    // =========================================================
+
+    suspend fun updateContactPhone(contactPhone: String): Boolean {
+        return try {
+            val organisationId = OrganisationSession.requireOrganisationId()
+            supabase.from("organisations").update({
+                set("contact_phone", contactPhone)
+            }) {
+                filter { eq("organisation_id", organisationId) }
+            }
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    suspend fun updateContactEmail(contactEmail: String): Boolean {
+        return try {
+            val organisationId = OrganisationSession.requireOrganisationId()
+            supabase.from("organisations").update({
+                set("contact_email", contactEmail)
+            }) {
+                filter { eq("organisation_id", organisationId) }
+            }
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    suspend fun updateDescription(description: String): Boolean {
+        return try {
+            val organisationId = OrganisationSession.requireOrganisationId()
+            supabase.from("organisations").update({
+                set("description", description)
+            }) {
+                filter { eq("organisation_id", organisationId) }
+            }
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    // =========================================================
+    // EDIT PROFILE SCREEN — account-level fields on `user_profiles`,
+    // same columns populated at sign-up. Unrelated to the three
+    // functions above.
+    // =========================================================
+
     suspend fun updateProfile(
         organisationName: String,
-        contactPhone: String,
-        contactEmail: String,
-        description: String,
+        registeredPhone: String,
+        bio: String,
         locationName: String,
         stateRegion: String,
         country: String,
@@ -386,6 +478,8 @@ object OrganisationProfileRepository {
                 .update({
                     set("full_name", organisationName)
                     set("avatar_path", profileImageUrl)
+                    set("bio", bio)
+                    set("phone", registeredPhone)
                 }) {
                     filter { eq("auth_user_id", currentUser.id) }
                 }
@@ -394,9 +488,6 @@ object OrganisationProfileRepository {
                 .from("organisations")
                 .update({
                     set("organisation_name", organisationName)
-                    set("contact_phone", contactPhone)
-                    set("contact_email", contactEmail)
-                    set("description", description)
                     set("location_name", locationName)
                     set("state_region", stateRegion)
                     set("country", country)

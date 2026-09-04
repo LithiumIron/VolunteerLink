@@ -81,6 +81,8 @@ fun OrganisationPostManagementScreen(
     postId: String,
     onBack: () -> Unit,
     onEdit: () -> Unit,
+    onViewVolunteerProfile: (String) -> Unit = {},
+    onMessageVolunteer: (String) -> Unit = {},
     onViewApplication: (roleTemplateId: String, userId: String) -> Unit = { _, _ -> },
     returnToPeopleAfterApplicantReview: Boolean = false,
     openPeopleFromHome: Boolean = false,
@@ -195,11 +197,23 @@ fun OrganisationPostManagementScreen(
             isShowingCachedData = uiState.isShowingCachedData,
             lastSyncedAtEpochMillis = uiState.lastSyncedAtEpochMillis,
             isRefreshing = uiState.isRefreshing,
+            isLoadingPostGroup = uiState.isLoadingPostGroup,
+            isAddingPostGroupMembers = uiState.isAddingPostGroupMembers,
+            postGroupConversationId = uiState.postGroupConversationId,
+            postGroupEligibleCount = uiState.postGroupEligibleCount,
+            postGroupActiveMemberCount = uiState.postGroupActiveMemberCount,
+            postGroupMissingCount = uiState.postGroupMissingCount,
+            postGroupHasStarted = uiState.postGroupHasStarted,
+            postGroupCanAdd = uiState.postGroupCanAdd,
+            postGroupActionMessage = uiState.postGroupActionMessage,
             onSyncSelected = viewModel::refresh,
+            onAddAllToGroup = viewModel::addAllAcceptedVolunteersToGroup,
             onBack = {
                 if (hasUnfinishedReview) confirmLeaveReview = true else onBack()
             },
             onEdit = onEdit,
+            onViewVolunteerProfile = onViewVolunteerProfile,
+            onMessageVolunteer = onMessageVolunteer,
             onViewApplication = onViewApplication,
             onToggleShortlist = viewModel::toggleApplicantShortlist,
             onStartAttendance = viewModel::startPhysicalAttendance,
@@ -409,9 +423,21 @@ private fun OrganisationPostManagementContent(
     isShowingCachedData: Boolean,
     lastSyncedAtEpochMillis: Long?,
     isRefreshing: Boolean,
+    isLoadingPostGroup: Boolean,
+    isAddingPostGroupMembers: Boolean,
+    postGroupConversationId: String?,
+    postGroupEligibleCount: Int,
+    postGroupActiveMemberCount: Int,
+    postGroupMissingCount: Int,
+    postGroupHasStarted: Boolean,
+    postGroupCanAdd: Boolean,
+    postGroupActionMessage: String?,
     onSyncSelected: () -> Unit,
+    onAddAllToGroup: () -> Unit,
     onBack: () -> Unit,
     onEdit: () -> Unit,
+    onViewVolunteerProfile: (String) -> Unit,
+    onMessageVolunteer: (String) -> Unit,
     onViewApplication: (roleTemplateId: String, userId: String) -> Unit,
     onToggleShortlist: (PostManagementPerson) -> Unit,
     onStartAttendance: () -> Unit,
@@ -439,7 +465,6 @@ private fun OrganisationPostManagementContent(
 ) {
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var selectedRoleId by rememberSaveable { mutableStateOf<String?>(null) }
-    var selectedPerson by remember { mutableStateOf<PostManagementPerson?>(null) }
     var selectedAttendanceDate by rememberSaveable { mutableStateOf<String?>(null) }
     var absentConfirmationPerson by remember { mutableStateOf<PostManagementPerson?>(null) }
     var absentConfirmationDate by remember { mutableStateOf<String?>(null) }
@@ -846,6 +871,21 @@ private fun OrganisationPostManagementContent(
                     }
 
                     item(key = "people_controls") {
+                        if (selectedPeopleTab == PostManagementPeopleTab.VOLUNTEERS) {
+                            PostManagementGroupSyncCard(
+                                groupExists = postGroupConversationId != null,
+                                eligibleCount = postGroupEligibleCount,
+                                activeMemberCount = postGroupActiveMemberCount,
+                                missingCount = postGroupMissingCount,
+                                hasStarted = postGroupHasStarted,
+                                canAdd = postGroupCanAdd,
+                                isLoading = isLoadingPostGroup,
+                                isAdding = isAddingPostGroupMembers,
+                                actionMessage = postGroupActionMessage,
+                                onAddAll = onAddAllToGroup,
+                                modifier = Modifier.padding(bottom = 12.dp)
+                            )
+                        }
                         PostManagementPeopleControls(
                             selectedTab = selectedPeopleTab,
                             showApplicantsTab = showApplicantsTab,
@@ -981,7 +1021,8 @@ private fun OrganisationPostManagementContent(
                                         selectedRemoteSubmissionPerson = selected
                                         remoteSubmissionFileError = null
                                     },
-                                    onViewProfile = { selectedPerson = it },
+                                    onViewProfile = { onViewVolunteerProfile(it.userId) },
+                                    onMessage = { onMessageVolunteer(it.userId) },
                                     onViewApplication = { selected ->
                                         onViewApplication(
                                             selected.roleTemplateId,
@@ -1043,7 +1084,7 @@ private fun OrganisationPostManagementContent(
                                     absentConfirmationPerson = selected
                                     absentConfirmationDate = date
                                 },
-                                onViewProfile = { selectedPerson = it }
+                                onViewProfile = { onViewVolunteerProfile(it.userId) }
                             )
                         }
                     } else if (showSelectedRemote && remoteReview != null) {
@@ -1069,7 +1110,7 @@ private fun OrganisationPostManagementContent(
                                 onFeedbackChange = onSetRemoteFeedback,
                                 onStageChange = onRemoteReviewStageChange,
                                 onFinalize = onFinalizeRemoteReview,
-                                onViewProfile = { selectedPerson = it }
+                                onViewProfile = { onViewVolunteerProfile(it.userId) }
                             )
                         }
                     } else {
@@ -1085,12 +1126,6 @@ private fun OrganisationPostManagementContent(
         }
     }
 
-    selectedPerson?.let { person ->
-        PostManagementProfilePreviewDialog(
-            person = person,
-            onDismiss = { selectedPerson = null }
-        )
-    }
 
     selectedRemoteSubmission?.let { submission ->
         val isShared = submission.submissionType.equals("SHARED", ignoreCase = true)

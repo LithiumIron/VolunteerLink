@@ -1,5 +1,6 @@
 package com.example.volunteerlink.organisation.screens
 
+import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -16,14 +17,17 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Business
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -36,6 +40,7 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,6 +57,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.volunteerlink.data.location.CurrentLocationResolver
 import com.example.volunteerlink.data.saveProfileImage
 import com.example.volunteerlink.organisation.OrganisationTypeOptions
 import com.example.volunteerlink.organisation.auth.OrganisationSessionStore
@@ -60,6 +66,7 @@ import com.example.volunteerlink.organisation.organisationFieldColours
 import com.example.volunteerlink.organisation.repository.OrganisationProfileRepository
 import kotlinx.coroutines.launch
 
+private enum class EmailChangeStep { NONE, ENTER_EMAIL, WAITING_FOR_LINK }
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditOrganisationProfileScreen(
@@ -82,10 +89,27 @@ fun EditOrganisationProfileScreen(
     var isSaving by remember { mutableStateOf(false) }
 
     var organisationName by remember { mutableStateOf(cachedProfile?.organisationName ?: "") }
-    var contactPhone by remember { mutableStateOf(cachedProfile?.contactPhone ?: "") }
-    var contactEmail by remember { mutableStateOf(cachedProfile?.contactEmail ?: "") }
-    var description by remember { mutableStateOf(cachedProfile?.description ?: "") }
+    var contactPhone by remember { mutableStateOf(cachedProfile?.registeredPhone ?: "") }
+    var description by remember { mutableStateOf(cachedProfile?.bio ?: "") }
     var profileImageUrl by remember { mutableStateOf(cachedProfile?.profileImageUrl) }
+
+    var loginEmailState by remember { mutableStateOf(cachedProfile?.loginEmail ?: "") }
+
+    var emailChangeStep by remember { mutableStateOf(EmailChangeStep.NONE) }
+    var newEmailInput by remember { mutableStateOf("") }
+    var isProcessingEmailChange by remember { mutableStateOf(false) }
+    var emailChangeError by remember { mutableStateOf<String?>(null) }
+
+    val emailInteractionSource = remember { MutableInteractionSource() }
+    LaunchedEffect(emailInteractionSource) {
+        emailInteractionSource.interactions.collect {
+            if (it is PressInteraction.Release) {
+                newEmailInput = ""
+                emailChangeError = null
+                emailChangeStep = EmailChangeStep.ENTER_EMAIL
+            }
+        }
+    }
 
     var organisationType by remember { mutableStateOf(cachedProfile?.organisationType ?: "") }
     var country by remember { mutableStateOf(cachedProfile?.country ?: "") }
@@ -107,6 +131,25 @@ fun EditOrganisationProfileScreen(
                 val imageUrl = saveProfileImage(context = context, uri = uri)
                 if (imageUrl != null) {
                     profileImageUrl = imageUrl
+                }
+            }
+        }
+    }
+
+    // While waiting, check every few seconds whether the email actually
+// changed server-side — this is what catches the link being clicked
+// on a completely different device.
+    LaunchedEffect(emailChangeStep) {
+        if (emailChangeStep == EmailChangeStep.WAITING_FOR_LINK) {
+            val originalEmail = loginEmailState
+            while (emailChangeStep == EmailChangeStep.WAITING_FOR_LINK) {
+                kotlinx.coroutines.delay(3000)
+                val refreshed = OrganisationProfileRepository.refreshLoginEmail()
+                if (refreshed != null && refreshed != originalEmail) {
+                    loginEmailState = refreshed
+                    OrganisationSessionStore.clearProfileData()
+                    emailChangeStep = EmailChangeStep.NONE
+                    break
                 }
             }
         }
@@ -220,6 +263,21 @@ fun EditOrganisationProfileScreen(
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
 
+            if (!profileImageUrl.isNullOrBlank()) {
+                Spacer(Modifier.height(4.dp))
+
+                Text(
+                    text = "Remove photo",
+                    color = Color(0xFFC62828),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { profileImageUrl = null }
+                )
+            }
+
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -292,23 +350,20 @@ fun EditOrganisationProfileScreen(
 
                 Spacer(Modifier.height(13.dp))
 
-                // LOGIN EMAIL (read-only — belongs to auth.users, not
-                // editable from here, same reasoning as the volunteer
-                // edit screen)
-                // Contact email below is the separate, genuinely editable
-                // business contact address stored on organisations.
-
-                // CONTACT EMAIL
-                OutlinedTextField(
-                    value = contactEmail,
-                    onValueChange = { contactEmail = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Contact email") },
-                    singleLine = true,
-                    enabled = !isSaving,
-                    placeholder = { Text("Shown to volunteers — can differ from your login email") },
-                    colors = organisationFieldColours()
-                )
+                // LOGIN EMAIL — tap to start the Supabase Auth email-change flow.
+                Box {
+                    OutlinedTextField(
+                        value = loginEmailState,
+                        onValueChange = {},
+                        readOnly = true,
+                        enabled = !isSaving,
+                        interactionSource = emailInteractionSource,
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Login email") },
+                        trailingIcon = { Text("›") },
+                        colors = organisationFieldColours()
+                    )
+                }
 
                 Spacer(Modifier.height(13.dp))
 
@@ -324,6 +379,87 @@ fun EditOrganisationProfileScreen(
                 )
 
                 Spacer(Modifier.height(13.dp))
+
+                // USE CURRENT LOCATION (optional shortcut — manual picker below still
+// works exactly as before)
+                var isResolvingCurrentLocation by remember { mutableStateOf(false) }
+                var currentLocationMessage by remember { mutableStateOf<String?>(null) }
+                var cancelCurrentLocationRequest by remember { mutableStateOf<(() -> Unit)?>(null) }
+
+                DisposableEffect(Unit) {
+                    onDispose { cancelCurrentLocationRequest?.invoke() }
+                }
+
+                fun beginCurrentLocationResolution() {
+                    if (!CurrentLocationResolver.isLocationEnabled(context)) {
+                        isResolvingCurrentLocation = false
+                        currentLocationMessage = "Turn on your device's Location setting, then try again."
+                        return
+                    }
+                    cancelCurrentLocationRequest?.invoke()
+                    isResolvingCurrentLocation = true
+                    currentLocationMessage = "Getting your location…"
+                    cancelCurrentLocationRequest = CurrentLocationResolver.resolve(
+                        context = context,
+                        countryStates = countryStates,
+                        scope = scope
+                    ) { outcome ->
+                        isResolvingCurrentLocation = false
+                        currentLocationMessage = outcome.message
+                        outcome.match?.let { match ->
+                            country = match.country
+                            stateRegion = match.stateRegion
+                            locationName = match.locationName
+                        }
+                    }
+                }
+
+                val currentLocationPermissionLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.RequestMultiplePermissions()
+                ) { permissions ->
+                    if (permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+                        permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+                    ) {
+                        beginCurrentLocationResolution()
+                    } else {
+                        isResolvingCurrentLocation = false
+                        currentLocationMessage = "Location permission was not granted."
+                    }
+                }
+
+                TextButton(
+                    onClick = {
+                        if (CurrentLocationResolver.hasLocationPermission(context)) {
+                            beginCurrentLocationResolution()
+                        } else {
+                            isResolvingCurrentLocation = true
+                            currentLocationMessage = "Waiting for location permission…"
+                            currentLocationPermissionLauncher.launch(
+                                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+                            )
+                        }
+                    },
+                    enabled = !isSaving && !isResolvingCurrentLocation
+                ) {
+                    if (isResolvingCurrentLocation) {
+                        CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                    } else {
+                        Icon(Icons.Filled.MyLocation, contentDescription = null, modifier = Modifier.size(18.dp))
+                    }
+                    Spacer(Modifier.width(6.dp))
+                    Text(if (isResolvingCurrentLocation) "Locating..." else "Use current location")
+                }
+
+                currentLocationMessage?.let { message ->
+                    Text(
+                        text = message,
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+                }
+
+                Spacer(Modifier.height(8.dp))
 
                 // LOCATION (tap to open cascading picker — same pattern
                 // and same countryStates data as the sign-up screen)
@@ -500,11 +636,99 @@ fun EditOrganisationProfileScreen(
                             }
                         )
                     }
+                    if (emailChangeStep != EmailChangeStep.NONE) {
+                        AlertDialog(
+                            onDismissRequest = {
+                                if (!isProcessingEmailChange) {
+                                    emailChangeStep = EmailChangeStep.NONE
+                                    emailChangeError = null
+                                }
+                            },
+                            title = {
+                                Text(
+                                    if (emailChangeStep == EmailChangeStep.ENTER_EMAIL)
+                                        "Change login email"
+                                    else
+                                        "Check your email"
+                                )
+                            },
+                            text = {
+                                Column {
+                                    if (emailChangeStep == EmailChangeStep.ENTER_EMAIL) {
+                                        Text(
+                                            "We'll send a confirmation link to your new email.",
+                                            fontSize = 12.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Spacer(Modifier.height(10.dp))
+                                        OutlinedTextField(
+                                            value = newEmailInput,
+                                            onValueChange = {
+                                                newEmailInput = it
+                                                emailChangeError = null
+                                            },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            singleLine = true,
+                                            enabled = !isProcessingEmailChange,
+                                            label = { Text("New email") }
+                                        )
+                                        emailChangeError?.let { message ->
+                                            Spacer(Modifier.height(6.dp))
+                                            Text(message, fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
+                                        }
+                                    } else {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                                            Spacer(Modifier.width(10.dp))
+                                            Text(
+                                                "We sent a link to $newEmailInput. Click it from any device — " +
+                                                        "this screen will update automatically once confirmed.",
+                                                fontSize = 12.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                }
+                            },
+                            confirmButton = {
+                                if (emailChangeStep == EmailChangeStep.ENTER_EMAIL) {
+                                    TextButton(
+                                        enabled = !isProcessingEmailChange,
+                                        onClick = {
+                                            scope.launch {
+                                                val trimmed = newEmailInput.trim()
+                                                if (trimmed.isBlank()) {
+                                                    emailChangeError = "Enter an email address."
+                                                    return@launch
+                                                }
+                                                isProcessingEmailChange = true
+                                                val success = OrganisationProfileRepository.requestEmailChange(trimmed)
+                                                isProcessingEmailChange = false
+                                                if (success) {
+                                                    emailChangeStep = EmailChangeStep.WAITING_FOR_LINK
+                                                } else {
+                                                    emailChangeError = "Couldn't send link. Try again shortly."
+                                                }
+                                            }
+                                        }
+                                    ) { Text(if (isProcessingEmailChange) "Sending..." else "Send link") }
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(
+                                    onClick = {
+                                        emailChangeStep = EmailChangeStep.NONE
+                                        emailChangeError = null
+                                    }
+                                ) { Text(if (emailChangeStep == EmailChangeStep.WAITING_FOR_LINK) "Close" else "Cancel") }
+                            }
+                        )
+                    }
                 }
 
                 Spacer(Modifier.height(13.dp))
 
-                // DESCRIPTION
+                // DESCRIPTION (bio)
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
@@ -526,9 +750,8 @@ fun EditOrganisationProfileScreen(
                             try {
                                 val success = OrganisationProfileRepository.updateProfile(
                                     organisationName = organisationName,
-                                    contactPhone = contactPhone,
-                                    contactEmail = contactEmail,
-                                    description = description,
+                                    registeredPhone = contactPhone,
+                                    bio = description,
                                     locationName = locationName,
                                     stateRegion = stateRegion,
                                     country = country,

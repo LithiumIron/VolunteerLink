@@ -15,6 +15,9 @@ data class VolunteerProfileData(
     val userId: String,
     val fullName: String,
     val email: String,
+    val city: String,
+    val stateRegion: String,
+    val country: String,
     val bio: String = "",
     val phone: String = "",
     val availability: List<String> = emptyList(),
@@ -203,12 +206,5 @@ object VolunteerOpportunitySessionStore {
         volunteerApplications.add(0, application)
     }
 
-    fun replaceApplication(
-        application: VolunteerOpportunityApplication
-    ) {
-        val index = volunteerApplications.indexOfFirst {
-            it.applicationId == application.applicationId
-        }
-        if (index >= 0) volunteerApplications[index] = application
-    }
+
 }

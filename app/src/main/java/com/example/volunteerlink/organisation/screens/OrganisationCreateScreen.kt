@@ -40,6 +40,7 @@ import com.example.volunteerlink.organisation.viewmodel.CreatePostViewModel
 fun OrganisationCreateScreen(
     onExitCreate: () -> Unit = {},
     editPostId: String? = null,
+    impactWeaveDraftId: String? = null,
     viewModel: CreatePostViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -49,6 +50,10 @@ fun OrganisationCreateScreen(
         if (!editPostId.isNullOrBlank()) {
             viewModel.loadExistingPostForEdit(editPostId)
         }
+    }
+    LaunchedEffect(impactWeaveDraftId) {
+        impactWeaveDraftId?.takeIf { it.isNotBlank() }
+            ?.let(viewModel::loadImpactWeaveForCreate)
     }
     var showDiscardDialog by remember { mutableStateOf(false) }
     var hasRequestedLocationPermission by rememberSaveable { mutableStateOf(false) }
@@ -136,7 +141,18 @@ fun OrganisationCreateScreen(
 
     BackHandler(onBack = requestBack)
 
-    if (uiState.isLoadingExistingPost) {
+    if (uiState.isLoadingImpactWeave) {
+        OrganisationModulePage(
+            title = "Preparing Volunteer Post",
+            message = "Loading the confirmed Impact Weave activity and partner support..."
+        )
+    } else if (uiState.impactWeaveLoadError != null) {
+        OrganisationModulePage(
+            title = "Couldn't Open Impact Weave",
+            message = uiState.impactWeaveLoadError
+                ?: "This plan is no longer ready to become a Volunteer Post."
+        )
+    } else if (uiState.isLoadingExistingPost) {
         OrganisationModulePage(
             title = "Loading Post",
             message = "Loading the existing Volunteer Post and its edit restrictions..."
@@ -208,7 +224,8 @@ fun OrganisationCreateScreen(
                 onEditStep = viewModel::editStepFromReview,
                 onSaveDraft = { viewModel.saveDraft(context) },
                 onPublish = { viewModel.publishPost(context) },
-                onSaveChanges = { viewModel.saveChanges(context) }
+                onSaveChanges = { viewModel.saveChanges(context) },
+                allowSaveDraft = uiState.impactWeaveDraftId == null
             )
         }
 
