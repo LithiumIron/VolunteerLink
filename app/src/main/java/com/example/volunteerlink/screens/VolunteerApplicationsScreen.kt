@@ -1,4 +1,4 @@
-
+﻿
 package com.example.volunteerlink.screens
 
 import androidx.compose.foundation.BorderStroke
@@ -405,7 +405,7 @@ fun VolunteerApplicationDetailsScreen(
                     eventTime =
                         if (applicationIsRemote) "See submission deadline below" else
                             volunteerOpportunityEvent?.let {
-                                "${com.example.volunteerlink.data.VolunteerScheduleText.time(it.eventPhysicalStartTime)} – " +
+                                "${com.example.volunteerlink.data.VolunteerScheduleText.time(it.eventPhysicalStartTime)} ΓÇô " +
                                     "${com.example.volunteerlink.data.VolunteerScheduleText.time(it.eventPhysicalEndTime)}"
                             } ?: volunteerApplication.applicationEventTime,
                     eventLocation =
@@ -1018,7 +1018,7 @@ private fun VolunteerApplicationListCard(
                 )
 
                 Text(
-                    text = "View  ›",
+                    text = "View  ΓÇ║",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     color = VolunteerLinkPrimaryGreen
@@ -1202,7 +1202,7 @@ private fun VolunteerApplicationTimelineRow(
                         Text(
                             text =
                                 if (step.state == "ERROR") "!"
-                                else "•",
+                                else "ΓÇó",
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
                             color =
@@ -1498,7 +1498,7 @@ private fun VolunteerApplicationInformationCard(
                             .joinToString(" - ")
                     } else {
                         listOfNotNull(eventDate, eventEndDate?.takeUnless { it == eventDate })
-                            .joinToString(" – ") + (eventTime?.let { "\nCheck-in hours: $it" } ?: "")
+                            .joinToString(" ΓÇô ") + (eventTime?.let { "\nCheck-in hours: $it" } ?: "")
                     }
                 VolunteerApplicationInformationRow(
                     label = "Work period",
