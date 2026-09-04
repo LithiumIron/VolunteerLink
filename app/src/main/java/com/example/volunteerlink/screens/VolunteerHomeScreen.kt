@@ -1,6 +1,8 @@
 
 package com.example.volunteerlink.screens
 
+// Main volunteer dashboard: recommendations, search entry points, promotions and current activity.
+
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -117,6 +119,7 @@ fun VolunteerHomeScreen(
     skillPathViewModel:
         VolunteerSkillPathViewModel = viewModel()
 ) {
+    // Home uses the same business clock as attendance and application timeline rules.
     val context = LocalContext.current
     val businessNow = volunteerBusinessTime()
     val applicationClock by com.example.volunteerlink.data.time.AppClock.state.collectAsStateWithLifecycle()
@@ -124,6 +127,7 @@ fun VolunteerHomeScreen(
     var selectedHomeFilter by rememberSaveable {
         mutableStateOf(VolunteerHomeFeedFilter.FOR_YOU)
     }
+    // Request location only when the volunteer chooses a personalised Home feed.
     val matchLocationPermissionLauncher =
         rememberLauncherForActivityResult(
             ActivityResultContracts.RequestMultiplePermissions()
@@ -135,6 +139,7 @@ fun VolunteerHomeScreen(
                 DeviceLocationHelper.getApproximateCurrentLocation(context) {
                         location ->
                     location?.let {
+                        // Store only the calculated distance data used by recommendation cards.
                         VolunteerOpportunitySessionStore
                             .updateDistancesFromDevice(
                                 latitude = it.latitude,

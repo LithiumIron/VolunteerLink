@@ -1,5 +1,7 @@
 package com.example.volunteerlink.data
 
+// Applies all discovery rules before a role is shown as available to the volunteer.
+
 import com.example.volunteerlink.data.time.AppClock
 import com.example.volunteerlink.model.VolunteerApplicationStatus
 import com.example.volunteerlink.model.VolunteerOpportunityApplication

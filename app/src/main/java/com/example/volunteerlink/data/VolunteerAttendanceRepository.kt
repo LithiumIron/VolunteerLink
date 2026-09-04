@@ -1,5 +1,7 @@
 package com.example.volunteerlink.data
 
+// Reads attendance information from Supabase without changing organiser records.
+
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.postgrest

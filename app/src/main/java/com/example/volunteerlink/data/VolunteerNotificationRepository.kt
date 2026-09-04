@@ -1,6 +1,8 @@
 
 package com.example.volunteerlink.data
 
+// Loads notification records and stores dismissal changes for the signed-in volunteer.
+
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.serialization.SerialName

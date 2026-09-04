@@ -1,6 +1,8 @@
 ﻿
 package com.example.volunteerlink.screens
 
+// Controls the application flow: form validation, profile review, server submission and success feedback.
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -76,10 +78,12 @@ fun VolunteerApplicationScreen(
     volunteerOpportunityViewModel:
         VolunteerOpportunityViewModel
 ) {
+    // Observe loading and error states while an application action is running.
     val opportunityUiState by
         volunteerOpportunityViewModel.uiState
             .collectAsStateWithLifecycle()
 
+    // Read the selected event and role from the shared session data.
     val volunteerOpportunityEvent =
         VolunteerOpportunitySessionStore.findEventById(
             volunteerEventId
@@ -91,6 +95,7 @@ fun VolunteerApplicationScreen(
             roleId = volunteerRoleId
         )
 
+    // Stop safely when an old navigation link points to data that no longer exists.
     if (
         volunteerOpportunityEvent == null ||
         volunteerOpportunityRole == null
@@ -101,6 +106,7 @@ fun VolunteerApplicationScreen(
         return
     }
 
+    // This local flag changes the screen from the form to the success page after server success.
     var applicationWasSubmitted by
     rememberSaveable(
         volunteerEventId,
@@ -127,6 +133,7 @@ fun VolunteerApplicationScreen(
                         VolunteerApplicationStatus.CANCELLED
             }
 
+    // Choose one visible state: success, existing record, review dialog, or application form.
     when {
         applicationWasSubmitted -> {
             VolunteerApplicationSuccessScreen(

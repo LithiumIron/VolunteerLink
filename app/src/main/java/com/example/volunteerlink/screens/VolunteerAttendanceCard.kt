@@ -1,5 +1,7 @@
 package com.example.volunteerlink.screens
 
+// Displays the attendance action for one accepted physical role.
+
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.BorderStroke

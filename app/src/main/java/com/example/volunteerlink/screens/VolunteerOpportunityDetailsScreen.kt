@@ -1,6 +1,8 @@
 
 package com.example.volunteerlink.screens
 
+// Displays event-level information and passes the selected role into the role-details flow.
+
 import android.content.Context
 import android.content.Intent
 import android.net.Uri

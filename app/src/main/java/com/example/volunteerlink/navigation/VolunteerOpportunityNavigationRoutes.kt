@@ -1,5 +1,7 @@
 package com.example.volunteerlink.navigation
 
+// Defines route names and route arguments used by the volunteer navigation host.
+
 object VolunteerOpportunityNavigationRoutes {
     const val VOLUNTEER_FAVOURITES_ROUTE = "volunteer_favourites"
 

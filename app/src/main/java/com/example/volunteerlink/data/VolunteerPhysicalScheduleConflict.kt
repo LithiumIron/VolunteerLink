@@ -1,5 +1,7 @@
 package com.example.volunteerlink.data
 
+// Finds overlapping Physical roles. Remote and Hybrid roles are intentionally not treated as conflicts.
+
 import com.example.volunteerlink.model.VolunteerApplicationStatus
 import com.example.volunteerlink.model.VolunteerOpportunityApplication
 import com.example.volunteerlink.model.VolunteerOpportunityEvent
@@ -43,10 +45,12 @@ object VolunteerPhysicalScheduleConflictEvaluator {
         applications: List<VolunteerOpportunityApplication> = VolunteerOpportunitySessionStore.volunteerApplications,
         events: List<VolunteerOpportunityEvent> = VolunteerOpportunitySessionStore.volunteerOpportunityEvents
     ): VolunteerPhysicalScheduleConflict? {
+        // Only Physical roles have fixed time conflicts. Remote and Hybrid work remains flexible.
         if (!candidateRole.roleMode.equals("PHYSICAL", ignoreCase = true)) return null
         val candidateWindows = windows(candidateEvent, candidateRole)
         if (candidateWindows.isEmpty()) return null
         return applications.asSequence()
+            // Only active applications can block a new Physical role.
             .filter { it.applicationStatus in setOf(VolunteerApplicationStatus.PENDING, VolunteerApplicationStatus.ACCEPTED) }
             .filterNot { it.applicationEventId == candidateEvent.eventId && it.applicationRoleId == candidateRole.roleId }
             .mapNotNull { application ->
@@ -54,6 +58,7 @@ object VolunteerPhysicalScheduleConflictEvaluator {
                 val role = application.applicationRoleId?.let { id -> event.eventVolunteerRoles.firstOrNull { it.roleId == id } }
                     ?: return@mapNotNull null
                 if (!role.roleMode.equals("PHYSICAL", ignoreCase = true)) return@mapNotNull null
+                // Two time windows overlap when one starts before the other ends.
                 val matched = candidateWindows.firstNotNullOfOrNull { proposed ->
                     windows(event, role).firstOrNull { existing ->
                         proposed.date == existing.date && proposed.start < existing.end && proposed.end > existing.start
@@ -66,6 +71,7 @@ object VolunteerPhysicalScheduleConflictEvaluator {
     }
 
     private fun windows(event: VolunteerOpportunityEvent, role: VolunteerOpportunityRole): List<Window> {
+        // Role-specific schedule items override the general event schedule.
         val assigned = role.roleScheduleItems.filter {
             it.assignedToRole && it.scheduleType.equals("PHYSICAL", ignoreCase = true) && it.rawDate.isNotBlank()
         }.mapNotNull {

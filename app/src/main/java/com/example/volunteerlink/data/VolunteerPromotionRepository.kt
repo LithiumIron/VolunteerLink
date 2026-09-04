@@ -1,5 +1,7 @@
 package com.example.volunteerlink.data
 
+// Retrieves promotion data and maps it into safe UI models.
+
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
 

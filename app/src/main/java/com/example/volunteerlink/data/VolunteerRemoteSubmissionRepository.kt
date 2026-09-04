@@ -1,5 +1,7 @@
 package com.example.volunteerlink.data
 
+// Validates one remote-project file, uploads it, and saves its submission metadata.
+
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -45,6 +47,7 @@ data class VolunteerRemoteContext(
 )
 
 object VolunteerRemoteFileRules {
+    // Keep supported file types and the size limit in one place for the picker and upload checks.
     const val MAX_BYTES = 20_000_000L
     val mimeTypes = linkedMapOf(
         "pdf" to "application/pdf", "jpg" to "image/jpeg", "jpeg" to "image/jpeg",
@@ -115,6 +118,7 @@ object VolunteerRemoteSubmissionRepository {
                 if (sizeIndex >= 0 && !c.isNull(sizeIndex)) reportedSize = c.getLong(sizeIndex)
             }
         }
+        // Validate the filename before copying the selected document into app storage.
         val mime = VolunteerRemoteFileRules.mimeType(name)
         reportedSize?.takeIf { it >= 0 }?.let(VolunteerRemoteFileRules::checkSize)
         val local = File.createTempFile("volunteer_remote_", ".tmp", context.cacheDir)
@@ -125,6 +129,7 @@ object VolunteerRemoteSubmissionRepository {
                 local.outputStream().use { target ->
                     val buffer = ByteArray(8192)
                     var total = 0L
+                    // Copy in small chunks so a large file does not fill memory.
                     while (true) {
                         currentCoroutineContext().ensureActive()
                         val count = source.read(buffer)

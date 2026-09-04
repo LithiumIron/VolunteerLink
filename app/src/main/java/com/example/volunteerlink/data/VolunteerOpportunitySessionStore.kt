@@ -1,5 +1,7 @@
 package com.example.volunteerlink.data
 
+// In-memory session store shared by Volunteer screens after dashboard data has been loaded.
+
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf

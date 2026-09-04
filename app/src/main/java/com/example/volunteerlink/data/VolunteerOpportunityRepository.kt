@@ -1,5 +1,7 @@
 package com.example.volunteerlink.data
 
+// Main repository that maps Supabase rows into the event, role and application models used by the UI.
+
 import com.example.volunteerlink.model.VolunteerApplicationStatus
 import com.example.volunteerlink.model.VolunteerOpportunityApplication
 import com.example.volunteerlink.model.VolunteerOpportunityCategory

@@ -1,6 +1,8 @@
 
 package com.example.volunteerlink.screens
 
+// Shows volunteer notifications and lets the user open the related destination.
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box

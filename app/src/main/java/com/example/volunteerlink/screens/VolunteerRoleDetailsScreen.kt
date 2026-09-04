@@ -1,6 +1,8 @@
 
 package com.example.volunteerlink.screens
 
+// Applies role-level eligibility checks and gives the volunteer the correct next action.
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement

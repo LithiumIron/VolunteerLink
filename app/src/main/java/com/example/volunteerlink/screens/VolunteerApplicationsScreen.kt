@@ -1,6 +1,8 @@
 ﻿
 package com.example.volunteerlink.screens
 
+// Shows application history, filters, status details, cancellation and reapplication actions.
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -85,12 +87,14 @@ fun VolunteerMyApplicationsScreen(
         applicationId: Int
     ) -> Unit
 ) {
+    // Use the shared app clock so the Today filters match the database test/real time setting.
     val businessNow = volunteerBusinessTime()
     var selectedStatusFilter by
     rememberSaveable {
         mutableStateOf("All")
     }
 
+    // These labels are also handled by the filtering rules below.
     val statusFilters =
         listOf(
             "All",
@@ -105,6 +109,7 @@ fun VolunteerMyApplicationsScreen(
             "Cancelled"
         )
 
+    // Filter only the already-loaded application list; this does not make a new database request.
     val filteredApplications =
         VolunteerOpportunitySessionStore
             .volunteerApplications

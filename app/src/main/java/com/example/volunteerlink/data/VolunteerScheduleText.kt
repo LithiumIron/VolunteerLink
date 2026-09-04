@@ -1,5 +1,7 @@
 package com.example.volunteerlink.data
 
+// Keeps date and time formatting consistent across volunteer event screens.
+
 import com.example.volunteerlink.model.VolunteerOpportunityEvent
 import com.example.volunteerlink.model.VolunteerOpportunityRole
 import java.text.SimpleDateFormat

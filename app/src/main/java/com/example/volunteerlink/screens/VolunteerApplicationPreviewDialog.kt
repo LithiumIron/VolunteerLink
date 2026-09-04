@@ -1,5 +1,7 @@
 package com.example.volunteerlink.screens
 
+// Final confirmation dialog. It shows read-only profile evidence before an application is sent.
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll

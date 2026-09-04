@@ -1,5 +1,7 @@
 package com.example.volunteerlink.screens
 
+// Renders a certificate only after the linked role has been verified as completed.
+
 import android.content.Context
 import android.graphics.Paint
 import android.graphics.pdf.PdfDocument

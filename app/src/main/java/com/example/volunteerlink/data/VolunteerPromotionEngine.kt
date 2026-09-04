@@ -1,5 +1,7 @@
 package com.example.volunteerlink.data
 
+// Creates promotion display items from events that are currently relevant to the volunteer.
+
 import com.example.volunteerlink.model.VolunteerOpportunityEvent
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable

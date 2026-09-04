@@ -1,5 +1,7 @@
 package com.example.volunteerlink.navigation
 
+// Owns navigation between Volunteer Home, event details, roles, applications and certificates.
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement

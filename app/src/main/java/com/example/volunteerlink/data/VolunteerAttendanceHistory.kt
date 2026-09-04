@@ -1,5 +1,7 @@
 package com.example.volunteerlink.data
 
+// Converts attendance records into display states for the volunteer history screens.
+
 import com.example.volunteerlink.model.VolunteerOpportunityEvent
 import com.example.volunteerlink.model.VolunteerOpportunityRole
 import java.text.ParsePosition

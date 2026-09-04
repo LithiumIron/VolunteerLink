@@ -1,5 +1,7 @@
 package com.example.volunteerlink.data
 
+// Builds the volunteer dashboard from cached data first, then refreshes it from Supabase.
+
 import android.content.Context
 import com.example.volunteerlink.data.local.CachedVolunteerDashboard
 import com.example.volunteerlink.data.local.VolunteerLocalDatabase
