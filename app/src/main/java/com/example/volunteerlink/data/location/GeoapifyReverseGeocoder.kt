@@ -1,5 +1,20 @@
 package com.example.volunteerlink.data.location
 
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Supports Organisation location handling through the shared Geoapify Reverse Geocoder data-layer component.
+//
+// The file keeps provider/device-specific location details outside Compose and exposes normalized values to the
+// Organisation ViewModels.
+//
+// Location helpers do not publish data by themselves; selected values only become persistent when the owning
+// workflow saves through its repository.
+//
+// Architectural layer: Shared data/support layer.
+// ============================================================================
+
+
 import android.net.Uri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -8,15 +23,49 @@ import kotlinx.serialization.json.Json
 import java.net.HttpURLConnection
 import java.net.URL
 
-// Stores the country, state or region, and city matched from the GPS location.
+/** A GPS fix matched against VolunteerLink's own countryStates dropdown data. */
+/**
+ * DETAILED DECLARATION — GeoapifyLocationMatch
+ *
+ * Domain/UI type for Geoapify Location Match used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class GeoapifyLocationMatch(
     val country: String,
     val stateRegion: String,
     val locationName: String
 )
 
+/**
+ * DETAILED DECLARATION — GeoapifyReverseGeocoder
+ *
+ * Single shared instance for Geoapify Reverse Geocoder so related rules/state are defined once for the
+ * application process.
+ */
 object GeoapifyReverseGeocoder {
 
+    /**
+     * Reverse-geocodes lat/lon via Geoapify, then tries to match the result
+     * against [countryStates]. Returns null on any API failure OR when
+     * nothing in the response matches an existing entry — callers must
+     * fall back to manual selection rather than accept an unmatched value.
+     */
+    /**
+     * DETAILED BEHAVIOUR — matchToKnownLocation
+     *
+     * Implements the current VolunteerLink responsibility for match to known location in this support/model
+     * layer.
+     *
+     * Works with structured location suggestions/coordinates so free-text search is separated from the final
+     * location fields saved with the post/plan.
+     *
+     * Runs blocking file/network-oriented work off the main UI thread to avoid freezing Compose interactions.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     suspend fun matchToKnownLocation(
         apiKey: String,
         latitude: Double,
@@ -24,7 +73,6 @@ object GeoapifyReverseGeocoder {
         countryStates: Map<String, Map<String, List<String>>>
     ): GeoapifyLocationMatch? = withContext(Dispatchers.IO) {
         try {
-            // Builds the Geoapify reverse-geocoding API URL using the GPS coordinates.
             val url = URL(
                 "https://api.geoapify.com/v1/geocode/reverse" +
                         "?lat=$latitude&lon=$longitude&apiKey=${Uri.encode(apiKey)}"
@@ -35,7 +83,6 @@ object GeoapifyReverseGeocoder {
             connection.connectTimeout = 10_000
             connection.readTimeout = 10_000
 
-            // Stores the API response body after a successful request.
             val body = try {
                 if (connection.responseCode !in 200..299) return@withContext null
                 connection.inputStream.bufferedReader().use { it.readText() }
@@ -43,11 +90,9 @@ object GeoapifyReverseGeocoder {
                 connection.disconnect()
             }
 
-            // Converts the JSON response into a Geoapify response object.
             val parsed = Json { ignoreUnknownKeys = true }
                 .decodeFromString<GeoapifyReverseResponse>(body)
 
-            // Retrieves the first location feature from the API response.
             val properties = parsed.features.firstOrNull()?.properties
                 ?: return@withContext null
 
@@ -58,11 +103,18 @@ object GeoapifyReverseGeocoder {
         }
     }
 
+    /**
+     * DETAILED BEHAVIOUR — matchProperties
+     *
+     * Implements the current VolunteerLink responsibility for match properties in this support/model layer.
+     *
+     * Works with structured location suggestions/coordinates so free-text search is separated from the final
+     * location fields saved with the post/plan.
+     */
     private fun matchProperties(
         properties: GeoapifyProperties,
         countryStates: Map<String, Map<String, List<String>>>
     ): GeoapifyLocationMatch? {
-        // Collects possible city or area names returned by Geoapify.
         val candidateCities = listOfNotNull(
             properties.city, properties.county, properties.suburb, properties.district
         )
@@ -89,16 +141,37 @@ object GeoapifyReverseGeocoder {
     }
 }
 
-// Stores the list of reverse-geocoding features returned by Geoapify
 @Serializable
+/**
+ * DETAILED DECLARATION — GeoapifyReverseResponse
+ *
+ * Domain/UI type for Geoapify Reverse Response used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 private data class GeoapifyReverseResponse(val features: List<GeoapifyFeature> = emptyList())
 
-// Stores the location properties returned for a Geoapify result.
 @Serializable
+/**
+ * DETAILED DECLARATION — GeoapifyFeature
+ *
+ * Domain/UI type for Geoapify Feature used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 private data class GeoapifyFeature(val properties: GeoapifyProperties)
 
-// Stores the country, state and possible city names returned by Geoapify.
 @Serializable
+/**
+ * DETAILED DECLARATION — GeoapifyProperties
+ *
+ * Domain/UI type for Geoapify Properties used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 private data class GeoapifyProperties(
     val country: String? = null,
     val state: String? = null,

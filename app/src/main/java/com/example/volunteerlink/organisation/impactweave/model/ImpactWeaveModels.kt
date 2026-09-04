@@ -1,19 +1,37 @@
 package com.example.volunteerlink.organisation.impactweave.model
 
-// FILE OVERVIEW:
-/*
- * ImpactWeaveModels groups the data structures used by the organisation Impact Weave and partnership flow.
- * These models make state explicit and allow the UI, ViewModel and repository layers to exchange
- * strongly typed values instead of passing unrelated parameters throughout the feature.
- */
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Defines the typed models used throughout Impact Weave planning, matching, invitations, contributions and
+// conversion.
+//
+// These types distinguish requested needs, candidate provider support, confirmed contribution state and plan
+// lifecycle rather than storing partnership business structures in untyped UI maps.
+//
+// Supabase remains authoritative once a plan is persisted; these models are the Android representation of that
+// normalized state.
+//
+// Architectural layer: Domain/UI model layer.
+// ============================================================================
 
 
 import com.example.volunteerlink.data.location.LocationSuggestion
 import com.example.volunteerlink.organisation.create.model.VolunteerPostCategory
+import kotlinx.serialization.Serializable
 
 /**
  * Lists the supported values represented by impact weave mode.
  * It keeps related Impact Weave and partnership values together so callers do not pass disconnected fields around.
+ */
+@Serializable
+/**
+ * DETAILED DECLARATION — ImpactWeaveMode
+ *
+ * Domain/UI type for Impact Weave Mode used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
  */
 enum class ImpactWeaveMode(
     val displayName: String,
@@ -33,6 +51,15 @@ enum class ImpactWeaveMode(
  * Lists the supported values represented by impact weave duration.
  * It keeps related Impact Weave and partnership values together so callers do not pass disconnected fields around.
  */
+@Serializable
+/**
+ * DETAILED DECLARATION — ImpactWeaveDuration
+ *
+ * Domain/UI type for Impact Weave Duration used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 enum class ImpactWeaveDuration(
     val displayName: String
 ) {
@@ -43,6 +70,15 @@ enum class ImpactWeaveDuration(
 /**
  * Lists the supported values represented by impact weave page.
  * It keeps related Impact Weave and partnership values together so callers do not pass disconnected fields around.
+ */
+@Serializable
+/**
+ * DETAILED DECLARATION — ImpactWeavePage
+ *
+ * Domain/UI type for Impact Weave Page used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
  */
 enum class ImpactWeavePage {
     LIST,
@@ -55,6 +91,16 @@ enum class ImpactWeavePage {
 /**
  * Holds the values represented by impact weave need draft as one strongly typed model.
  * It keeps related Impact Weave and partnership values together so callers do not pass disconnected fields around.
+ */
+@Serializable
+/**
+ * DETAILED DECLARATION — ImpactWeaveNeedDraft
+ *
+ * Represents editable/incomplete user input for Impact Weave Need Draft before it becomes a server-
+ * authoritative record.
+ *
+ * The draft can contain temporarily incomplete values because validation is applied at step transitions and
+ * final persistence boundaries.
  */
 data class ImpactWeaveNeedDraft(
     val needId: Int,
@@ -79,6 +125,16 @@ data class ImpactWeaveNeedDraft(
 /**
  * Holds the values represented by impact weave draft as one strongly typed model.
  * It keeps related Impact Weave and partnership values together so callers do not pass disconnected fields around.
+ */
+@Serializable
+/**
+ * DETAILED DECLARATION — ImpactWeaveDraft
+ *
+ * Represents editable/incomplete user input for Impact Weave Draft before it becomes a server-authoritative
+ * record.
+ *
+ * The draft can contain temporarily incomplete values because validation is applied at step transitions and
+ * final persistence boundaries.
  */
 data class ImpactWeaveDraft(
     val draftId: Int,
@@ -106,6 +162,14 @@ data class ImpactWeaveDraft(
 )
 
 /** A persisted need returned by the matching input RPC. */
+/**
+ * DETAILED DECLARATION — ImpactWeaveDatabaseNeed
+ *
+ * Domain/UI type for Impact Weave Database Need used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class ImpactWeaveDatabaseNeed(
     val needId: String,
     val originalText: String,
@@ -123,6 +187,14 @@ data class ImpactWeaveDatabaseNeed(
 }
 
 /** A real support record provided by another organisation. */
+/**
+ * DETAILED DECLARATION — ImpactWeaveSupportCandidate
+ *
+ * Domain/UI type for Impact Weave Support Candidate used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class ImpactWeaveSupportCandidate(
     val supportId: String,
     val organisationId: String,
@@ -143,6 +215,14 @@ data class ImpactWeaveSupportCandidate(
  * Holds the values represented by impact weave matching input as one strongly typed model.
  * It keeps related Impact Weave and partnership values together so callers do not pass disconnected fields around.
  */
+/**
+ * DETAILED DECLARATION — ImpactWeaveMatchingInput
+ *
+ * Domain/UI type for Impact Weave Matching Input used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class ImpactWeaveMatchingInput(
     val needs: List<ImpactWeaveDatabaseNeed>,
     val candidates: List<ImpactWeaveSupportCandidate>
@@ -151,6 +231,14 @@ data class ImpactWeaveMatchingInput(
 /**
  * Holds the values represented by impact weave need match result as one strongly typed model.
  * It keeps related Impact Weave and partnership values together so callers do not pass disconnected fields around.
+ */
+/**
+ * DETAILED DECLARATION — ImpactWeaveNeedMatchResult
+ *
+ * Domain/UI type for Impact Weave Need Match Result used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
  */
 data class ImpactWeaveNeedMatchResult(
     val need: ImpactWeaveDatabaseNeed,
@@ -167,6 +255,14 @@ data class ImpactWeaveNeedMatchResult(
  * Holds the values represented by impact weave match results as one strongly typed model.
  * It keeps related Impact Weave and partnership values together so callers do not pass disconnected fields around.
  */
+/**
+ * DETAILED DECLARATION — ImpactWeaveMatchResults
+ *
+ * Domain/UI type for Impact Weave Match Results used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class ImpactWeaveMatchResults(
     val draftId: String,
     val needResults: List<ImpactWeaveNeedMatchResult>,
@@ -181,6 +277,14 @@ data class ImpactWeaveMatchResults(
 /**
  * Holds the values represented by impact weave active plan as one strongly typed model.
  * It keeps related Impact Weave and partnership values together so callers do not pass disconnected fields around.
+ */
+/**
+ * DETAILED DECLARATION — ImpactWeaveActivePlan
+ *
+ * Domain/UI type for Impact Weave Active Plan used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
  */
 data class ImpactWeaveActivePlan(
     val draftId: String,
@@ -204,6 +308,14 @@ data class ImpactWeaveActivePlan(
  * Holds the values represented by impact weave partnership item state as one strongly typed model.
  * It keeps related Impact Weave and partnership values together so callers do not pass disconnected fields around.
  */
+/**
+ * DETAILED DECLARATION — ImpactWeavePartnershipItemState
+ *
+ * Domain/UI type for Impact Weave Partnership Item State used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class ImpactWeavePartnershipItemState(
     val needId: String,
     val supportId: String?,
@@ -218,6 +330,14 @@ data class ImpactWeavePartnershipItemState(
  * Holds the values represented by impact weave partnership state as one strongly typed model.
  * It keeps related Impact Weave and partnership values together so callers do not pass disconnected fields around.
  */
+/**
+ * DETAILED DECLARATION — ImpactWeavePartnershipState
+ *
+ * Domain/UI type for Impact Weave Partnership State used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class ImpactWeavePartnershipState(
     val invitationId: String,
     val organisationId: String,
@@ -230,6 +350,14 @@ data class ImpactWeavePartnershipState(
 /**
  * Holds the values represented by impact weave ui state as one strongly typed model.
  * It keeps related Impact Weave and partnership values together so callers do not pass disconnected fields around.
+ */
+/**
+ * DETAILED DECLARATION — ImpactWeaveUiState
+ *
+ * Immutable snapshot of all UI-visible state required by Impact Weave Ui State.
+ *
+ * Keeping loading/data/error/action flags together makes recomposition deterministic and avoids hidden mutable
+ * state in individual composables.
  */
 data class ImpactWeaveUiState(
     val page: ImpactWeavePage = ImpactWeavePage.LIST,
@@ -255,6 +383,14 @@ data class ImpactWeaveUiState(
  * Holds the values represented by impact weave post prefill as one strongly typed model.
  * It keeps related Impact Weave and partnership values together so callers do not pass disconnected fields around.
  */
+/**
+ * DETAILED DECLARATION — ImpactWeavePostPrefill
+ *
+ * Domain/UI type for Impact Weave Post Prefill used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class ImpactWeavePostPrefill(
     val draftId: String,
     val category: VolunteerPostCategory,
@@ -272,6 +408,14 @@ data class ImpactWeavePostPrefill(
 /**
  * Holds the values represented by impact weave post partner as one strongly typed model.
  * It keeps related Impact Weave and partnership values together so callers do not pass disconnected fields around.
+ */
+/**
+ * DETAILED DECLARATION — ImpactWeavePostPartner
+ *
+ * Domain/UI type for Impact Weave Post Partner used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
  */
 data class ImpactWeavePostPartner(
     val organisationName: String,

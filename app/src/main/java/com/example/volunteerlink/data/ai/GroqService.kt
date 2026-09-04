@@ -1,5 +1,22 @@
 package com.example.volunteerlink.data.ai
 
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Contains the semantic-analysis service used internally by Impact Weave to rank compatibility between real
+// organisation support records and requested needs.
+//
+// The service receives only candidate/support data already returned by VolunteerLink's eligible-partner backend
+// and produces a compatibility classification; it does not create organisations, quantities, capacities or
+// partnership records.
+//
+// Factual eligibility and persisted partnership state remain controlled by Supabase. The AI result is a
+// ranking/interpretation layer, not the source of database truth.
+//
+// Architectural layer: Shared data/support layer.
+// ============================================================================
+
+
 import com.example.volunteerlink.BuildConfig
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.android.Android
@@ -13,6 +30,14 @@ import io.ktor.http.contentType
 import org.json.JSONArray
 import org.json.JSONObject
 
+/**
+ * DETAILED DECLARATION — OrganisationSupportAnalysis
+ *
+ * Domain/UI type for Organisation Support Analysis used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class OrganisationSupportAnalysis(
     val isValid: Boolean,
     val supportType: String?,
@@ -23,6 +48,14 @@ data class OrganisationSupportAnalysis(
 )
 
 
+/**
+ * DETAILED DECLARATION — GroqImpactWeaveNeed
+ *
+ * Domain/UI type for Groq Impact Weave Need used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class GroqImpactWeaveNeed(
     val needId: String,
     val supportType: String,
@@ -30,6 +63,14 @@ data class GroqImpactWeaveNeed(
     val originalText: String
 )
 
+/**
+ * DETAILED DECLARATION — GroqImpactWeaveCandidate
+ *
+ * Domain/UI type for Groq Impact Weave Candidate used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class GroqImpactWeaveCandidate(
     val supportId: String,
     val supportType: String,
@@ -37,18 +78,40 @@ data class GroqImpactWeaveCandidate(
     val supportDescription: String
 )
 
+/**
+ * DETAILED DECLARATION — ImpactWeaveSemanticMatch
+ *
+ * Domain/UI type for Impact Weave Semantic Match used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class ImpactWeaveSemanticMatch(
     val needId: String,
     val supportId: String,
     val level: String
 )
 
+/**
+ * DETAILED DECLARATION — GroqService
+ *
+ * Domain/UI type for Groq Service used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 class GroqService {
 
     private val client = HttpClient(Android) {
         expectSuccess = true
     }
 
+    /**
+     * DETAILED BEHAVIOUR — analyseOrganisationSupport
+     *
+     * Implements the current VolunteerLink responsibility for analyse organisation support in this
+     * support/model layer.
+     */
     suspend fun analyseOrganisationSupport(text: String): OrganisationSupportAnalysis {
         val systemPrompt = """
             You classify ONE physical partnership resource that an organisation CAN PROVIDE for VolunteerLink Impact Weave.
@@ -110,6 +173,12 @@ class GroqService {
         return requestAnalysis(text, systemPrompt)
     }
 
+    /**
+     * DETAILED BEHAVIOUR — analyseImpactWeaveNeed
+     *
+     * Implements the current VolunteerLink responsibility for analyse impact weave need in this support/model
+     * layer.
+     */
     suspend fun analyseImpactWeaveNeed(text: String): OrganisationSupportAnalysis {
         val systemPrompt = """
             You classify ONE physical partnership resource that an organisation NEEDS for VolunteerLink Impact Weave.
@@ -173,6 +242,15 @@ class GroqService {
     /**
      * Semantic classification only. Quantity/capacity and geography stay deterministic in
      * the app/database so Groq cannot invent availability or locations.
+     */
+    /**
+     * DETAILED BEHAVIOUR — rankImpactWeaveCandidates
+     *
+     * Implements the current VolunteerLink responsibility for rank impact weave candidates in this
+     * support/model layer.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
      */
     suspend fun rankImpactWeaveCandidates(
         needs: List<GroqImpactWeaveNeed>,
@@ -248,6 +326,12 @@ class GroqService {
             }
     }
 
+    /**
+     * DETAILED BEHAVIOUR — classifyImpactWeaveCandidatesOnce
+     *
+     * Implements the current VolunteerLink responsibility for classify impact weave candidates once in this
+     * support/model layer.
+     */
     private suspend fun classifyImpactWeaveCandidatesOnce(
         needs: List<GroqImpactWeaveNeed>,
         candidates: List<GroqImpactWeaveCandidate>,
@@ -386,10 +470,21 @@ class GroqService {
         return result.distinctBy { Triple(it.needId, it.supportId, it.level) }
     }
 
+    /**
+     * DETAILED BEHAVIOUR — isClearDirectResourceMatch
+     *
+     * Implements the current VolunteerLink responsibility for is clear direct resource match in this
+     * support/model layer.
+     */
     private fun isClearDirectResourceMatch(
         needName: String,
         candidateName: String
     ): Boolean {
+        /**
+         * DETAILED BEHAVIOUR — tokens
+         *
+         * Implements the current VolunteerLink responsibility for tokens in this support/model layer.
+         */
         fun tokens(value: String): Set<String> = value
             .lowercase()
             .split(Regex("[^a-z0-9]+"))
@@ -406,6 +501,11 @@ class GroqService {
         return needTokens == candidateTokens || candidateTokens.containsAll(needTokens)
     }
 
+    /**
+     * DETAILED BEHAVIOUR — requestAnalysis
+     *
+     * Implements the current VolunteerLink responsibility for request analysis in this support/model layer.
+     */
     private suspend fun requestAnalysis(
         text: String,
         systemPrompt: String
@@ -466,6 +566,11 @@ class GroqService {
         return validateAnalysis(JSONObject(content))
     }
 
+    /**
+     * DETAILED BEHAVIOUR — validateAnalysis
+     *
+     * Implements the current VolunteerLink responsibility for validate analysis in this support/model layer.
+     */
     private fun validateAnalysis(json: JSONObject): OrganisationSupportAnalysis {
         val isValid = json.optBoolean("valid", false)
         val supportType = json.optString("support_type")
@@ -506,6 +611,11 @@ class GroqService {
         )
     }
 
+    /**
+     * DETAILED BEHAVIOUR — invalidAnalysis
+     *
+     * Implements the current VolunteerLink responsibility for invalid analysis in this support/model layer.
+     */
     private fun invalidAnalysis(reason: String) = OrganisationSupportAnalysis(
         isValid = false,
         supportType = null,
@@ -515,6 +625,11 @@ class GroqService {
         reason = reason
     )
 
+    /**
+     * DETAILED BEHAVIOUR — positiveIntOrNull
+     *
+     * Implements the current VolunteerLink responsibility for positive int or null in this support/model layer.
+     */
     private fun JSONObject.positiveIntOrNull(key: String): Int? {
         if (!has(key) || isNull(key)) return null
         return optInt(key, -1).takeIf { it > 0 }

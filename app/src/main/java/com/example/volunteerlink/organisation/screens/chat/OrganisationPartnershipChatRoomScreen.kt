@@ -1,5 +1,20 @@
 package com.example.volunteerlink.organisation.screens.chat
 
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Implements Organisation chat presentation/interaction associated with Organisation Partnership Chat Room Screen.
+//
+// The screen/component renders shared chat models and emits repository-facing actions through callbacks or
+// coroutine calls rather than editing database tables directly.
+//
+// Sent messages, membership and read state remain Supabase-authoritative; only unsent text may be kept in account-
+// scoped local storage as a convenience.
+//
+// Architectural layer: Compose presentation layer.
+// ============================================================================
+
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -53,6 +68,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.volunteerlink.organisation.data.OrganisationLocalStorage
 import com.example.volunteerlink.organisation.repository.PartnershipChat
 import com.example.volunteerlink.organisation.repository.PartnershipChatMessage
 import com.example.volunteerlink.organisation.repository.PartnershipInvitationItem
@@ -63,12 +79,31 @@ import com.example.volunteerlink.ui.theme.BubbleGreen
 import com.example.volunteerlink.ui.theme.CardBeige
 import com.example.volunteerlink.ui.theme.DeepGreen
 import com.example.volunteerlink.ui.theme.TextMuted
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — OrganisationPartnershipChatRoomScreen
+ *
+ * Renders the Organisation Partnership Chat Room screen from state supplied by the owning ViewModel/repository-
+ * facing coordinator.
+ *
+ * The composable maps state to Material3 UI and emits callbacks; it does not become the source of truth for
+ * persisted VolunteerLink data.
+ *
+ * Coordinates account-scoped local persistence only for recoverable/cached UI state; published or transactional
+ * business state continues to come from Supabase.
+ *
+ * Runs asynchronous work in a lifecycle-aware coroutine and exposes progress/error state rather than blocking
+ * the UI thread.
+ *
+ * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without leaving
+ * the UI in an assumed-success state.
+ */
 fun OrganisationPartnershipChatRoomScreen(
     conversationId: String,
     onBack: () -> Unit
@@ -76,7 +111,8 @@ fun OrganisationPartnershipChatRoomScreen(
     var chat by remember { mutableStateOf<PartnershipChat?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    var draft by remember { mutableStateOf("") }
+    var draft by remember(conversationId) { mutableStateOf("") }
+    var localDraftRestored by remember(conversationId) { mutableStateOf(false) }
     var isSending by remember { mutableStateOf(false) }
     var respondingInvitationId by remember { mutableStateOf<String?>(null) }
     var responseNotice by remember { mutableStateOf<String?>(null) }
@@ -85,6 +121,32 @@ fun OrganisationPartnershipChatRoomScreen(
     var refreshVersion by remember { mutableIntStateOf(0) }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
+
+    // Partnership messages themselves are server-authoritative. Local storage
+    // only protects text that has not been sent yet, scoped to this conversation.
+    LaunchedEffect(conversationId) {
+        draft = runCatching {
+            OrganisationLocalStorage.loadTextDraft(
+                draftType = "partnership_chat",
+                conversationId = conversationId
+            )
+        }.getOrDefault("")
+        localDraftRestored = true
+    }
+
+    // Debounced compose-box autosave. When send succeeds and draft becomes blank,
+    // saveTextDraft() deletes the tiny local file automatically.
+    LaunchedEffect(conversationId, draft, localDraftRestored) {
+        if (!localDraftRestored) return@LaunchedEffect
+        delay(350)
+        runCatching {
+            OrganisationLocalStorage.saveTextDraft(
+                draftType = "partnership_chat",
+                conversationId = conversationId,
+                text = draft
+            )
+        }
+    }
 
     val respondToInvitation: (String, Int, String) -> Unit = { invitationId, revision, action ->
         if (respondingInvitationId == null) {
@@ -411,6 +473,14 @@ fun OrganisationPartnershipChatRoomScreen(
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — PartnershipChatHeader
+ *
+ * Renders the reusable Partnership Chat Header portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun PartnershipChatHeader(
     chat: PartnershipChat?,
     onBack: () -> Unit
@@ -469,6 +539,14 @@ private fun PartnershipChatHeader(
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — PartnershipMessageRow
+ *
+ * Renders the reusable Partnership Message Row portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun PartnershipMessageRow(
     message: PartnershipChatMessage,
     currentUserId: String,
@@ -496,6 +574,14 @@ private fun PartnershipMessageRow(
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — PartnershipTextMessageBubble
+ *
+ * Handles the Compose/UI responsibility for partnership text message bubble.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun PartnershipTextMessageBubble(
     message: PartnershipChatMessage,
     isMe: Boolean
@@ -553,6 +639,14 @@ private fun PartnershipTextMessageBubble(
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — PartnershipInvitationMessageCard
+ *
+ * Renders the reusable Partnership Invitation Message Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun PartnershipInvitationMessageCard(
     message: PartnershipChatMessage,
     chat: PartnershipChat,
@@ -813,6 +907,14 @@ private fun PartnershipInvitationMessageCard(
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — PartnershipActivitySummary
+ *
+ * Renders the reusable Partnership Activity Summary portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun PartnershipActivitySummary(
     chat: PartnershipChat,
     showFullDescription: Boolean,
@@ -878,6 +980,14 @@ private fun PartnershipActivitySummary(
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — PartnershipActivityMetaRow
+ *
+ * Renders the reusable Partnership Activity Meta Row portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun PartnershipActivityMetaRow(
     label: String,
     value: String
@@ -908,6 +1018,14 @@ private fun PartnershipActivityMetaRow(
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — PartnershipInvitationItemCard
+ *
+ * Renders the reusable Partnership Invitation Item Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun PartnershipInvitationItemCard(
     item: PartnershipInvitationItem,
     position: Int
@@ -1018,11 +1136,27 @@ private fun PartnershipInvitationItemCard(
     }
 }
 
+/**
+ * DETAILED BEHAVIOUR — readablePartnershipLabel
+ *
+ * Handles the Compose/UI responsibility for readable partnership label.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun readablePartnershipLabel(value: String): String = value
     .lowercase(Locale.ROOT)
     .replace('_', ' ')
     .replaceFirstChar { it.titlecase(Locale.getDefault()) }
 
+/**
+ * DETAILED BEHAVIOUR — partnershipActivitySchedule
+ *
+ * Handles the Compose/UI responsibility for partnership activity schedule.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun partnershipActivitySchedule(chat: PartnershipChat): String {
     val startDate = chat.startDate
     val endDate = chat.endDate
@@ -1031,6 +1165,14 @@ private fun partnershipActivitySchedule(chat: PartnershipChat): String {
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — PartnershipSystemMessage
+ *
+ * Handles the Compose/UI responsibility for partnership system message.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun PartnershipSystemMessage(message: PartnershipChatMessage) {
     Box(
         modifier = Modifier
@@ -1059,6 +1201,14 @@ private fun PartnershipSystemMessage(message: PartnershipChatMessage) {
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — PartnershipChatStatusPill
+ *
+ * Handles the Compose/UI responsibility for partnership chat status pill.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun PartnershipChatStatusPill(status: String) {
     val text = status
         .lowercase(Locale.ROOT)
@@ -1085,6 +1235,14 @@ private fun PartnershipChatStatusPill(status: String) {
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — PartnershipMessageInput
+ *
+ * Handles the Compose/UI responsibility for partnership message input.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun PartnershipMessageInput(
     draft: String,
     isSending: Boolean,
@@ -1128,6 +1286,17 @@ private fun PartnershipMessageInput(
     }
 }
 
+/**
+ * DETAILED BEHAVIOUR — partnershipMessageTime
+ *
+ * Handles the Compose/UI responsibility for partnership message time.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ *
+ * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without leaving
+ * the UI in an assumed-success state.
+ */
 private fun partnershipMessageTime(value: String): String {
     val patterns = listOf(
         "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
@@ -1147,6 +1316,14 @@ private fun partnershipMessageTime(value: String): String {
     return SimpleDateFormat("h:mm a", Locale.getDefault()).format(parsed)
 }
 
+/**
+ * DETAILED BEHAVIOUR — safePartnershipChatError
+ *
+ * Handles the Compose/UI responsibility for safe partnership chat error.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun safePartnershipChatError(raw: String): String {
     val safeHead = raw
         .substringBefore("\nCode:")

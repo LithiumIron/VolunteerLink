@@ -1,6 +1,27 @@
 
 package com.example.volunteerlink.data.time
 
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Provides one application-wide business-time source for date-sensitive VolunteerLink rules.
+//
+// When app_test_clock.APP enables test time, nowMillis returns the frozen Supabase test timestamp; otherwise it
+// returns the device/system time.
+//
+// The last successfully loaded clock choice is cached in SharedPreferences so a temporary offline restart does not
+// silently switch the business date during testing.
+//
+// Create Post timing checks, application windows, Manage status and other business-date calculations should read
+// AppClock rather than calling System.currentTimeMillis directly.
+//
+// The database has a matching volunteer_app_now() concept so client and server can evaluate the same test
+// scenario.
+//
+// Architectural layer: Shared data/support layer.
+// ============================================================================
+
+
 import android.content.Context
 import android.util.Log
 import com.example.volunteerlink.data.supabase
@@ -23,6 +44,11 @@ import java.util.Locale
  * SimpleDateFormat code then automatically interprets those milliseconds using the
  * phone's local time zone.
  */
+/**
+ * DETAILED DECLARATION — AppClock
+ *
+ * Single shared instance for App Clock so related rules/state are defined once for the application process.
+ */
 object AppClock {
 
     private const val CLOCK_NAME = "APP"
@@ -41,6 +67,11 @@ object AppClock {
      * Restores the last successfully downloaded clock before Compose starts.
      * Offline mode therefore uses the same date as the cached dashboard instead
      * of silently changing to the phone clock after every process restart.
+     */
+    /**
+     * DETAILED BEHAVIOUR — initialise
+     *
+     * Implements the current VolunteerLink responsibility for initialise in this support/model layer.
      */
     fun initialise(context: Context) {
         applicationContext = context.applicationContext
@@ -64,6 +95,13 @@ object AppClock {
      * Returns the time the rest of the app should treat as "now".
      * Test time is intentionally frozen so date-dependent behaviour is easy to preview.
      */
+    /**
+     * DETAILED BEHAVIOUR — nowMillis
+     *
+     * Implements the current VolunteerLink responsibility for now millis in this support/model layer.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun nowMillis(): Long {
         val current = _state.value
         return if (current.useTestTime && current.testTimeMillis != null) {
@@ -74,6 +112,13 @@ object AppClock {
     }
 
     /** True only when a usable database test time is currently active. */
+    /**
+     * DETAILED BEHAVIOUR — isUsingTestTime
+     *
+     * Implements the current VolunteerLink responsibility for is using test time in this support/model layer.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun isUsingTestTime(): Boolean {
         val current = _state.value
         return current.useTestTime && current.testTimeMillis != null
@@ -88,9 +133,25 @@ object AppClock {
      *
      * Any database/network problem safely falls back to the phone's real time.
      */
+    /**
+     * DETAILED BEHAVIOUR — refreshFromDatabase
+     *
+     * Implements the current VolunteerLink responsibility for refresh from database in this support/model
+     * layer.
+     *
+     * Reads/maps Supabase table data from `app_test_clock` (the single shared application test-clock row used
+     * to control VolunteerLink business time during testing).
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     suspend fun refreshFromDatabase() {
         try {
             val row = supabase
+                // SUPABASE TABLE: app_test_clock — the single shared application test-clock row used to control VolunteerLink business time during testing.
+                // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
                 .from("app_test_clock")
                 .select {
                     filter {
@@ -159,6 +220,16 @@ object AppClock {
      * refreshVersion is incremented even when test mode is OFF so screens that
      * depend on "today" can recalculate after the app resumes.
      */
+    /**
+     * DETAILED BEHAVIOUR — updateState
+     *
+     * Implements the current VolunteerLink responsibility for update state in this support/model layer.
+     *
+     * Uses AppClock for business-date/time decisions so the same code works with the project test clock and
+     * normal device time.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     private fun updateState(
         useTestTime: Boolean,
         testTimeMillis: Long?,
@@ -195,6 +266,15 @@ object AppClock {
      * Fractional seconds can contain more than three digits, so trim them to
      * milliseconds before SimpleDateFormat parses the value.
      */
+    /**
+     * DETAILED BEHAVIOUR — parseSupabaseTimestamp
+     *
+     * Implements the current VolunteerLink responsibility for parse supabase timestamp in this support/model
+     * layer.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     private fun parseSupabaseTimestamp(value: String): Long? {
         val normalized = value.trim()
             .replace(
@@ -218,6 +298,11 @@ object AppClock {
         }
     }
 
+    /**
+     * DETAILED BEHAVIOUR — optionalText
+     *
+     * Implements the current VolunteerLink responsibility for optional text in this support/model layer.
+     */
     private fun JsonObject.optionalText(key: String): String? {
         return this[key]
             ?.jsonPrimitive
@@ -226,6 +311,14 @@ object AppClock {
 }
 
 /** Small observable state so a future debug indicator can show clock mode if needed. */
+/**
+ * DETAILED DECLARATION — AppClockState
+ *
+ * Domain/UI type for App Clock State used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class AppClockState(
     val useTestTime: Boolean = false,
     val testTimeMillis: Long? = null,

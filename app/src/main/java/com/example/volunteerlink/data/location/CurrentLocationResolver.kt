@@ -1,5 +1,21 @@
 package com.example.volunteerlink.data.location
 
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Coordinates the device-location and reverse-geocoding steps needed when an Organisation chooses to use its
+// current location.
+//
+// It keeps Android location permission/provider details out of the screen and returns a structured location result
+// that can be placed into the same Create Post fields used by Geoapify selection.
+//
+// Current location is a convenience input only; it does not bypass validation or become a database write until the
+// organisation saves/publishes the post.
+//
+// Architectural layer: Shared data/support layer.
+// ============================================================================
+
+
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
@@ -10,11 +26,25 @@ import com.example.volunteerlink.BuildConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
+/**
+ * DETAILED DECLARATION — CurrentLocationOutcome
+ *
+ * Domain/UI type for Current Location Outcome used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class CurrentLocationOutcome(
     val match: GeoapifyLocationMatch?,
     val message: String
 )
 
+/**
+ * DETAILED DECLARATION — CurrentLocationResolver
+ *
+ * Single shared instance for Current Location Resolver so related rules/state are defined once for the
+ * application process.
+ */
 object CurrentLocationResolver {
 
     fun hasLocationPermission(context: Context): Boolean =

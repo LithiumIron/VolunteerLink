@@ -1,11 +1,28 @@
 package com.example.volunteerlink.organisation.viewmodel
 
-// FILE OVERVIEW:
-/*
- * CreatePostViewModel coordinates state and user actions for the organisation Create/Edit Post flow.
- * It translates UI events into validation/repository operations and exposes observable state
- * back to Compose so the screen can stay declarative.
- */
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Acts as the main state owner and business coordinator for the five-step Create/Edit Volunteer Post wizard.
+//
+// It supports three important contexts: creating a brand-new post, editing an existing persisted post, and
+// creating a Volunteer Post from an Impact Weave plan.
+//
+// Every field change enters through this ViewModel so dependent values can be revalidated together: post mode
+// affects Physical/Remote sections, date changes affect schedule validity, role changes affect role settings, and
+// review validity depends on all earlier steps.
+//
+// For a brand-new normal post, the ViewModel also coordinates device autosave so unfinished work survives process
+// death without creating a real Supabase DRAFT until the organisation explicitly chooses Save Draft.
+//
+// Repository calls are kept out of Compose. The ViewModel translates UI events into repository operations and
+// exposes loading, validation, success and error state back to the screen.
+//
+// Business time calculations use AppClock so date-sensitive rules behave consistently when the project test clock
+// is enabled.
+//
+// Architectural layer: ViewModel / workflow state layer.
+// ============================================================================
 
 
 import android.content.Context
@@ -31,6 +48,8 @@ import com.example.volunteerlink.organisation.create.model.VolunteerPostCategory
 import com.example.volunteerlink.organisation.create.model.VolunteerPostType
 import com.example.volunteerlink.organisation.create.model.VolunteerRoleLevel
 import com.example.volunteerlink.organisation.create.model.VolunteerRoleMode
+import com.example.volunteerlink.organisation.data.CachedCreatePostAutosave
+import com.example.volunteerlink.organisation.data.OrganisationLocalStorage
 import com.example.volunteerlink.organisation.impactweave.model.ImpactWeaveMode
 import com.example.volunteerlink.organisation.repository.CreatePostRepository
 import com.example.volunteerlink.organisation.repository.ExistingPostEditData
@@ -42,6 +61,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -55,6 +75,15 @@ import java.util.UUID
  * The UI only reads uiState and calls these action functions. This follows the
  * same StateFlow pattern used in the practicals while keeping a larger form in
  * one structured CreatePostDraft object.
+ */
+/**
+ * DETAILED DECLARATION — CreatePostViewModel
+ *
+ * Lifecycle-aware state owner for Create Post View Model. It survives ordinary Compose recomposition and
+ * coordinates asynchronous repository work.
+ *
+ * UI callbacks enter through methods on this class so validation, loading/error state and dependent business
+ * rules remain centralised.
  */
 class CreatePostViewModel : ViewModel() {
 
@@ -75,9 +104,183 @@ class CreatePostViewModel : ViewModel() {
     // not become UI responsibilities.
     private var originalExistingPost: ExistingPostEditData? = null
 
+    // Local autosave is enabled ONLY by the normal Create Post route. Existing
+    // Post Edit and Impact Weave conversion deliberately do not touch this file,
+    // so opening those editors cannot erase an unrelated unfinished new post.
+    private var localAutosaveEnabled = false
+    private var localAutosaveRestoreStarted = false
+    private var lastLocalAutosaveSignature: CachedCreatePostAutosave? = null
+
+    init {
+        // Observe the whole UI state instead of sprinkling file writes across every
+        // updateTitle/updateDate/updateRole/... function. collectLatest gives us a
+        // small debounce: fast typing cancels the previous pending write and only
+        // the latest stable form state reaches internal storage.
+        viewModelScope.launch {
+            _uiState.collectLatest { state ->
+                if (!localAutosaveEnabled) return@collectLatest
+
+                val signature = createLocalAutosave(state)
+                if (signature == lastLocalAutosaveSignature) return@collectLatest
+
+                delay(450)
+                if (!localAutosaveEnabled) return@collectLatest
+
+                // collectLatest should already cancel stale emissions, but read the
+                // current state once more so the file always represents the latest
+                // form rather than a superseded keystroke.
+                val latestState = _uiState.value
+                val latestSignature = createLocalAutosave(latestState)
+                if (latestSignature != signature) return@collectLatest
+
+                runCatching {
+                    if (latestState.draft.hasMeaningfulContent()) {
+                        OrganisationLocalStorage.saveCreatePostAutosave(
+                            latestSignature.copy(
+                                lastSavedAtEpochMillis = System.currentTimeMillis()
+                            )
+                        )
+                    } else {
+                        OrganisationLocalStorage.clearCreatePostAutosave()
+                    }
+                }
+                lastLocalAutosaveSignature = latestSignature
+            }
+        }
+    }
+
+    /**
+     * Called only by the ordinary Organisation > Create route.
+     *
+     * A device autosave is restored only into a fresh New Post editor. Database
+     * drafts are reopened from Manage Posts, while Existing Post Edit and Impact
+     * Weave have their own authoritative Supabase data and must never reuse this
+     * unrelated local form.
+     */
+    /**
+     * DETAILED BEHAVIOUR — prepareNewPostAutosave
+     *
+     * Initialises the device autosave behaviour for a normal brand-new Create Post session.
+     *
+     * It restores a compatible account-scoped autosave when available and then arranges debounced writes as the
+     * draft changes, allowing Android process recreation or app closure without losing the form.
+     *
+     * This local recovery path is deliberately disabled for Existing Post Edit and Impact Weave conversion
+     * because those workflows already have authoritative server identities/state.
+     *
+     * Coordinates account-scoped local persistence only for recoverable/cached UI state; published or
+     * transactional business state continues to come from Supabase.
+     *
+     * Runs asynchronous work in a lifecycle-aware coroutine and exposes progress/error state rather than
+     * blocking the UI thread.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
+    fun prepareNewPostAutosave() {
+        localAutosaveEnabled = true
+        if (localAutosaveRestoreStarted) return
+        localAutosaveRestoreStarted = true
+
+        viewModelScope.launch {
+            val cached = runCatching {
+                OrganisationLocalStorage.loadCreatePostAutosave()
+            }.getOrNull() ?: return@launch
+
+            val current = _uiState.value
+            val isFreshNewPost = !current.isExistingPostEdit &&
+                current.impactWeaveDraftId == null &&
+                !current.isLoadingExistingPost &&
+                !current.isLoadingImpactWeave &&
+                !current.draft.hasMeaningfulContent()
+
+            if (!isFreshNewPost) return@launch
+
+            val restoredStep = cached.currentStep.coerceIn(1, 5)
+            lastLocalAutosaveSignature = cached.copy(lastSavedAtEpochMillis = 0L)
+
+            _uiState.update { state ->
+                state.copy(
+                    draft = cached.draft,
+                    currentStep = restoredStep,
+                    reviewEditStep = cached.reviewEditStep,
+                    activeScheduleSection = cached.activeScheduleSection,
+                    selectedPhysicalScheduleDateMillis = cached.selectedPhysicalScheduleDateMillis,
+                    editingScheduleItemId = cached.editingScheduleItemId,
+                    scheduleEditorDraft = cached.scheduleEditorDraft,
+                    isScheduleEditorOpen = cached.isScheduleEditorOpen &&
+                        cached.scheduleEditorDraft != null,
+                    // Reaching a later wizard page means those earlier stages had
+                    // already passed their validation when the autosave was made.
+                    isStepOneReady = restoredStep >= 2,
+                    isStepTwoReady = restoredStep >= 3,
+                    isStepThreeReady = restoredStep >= 4,
+                    isStepFourReady = restoredStep >= 5,
+                    isPostTypeCommitted = cached.draft.postType != null && restoredStep >= 2
+                )
+            }
+
+            // Role templates are catalogue data, not duplicated in local storage.
+            // Reload them normally so restored ROLE... IDs can be rendered with
+            // the latest names/skills when the organiser resumes Steps 2-5.
+            if (cached.draft.selectedRoles.isNotEmpty() || restoredStep >= 2) {
+                loadRoleCatalogue(forceReload = false)
+            }
+        }
+    }
+
+    /** Builds the stable part of the New Post form that is safe to autosave. */
+    /**
+     * DETAILED BEHAVIOUR — createLocalAutosave
+     *
+     * Implements the ViewModel workflow operation for create local autosave.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
+    private fun createLocalAutosave(state: CreatePostUiState): CachedCreatePostAutosave =
+        CachedCreatePostAutosave(
+            draft = state.draft,
+            currentStep = state.currentStep,
+            reviewEditStep = state.reviewEditStep,
+            activeScheduleSection = state.activeScheduleSection,
+            selectedPhysicalScheduleDateMillis = state.selectedPhysicalScheduleDateMillis,
+            editingScheduleItemId = state.editingScheduleItemId,
+            scheduleEditorDraft = state.scheduleEditorDraft,
+            isScheduleEditorOpen = state.isScheduleEditorOpen,
+            // Keep equality stable while observing changes. The real timestamp is
+            // filled only at the moment the JSON file is written.
+            lastSavedAtEpochMillis = 0L
+        )
+
     /**
      * Loads the impact weave for create needed by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — loadImpactWeaveForCreate
+     *
+     * Loads the server-approved Impact Weave prefill and places those agreed activity values into
+     * CreatePostDraft before the organisation continues through the normal role/schedule/review steps.
+     *
+     * Impact Weave-controlled Physical activity details are marked as non-editable where the partnership
+     * agreement requires them to remain unchanged.
+     *
+     * The operation keeps the Impact Weave draft id in UI state so a successful publish can complete the
+     * conversion and link accepted partners.
+     *
+     * Runs asynchronous work in a lifecycle-aware coroutine and exposes progress/error state rather than
+     * blocking the UI thread.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     *
+     * Maintains the relationship between single-day/multi-day selection and the Physical date range so
+     * downstream schedule validation receives coherent dates.
      */
     fun loadImpactWeaveForCreate(draftId: String) {
         if (_uiState.value.impactWeaveDraftId == draftId ||
@@ -132,6 +335,25 @@ class CreatePostViewModel : ViewModel() {
      * Loads the existing post for edit needed by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — loadExistingPostForEdit
+     *
+     * Hydrates the five-step wizard from a persisted post and switches the ViewModel into ExistingPostEdit mode
+     * while preserving the same post id.
+     *
+     * Repository data includes edit-policy dependencies, allowing the ViewModel to disable fields that could
+     * invalidate existing volunteer applications, participation or submissions.
+     *
+     * A load error is exposed as editor state and does not create a new draft or overwrite the existing post.
+     *
+     * Runs asynchronous work in a lifecycle-aware coroutine and exposes progress/error state rather than
+     * blocking the UI thread.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     fun loadExistingPostForEdit(postId: String) {
         val currentMode = _uiState.value.editorMode
         if (currentMode is CreatePostEditorMode.ExistingPostEdit &&
@@ -179,6 +401,17 @@ class CreatePostViewModel : ViewModel() {
      * Retries the current operation in the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — retryExistingPostLoad
+     *
+     * Loads or refreshes the data required by retry existing post load and writes the result into observable UI
+     * state.
+     *
+     * The coroutine/repository boundary is handled here so Compose only reacts to loading, success and error
+     * state.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun retryExistingPostLoad() {
         val postId = _uiState.value.existingPostId ?: return
         originalExistingPost = null
@@ -189,6 +422,16 @@ class CreatePostViewModel : ViewModel() {
      * Closes or clears the edit restriction message in the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — dismissEditRestrictionMessage
+     *
+     * Implements the ViewModel workflow operation for dismiss edit restriction message.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun dismissEditRestrictionMessage() {
         _uiState.update { it.copy(editRestrictionMessage = null) }
     }
@@ -196,6 +439,16 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Derives the allow edit value used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — allowEdit
+     *
+     * Implements the ViewModel workflow operation for allow edit.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
      */
     private fun allowEdit(allowed: Boolean, message: String): Boolean {
         if (!_uiState.value.isExistingPostEdit || allowed) return true
@@ -207,6 +460,16 @@ class CreatePostViewModel : ViewModel() {
      * Derives the allow impact weave field edit value used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — allowImpactWeaveFieldEdit
+     *
+     * Implements the ViewModel workflow operation for allow impact weave field edit.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     private fun allowImpactWeaveFieldEdit(message: String): Boolean {
         if (_uiState.value.impactWeaveDraftId == null) return true
         _uiState.update { it.copy(editRestrictionMessage = message) }
@@ -216,6 +479,14 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Returns the safe impact weave load error used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — safeImpactWeaveLoadError
+     *
+     * Implements the ViewModel workflow operation for safe impact weave load error.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
      */
     private fun safeImpactWeaveLoadError(raw: String): String = when {
         raw.contains("POST_REQUIRES_7_DAYS", true) ->
@@ -233,12 +504,32 @@ class CreatePostViewModel : ViewModel() {
      * Derives the role policy value used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — rolePolicy
+     *
+     * Implements the ViewModel workflow operation for role policy.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     private fun rolePolicy(roleTemplateId: String) =
         _uiState.value.editPolicy?.rolePolicies?.get(roleTemplateId)
 
     /**
      * Derives the current schedule policy value used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — currentSchedulePolicy
+     *
+     * Implements the ViewModel workflow operation for current schedule policy.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
      */
     private fun currentSchedulePolicy() = _uiState.value.editingScheduleItemId
         ?.let { _uiState.value.editPolicy?.schedulePolicies?.get(it) }
@@ -253,6 +544,17 @@ class CreatePostViewModel : ViewModel() {
      *
      * Shared Step 1 information is never cleared here. If the current mode
      * already contains mode-specific input, the UI asks for confirmation first.
+     */
+    /**
+     * DETAILED BEHAVIOUR — requestPostTypeChange
+     *
+     * Controls workflow/navigation state for request post type change while keeping step transitions and
+     * confirmation rules in one place.
+     *
+     * The screen emits the intent, but the ViewModel decides whether the transition is currently valid for the
+     * draft/post state.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
      */
     fun requestPostTypeChange(type: VolunteerPostType) {
         val currentState = _uiState.value
@@ -295,12 +597,34 @@ class CreatePostViewModel : ViewModel() {
     }
 
     /** Called by the confirmation dialog. */
+    /**
+     * DETAILED BEHAVIOUR — confirmPostTypeChange
+     *
+     * Controls workflow/navigation state for confirm post type change while keeping step transitions and
+     * confirmation rules in one place.
+     *
+     * The screen emits the intent, but the ViewModel decides whether the transition is currently valid for the
+     * draft/post state.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun confirmPostTypeChange() {
         val pendingType = _uiState.value.pendingPostType ?: return
         applyPostTypeChange(pendingType)
     }
 
     /** Keeps the current mode and closes the confirmation dialog. */
+    /**
+     * DETAILED BEHAVIOUR — cancelPostTypeChange
+     *
+     * Controls workflow/navigation state for cancel post type change while keeping step transitions and
+     * confirmation rules in one place.
+     *
+     * The screen emits the intent, but the ViewModel decides whether the transition is currently valid for the
+     * draft/post state.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun cancelPostTypeChange() {
         _uiState.update { current ->
             current.copy(pendingPostType = null)
@@ -310,6 +634,16 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Applies the post type change used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — applyPostTypeChange
+     *
+     * Implements the ViewModel workflow operation for apply post type change.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
      */
     private fun applyPostTypeChange(type: VolunteerPostType) {
         _uiState.update { current ->
@@ -332,6 +666,17 @@ class CreatePostViewModel : ViewModel() {
      * Updates the category used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — updateCategory
+     *
+     * Receives the UI event for changing category and applies it through the ViewModel instead of mutating
+     * Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun updateCategory(category: VolunteerPostCategory) {
         if (!allowImpactWeaveFieldEdit("Impact Weave activity details are final here. Edit them from the Impact Weave plan.")) return
         if (!allowEdit(
@@ -345,6 +690,17 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Updates the title used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — updateTitle
+     *
+     * Receives the UI event for changing title and applies it through the ViewModel instead of mutating Compose
+     * state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
      */
     fun updateTitle(title: String) {
         if (!allowImpactWeaveFieldEdit("Impact Weave activity details are final here. Edit them from the Impact Weave plan.")) return
@@ -360,6 +716,17 @@ class CreatePostViewModel : ViewModel() {
      * Updates the description used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — updateDescription
+     *
+     * Receives the UI event for changing description and applies it through the ViewModel instead of mutating
+     * Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun updateDescription(description: String) {
         if (!allowImpactWeaveFieldEdit("Impact Weave activity details are final here. Edit them from the Impact Weave plan.")) return
         if (!allowEdit(
@@ -374,6 +741,17 @@ class CreatePostViewModel : ViewModel() {
      * Updates the thumbnail uri used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — updateThumbnailUri
+     *
+     * Receives the UI event for changing thumbnail uri and applies it through the ViewModel instead of mutating
+     * Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun updateThumbnailUri(uri: String?) {
         if (!allowEdit(
                 _uiState.value.editPolicy?.canEditSharedPostInfo != false,
@@ -387,6 +765,23 @@ class CreatePostViewModel : ViewModel() {
     // Physical event
     // ---------------------------------------------------------------------
 
+    /**
+     * DETAILED BEHAVIOUR — updateIsMultiDay
+     *
+     * Receives the UI event for changing is multi day and applies it through the ViewModel instead of mutating
+     * Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     *
+     * Maintains the relationship between single-day/multi-day selection and the Physical date range so
+     * downstream schedule validation receives coherent dates.
+     */
     fun updateIsMultiDay(isMultiDay: Boolean) {
         if (!allowImpactWeaveFieldEdit("The agreed Impact Weave schedule is final and cannot be changed in Create Post.")) return
         if (!allowEdit(
@@ -421,6 +816,23 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Updates the physical start date used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — updatePhysicalStartDate
+     *
+     * Receives the UI event for changing physical start date and applies it through the ViewModel instead of
+     * mutating Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     *
+     * Maintains the relationship between single-day/multi-day selection and the Physical date range so
+     * downstream schedule validation receives coherent dates.
      */
     fun updatePhysicalStartDate(dateMillis: Long) {
         if (!allowImpactWeaveFieldEdit("The agreed Impact Weave schedule is final and cannot be changed in Create Post.")) return
@@ -460,6 +872,20 @@ class CreatePostViewModel : ViewModel() {
      * Updates the physical end date used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — updatePhysicalEndDate
+     *
+     * Receives the UI event for changing physical end date and applies it through the ViewModel instead of
+     * mutating Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun updatePhysicalEndDate(dateMillis: Long) {
         if (!allowImpactWeaveFieldEdit("The agreed Impact Weave schedule is final and cannot be changed in Create Post.")) return
         if (!allowEdit(
@@ -478,6 +904,17 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Updates the physical start time used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — updatePhysicalStartTime
+     *
+     * Receives the UI event for changing physical start time and applies it through the ViewModel instead of
+     * mutating Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
      */
     fun updatePhysicalStartTime(hour: Int, minute: Int) {
         if (!allowImpactWeaveFieldEdit("The agreed Impact Weave schedule is final and cannot be changed in Create Post.")) return
@@ -501,6 +938,20 @@ class CreatePostViewModel : ViewModel() {
 
     /**
      * Returns an error for the time dialog. Invalid end times are not saved.
+     */
+    /**
+     * DETAILED BEHAVIOUR — updatePhysicalEndTime
+     *
+     * Receives the UI event for changing physical end time and applies it through the ViewModel instead of
+     * mutating Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
      */
     fun updatePhysicalEndTime(hour: Int, minute: Int): String? {
         if (!allowImpactWeaveFieldEdit("The agreed Impact Weave schedule is final and cannot be changed in Create Post.")) {
@@ -544,6 +995,16 @@ class CreatePostViewModel : ViewModel() {
      * Clears the physical time error for the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — clearPhysicalTimeError
+     *
+     * Implements the ViewModel workflow operation for clear physical time error.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun clearPhysicalTimeError() {
         _uiState.update { it.copy(physicalTimeError = null) }
     }
@@ -551,6 +1012,17 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Updates the meeting point used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — updateMeetingPoint
+     *
+     * Receives the UI event for changing meeting point and applies it through the ViewModel instead of mutating
+     * Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
      */
     fun updateMeetingPoint(text: String) {
         if (!allowEdit(
@@ -564,6 +1036,17 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Updates the physical volunteer capacity used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — updatePhysicalVolunteerCapacity
+     *
+     * Receives the UI event for changing physical volunteer capacity and applies it through the ViewModel
+     * instead of mutating Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
      */
     fun updatePhysicalVolunteerCapacity(text: String) {
         if (!allowEdit(
@@ -582,6 +1065,15 @@ class CreatePostViewModel : ViewModel() {
     // Geoapify location
     // ---------------------------------------------------------------------
 
+    /**
+     * DETAILED BEHAVIOUR — updateLocationSearchBias
+     *
+     * Receives the UI event for changing location search bias and applies it through the ViewModel instead of
+     * mutating Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     */
     fun updateLocationSearchBias(latitude: Double, longitude: Double) {
         locationBiasLatitude = latitude
         locationBiasLongitude = longitude
@@ -590,6 +1082,26 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Handles the location query changed event for the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — onLocationQueryChanged
+     *
+     * Receives the UI event for changing location query changed and applies it through the ViewModel instead of
+     * mutating Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Works with structured location suggestions/coordinates so free-text search is separated from the final
+     * location fields saved with the post/plan.
+     *
+     * Runs asynchronous work in a lifecycle-aware coroutine and exposes progress/error state rather than
+     * blocking the UI thread.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
      */
     fun onLocationQueryChanged(query: String) {
         if (!allowImpactWeaveFieldEdit("The confirmed partnership venue is locked for this post.")) return
@@ -687,6 +1199,20 @@ class CreatePostViewModel : ViewModel() {
      * Handles the location selected event for the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — onLocationSelected
+     *
+     * Receives the UI event for changing location selected and applies it through the ViewModel instead of
+     * mutating Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Works with structured location suggestions/coordinates so free-text search is separated from the final
+     * location fields saved with the post/plan.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun onLocationSelected(location: LocationSuggestion) {
         if (!allowImpactWeaveFieldEdit("The confirmed partnership venue is locked for this post.")) return
         if (!allowEdit(
@@ -718,6 +1244,16 @@ class CreatePostViewModel : ViewModel() {
      * Clears the location for the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — clearLocation
+     *
+     * Implements the ViewModel workflow operation for clear location.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun clearLocation() {
         if (!allowImpactWeaveFieldEdit("The confirmed partnership venue is locked for this post.")) return
         if (!allowEdit(
@@ -747,6 +1283,20 @@ class CreatePostViewModel : ViewModel() {
     // Remote project
     // ---------------------------------------------------------------------
 
+    /**
+     * DETAILED BEHAVIOUR — updateRemoteStartDate
+     *
+     * Receives the UI event for changing remote start date and applies it through the ViewModel instead of
+     * mutating Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun updateRemoteStartDate(dateMillis: Long) {
         if (!allowEdit(
                 _uiState.value.editPolicy?.canEditRemoteStart != false,
@@ -781,6 +1331,20 @@ class CreatePostViewModel : ViewModel() {
      * Updates the remote due date used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — updateRemoteDueDate
+     *
+     * Receives the UI event for changing remote due date and applies it through the ViewModel instead of
+     * mutating Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun updateRemoteDueDate(dateMillis: Long) {
         val policy = _uiState.value.editPolicy
         if (!allowEdit(
@@ -809,6 +1373,17 @@ class CreatePostViewModel : ViewModel() {
      * Updates the remote volunteer capacity used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — updateRemoteVolunteerCapacity
+     *
+     * Receives the UI event for changing remote volunteer capacity and applies it through the ViewModel instead
+     * of mutating Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun updateRemoteVolunteerCapacity(text: String) {
         if (!allowEdit(
                 _uiState.value.editPolicy?.canEditRemoteCapacity != false,
@@ -826,6 +1401,17 @@ class CreatePostViewModel : ViewModel() {
      * Updates the remote submission mode used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — updateRemoteSubmissionMode
+     *
+     * Receives the UI event for changing remote submission mode and applies it through the ViewModel instead of
+     * mutating Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun updateRemoteSubmissionMode(mode: RemoteSubmissionMode) {
         if (!allowEdit(
                 _uiState.value.editPolicy?.canEditRemoteSubmissionSetup != false,
@@ -840,6 +1426,17 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Updates the shared deliverable used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — updateSharedDeliverable
+     *
+     * Receives the UI event for changing shared deliverable and applies it through the ViewModel instead of
+     * mutating Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
      */
     fun updateSharedDeliverable(text: String) {
         if (!allowEdit(
@@ -856,6 +1453,17 @@ class CreatePostViewModel : ViewModel() {
     // Hybrid capacities
     // ---------------------------------------------------------------------
 
+    /**
+     * DETAILED BEHAVIOUR — updateHybridPhysicalVolunteerCapacity
+     *
+     * Receives the UI event for changing hybrid physical volunteer capacity and applies it through the
+     * ViewModel instead of mutating Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun updateHybridPhysicalVolunteerCapacity(text: String) {
         if (!allowEdit(
                 _uiState.value.editPolicy?.canEditPhysicalCapacity != false,
@@ -872,6 +1480,17 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Updates the hybrid remote volunteer capacity used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — updateHybridRemoteVolunteerCapacity
+     *
+     * Receives the UI event for changing hybrid remote volunteer capacity and applies it through the ViewModel
+     * instead of mutating Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
      */
     fun updateHybridRemoteVolunteerCapacity(text: String) {
         if (!allowEdit(
@@ -894,6 +1513,20 @@ class CreatePostViewModel : ViewModel() {
      * Moves from the validated Step 1 form to role selection.
      * Catalogue data is loaded from Supabase only when it is not already kept
      * in this ViewModel.
+     */
+    /**
+     * DETAILED BEHAVIOUR — openStepTwo
+     *
+     * Controls workflow/navigation state for open step two while keeping step transitions and confirmation
+     * rules in one place.
+     *
+     * The screen emits the intent, but the ViewModel decides whether the transition is currently valid for the
+     * draft/post state.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
      */
     fun openStepTwo() {
         if (_uiState.value.reviewEditStep == 1) {
@@ -940,6 +1573,17 @@ class CreatePostViewModel : ViewModel() {
      * Moves the organisation Create/Edit Post flow back to the previous relevant step or state.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — backToStepOne
+     *
+     * Controls workflow/navigation state for back to step one while keeping step transitions and confirmation
+     * rules in one place.
+     *
+     * The screen emits the intent, but the ViewModel decides whether the transition is currently valid for the
+     * draft/post state.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun backToStepOne() {
         _uiState.update { current ->
             current.copy(
@@ -954,6 +1598,15 @@ class CreatePostViewModel : ViewModel() {
      * Retries the current operation in the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — retryRoleCatalogue
+     *
+     * Loads or refreshes the data required by retry role catalogue and writes the result into observable UI
+     * state.
+     *
+     * The coroutine/repository boundary is handled here so Compose only reacts to loading, success and error
+     * state.
+     */
     fun retryRoleCatalogue() {
         loadRoleCatalogue(forceReload = true)
     }
@@ -961,6 +1614,26 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Loads the role catalogue needed by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — loadRoleCatalogue
+     *
+     * Loads or refreshes the data required by load role catalogue and writes the result into observable UI
+     * state.
+     *
+     * The coroutine/repository boundary is handled here so Compose only reacts to loading, success and error
+     * state.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
+     *
+     * Runs asynchronous work in a lifecycle-aware coroutine and exposes progress/error state rather than
+     * blocking the UI thread.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
      */
     private fun loadRoleCatalogue(forceReload: Boolean = false) {
         if (
@@ -1022,6 +1695,17 @@ class CreatePostViewModel : ViewModel() {
      * Updates the role search query used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — updateRoleSearchQuery
+     *
+     * Receives the UI event for changing role search query and applies it through the ViewModel instead of
+     * mutating Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun updateRoleSearchQuery(query: String) {
         _uiState.update { current ->
             current.copy(
@@ -1034,6 +1718,17 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Updates the role mode filter used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — updateRoleModeFilter
+     *
+     * Receives the UI event for changing role mode filter and applies it through the ViewModel instead of
+     * mutating Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
      */
     fun updateRoleModeFilter(mode: VolunteerRoleMode?) {
         val postType = _uiState.value.draft.postType
@@ -1070,6 +1765,19 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Adds the role to the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — addRole
+     *
+     * Implements the ViewModel workflow operation for add role.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
      */
     fun addRole(roleTemplateId: String) {
         val current = _uiState.value
@@ -1137,6 +1845,14 @@ class CreatePostViewModel : ViewModel() {
      * Removes the role from the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — removeRole
+     *
+     * Implements the ViewModel workflow operation for remove role.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     fun removeRole(roleTemplateId: String) {
         val policy = rolePolicy(roleTemplateId)
         if (!allowEdit(
@@ -1166,6 +1882,16 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Increases the role capacity in the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — increaseRoleCapacity
+     *
+     * Implements the ViewModel workflow operation for increase role capacity.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
      */
     fun increaseRoleCapacity(roleTemplateId: String) {
         val policy = rolePolicy(roleTemplateId)
@@ -1209,6 +1935,14 @@ class CreatePostViewModel : ViewModel() {
      * Decreases the role capacity in the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — decreaseRoleCapacity
+     *
+     * Implements the ViewModel workflow operation for decrease role capacity.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     fun decreaseRoleCapacity(roleTemplateId: String) {
         val policy = rolePolicy(roleTemplateId)
         if (!allowEdit(
@@ -1236,6 +1970,17 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Updates the role capacity used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — updateRoleCapacity
+     *
+     * Receives the UI event for changing role capacity and applies it through the ViewModel instead of mutating
+     * Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
      */
     fun updateRoleCapacity(
         roleTemplateId: String,
@@ -1302,6 +2047,20 @@ class CreatePostViewModel : ViewModel() {
      * Derives the continue from step two value used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — continueFromStepTwo
+     *
+     * Controls workflow/navigation state for continue from step two while keeping step transitions and
+     * confirmation rules in one place.
+     *
+     * The screen emits the intent, but the ViewModel decides whether the transition is currently valid for the
+     * draft/post state.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun continueFromStepTwo(): Boolean {
         val current = _uiState.value
         val errors = CreatePostValidator.validateStepTwo(
@@ -1342,6 +2101,20 @@ class CreatePostViewModel : ViewModel() {
      * Opens Step 3 and prepares each selected role from the Supabase catalogue.
      * Recommended skills become the starting selection only the first time the
      * role reaches Step 3; existing organiser edits are preserved.
+     */
+    /**
+     * DETAILED BEHAVIOUR — openStepThree
+     *
+     * Controls workflow/navigation state for open step three while keeping step transitions and confirmation
+     * rules in one place.
+     *
+     * The screen emits the intent, but the ViewModel decides whether the transition is currently valid for the
+     * draft/post state.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
      */
     fun openStepThree() {
         val current = _uiState.value
@@ -1484,6 +2257,17 @@ class CreatePostViewModel : ViewModel() {
     }
 
     /** Opens one selected role in the Step 3 editor. */
+    /**
+     * DETAILED BEHAVIOUR — openRoleEditor
+     *
+     * Controls workflow/navigation state for open role editor while keeping step transitions and confirmation
+     * rules in one place.
+     *
+     * The screen emits the intent, but the ViewModel decides whether the transition is currently valid for the
+     * draft/post state.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun openRoleEditor(roleTemplateId: String) {
         val current = _uiState.value
         if (current.draft.selectedRoles.none {
@@ -1501,6 +2285,16 @@ class CreatePostViewModel : ViewModel() {
     }
 
     /** Returns from one role editor to the Step 3 overview. */
+    /**
+     * DETAILED BEHAVIOUR — closeRoleEditor
+     *
+     * Implements the ViewModel workflow operation for close role editor.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun closeRoleEditor() {
         _uiState.update { state ->
             state.copy(
@@ -1511,6 +2305,17 @@ class CreatePostViewModel : ViewModel() {
     }
 
     /** System Back: role editor -> overview; Review edit -> Review; otherwise Step 2. */
+    /**
+     * DETAILED BEHAVIOUR — backFromStepThree
+     *
+     * Controls workflow/navigation state for back from step three while keeping step transitions and
+     * confirmation rules in one place.
+     *
+     * The screen emits the intent, but the ViewModel decides whether the transition is currently valid for the
+     * draft/post state.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun backFromStepThree() {
         val current = _uiState.value
 
@@ -1536,6 +2341,16 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Toggles the practised skill used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — togglePractisedSkill
+     *
+     * Implements the ViewModel workflow operation for toggle practised skill.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
      */
     fun togglePractisedSkill(
         roleTemplateId: String,
@@ -1605,6 +2420,16 @@ class CreatePostViewModel : ViewModel() {
      * Toggles the required skill used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — toggleRequiredSkill
+     *
+     * Implements the ViewModel workflow operation for toggle required skill.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun toggleRequiredSkill(
         roleTemplateId: String,
         skillId: String
@@ -1666,6 +2491,14 @@ class CreatePostViewModel : ViewModel() {
      * Increases the required skill experience in the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — increaseRequiredSkillExperience
+     *
+     * Implements the ViewModel workflow operation for increase required skill experience.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     fun increaseRequiredSkillExperience(
         roleTemplateId: String,
         skillId: String
@@ -1681,6 +2514,14 @@ class CreatePostViewModel : ViewModel() {
      * Decreases the required skill experience in the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — decreaseRequiredSkillExperience
+     *
+     * Implements the ViewModel workflow operation for decrease required skill experience.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     fun decreaseRequiredSkillExperience(
         roleTemplateId: String,
         skillId: String
@@ -1695,6 +2536,14 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Derives the change required skill experience value used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — changeRequiredSkillExperience
+     *
+     * Implements the ViewModel workflow operation for change required skill experience.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
      */
     private fun changeRequiredSkillExperience(
         roleTemplateId: String,
@@ -1722,6 +2571,14 @@ class CreatePostViewModel : ViewModel() {
      * Adds the responsibility to the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — addResponsibility
+     *
+     * Implements the ViewModel workflow operation for add responsibility.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     fun addResponsibility(roleTemplateId: String) {
         if (!allowEdit(
                 rolePolicy(roleTemplateId)?.canChangeResponsibilities != false,
@@ -1742,6 +2599,15 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Updates the responsibility used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — updateResponsibility
+     *
+     * Receives the UI event for changing responsibility and applies it through the ViewModel instead of
+     * mutating Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
      */
     fun updateResponsibility(
         roleTemplateId: String,
@@ -1769,6 +2635,14 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Removes the responsibility from the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — removeResponsibility
+     *
+     * Implements the ViewModel workflow operation for remove responsibility.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
      */
     fun removeResponsibility(
         roleTemplateId: String,
@@ -1800,6 +2674,15 @@ class CreatePostViewModel : ViewModel() {
      * The role level only controls the initial recommendation. Organisations
      * can choose either method for Beginner, Intermediate or Advanced roles.
      */
+    /**
+     * DETAILED BEHAVIOUR — updateRoleApplicationMethod
+     *
+     * Receives the UI event for changing role application method and applies it through the ViewModel instead
+     * of mutating Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     */
     fun updateRoleApplicationMethod(
         roleTemplateId: String,
         method: RoleApplicationMethod
@@ -1827,6 +2710,14 @@ class CreatePostViewModel : ViewModel() {
      * Adds the screening question to the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — addScreeningQuestion
+     *
+     * Implements the ViewModel workflow operation for add screening question.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     fun addScreeningQuestion(roleTemplateId: String) {
         if (!allowEdit(
                 rolePolicy(roleTemplateId)?.canChangeScreeningQuestions != false,
@@ -1851,6 +2742,15 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Updates the screening question used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — updateScreeningQuestion
+     *
+     * Receives the UI event for changing screening question and applies it through the ViewModel instead of
+     * mutating Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
      */
     fun updateScreeningQuestion(
         roleTemplateId: String,
@@ -1879,6 +2779,14 @@ class CreatePostViewModel : ViewModel() {
      * Removes the screening question from the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — removeScreeningQuestion
+     *
+     * Implements the ViewModel workflow operation for remove screening question.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     fun removeScreeningQuestion(
         roleTemplateId: String,
         index: Int
@@ -1900,6 +2808,15 @@ class CreatePostViewModel : ViewModel() {
      * Updates the role notes used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — updateRoleNotes
+     *
+     * Receives the UI event for changing role notes and applies it through the ViewModel instead of mutating
+     * Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     */
     fun updateRoleNotes(
         roleTemplateId: String,
         text: String
@@ -1917,6 +2834,15 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Updates the individual submission requirement used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — updateIndividualSubmissionRequirement
+     *
+     * Receives the UI event for changing individual submission requirement and applies it through the ViewModel
+     * instead of mutating Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
      */
     fun updateIndividualSubmissionRequirement(
         roleTemplateId: String,
@@ -1937,6 +2863,20 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Updates the shared submission responsible role used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — updateSharedSubmissionResponsibleRole
+     *
+     * Receives the UI event for changing shared submission responsible role and applies it through the
+     * ViewModel instead of mutating Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
      */
     fun updateSharedSubmissionResponsibleRole(
         roleTemplateId: String
@@ -1977,6 +2917,19 @@ class CreatePostViewModel : ViewModel() {
     }
 
     /** True when the current Step 3 values for this role can be saved. */
+    /**
+     * DETAILED BEHAVIOUR — canSaveRoleConfiguration
+     *
+     * Implements the ViewModel workflow operation for can save role configuration.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun canSaveRoleConfiguration(roleTemplateId: String): Boolean {
         val current = _uiState.value
         val template = current.roleCatalogue.firstOrNull {
@@ -1994,6 +2947,20 @@ class CreatePostViewModel : ViewModel() {
     }
 
     /** Cleans, validates and marks one role Ready. */
+    /**
+     * DETAILED BEHAVIOUR — saveRoleConfiguration
+     *
+     * Coordinates the user-confirmed business action for save role configuration from UI state to the
+     * repository and back.
+     *
+     * The ViewModel does not mark the action successful until the backend operation completes; afterwards it
+     * refreshes/updates state from the authoritative result.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun saveRoleConfiguration(roleTemplateId: String): Boolean {
         val current = _uiState.value
         val template = current.roleCatalogue.firstOrNull {
@@ -2068,6 +3035,17 @@ class CreatePostViewModel : ViewModel() {
     }
 
     /** Saves the current role and opens the next role that still needs review. */
+    /**
+     * DETAILED BEHAVIOUR — saveAndOpenNextRole
+     *
+     * Coordinates the user-confirmed business action for save and open next role from UI state to the
+     * repository and back.
+     *
+     * The ViewModel does not mark the action successful until the backend operation completes; afterwards it
+     * refreshes/updates state from the authoritative result.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun saveAndOpenNextRole(roleTemplateId: String): Boolean {
         if (!saveRoleConfiguration(roleTemplateId)) return false
 
@@ -2090,6 +3068,20 @@ class CreatePostViewModel : ViewModel() {
     }
 
     /** Validates Step 3 before the Schedule step is opened. */
+    /**
+     * DETAILED BEHAVIOUR — continueFromStepThree
+     *
+     * Controls workflow/navigation state for continue from step three while keeping step transitions and
+     * confirmation rules in one place.
+     *
+     * The screen emits the intent, but the ViewModel decides whether the transition is currently valid for the
+     * draft/post state.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun continueFromStepThree(): Boolean {
         val current = _uiState.value
         val templatesById = current.roleCatalogue.associateBy { it.roleTemplateId }
@@ -2187,6 +3179,17 @@ class CreatePostViewModel : ViewModel() {
      * Moves the organisation Create/Edit Post flow back to the previous relevant step or state.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — backToStepThree
+     *
+     * Controls workflow/navigation state for back to step three while keeping step transitions and confirmation
+     * rules in one place.
+     *
+     * The screen emits the intent, but the ViewModel decides whether the transition is currently valid for the
+     * draft/post state.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun backToStepThree() {
         _uiState.update { state ->
             state.copy(
@@ -2201,6 +3204,16 @@ class CreatePostViewModel : ViewModel() {
     // Step 4: schedule
     // ---------------------------------------------------------------------
 
+    /**
+     * DETAILED BEHAVIOUR — selectScheduleSection
+     *
+     * Implements the ViewModel workflow operation for select schedule section.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun selectScheduleSection(section: ScheduleType) {
         if (section !in availableScheduleSections(_uiState.value.draft.postType)) {
             return
@@ -2218,6 +3231,19 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Selects the physical schedule date used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — selectPhysicalScheduleDate
+     *
+     * Implements the ViewModel workflow operation for select physical schedule date.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
      */
     fun selectPhysicalScheduleDate(dateMillis: Long) {
         val date = CreatePostValidator.startOfDayMillis(dateMillis)
@@ -2237,6 +3263,17 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Opens the schedule item editor in the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — openScheduleItemEditor
+     *
+     * Controls workflow/navigation state for open schedule item editor while keeping step transitions and
+     * confirmation rules in one place.
+     *
+     * The screen emits the intent, but the ViewModel decides whether the transition is currently valid for the
+     * draft/post state.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
      */
     fun openScheduleItemEditor(itemId: String) {
         val current = _uiState.value
@@ -2276,6 +3313,16 @@ class CreatePostViewModel : ViewModel() {
      * The overview shows a Resume / Discard card instead of creating an
      * incomplete saved schedule item.
      */
+    /**
+     * DETAILED BEHAVIOUR — closeScheduleItemEditor
+     *
+     * Implements the ViewModel workflow operation for close schedule item editor.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun closeScheduleItemEditor() {
         _uiState.update { state ->
             state.copy(
@@ -2289,6 +3336,16 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Derives the resume schedule editor draft value used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — resumeScheduleEditorDraft
+     *
+     * Implements the ViewModel workflow operation for resume schedule editor draft.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
      */
     fun resumeScheduleEditorDraft() {
         val item = _uiState.value.scheduleEditorDraft ?: return
@@ -2313,6 +3370,16 @@ class CreatePostViewModel : ViewModel() {
      * Derives the discard schedule editor draft value used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — discardScheduleEditorDraft
+     *
+     * Implements the ViewModel workflow operation for discard schedule editor draft.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun discardScheduleEditorDraft() {
         _uiState.update { state ->
             state.copy(
@@ -2326,6 +3393,17 @@ class CreatePostViewModel : ViewModel() {
     }
 
     /** System Back: item editor -> overview; Review edit -> Review; otherwise Step 3. */
+    /**
+     * DETAILED BEHAVIOUR — backFromStepFour
+     *
+     * Controls workflow/navigation state for back from step four while keeping step transitions and
+     * confirmation rules in one place.
+     *
+     * The screen emits the intent, but the ViewModel decides whether the transition is currently valid for the
+     * draft/post state.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun backFromStepFour() {
         val current = _uiState.value
 
@@ -2355,6 +3433,19 @@ class CreatePostViewModel : ViewModel() {
      *
      * Do not try to find a free slot here. The organiser chooses the time and
      * overlap validation runs only when Save is pressed.
+     */
+    /**
+     * DETAILED BEHAVIOUR — addPhysicalScheduleItem
+     *
+     * Implements the ViewModel workflow operation for add physical schedule item.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
      */
     fun addPhysicalScheduleItem(dateMillis: Long): String? {
         if (!allowEdit(
@@ -2411,6 +3502,19 @@ class CreatePostViewModel : ViewModel() {
     }
 
     /** Starts a new date-based Remote milestone editor. */
+    /**
+     * DETAILED BEHAVIOUR — addRemoteScheduleItem
+     *
+     * Implements the ViewModel workflow operation for add remote schedule item.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun addRemoteScheduleItem(): String? {
         if (!allowEdit(
                 _uiState.value.editPolicy?.canAddRemoteSchedule != false,
@@ -2479,6 +3583,16 @@ class CreatePostViewModel : ViewModel() {
      * Renders the remove schedule item item used in the organisation Create/Edit Post flow.
      * It receives state and callbacks from its caller so presentation code stays separate from database operations.
      */
+    /**
+     * DETAILED BEHAVIOUR — removeScheduleItem
+     *
+     * Implements the ViewModel workflow operation for remove schedule item.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun removeScheduleItem(itemId: String) {
         val schedulePolicy = _uiState.value.editPolicy?.schedulePolicies?.get(itemId)
         if (!allowEdit(
@@ -2504,6 +3618,15 @@ class CreatePostViewModel : ViewModel() {
      * Updates the schedule editor title used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — updateScheduleEditorTitle
+     *
+     * Receives the UI event for changing schedule editor title and applies it through the ViewModel instead of
+     * mutating Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     */
     fun updateScheduleEditorTitle(text: String) {
         updateScheduleEditor { item ->
             item.copy(title = text.take(120))
@@ -2514,6 +3637,15 @@ class CreatePostViewModel : ViewModel() {
      * Updates the schedule editor notes used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — updateScheduleEditorNotes
+     *
+     * Receives the UI event for changing schedule editor notes and applies it through the ViewModel instead of
+     * mutating Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     */
     fun updateScheduleEditorNotes(text: String) {
         updateScheduleEditor { item ->
             item.copy(notes = text.take(500))
@@ -2523,6 +3655,15 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Updates the schedule editor location used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — updateScheduleEditorLocation
+     *
+     * Receives the UI event for changing schedule editor location and applies it through the ViewModel instead
+     * of mutating Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
      */
     fun updateScheduleEditorLocation(text: String) {
         updateScheduleEditor { item ->
@@ -2537,6 +3678,20 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Updates the schedule editor date used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — updateScheduleEditorDate
+     *
+     * Receives the UI event for changing schedule editor date and applies it through the ViewModel instead of
+     * mutating Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
      */
     fun updateScheduleEditorDate(dateMillis: Long) {
         val date = CreatePostValidator.startOfDayMillis(dateMillis)
@@ -2565,6 +3720,17 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Updates the schedule editor start time used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — updateScheduleEditorStartTime
+     *
+     * Receives the UI event for changing schedule editor start time and applies it through the ViewModel
+     * instead of mutating Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
      */
     fun updateScheduleEditorStartTime(
         hour: Int,
@@ -2607,6 +3773,17 @@ class CreatePostViewModel : ViewModel() {
      * Updates the schedule editor end time used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — updateScheduleEditorEndTime
+     *
+     * Receives the UI event for changing schedule editor end time and applies it through the ViewModel instead
+     * of mutating Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun updateScheduleEditorEndTime(
         hour: Int,
         minute: Int
@@ -2646,6 +3823,20 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Updates the schedule editor applies to all used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — updateScheduleEditorAppliesToAll
+     *
+     * Receives the UI event for changing schedule editor applies to all and applies it through the ViewModel
+     * instead of mutating Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
      */
     fun updateScheduleEditorAppliesToAll(appliesToAll: Boolean) {
         val current = _uiState.value
@@ -2690,6 +3881,19 @@ class CreatePostViewModel : ViewModel() {
      * Toggles the schedule editor role used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — toggleScheduleEditorRole
+     *
+     * Implements the ViewModel workflow operation for toggle schedule editor role.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun toggleScheduleEditorRole(roleTemplateId: String) {
         val current = _uiState.value
         val item = current.scheduleEditorDraft ?: return
@@ -2723,6 +3927,19 @@ class CreatePostViewModel : ViewModel() {
     }
 
     /** Validates the temporary editor buffer without saving it to CreatePostDraft. */
+    /**
+     * DETAILED BEHAVIOUR — validateScheduleEditor
+     *
+     * Implements the ViewModel workflow operation for validate schedule editor.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun validateScheduleEditor(): Boolean {
         val current = _uiState.value
         val item = current.scheduleEditorDraft ?: return false
@@ -2753,6 +3970,20 @@ class CreatePostViewModel : ViewModel() {
     }
 
     /** Commits a valid editor buffer to the shared CreatePostDraft. */
+    /**
+     * DETAILED BEHAVIOUR — saveScheduleEditor
+     *
+     * Coordinates the user-confirmed business action for save schedule editor from UI state to the repository
+     * and back.
+     *
+     * The ViewModel does not mark the action successful until the backend operation completes; afterwards it
+     * refreshes/updates state from the authoritative result.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun saveScheduleEditor(): Boolean {
         val current = _uiState.value
         val item = current.scheduleEditorDraft ?: return false
@@ -2799,6 +4030,16 @@ class CreatePostViewModel : ViewModel() {
     }
 
     /** Used by the overview to mark only saved items invalidated by earlier steps. */
+    /**
+     * DETAILED BEHAVIOUR — getScheduleItemValidationMessage
+     *
+     * Implements the ViewModel workflow operation for get schedule item validation message.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun getScheduleItemValidationMessage(itemId: String): String? {
         val current = _uiState.value
         val item = current.draft.scheduleItems.firstOrNull { existing ->
@@ -2816,6 +4057,19 @@ class CreatePostViewModel : ViewModel() {
      * Copies one complete Physical day to another event date.
      * The copied activities receive new local draft IDs. Remote items on the
      * target date are never touched.
+     */
+    /**
+     * DETAILED BEHAVIOUR — copyPhysicalScheduleDay
+     *
+     * Implements the ViewModel workflow operation for copy physical schedule day.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
      */
     fun copyPhysicalScheduleDay(
         sourceDateMillis: Long,
@@ -2921,6 +4175,19 @@ class CreatePostViewModel : ViewModel() {
      * Derives the physical schedule day has items value used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — physicalScheduleDayHasItems
+     *
+     * Implements the ViewModel workflow operation for physical schedule day has items.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun physicalScheduleDayHasItems(dateMillis: Long): Boolean {
         val date = CreatePostValidator.startOfDayMillis(dateMillis)
         return _uiState.value.draft.scheduleItems.any { item ->
@@ -2934,6 +4201,19 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Checks whether the organisation Create/Edit Post flow allows copy physical schedule day.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — canCopyPhysicalScheduleDay
+     *
+     * Implements the ViewModel workflow operation for can copy physical schedule day.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
      */
     fun canCopyPhysicalScheduleDay(dateMillis: Long): Boolean {
         val current = _uiState.value
@@ -2957,6 +4237,16 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Validates the schedule for continue used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — validateScheduleForContinue
+     *
+     * Implements the ViewModel workflow operation for validate schedule for continue.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
      */
     fun validateScheduleForContinue(): Boolean {
         val current = _uiState.value
@@ -2989,6 +4279,19 @@ class CreatePostViewModel : ViewModel() {
      * Returns the schedule proceed warning used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — getScheduleProceedWarning
+     *
+     * Implements the ViewModel workflow operation for get schedule proceed warning.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun getScheduleProceedWarning(): String? {
         return CreatePostValidator.scheduleProceedWarning(
             draft = _uiState.value.draft
@@ -3002,6 +4305,17 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Opens Review Summary after Step 4 has been validated.
      * Save Draft and Publish are both available from Review.
+     */
+    /**
+     * DETAILED BEHAVIOUR — openReviewSummary
+     *
+     * Controls workflow/navigation state for open review summary while keeping step transitions and
+     * confirmation rules in one place.
+     *
+     * The screen emits the intent, but the ViewModel decides whether the transition is currently valid for the
+     * draft/post state.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
      */
     fun openReviewSummary() {
         if (!validateScheduleForContinue()) return
@@ -3021,6 +4335,17 @@ class CreatePostViewModel : ViewModel() {
     }
 
     /** System Back from Review follows the normal wizard order to Step 4. */
+    /**
+     * DETAILED BEHAVIOUR — backFromReview
+     *
+     * Controls workflow/navigation state for back from review while keeping step transitions and confirmation
+     * rules in one place.
+     *
+     * The screen emits the intent, but the ViewModel decides whether the transition is currently valid for the
+     * draft/post state.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun backFromReview() {
         _uiState.update { state ->
             val sections = availableScheduleSections(state.draft.postType)
@@ -3045,6 +4370,16 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Review has one Edit action for each major wizard section. The edited
      * page reuses the existing form and keeps the same shared CreatePostDraft.
+     */
+    /**
+     * DETAILED BEHAVIOUR — editStepFromReview
+     *
+     * Implements the ViewModel workflow operation for edit step from review.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
      */
     fun editStepFromReview(step: Int) {
         if (step !in 1..4 || _uiState.value.currentStep != 5) return
@@ -3110,6 +4445,16 @@ class CreatePostViewModel : ViewModel() {
      * Back from an Edit opened by Review returns to Review without clearing
      * the shared draft. This matches the wizard's existing live-edit model.
      */
+    /**
+     * DETAILED BEHAVIOUR — returnToReviewFromEdit
+     *
+     * Implements the ViewModel workflow operation for return to review from edit.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun returnToReviewFromEdit() {
         _uiState.update { state ->
             state.copy(
@@ -3126,6 +4471,19 @@ class CreatePostViewModel : ViewModel() {
      * Step 1 can invalidate later sections when dates, mode or capacities are
      * changed. Save Changes therefore sends the organiser only to the first
      * dependent section that now needs attention.
+     */
+    /**
+     * DETAILED BEHAVIOUR — finishReviewEditAfterStepOne
+     *
+     * Implements the ViewModel workflow operation for finish review edit after step one.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
      */
     private fun finishReviewEditAfterStepOne() {
         val current = _uiState.value
@@ -3174,6 +4532,16 @@ class CreatePostViewModel : ViewModel() {
      * Reuse openStepThree() so Supabase recommendations/defaults are prepared
      * before deciding whether Review can be shown again.
      */
+    /**
+     * DETAILED BEHAVIOUR — finishReviewEditAfterStepTwo
+     *
+     * Implements the ViewModel workflow operation for finish review edit after step two.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     private fun finishReviewEditAfterStepTwo() {
         _uiState.update { state ->
             state.copy(reviewEditStep = 3)
@@ -3190,6 +4558,16 @@ class CreatePostViewModel : ViewModel() {
      * Step 3 changes can affect Step 4 validation. If Schedule needs repair,
      * keep the organiser in the Review-edit context so Save Changes eventually
      * returns to Review instead of restarting the wizard.
+     */
+    /**
+     * DETAILED BEHAVIOUR — finishReviewEditAfterStepThree
+     *
+     * Implements the ViewModel workflow operation for finish review edit after step three.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
      */
     private fun finishReviewEditAfterStepThree() {
         val current = _uiState.value
@@ -3230,6 +4608,25 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Saves the changes for the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — saveChanges
+     *
+     * Coordinates the user-confirmed business action for save changes from UI state to the repository and back.
+     *
+     * The ViewModel does not mark the action successful until the backend operation completes; afterwards it
+     * refreshes/updates state from the authoritative result.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
+     *
+     * Runs asynchronous work in a lifecycle-aware coroutine and exposes progress/error state rather than
+     * blocking the UI thread.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
      */
     fun saveChanges(context: Context) {
         val current = _uiState.value
@@ -3387,6 +4784,18 @@ class CreatePostViewModel : ViewModel() {
      * Saves the draft for the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — saveDraft
+     *
+     * Runs the appropriate validation for a server-saved DRAFT and asks the repository to persist the post
+     * without publishing it.
+     *
+     * After Supabase confirms the real draft, the temporary device autosave is no longer needed and can be
+     * cleared because Manage can reload the database record.
+     *
+     * Impact Weave conversion does not use this normal Save Draft path because partnership conversion has its
+     * own lifecycle.
+     */
     fun saveDraft(context: Context) {
         saveDraftInternal(
             context = context,
@@ -3397,6 +4806,17 @@ class CreatePostViewModel : ViewModel() {
     /**
      * The organiser explicitly chose to keep an outdated date in a Draft.
      * Revalidate everything else, then save without bypassing any other rule.
+     */
+    /**
+     * DETAILED BEHAVIOUR — confirmSaveDraftWithDateWarning
+     *
+     * Controls workflow/navigation state for confirm save draft with date warning while keeping step
+     * transitions and confirmation rules in one place.
+     *
+     * The screen emits the intent, but the ViewModel decides whether the transition is currently valid for the
+     * draft/post state.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
      */
     fun confirmSaveDraftWithDateWarning(context: Context) {
         _uiState.update { state ->
@@ -3412,6 +4832,16 @@ class CreatePostViewModel : ViewModel() {
      * Closes or clears the save draft date warning in the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — dismissSaveDraftDateWarning
+     *
+     * Implements the ViewModel workflow operation for dismiss save draft date warning.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun dismissSaveDraftDateWarning() {
         _uiState.update { state ->
             state.copy(saveDraftDateWarning = null)
@@ -3421,6 +4851,29 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Saves the draft internal for the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — saveDraftInternal
+     *
+     * Coordinates the user-confirmed business action for save draft internal from UI state to the repository
+     * and back.
+     *
+     * The ViewModel does not mark the action successful until the backend operation completes; afterwards it
+     * refreshes/updates state from the authoritative result.
+     *
+     * Coordinates account-scoped local persistence only for recoverable/cached UI state; published or
+     * transactional business state continues to come from Supabase.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
+     *
+     * Runs asynchronous work in a lifecycle-aware coroutine and exposes progress/error state rather than
+     * blocking the UI thread.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
      */
     private fun saveDraftInternal(
         context: Context,
@@ -3493,6 +4946,14 @@ class CreatePostViewModel : ViewModel() {
                     thumbnail = thumbnail
                 )
 
+                // A successful Supabase Draft replaces the device-only autosave.
+                // Keeping both would make the old local form reappear as a second
+                // unfinished post the next time the organisation opens Create.
+                if (localAutosaveEnabled) {
+                    runCatching { OrganisationLocalStorage.clearCreatePostAutosave() }
+                    lastLocalAutosaveSignature = null
+                }
+
                 // The complete post now exists in Supabase with status DRAFT.
                 // Clear only the local wizard state; reopening saved drafts is
                 // separate Manage Posts work.
@@ -3537,6 +4998,33 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Publishes the current Volunteer Post data after the required Create/Edit Post checks pass.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — publishPost
+     *
+     * Runs final review validation and then requests repository publication for the current new-post/Impact-
+     * Weave draft.
+     *
+     * The ViewModel exposes isPublishing/success/error state, clears the device autosave only after confirmed
+     * server success, and keeps the draft available when publication fails so the organisation can
+     * correct/retry.
+     *
+     * Date validation is based on the shared AppClock/timing rules rather than the phone clock being read ad
+     * hoc in the screen.
+     *
+     * Coordinates account-scoped local persistence only for recoverable/cached UI state; published or
+     * transactional business state continues to come from Supabase.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
+     *
+     * Runs asynchronous work in a lifecycle-aware coroutine and exposes progress/error state rather than
+     * blocking the UI thread.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
      */
     fun publishPost(context: Context) {
         val current = _uiState.value
@@ -3601,6 +5089,14 @@ class CreatePostViewModel : ViewModel() {
                     impactWeaveDraftId = snapshot.impactWeaveDraftId
                 )
 
+                // Publishing also completes the local New Post form. Impact Weave
+                // and Existing Post Edit never enable this flag, so they cannot
+                // accidentally delete a separate unfinished normal Create Post.
+                if (localAutosaveEnabled) {
+                    runCatching { OrganisationLocalStorage.clearCreatePostAutosave() }
+                    lastLocalAutosaveSignature = null
+                }
+
                 // Publishing is complete, so the editable draft is cleared.
                 // publishedPostId switches the route to the success screen.
                 _uiState.update { state ->
@@ -3645,6 +5141,16 @@ class CreatePostViewModel : ViewModel() {
      * Closes or clears the publish date block in the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — dismissPublishDateBlock
+     *
+     * Implements the ViewModel workflow operation for dismiss publish date block.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun dismissPublishDateBlock() {
         _uiState.update { state ->
             state.copy(publishDateBlockMessage = null)
@@ -3654,6 +5160,19 @@ class CreatePostViewModel : ViewModel() {
     /**
      * A failed final Publish should not make the organiser hunt through five
      * steps. Return directly to Post Details and expose the live date error.
+     */
+    /**
+     * DETAILED BEHAVIOUR — fixPublishDateFromReview
+     *
+     * Implements the ViewModel workflow operation for fix publish date from review.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
      */
     fun fixPublishDateFromReview() {
         val refreshedErrors = CreatePostValidator.validateStepOne(
@@ -3678,6 +5197,17 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Returns the post save validation error used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — postSaveValidationError
+     *
+     * Implements the ViewModel workflow operation for post save validation error.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
      */
     private fun postSaveValidationError(
         state: CreatePostUiState,
@@ -3723,6 +5253,19 @@ class CreatePostViewModel : ViewModel() {
      * An untouched historical item must not block an unrelated Manage Edit.
      * New or modified schedule data still uses the current Create rules.
      */
+    /**
+     * DETAILED BEHAVIOUR — validateStepFourForCurrentEditor
+     *
+     * Implements the ViewModel workflow operation for validate step four for current editor.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     private fun validateStepFourForCurrentEditor(
         draft: CreatePostDraft,
         roleCatalogue: List<CreateRoleTemplate>
@@ -3767,6 +5310,19 @@ class CreatePostViewModel : ViewModel() {
      * Derives the schedule item validation message for current editor value used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — scheduleItemValidationMessageForCurrentEditor
+     *
+     * Implements the ViewModel workflow operation for schedule item validation message for current editor.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     private fun scheduleItemValidationMessageForCurrentEditor(
         draft: CreatePostDraft,
         item: ScheduleItemDraft,
@@ -3798,6 +5354,14 @@ class CreatePostViewModel : ViewModel() {
      * Derives the schedule validation context unchanged value used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — scheduleValidationContextUnchanged
+     *
+     * Implements the ViewModel workflow operation for schedule validation context unchanged.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     private fun scheduleValidationContextUnchanged(
         current: CreatePostDraft,
         original: CreatePostDraft
@@ -3817,6 +5381,16 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Prepares the thumbnail for save for the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — prepareThumbnailForSave
+     *
+     * Implements the ViewModel workflow operation for prepare thumbnail for save.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Runs blocking file/network-oriented work off the main UI thread to avoid freezing Compose interactions.
      */
     private suspend fun prepareThumbnailForSave(
         context: Context,
@@ -3859,6 +5433,17 @@ class CreatePostViewModel : ViewModel() {
      * Opens the new schedule editor in the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — openNewScheduleEditor
+     *
+     * Controls workflow/navigation state for open new schedule editor while keeping step transitions and
+     * confirmation rules in one place.
+     *
+     * The screen emits the intent, but the ViewModel decides whether the transition is currently valid for the
+     * draft/post state.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     private fun openNewScheduleEditor(
         item: ScheduleItemDraft,
         selectedPhysicalDate: Long? = null
@@ -3881,6 +5466,17 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Updates the schedule editor used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — updateScheduleEditor
+     *
+     * Receives the UI event for changing schedule editor and applies it through the ViewModel instead of
+     * mutating Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
      */
     private fun updateScheduleEditor(
         transform: (ScheduleItemDraft) -> ScheduleItemDraft
@@ -3907,6 +5503,14 @@ class CreatePostViewModel : ViewModel() {
      * Renders the clean schedule item item used in the organisation Create/Edit Post flow.
      * It receives state and callbacks from its caller so presentation code stays separate from database operations.
      */
+    /**
+     * DETAILED BEHAVIOUR — cleanScheduleItem
+     *
+     * Implements the ViewModel workflow operation for clean schedule item.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     private fun cleanScheduleItem(
         item: ScheduleItemDraft
     ): ScheduleItemDraft {
@@ -3921,6 +5525,16 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Renders the draft with editor item item used in the organisation Create/Edit Post flow.
      * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+     */
+    /**
+     * DETAILED BEHAVIOUR — draftWithEditorItem
+     *
+     * Implements the ViewModel workflow operation for draft with editor item.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
      */
     private fun draftWithEditorItem(
         draft: CreatePostDraft,
@@ -3942,6 +5556,17 @@ class CreatePostViewModel : ViewModel() {
      * Updates the step four draft used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — updateStepFourDraft
+     *
+     * Receives the UI event for changing step four draft and applies it through the ViewModel instead of
+     * mutating Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     private fun updateStepFourDraft(
         change: (CreatePostDraft) -> CreatePostDraft
     ) {
@@ -3959,6 +5584,17 @@ class CreatePostViewModel : ViewModel() {
      * Sets the schedule error used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — setScheduleError
+     *
+     * Receives the UI event for changing schedule error and applies it through the ViewModel instead of
+     * mutating Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     private fun setScheduleError(message: String) {
         _uiState.update { state ->
             state.copy(
@@ -3973,6 +5609,14 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Returns the available schedule sections value required by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — availableScheduleSections
+     *
+     * Implements the ViewModel workflow operation for available schedule sections.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
      */
     private fun availableScheduleSections(
         postType: VolunteerPostType?
@@ -3993,6 +5637,17 @@ class CreatePostViewModel : ViewModel() {
      * Returns the valid selected physical date value required by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — validSelectedPhysicalDate
+     *
+     * Implements the ViewModel workflow operation for valid selected physical date.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
+     */
     private fun validSelectedPhysicalDate(
         draft: CreatePostDraft,
         currentDate: Long?
@@ -4008,6 +5663,17 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Updates the role configuration used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — updateRoleConfiguration
+     *
+     * Receives the UI event for changing role configuration and applies it through the ViewModel instead of
+     * mutating Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
      */
     private fun updateRoleConfiguration(
         roleTemplateId: String,
@@ -4041,6 +5707,17 @@ class CreatePostViewModel : ViewModel() {
      * Sets the role settings error used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — setRoleSettingsError
+     *
+     * Receives the UI event for changing role settings error and applies it through the ViewModel instead of
+     * mutating Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     private fun setRoleSettingsError(message: String) {
         _uiState.update { state ->
             state.copy(
@@ -4054,6 +5731,14 @@ class CreatePostViewModel : ViewModel() {
      * Step 2 can remove a role after Step 4 has already been configured. Keep
      * saved schedule targets inside the current selected role set so stale
      * ROLE IDs cannot reach the database.
+     */
+    /**
+     * DETAILED BEHAVIOUR — cleanScheduleRoleReferences
+     *
+     * Implements the ViewModel workflow operation for clean schedule role references.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
      */
     private fun cleanScheduleRoleReferences(
         draft: CreatePostDraft,
@@ -4073,6 +5758,17 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Derives the clean schedule item role references value used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — cleanScheduleItemRoleReferences
+     *
+     * Implements the ViewModel workflow operation for clean schedule item role references.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
      */
     private fun cleanScheduleItemRoleReferences(
         item: ScheduleItemDraft,
@@ -4095,6 +5791,20 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Updates the step two draft used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — updateStepTwoDraft
+     *
+     * Receives the UI event for changing step two draft and applies it through the ViewModel instead of
+     * mutating Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
      */
     private fun updateStepTwoDraft(
         change: (CreatePostDraft) -> CreatePostDraft
@@ -4133,6 +5843,14 @@ class CreatePostViewModel : ViewModel() {
      * Checks whether the role matches the post type required by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — roleMatchesPostType
+     *
+     * Implements the ViewModel workflow operation for role matches post type.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     private fun roleMatchesPostType(
         roleMode: VolunteerRoleMode,
         postType: VolunteerPostType?
@@ -4153,6 +5871,14 @@ class CreatePostViewModel : ViewModel() {
      * Derives the required capacity for mode value used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — requiredCapacityForMode
+     *
+     * Implements the ViewModel workflow operation for required capacity for mode.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     private fun requiredCapacityForMode(
         draft: CreatePostDraft,
         mode: VolunteerRoleMode
@@ -4169,6 +5895,14 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Derives the assigned capacity for mode value used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — assignedCapacityForMode
+     *
+     * Implements the ViewModel workflow operation for assigned capacity for mode.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
      */
     private fun assignedCapacityForMode(
         draft: CreatePostDraft,
@@ -4188,6 +5922,19 @@ class CreatePostViewModel : ViewModel() {
     // Step validation / editor lifecycle
     // ---------------------------------------------------------------------
 
+    /**
+     * DETAILED BEHAVIOUR — validateStepOneForCurrentEditor
+     *
+     * Implements the ViewModel workflow operation for validate step one for current editor.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     private fun validateStepOneForCurrentEditor(
         draft: CreatePostDraft
     ): com.example.volunteerlink.organisation.create.model.CreatePostErrors {
@@ -4209,6 +5956,17 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Derives the continue from step one value used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — continueFromStepOne
+     *
+     * Controls workflow/navigation state for continue from step one while keeping step transitions and
+     * confirmation rules in one place.
+     *
+     * The screen emits the intent, but the ViewModel decides whether the transition is currently valid for the
+     * draft/post state.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
      */
     fun continueFromStepOne(): Boolean {
         val currentDraft = _uiState.value.draft
@@ -4243,6 +6001,16 @@ class CreatePostViewModel : ViewModel() {
      * Checks whether the current Create/Edit Post state has unsaved input.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — hasUnsavedInput
+     *
+     * Implements the ViewModel workflow operation for has unsaved input.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun hasUnsavedInput(): Boolean {
         val current = _uiState.value
         val original = originalExistingPost
@@ -4257,8 +6025,38 @@ class CreatePostViewModel : ViewModel() {
      * Derives the discard draft value used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — discardDraft
+     *
+     * Implements the ViewModel workflow operation for discard draft.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Coordinates account-scoped local persistence only for recoverable/cached UI state; published or
+     * transactional business state continues to come from Supabase.
+     *
+     * Runs asynchronous work in a lifecycle-aware coroutine and exposes progress/error state rather than
+     * blocking the UI thread.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     fun discardDraft() {
         locationSearchJob?.cancel()
+
+        // Only the ordinary New Post route owns create_post_autosave. This guard
+        // is important because the shared editor is also used for Existing Post
+        // Edit and Impact Weave conversion.
+        if (localAutosaveEnabled) {
+            viewModelScope.launch {
+                runCatching { OrganisationLocalStorage.clearCreatePostAutosave() }
+            }
+            lastLocalAutosaveSignature = null
+        }
+
         _uiState.value = CreatePostUiState()
     }
 
@@ -4267,6 +6065,20 @@ class CreatePostViewModel : ViewModel() {
      * the new event/project window. Without this, moving a post to satisfy the
      * 7-day publish rule leaves the old schedule dates behind and Step 4 can no
      * longer be completed.
+     */
+    /**
+     * DETAILED BEHAVIOUR — updateDraft
+     *
+     * Receives the UI event for changing draft and applies it through the ViewModel instead of mutating Compose
+     * state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     *
+     * Rebases dependent schedule dates when the parent date range moves, preserving valid relative-day intent
+     * instead of leaving stale out-of-range schedule items.
      */
     private fun updateDraft(
         change: (CreatePostDraft) -> CreatePostDraft
@@ -4316,6 +6128,14 @@ class CreatePostViewModel : ViewModel() {
      * Holds the values represented by schedule date window as one strongly typed model.
      * It supports state coordination and user actions for the Create/Edit Post flow.
      */
+    /**
+     * DETAILED DECLARATION — ScheduleDateWindow
+     *
+     * Domain/UI type for Schedule Date Window used by the Organisation module.
+     *
+     * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-
+     * typed maps.
+     */
     private data class ScheduleDateWindow(
         val start: Long,
         val end: Long
@@ -4324,6 +6144,17 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Re-maps the saved schedule dates when the organisation Create/Edit Post date range changes.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — rebaseSavedScheduleDates
+     *
+     * Implements the ViewModel workflow operation for rebase saved schedule dates.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Rebases dependent schedule dates when the parent date range moves, preserving valid relative-day intent
+     * instead of leaving stale out-of-range schedule items.
      */
     private fun rebaseSavedScheduleDates(
         previous: CreatePostDraft,
@@ -4348,6 +6179,20 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Re-maps the schedule item date when the organisation Create/Edit Post date range changes.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — rebaseScheduleItemDate
+     *
+     * Implements the ViewModel workflow operation for rebase schedule item date.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
+     *
+     * Rebases dependent schedule dates when the parent date range moves, preserving valid relative-day intent
+     * instead of leaving stale out-of-range schedule items.
      */
     private fun rebaseScheduleItemDate(
         previous: CreatePostDraft,
@@ -4380,6 +6225,20 @@ class CreatePostViewModel : ViewModel() {
      * Re-maps the selected physical date when the organisation Create/Edit Post date range changes.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — rebaseSelectedPhysicalDate
+     *
+     * Implements the ViewModel workflow operation for rebase selected physical date.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
+     *
+     * Rebases dependent schedule dates when the parent date range moves, preserving valid relative-day intent
+     * instead of leaving stale out-of-range schedule items.
+     */
     private fun rebaseSelectedPhysicalDate(
         previous: CreatePostDraft,
         updated: CreatePostDraft,
@@ -4405,6 +6264,14 @@ class CreatePostViewModel : ViewModel() {
      * Checks whether the physical schedule window changed compared with the previously loaded value.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — physicalScheduleWindowChanged
+     *
+     * Implements the ViewModel workflow operation for physical schedule window changed.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     private fun physicalScheduleWindowChanged(
         previous: CreatePostDraft,
         updated: CreatePostDraft
@@ -4418,6 +6285,14 @@ class CreatePostViewModel : ViewModel() {
      * Checks whether the remote schedule window changed compared with the previously loaded value.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — remoteScheduleWindowChanged
+     *
+     * Implements the ViewModel workflow operation for remote schedule window changed.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     private fun remoteScheduleWindowChanged(
         previous: CreatePostDraft,
         updated: CreatePostDraft
@@ -4429,6 +6304,14 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Derives the schedule date window value used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — scheduleDateWindow
+     *
+     * Implements the ViewModel workflow operation for schedule date window.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
      */
     private fun scheduleDateWindow(
         draft: CreatePostDraft,
@@ -4465,6 +6348,20 @@ class CreatePostViewModel : ViewModel() {
      * only one edge of the range changed, keep dates that are still valid and
      * move only the dates that fell outside the new range.
      */
+    /**
+     * DETAILED BEHAVIOUR — rebaseDateIntoWindow
+     *
+     * Implements the ViewModel workflow operation for rebase date into window.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
+     *
+     * Rebases dependent schedule dates when the parent date range moves, preserving valid relative-day intent
+     * instead of leaving stale out-of-range schedule items.
+     */
     private fun rebaseDateIntoWindow(
         date: Long,
         oldWindow: ScheduleDateWindow?,
@@ -4496,6 +6393,17 @@ class CreatePostViewModel : ViewModel() {
      * Normalises the date into the consistent form used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — normalizedDate
+     *
+     * Implements the ViewModel workflow operation for normalized date.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
+     */
     private fun normalizedDate(value: Long?): Long? {
         return value?.let(CreatePostValidator::startOfDayMillis)
     }
@@ -4503,6 +6411,17 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Derives the calendar day offset value used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — calendarDayOffset
+     *
+     * Implements the ViewModel workflow operation for calendar day offset.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
      */
     private fun calendarDayOffset(
         fromMillis: Long,
@@ -4528,6 +6447,17 @@ class CreatePostViewModel : ViewModel() {
      * Adds the calendar days to the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — addCalendarDays
+     *
+     * Implements the ViewModel workflow operation for add calendar days.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
+     */
     private fun addCalendarDays(
         dateMillis: Long,
         days: Int
@@ -4541,6 +6471,14 @@ class CreatePostViewModel : ViewModel() {
     /**
      * Parses the positive number used by the organisation Create/Edit Post flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — parsePositiveNumber
+     *
+     * Implements the ViewModel workflow operation for parse positive number.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
      */
     private fun parsePositiveNumber(text: String): Int? {
         val digitsOnly = text.filter { it.isDigit() }.take(4)

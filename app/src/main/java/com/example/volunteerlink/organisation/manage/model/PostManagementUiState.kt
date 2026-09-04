@@ -1,11 +1,18 @@
 package com.example.volunteerlink.organisation.manage.model
 
-// FILE OVERVIEW:
-/*
- * PostManagementUiState groups the data structures used by the organisation Manage Post flow.
- * These models make state explicit and allow the UI, ViewModel and repository layers to exchange
- * strongly typed values instead of passing unrelated parameters throughout the feature.
- */
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Defines immutable Organisation Manage/Post Management state associated with Post Management Ui State.
+//
+// The models combine normalized backend data into one screen-oriented representation without changing the
+// underlying database structure.
+//
+// Flags such as loading, cached/offline, timing state and active review action make it explicit when the UI may
+// render information versus when it may perform a server mutation.
+//
+// Architectural layer: Domain/UI model layer.
+// ============================================================================
 
 
 import com.example.volunteerlink.data.post.PostTimingState
@@ -15,6 +22,14 @@ import kotlinx.serialization.Serializable
 
 /** State for one Volunteer Post opened from Organisation > Manage > Volunteer Posts. */
 @Serializable
+/**
+ * DETAILED DECLARATION — OrganisationPostManagementUiState
+ *
+ * Immutable snapshot of all UI-visible state required by Organisation Post Management Ui State.
+ *
+ * Keeping loading/data/error/action flags together makes recomposition deterministic and avoids hidden mutable
+ * state in individual composables.
+ */
 data class OrganisationPostManagementUiState(
     val isLoading: Boolean = true,
     val post: PostManagementPost? = null,
@@ -55,6 +70,14 @@ data class OrganisationPostManagementUiState(
  * the ViewModel only adds the time-dependent lifecycle values.
  */
 @Serializable
+/**
+ * DETAILED DECLARATION — PostManagementPost
+ *
+ * Domain/UI type for Post Management Post used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class PostManagementPost(
     val postId: String,
     val organisationName: String,
@@ -97,6 +120,14 @@ data class PostManagementPost(
  * Holds the values represented by post management impact weave partner as one strongly typed model.
  * It keeps related Manage Post values together so callers do not pass disconnected fields around.
  */
+/**
+ * DETAILED DECLARATION — PostManagementImpactWeavePartner
+ *
+ * Domain/UI type for Post Management Impact Weave Partner used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class PostManagementImpactWeavePartner(
     val organisationId: String,
     val organisationName: String,
@@ -107,6 +138,14 @@ data class PostManagementImpactWeavePartner(
 /**
  * Holds the values represented by post management impact weave contribution as one strongly typed model.
  * It keeps related Manage Post values together so callers do not pass disconnected fields around.
+ */
+/**
+ * DETAILED DECLARATION — PostManagementImpactWeaveContribution
+ *
+ * Domain/UI type for Post Management Impact Weave Contribution used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
  */
 data class PostManagementImpactWeaveContribution(
     val supportType: String,
@@ -120,6 +159,14 @@ data class PostManagementImpactWeaveContribution(
 /**
  * Holds the values represented by post management physical details as one strongly typed model.
  * It keeps related Manage Post values together so callers do not pass disconnected fields around.
+ */
+/**
+ * DETAILED DECLARATION — PostManagementPhysicalDetails
+ *
+ * Domain/UI type for Post Management Physical Details used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
  */
 data class PostManagementPhysicalDetails(
     val startDate: String,
@@ -138,6 +185,14 @@ data class PostManagementPhysicalDetails(
  * Holds the values represented by post management remote details as one strongly typed model.
  * It keeps related Manage Post values together so callers do not pass disconnected fields around.
  */
+/**
+ * DETAILED DECLARATION — PostManagementRemoteDetails
+ *
+ * Domain/UI type for Post Management Remote Details used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class PostManagementRemoteDetails(
     val startDate: String,
     val endDate: String,
@@ -153,6 +208,14 @@ data class PostManagementRemoteDetails(
 
 /** One Remote deliverable submission. Shared submissions belong to the post; individual submissions belong to one volunteer. */
 @Serializable
+/**
+ * DETAILED DECLARATION — PostManagementRemoteSubmission
+ *
+ * Domain/UI type for Post Management Remote Submission used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class PostManagementRemoteSubmission(
     val submissionId: String,
     val roleTemplateId: String? = null,
@@ -172,6 +235,14 @@ data class PostManagementRemoteSubmission(
  * Holds the values represented by post management schedule item as one strongly typed model.
  * It keeps related Manage Post values together so callers do not pass disconnected fields around.
  */
+/**
+ * DETAILED DECLARATION — PostManagementScheduleItem
+ *
+ * Domain/UI type for Post Management Schedule Item used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class PostManagementScheduleItem(
     val scheduleItemId: String,
     val scheduleType: String,
@@ -188,6 +259,14 @@ data class PostManagementScheduleItem(
 /**
  * Holds the values represented by post management role as one strongly typed model.
  * It keeps related Manage Post values together so callers do not pass disconnected fields around.
+ */
+/**
+ * DETAILED DECLARATION — PostManagementRole
+ *
+ * Domain/UI type for Post Management Role used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
  */
 data class PostManagementRole(
     val roleTemplateId: String,
@@ -211,6 +290,14 @@ data class PostManagementRole(
 /**
  * Holds the values represented by post management person as one strongly typed model.
  * It keeps related Manage Post values together so callers do not pass disconnected fields around.
+ */
+/**
+ * DETAILED DECLARATION — PostManagementPerson
+ *
+ * Domain/UI type for Post Management Person used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
  */
 data class PostManagementPerson(
     val userId: String,
@@ -237,6 +324,14 @@ data class PostManagementPerson(
 
 /** One attendance session opened by the organisation for one Physical event day. */
 @Serializable
+/**
+ * DETAILED DECLARATION — PostManagementAttendanceDay
+ *
+ * Domain/UI type for Post Management Attendance Day used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class PostManagementAttendanceDay(
     val eventDate: String,
     val pinCode: String,
@@ -247,6 +342,14 @@ data class PostManagementAttendanceDay(
 
 /** One normalized volunteer check-in for one Physical role and event day. */
 @Serializable
+/**
+ * DETAILED DECLARATION — PostManagementAttendanceRecord
+ *
+ * Domain/UI type for Post Management Attendance Record used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class PostManagementAttendanceRecord(
     val eventDate: String,
     val roleTemplateId: String,
@@ -258,6 +361,14 @@ data class PostManagementAttendanceRecord(
 
 /** One final organisation review record for one volunteer participation. */
 @Serializable
+/**
+ * DETAILED DECLARATION — PostManagementEvaluation
+ *
+ * Domain/UI type for Post Management Evaluation used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class PostManagementEvaluation(
     val roleTemplateId: String,
     val userId: String,
@@ -272,6 +383,14 @@ data class PostManagementEvaluation(
 
 /** Small attendance-only payload used by the active People-screen poll. */
 @Serializable
+/**
+ * DETAILED DECLARATION — PostManagementAttendanceSnapshot
+ *
+ * Domain/UI type for Post Management Attendance Snapshot used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class PostManagementAttendanceSnapshot(
     val attendanceDays: List<PostManagementAttendanceDay> = emptyList(),
     val attendanceRecords: List<PostManagementAttendanceRecord> = emptyList()
@@ -279,6 +398,14 @@ data class PostManagementAttendanceSnapshot(
 
 /** Time-dependent Physical attendance state prepared for the Manage UI. */
 @Serializable
+/**
+ * DETAILED DECLARATION — PostManagementPhysicalAttendance
+ *
+ * Domain/UI type for Post Management Physical Attendance used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class PostManagementPhysicalAttendance(
     val todayDate: String,
     val todaySession: PostManagementAttendanceDay? = null,
@@ -297,6 +424,11 @@ data class PostManagementPhysicalAttendance(
      * Derives the summary for value used by the organisation Manage Post flow.
      * Keeping this transformation near the model makes the data flow easier to understand.
      */
+    /**
+     * DETAILED BEHAVIOUR — summaryFor
+     *
+     * Implements the current VolunteerLink responsibility for summary for in this support/model layer.
+     */
     fun summaryFor(person: PostManagementPerson): PostManagementVolunteerAttendanceSummary? {
         return volunteerSummaries.firstOrNull {
             it.userId == person.userId &&
@@ -309,6 +441,14 @@ data class PostManagementPhysicalAttendance(
 /**
  * Holds the values represented by post management volunteer attendance summary as one strongly typed model.
  * It keeps related Manage Post values together so callers do not pass disconnected fields around.
+ */
+/**
+ * DETAILED DECLARATION — PostManagementVolunteerAttendanceSummary
+ *
+ * Domain/UI type for Post Management Volunteer Attendance Summary used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
  */
 data class PostManagementVolunteerAttendanceSummary(
     val userId: String,
@@ -324,6 +464,11 @@ data class PostManagementVolunteerAttendanceSummary(
      * Derives the status for value used by the organisation Manage Post flow.
      * Keeping this transformation near the model makes the data flow easier to understand.
      */
+    /**
+     * DETAILED BEHAVIOUR — statusFor
+     *
+     * Implements the current VolunteerLink responsibility for status for in this support/model layer.
+     */
     fun statusFor(eventDate: String): PostManagementVolunteerAttendanceDateStatus? {
         return dateStatuses.firstOrNull { it.eventDate == eventDate }
     }
@@ -333,6 +478,14 @@ data class PostManagementVolunteerAttendanceSummary(
 /**
  * Holds the values represented by post management volunteer attendance date status as one strongly typed model.
  * It keeps related Manage Post values together so callers do not pass disconnected fields around.
+ */
+/**
+ * DETAILED DECLARATION — PostManagementVolunteerAttendanceDateStatus
+ *
+ * Domain/UI type for Post Management Volunteer Attendance Date Status used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
  */
 data class PostManagementVolunteerAttendanceDateStatus(
     val eventDate: String,
@@ -348,6 +501,14 @@ data class PostManagementVolunteerAttendanceDateStatus(
 
 /** One accepted Physical volunteer in the Physical close-out flow. Attendance determines verified time, not completion by itself. */
 @Serializable
+/**
+ * DETAILED DECLARATION — PostManagementPhysicalReviewEntry
+ *
+ * Domain/UI type for Post Management Physical Review Entry used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class PostManagementPhysicalReviewEntry(
     val person: PostManagementPerson,
     val attendanceSummary: PostManagementVolunteerAttendanceSummary,
@@ -370,6 +531,14 @@ data class PostManagementPhysicalReviewEntry(
 
 /** Feedback groups are reconstructed from equal feedback text; no group table is stored. */
 @Serializable
+/**
+ * DETAILED DECLARATION — PostManagementFeedbackGroup
+ *
+ * Domain/UI type for Post Management Feedback Group used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class PostManagementFeedbackGroup(
     val feedback: String,
     val userIds: List<String>,
@@ -381,6 +550,14 @@ data class PostManagementFeedbackGroup(
 
 /** Physical close-out state. `ready` means full attendance/no flagged issue and is only a quick-completion candidate, not automatically completed. */
 @Serializable
+/**
+ * DETAILED DECLARATION — PostManagementPhysicalReview
+ *
+ * Domain/UI type for Post Management Physical Review used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class PostManagementPhysicalReview(
     val ready: List<PostManagementPhysicalReviewEntry> = emptyList(),
     val needsReview: List<PostManagementPhysicalReviewEntry> = emptyList(),
@@ -404,6 +581,14 @@ data class PostManagementPhysicalReview(
  * Supabase until the organisation presses Finalize Event.
  */
 @Serializable
+/**
+ * DETAILED DECLARATION — PostManagementPhysicalReviewStage
+ *
+ * Domain/UI type for Post Management Physical Review Stage used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 enum class PostManagementPhysicalReviewStage {
     ATTENDANCE,
     COMPLETION,
@@ -416,6 +601,14 @@ enum class PostManagementPhysicalReviewStage {
  * Lists the supported values represented by post management pending decision type.
  * It keeps related Manage Post values together so callers do not pass disconnected fields around.
  */
+/**
+ * DETAILED DECLARATION — PostManagementPendingDecisionType
+ *
+ * Domain/UI type for Post Management Pending Decision Type used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 enum class PostManagementPendingDecisionType {
     COMPLETED,
     NOT_COMPLETED
@@ -425,6 +618,14 @@ enum class PostManagementPendingDecisionType {
 /**
  * Lists the supported values represented by post management pending decision source.
  * It keeps related Manage Post values together so callers do not pass disconnected fields around.
+ */
+/**
+ * DETAILED DECLARATION — PostManagementPendingDecisionSource
+ *
+ * Domain/UI type for Post Management Pending Decision Source used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
  */
 enum class PostManagementPendingDecisionSource {
     FULL_ATTENDANCE,
@@ -436,6 +637,14 @@ enum class PostManagementPendingDecisionSource {
 /**
  * Holds the values represented by post management pending review decision as one strongly typed model.
  * It keeps related Manage Post values together so callers do not pass disconnected fields around.
+ */
+/**
+ * DETAILED DECLARATION — PostManagementPendingReviewDecision
+ *
+ * Domain/UI type for Post Management Pending Review Decision used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
  */
 data class PostManagementPendingReviewDecision(
     val roleTemplateId: String,
@@ -449,6 +658,14 @@ data class PostManagementPendingReviewDecision(
 /**
  * Holds the values represented by post management physical review session as one strongly typed model.
  * It keeps related Manage Post values together so callers do not pass disconnected fields around.
+ */
+/**
+ * DETAILED DECLARATION — PostManagementPhysicalReviewSession
+ *
+ * Domain/UI type for Post Management Physical Review Session used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
  */
 data class PostManagementPhysicalReviewSession(
     val stage: PostManagementPhysicalReviewStage = PostManagementPhysicalReviewStage.ATTENDANCE,
@@ -466,6 +683,11 @@ data class PostManagementPhysicalReviewSession(
      * Derives the decision for value used by the organisation Manage Post flow.
      * Keeping this transformation near the model makes the data flow easier to understand.
      */
+    /**
+     * DETAILED BEHAVIOUR — decisionFor
+     *
+     * Implements the current VolunteerLink responsibility for decision for in this support/model layer.
+     */
     fun decisionFor(roleTemplateId: String, userId: String): PostManagementPendingReviewDecision? {
         return decisions.firstOrNull {
             it.roleTemplateId == roleTemplateId && it.userId == userId
@@ -476,6 +698,14 @@ data class PostManagementPhysicalReviewSession(
 
 /** Remote close-out uses submitted work rather than Physical attendance. */
 @Serializable
+/**
+ * DETAILED DECLARATION — PostManagementRemoteReviewStage
+ *
+ * Domain/UI type for Post Management Remote Review Stage used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 enum class PostManagementRemoteReviewStage {
     SUBMISSION,
     FEEDBACK,
@@ -486,6 +716,14 @@ enum class PostManagementRemoteReviewStage {
 /**
  * Lists the supported values represented by post management remote submission decision type.
  * It keeps related Manage Post values together so callers do not pass disconnected fields around.
+ */
+/**
+ * DETAILED DECLARATION — PostManagementRemoteSubmissionDecisionType
+ *
+ * Domain/UI type for Post Management Remote Submission Decision Type used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
  */
 enum class PostManagementRemoteSubmissionDecisionType {
     ACCEPT,
@@ -498,6 +736,14 @@ enum class PostManagementRemoteSubmissionDecisionType {
  * Lists the supported values represented by post management remote missing action.
  * It keeps related Manage Post values together so callers do not pass disconnected fields around.
  */
+/**
+ * DETAILED DECLARATION — PostManagementRemoteMissingAction
+ *
+ * Domain/UI type for Post Management Remote Missing Action used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 enum class PostManagementRemoteMissingAction {
     GIVE_MORE_TIME,
     CONTINUE_WITHOUT_WORK
@@ -509,6 +755,14 @@ enum class PostManagementRemoteMissingAction {
  * tells the database that the post uses SHARED_TEAM; submission mode is not duplicated.
  */
 @Serializable
+/**
+ * DETAILED DECLARATION — PostManagementRemoteMissingDecision
+ *
+ * Domain/UI type for Post Management Remote Missing Decision used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class PostManagementRemoteMissingDecision(
     val roleTemplateId: String? = null,
     val userId: String? = null,
@@ -520,6 +774,14 @@ data class PostManagementRemoteMissingDecision(
  * Holds the values represented by post management remote submission decision as one strongly typed model.
  * It keeps related Manage Post values together so callers do not pass disconnected fields around.
  */
+/**
+ * DETAILED DECLARATION — PostManagementRemoteSubmissionDecision
+ *
+ * Domain/UI type for Post Management Remote Submission Decision used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class PostManagementRemoteSubmissionDecision(
     val itemKey: String,
     val submissionId: String,
@@ -530,6 +792,14 @@ data class PostManagementRemoteSubmissionDecision(
 
 /** One submission stream shown in Remote > Needs Review. */
 @Serializable
+/**
+ * DETAILED DECLARATION — PostManagementRemoteReviewItem
+ *
+ * Domain/UI type for Post Management Remote Review Item used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class PostManagementRemoteReviewItem(
     val itemKey: String,
     val submissionType: String,
@@ -551,6 +821,14 @@ data class PostManagementRemoteReviewItem(
 
 /** Derived Remote review data. No review history is duplicated here. */
 @Serializable
+/**
+ * DETAILED DECLARATION — PostManagementRemoteReview
+ *
+ * Domain/UI type for Post Management Remote Review used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class PostManagementRemoteReview(
     val todayDate: String,
     val currentDeadline: String,
@@ -562,6 +840,11 @@ data class PostManagementRemoteReview(
     /**
      * Derives the item for value used by the organisation Manage Post flow.
      * Keeping this transformation near the model makes the data flow easier to understand.
+     */
+    /**
+     * DETAILED BEHAVIOUR — itemFor
+     *
+     * Implements the current VolunteerLink responsibility for item for in this support/model layer.
      */
     fun itemFor(person: PostManagementPerson): PostManagementRemoteReviewItem? {
         return if (submissionMode.equals("SHARED_TEAM", ignoreCase = true)) {
@@ -585,6 +868,14 @@ data class PostManagementRemoteReview(
  * NOT_COMPLETED. Only optional final feedback remains until Finish.
  */
 @Serializable
+/**
+ * DETAILED DECLARATION — PostManagementRemoteReviewSession
+ *
+ * Domain/UI type for Post Management Remote Review Session used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class PostManagementRemoteReviewSession(
     val stage: PostManagementRemoteReviewStage = PostManagementRemoteReviewStage.SUBMISSION,
     val submissionDecisions: List<PostManagementRemoteSubmissionDecision> = emptyList(),
@@ -605,12 +896,23 @@ data class PostManagementRemoteReviewSession(
      * Derives the submission decision for value used by the organisation Manage Post flow.
      * Keeping this transformation near the model makes the data flow easier to understand.
      */
+    /**
+     * DETAILED BEHAVIOUR — submissionDecisionFor
+     *
+     * Implements the current VolunteerLink responsibility for submission decision for in this support/model
+     * layer.
+     */
     fun submissionDecisionFor(itemKey: String): PostManagementRemoteSubmissionDecision? =
         submissionDecisions.firstOrNull { it.itemKey == itemKey }
 
     /**
      * Derives the missing action for value used by the organisation Manage Post flow.
      * Keeping this transformation near the model makes the data flow easier to understand.
+     */
+    /**
+     * DETAILED BEHAVIOUR — missingActionFor
+     *
+     * Implements the current VolunteerLink responsibility for missing action for in this support/model layer.
      */
     fun missingActionFor(itemKey: String): PostManagementRemoteMissingAction? =
         missingActions[itemKey]
@@ -619,6 +921,12 @@ data class PostManagementRemoteReviewSession(
 /**
  * Derives the remote review participation key value used by the organisation Manage Post flow.
  * Keeping this transformation near the model makes the data flow easier to understand.
+ */
+/**
+ * DETAILED BEHAVIOUR — remoteReviewParticipationKey
+ *
+ * Implements the current VolunteerLink responsibility for remote review participation key in this support/model
+ * layer.
  */
 fun remoteReviewParticipationKey(roleTemplateId: String, userId: String): String =
     "$roleTemplateId::$userId"

@@ -1,14 +1,32 @@
 package com.example.volunteerlink.organisation.create.model
 
-// FILE OVERVIEW:
-/*
- * ScheduleItemDraft groups the data structures used by the organisation Create/Edit Post flow.
- * These models make state explicit and allow the UI, ViewModel and repository layers to exchange
- * strongly typed values instead of passing unrelated parameters throughout the feature.
- */
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Defines the Create Post state/model structures associated with Schedule Item Draft.
+//
+// These models are UI/business-layer data: they let the five-step wizard hold incomplete user input before it is
+// converted to a validated repository payload.
+//
+// Database ids/rows are introduced only when a real saved draft or published post is persisted; local autosave
+// serializes the same draft state for recovery without making it authoritative.
+//
+// Architectural layer: Domain/UI model layer.
+// ============================================================================
 
+
+import kotlinx.serialization.Serializable
 
 /** The two optional Step 4 schedule sections kept in the reduced project scope. */
+@Serializable
+/**
+ * DETAILED DECLARATION — ScheduleType
+ *
+ * Domain/UI type for Schedule Type used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 enum class ScheduleType(
     val displayName: String,
     val databaseValue: String
@@ -29,6 +47,16 @@ enum class ScheduleType(
  * draftId is local wizard state, not schedule_items.schedule_item_id.
  * targetRoleTemplateIds uses ROLE... IDs while creating the post and those
  * same template IDs are stored through schedule_item_roles for the post.
+ */
+@Serializable
+/**
+ * DETAILED DECLARATION — ScheduleItemDraft
+ *
+ * Represents editable/incomplete user input for Schedule Item Draft before it becomes a server-authoritative
+ * record.
+ *
+ * The draft can contain temporarily incomplete values because validation is applied at step transitions and
+ * final persistence boundaries.
  */
 data class ScheduleItemDraft(
     val draftId: String,

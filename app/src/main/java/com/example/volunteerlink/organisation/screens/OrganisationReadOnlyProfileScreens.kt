@@ -1,5 +1,23 @@
 package com.example.volunteerlink.organisation.screens
 
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Implements the Organisation UI associated with Organisation Read Only Profile Screens.
+//
+// The composable layer is responsible for layout, interaction and displaying loading/error/validation state;
+// business rules and persistence are delegated to ViewModels/repositories.
+//
+// This separation makes it clear during maintenance which code changes appearance versus which code changes real
+// server data.
+//
+// Where the screen displays cached information, server-changing actions remain disabled or routed through a fresh
+// authenticated repository operation.
+//
+// Architectural layer: Compose presentation layer.
+// ============================================================================
+
+
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -71,6 +89,15 @@ import com.example.volunteerlink.ui.theme.VolunteerLinkTextSecondary
 import java.util.Locale
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — OrganisationViewVolunteerProfileScreen
+ *
+ * Renders the Organisation View Volunteer Profile screen from state supplied by the owning
+ * ViewModel/repository-facing coordinator.
+ *
+ * The composable maps state to Material3 UI and emits callbacks; it does not become the source of truth for
+ * persisted VolunteerLink data.
+ */
 fun OrganisationViewVolunteerProfileScreen(
     postId: String,
     userId: String,
@@ -120,6 +147,15 @@ fun OrganisationViewVolunteerProfileScreen(
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — OrganisationViewPartnerProfileScreen
+ *
+ * Renders the Organisation View Partner Profile screen from state supplied by the owning ViewModel/repository-
+ * facing coordinator.
+ *
+ * The composable maps state to Material3 UI and emits callbacks; it does not become the source of truth for
+ * persisted VolunteerLink data.
+ */
 fun OrganisationViewPartnerProfileScreen(
     organisationId: String,
     onBack: () -> Unit
@@ -152,6 +188,14 @@ fun OrganisationViewPartnerProfileScreen(
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — ReadOnlyProfileScaffold
+ *
+ * Handles the Compose/UI responsibility for read only profile scaffold.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun ReadOnlyProfileScaffold(
     title: String,
     barColor: Color,
@@ -203,6 +247,14 @@ private fun ReadOnlyProfileScaffold(
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — ProfileLoading
+ *
+ * Handles the Compose/UI responsibility for profile loading.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun ProfileLoading() {
     Box(
         modifier = Modifier
@@ -215,6 +267,14 @@ private fun ProfileLoading() {
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — ProfileError
+ *
+ * Handles the Compose/UI responsibility for profile error.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun ProfileError(message: String) {
     Surface(
         modifier = Modifier
@@ -241,6 +301,14 @@ private fun ProfileError(message: String) {
 // -----------------------------------------------------------------------------
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — VolunteerProfileTemplate
+ *
+ * Handles the Compose/UI responsibility for volunteer profile template.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun VolunteerProfileTemplate(
     profile: OrganisationViewedVolunteerProfile,
     onCertificateSelected: (OrganisationViewedVolunteerCertificate) -> Unit
@@ -490,6 +558,14 @@ private fun VolunteerProfileTemplate(
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — VolunteerEventContactSection
+ *
+ * Renders the reusable Volunteer Event Contact Section portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun VolunteerEventContactSection(
     phone: String,
     untilLabel: String?,
@@ -547,6 +623,14 @@ private fun VolunteerEventContactSection(
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — VolunteerStatCard
+ *
+ * Renders the reusable Volunteer Stat Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun VolunteerStatCard(
     title: String,
     value: String,
@@ -579,6 +663,14 @@ private fun VolunteerStatCard(
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — VolunteerSectionHeader
+ *
+ * Renders the reusable Volunteer Section Header portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun VolunteerSectionHeader(
     title: String,
     showAction: Boolean,
@@ -611,6 +703,14 @@ private fun VolunteerSectionHeader(
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — VolunteerEmptySectionText
+ *
+ * Renders the reusable Volunteer Empty Section Text portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun VolunteerEmptySectionText(text: String) {
     Text(
         text = text,
@@ -626,6 +726,14 @@ private fun VolunteerEmptySectionText(text: String) {
 // -----------------------------------------------------------------------------
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — OrganisationProfileTemplate
+ *
+ * Handles the Compose/UI responsibility for organisation profile template.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun OrganisationProfileTemplate(profile: OrganisationViewedPartnerProfile) {
     val context = LocalContext.current
 
@@ -824,6 +932,14 @@ private fun OrganisationProfileTemplate(profile: OrganisationViewedPartnerProfil
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — ReadOnlyOrganisationPartnershipSection
+ *
+ * Renders the reusable Read Only Organisation Partnership Section portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun ReadOnlyOrganisationPartnershipSection(profile: OrganisationViewedPartnerProfile) {
     Column(
         modifier = Modifier
@@ -940,6 +1056,14 @@ private fun ReadOnlyOrganisationPartnershipSection(profile: OrganisationViewedPa
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — ReadOnlyOrganisationSupportRow
+ *
+ * Renders the reusable Read Only Organisation Support Row portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun ReadOnlyOrganisationSupportRow(support: OrganisationViewedPartnerSupport) {
     val typeLabel = support.supportType
         .lowercase(Locale.ROOT)
@@ -990,6 +1114,14 @@ private fun ReadOnlyOrganisationSupportRow(support: OrganisationViewedPartnerSup
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — OrganisationContactSection
+ *
+ * Renders the reusable Organisation Contact Section portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun OrganisationContactSection(
     email: String,
     phone: String,
@@ -1068,6 +1200,14 @@ private fun OrganisationContactSection(
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — ContactValue
+ *
+ * Handles the Compose/UI responsibility for contact value.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun ContactValue(label: String, value: String) {
     Text(
         text = label,
@@ -1087,6 +1227,14 @@ private fun ContactValue(label: String, value: String) {
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — InitialsProfileAvatar
+ *
+ * Handles the Compose/UI responsibility for initials profile avatar.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun InitialsProfileAvatar(
     name: String,
     imageUrl: String?,
@@ -1122,6 +1270,14 @@ private fun InitialsProfileAvatar(
     }
 }
 
+/**
+ * DETAILED BEHAVIOUR — profileInitials
+ *
+ * Handles the Compose/UI responsibility for profile initials.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun profileInitials(name: String): String = name
     .trim()
     .split(Regex("\\s+"))
@@ -1131,6 +1287,17 @@ private fun profileInitials(name: String): String = name
     .joinToString("")
     .ifBlank { "V" }
 
+/**
+ * DETAILED BEHAVIOUR — openEmail
+ *
+ * Handles the Compose/UI responsibility for open email.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ *
+ * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without leaving
+ * the UI in an assumed-success state.
+ */
 private fun openEmail(context: Context, emailAddress: String) {
     val email = emailAddress.trim()
     if (email.isBlank()) {
@@ -1163,6 +1330,17 @@ private fun openEmail(context: Context, emailAddress: String) {
     }
 }
 
+/**
+ * DETAILED BEHAVIOUR — openPhone
+ *
+ * Handles the Compose/UI responsibility for open phone.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ *
+ * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without leaving
+ * the UI in an assumed-success state.
+ */
 private fun openPhone(context: Context, phoneNumber: String) {
     val phone = phoneNumber.trim()
     if (phone.isBlank()) return
@@ -1176,6 +1354,17 @@ private fun openPhone(context: Context, phoneNumber: String) {
     }
 }
 
+/**
+ * DETAILED BEHAVIOUR — openWebsite
+ *
+ * Handles the Compose/UI responsibility for open website.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ *
+ * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without leaving
+ * the UI in an assumed-success state.
+ */
 private fun openWebsite(context: Context, websiteUrl: String) {
     var website = websiteUrl.trim()
     if (website.isBlank()) return

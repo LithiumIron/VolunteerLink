@@ -1,11 +1,22 @@
 package com.example.volunteerlink.organisation.screens
 
-// FILE OVERVIEW:
-/*
- * OrganisationCreateScreen contains presentation code for the organisation Create/Edit Post flow.
- * It focuses on rendering state and forwarding user actions through callbacks/ViewModels,
- * keeping database access and business rules outside the composables where possible.
- */
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Hosts the complete five-step Organisation Create/Edit Post wizard and renders the step that corresponds to
+// CreatePostUiState.currentStep.
+//
+// The screen delegates field changes and navigation decisions to CreatePostViewModel; it does not write to
+// Supabase directly.
+//
+// Review actions are mode-aware: a normal new post can publish or save a real Supabase DRAFT, existing-post edit
+// uses Save Changes, and Impact Weave conversion follows its dedicated publish/conversion path.
+//
+// Success/error/loading UI is driven by ViewModel state so a button press is never treated as success until the
+// repository operation completes.
+//
+// Architectural layer: Compose presentation layer.
+// ============================================================================
 
 
 import android.Manifest
@@ -45,6 +56,15 @@ import com.example.volunteerlink.organisation.viewmodel.CreatePostViewModel
  * and do not own a NavController.
  */
 @Composable
+/**
+ * DETAILED BEHAVIOUR — OrganisationCreateScreen
+ *
+ * Renders the Organisation Create screen from state supplied by the owning ViewModel/repository-facing
+ * coordinator.
+ *
+ * The composable maps state to Material3 UI and emits callbacks; it does not become the source of truth for
+ * persisted VolunteerLink data.
+ */
 fun OrganisationCreateScreen(
     onExitCreate: () -> Unit = {},
     editPostId: String? = null,
@@ -54,6 +74,16 @@ fun OrganisationCreateScreen(
     // The CreatePostViewModel owns the complete five-step draft; this route only decides which step to display.
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+
+    // Normal Create Post owns one device-only autosave. It is deliberately
+    // prepared only when neither special editor mode is active; otherwise a
+    // Manage > Edit or Impact Weave conversion could overwrite an unrelated
+    // unfinished new post stored on this phone.
+    LaunchedEffect(editPostId, impactWeaveDraftId) {
+        if (editPostId.isNullOrBlank() && impactWeaveDraftId.isNullOrBlank()) {
+            viewModel.prepareNewPostAutosave()
+        }
+    }
 
     // Existing-post edit mode hydrates the same CreatePostDraft used by normal creation.
     LaunchedEffect(editPostId) {
@@ -74,6 +104,14 @@ fun OrganisationCreateScreen(
      * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
      */
     // Approximate device location only biases Geoapify ranking; the search itself remains global.
+    /**
+     * DETAILED BEHAVIOUR — loadLocationBias
+     *
+     * Handles the Compose/UI responsibility for load location bias.
+     *
+     * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+     * ViewModel/repository layers.
+     */
     fun loadLocationBias() {
         DeviceLocationHelper.getApproximateCurrentLocation(context) { location ->
             if (location != null) {

@@ -1,5 +1,20 @@
 package com.example.volunteerlink.organisation.screens.chat
 
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Implements Organisation chat presentation/interaction associated with Organisation Chat List Screen.
+//
+// The screen/component renders shared chat models and emits repository-facing actions through callbacks or
+// coroutine calls rather than editing database tables directly.
+//
+// Sent messages, membership and read state remain Supabase-authoritative; only unsent text may be kept in account-
+// scoped local storage as a convenience.
+//
+// Architectural layer: Compose presentation layer.
+// ============================================================================
+
+
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -34,6 +49,15 @@ import com.example.volunteerlink.chat.data.unreadCountFor
 import com.example.volunteerlink.ui.theme.*
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — OrganisationChatListScreen
+ *
+ * Renders the Organisation Chat List screen from state supplied by the owning ViewModel/repository-facing
+ * coordinator.
+ *
+ * The composable maps state to Material3 UI and emits callbacks; it does not become the source of truth for
+ * persisted VolunteerLink data.
+ */
 fun OrganisationChatListScreen(
     role: Role,
     onOpenChat: (String) -> Unit,
@@ -252,6 +276,14 @@ fun OrganisationChatListScreen(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
+/**
+ * DETAILED BEHAVIOUR — ChatRow
+ *
+ * Renders the reusable Chat Row portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun ChatRow(
     chat: ChatRoom,
     role: Role,

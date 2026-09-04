@@ -1,10 +1,26 @@
 package com.example.volunteerlink.organisation.screens.chat
 
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Implements Organisation chat presentation/interaction associated with Organisation Chat Room Screen.
+//
+// The screen/component renders shared chat models and emits repository-facing actions through callbacks or
+// coroutine calls rather than editing database tables directly.
+//
+// Sent messages, membership and read state remain Supabase-authoritative; only unsent text may be kept in account-
+// scoped local storage as a convenience.
+//
+// Architectural layer: Compose presentation layer.
+// ============================================================================
+
+
 import android.media.MediaPlayer
 import android.media.MediaRecorder
 import android.net.Uri
 import android.os.Build
 import android.widget.VideoView
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import android.content.ActivityNotFoundException
 import android.content.Intent
@@ -18,7 +34,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -48,6 +64,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -94,6 +111,7 @@ import com.example.volunteerlink.chat.data.Role
 import com.example.volunteerlink.chat.data.meSenderId
 import com.example.volunteerlink.chat.data.messageTimeLabel
 import com.example.volunteerlink.chat.repository.SupabaseChatRepository
+import com.example.volunteerlink.organisation.data.OrganisationLocalStorage
 import com.example.volunteerlink.ui.theme.BubbleGreen
 import com.example.volunteerlink.ui.theme.CardBeige
 import com.example.volunteerlink.ui.theme.DeepGreen
@@ -104,6 +122,24 @@ import kotlinx.coroutines.launch
 import java.io.File
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — OrganisationChatRoomScreen
+ *
+ * Renders the Organisation Chat Room screen from state supplied by the owning ViewModel/repository-facing
+ * coordinator.
+ *
+ * The composable maps state to Material3 UI and emits callbacks; it does not become the source of truth for
+ * persisted VolunteerLink data.
+ *
+ * Coordinates account-scoped local persistence only for recoverable/cached UI state; published or transactional
+ * business state continues to come from Supabase.
+ *
+ * Runs asynchronous work in a lifecycle-aware coroutine and exposes progress/error state rather than blocking
+ * the UI thread.
+ *
+ * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without leaving
+ * the UI in an assumed-success state.
+ */
 fun OrganisationChatRoomScreen(
     chatId: String,
     onBack: () -> Unit,
@@ -131,7 +167,8 @@ fun OrganisationChatRoomScreen(
         chat?.messages ?: emptyList()
     }
 
-    var draft by remember { mutableStateOf("") }
+    var draft by remember(chatId) { mutableStateOf("") }
+    var localDraftRestored by remember(chatId) { mutableStateOf(false) }
     var showEmojiPicker by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -163,14 +200,38 @@ fun OrganisationChatRoomScreen(
     var replyingTo by remember { mutableStateOf<ChatMessage?>(null) }
     var forwardingMessage by remember { mutableStateOf<ChatMessage?>(null) }
     var showForwardChatSelector by remember { mutableStateOf(false) }
-    var forwardError by remember {
-        mutableStateOf<String?>(null)
-    }
 
     var highlightedMessageId by remember { mutableStateOf<String?>(null) }
     var highlightJob by remember { mutableStateOf<Job?>(null) }
 
+    // Only the unsent compose-box text is stored locally. The message history,
+    // read state, attachments and membership continue to come from Supabase.
+    // This makes accidental navigation/process recreation less frustrating
+    // without creating a second local chat database.
+    LaunchedEffect(chatId) {
+        draft = runCatching {
+            OrganisationLocalStorage.loadTextDraft(
+                draftType = "event_chat",
+                conversationId = chatId
+            )
+        }.getOrDefault("")
+        localDraftRestored = true
+    }
 
+    // A short delay avoids writing the JSON file on every single keystroke.
+    // LaunchedEffect is cancelled/restarted whenever draft changes, so only the
+    // latest stable text is persisted. Blank text removes the saved draft.
+    LaunchedEffect(chatId, draft, localDraftRestored) {
+        if (!localDraftRestored) return@LaunchedEffect
+        delay(350)
+        runCatching {
+            OrganisationLocalStorage.saveTextDraft(
+                draftType = "event_chat",
+                conversationId = chatId,
+                text = draft
+            )
+        }
+    }
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -242,6 +303,14 @@ fun OrganisationChatRoomScreen(
         }
     }
 
+    /**
+     * DETAILED BEHAVIOUR — openCamera
+     *
+     * Handles the Compose/UI responsibility for open camera.
+     *
+     * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+     * ViewModel/repository layers.
+     */
     fun openCamera() {
         val hasCameraPermission =
             androidx.core.content.ContextCompat.checkSelfPermission(
@@ -258,6 +327,14 @@ fun OrganisationChatRoomScreen(
         }
     }
 
+    /**
+     * DETAILED BEHAVIOUR — openVideoCamera
+     *
+     * Handles the Compose/UI responsibility for open video camera.
+     *
+     * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+     * ViewModel/repository layers.
+     */
     fun openVideoCamera() {
         val hasCameraPermission =
             androidx.core.content.ContextCompat.checkSelfPermission(
@@ -274,6 +351,17 @@ fun OrganisationChatRoomScreen(
         }
     }
 
+    /**
+     * DETAILED BEHAVIOUR — startVoiceRecording
+     *
+     * Handles the Compose/UI responsibility for start voice recording.
+     *
+     * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+     * ViewModel/repository layers.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     fun startVoiceRecording() {
         if (chat == null || isRecording) return
 
@@ -304,6 +392,20 @@ fun OrganisationChatRoomScreen(
         }
     }
 
+    /**
+     * DETAILED BEHAVIOUR — stopVoiceRecording
+     *
+     * Handles the Compose/UI responsibility for stop voice recording.
+     *
+     * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+     * ViewModel/repository layers.
+     *
+     * Runs asynchronous work in a lifecycle-aware coroutine and exposes progress/error state rather than
+     * blocking the UI thread.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     fun stopVoiceRecording() {
         val recorder = mediaRecorder ?: return
         val filePath = recordingFilePath
@@ -349,6 +451,7 @@ fun OrganisationChatRoomScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .imePadding()
             .background(BubbleGreen.copy(alpha = 0.35f))
     ) {
         Row(
@@ -517,7 +620,37 @@ fun OrganisationChatRoomScreen(
                 contentPadding = PaddingValues(12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(visibleMessages, key = { it.id }) { message ->
+                itemsIndexed(
+                    items = visibleMessages,
+                    key = { _, message -> message.id }
+                ) { index, message ->
+                    val date = chatMessageDate(message.sentAtMillis)
+                    val previousDate = visibleMessages
+                        .getOrNull(index - 1)
+                        ?.let { chatMessageDate(it.sentAtMillis) }
+
+                    if (index == 0 || date != previousDate) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = CardBeige.copy(alpha = 0.9f)
+                            ) {
+                                Text(
+                                    text = date,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
+                                    color = TextMuted,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    }
+
                     MessageBubble(
                         msg = message,
                         viewerRole = ChatData.currentRole.value,
@@ -572,12 +705,8 @@ fun OrganisationChatRoomScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(Color.White)
-                    .imePadding()
                     .navigationBarsPadding()
-                    .padding(
-                        horizontal = 10.dp,
-                        vertical = 8.dp
-                    ),
+                    .padding(horizontal = 10.dp, vertical = 8.dp),  // Note: background removed, moved to Column
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
@@ -688,6 +817,8 @@ fun OrganisationChatRoomScreen(
                                     }
                                 }.onFailure {
                                     draft = textToSend
+                                    replyingTo = replyId?.let(ChatData::findMessageById)
+                                    Toast.makeText(context, "Unable to send this message.", Toast.LENGTH_LONG).show()
                                 }
                             }
                         }
@@ -900,9 +1031,14 @@ fun OrganisationChatRoomScreen(
                         deleteConfirmationMessage = null
                         scope.launch {
                             runCatching {
-                                SupabaseChatRepository.deleteMessage(message.id)
-                                SupabaseChatRepository.loadMessagesForChat(chatId)
-                            }.onSuccess { ChatData.replaceMessages(chatId, it) }
+                                if (!message.id.startsWith("m")) {
+                                    SupabaseChatRepository.deleteMessage(message.id)
+                                }
+                            }.onSuccess {
+                                ChatData.deleteMessage(chatId, message.id)
+                            }.onFailure {
+                                Toast.makeText(context, "Unable to delete this message.", Toast.LENGTH_LONG).show()
+                            }
                         }
                     }
                 ) {
@@ -936,8 +1072,11 @@ fun OrganisationChatRoomScreen(
                         scope.launch {
                             runCatching {
                                 SupabaseChatRepository.editMessage(message.id, replacement)
-                                SupabaseChatRepository.loadMessagesForChat(chatId)
-                            }.onSuccess { ChatData.replaceMessages(chatId, it) }
+                            }.onSuccess {
+                                ChatData.editMessage(chatId, message.id, replacement)
+                            }.onFailure {
+                                Toast.makeText(context, "Unable to edit this message.", Toast.LENGTH_LONG).show()
+                            }
                         }
                     }
                 ) {
@@ -959,14 +1098,6 @@ fun OrganisationChatRoomScreen(
             title = { Text("Forward to...") },
             text = {
                 Column {
-                    forwardError?.let { error ->
-                        Text(
-                            text = error,
-                            color = Color(0xFFB3261E),
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-                    }
                     // Only show chats the current user has access to
                     val availableChats = ChatData.chatsForCurrentRole()
                     availableChats.forEach { chat ->
@@ -976,34 +1107,21 @@ fun OrganisationChatRoomScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable {
-                                        val messageToForward = forwardingMessage ?: return@clickable
-
+                                        val message = forwardingMessage ?: return@clickable
                                         scope.launch {
-                                            forwardError = null
-
                                             runCatching {
-                                                SupabaseChatRepository.forwardMessage(
-                                                    sourceMessageId = messageToForward.id,
-                                                    targetConversationId = chat.id
+                                                SupabaseChatRepository.sendMessage(
+                                                    chat.id,
+                                                    "Forwarded: ${messageSummary(message)}"
                                                 )
-
-                                                SupabaseChatRepository.loadMessagesForChat(
-                                                    chat.id
-                                                )
-                                            }.onSuccess { updatedTargetMessages ->
-                                                ChatData.replaceMessages(
-                                                    chatId = chat.id,
-                                                    messages = updatedTargetMessages
-                                                )
-
-                                                forwardingMessage = null
-                                                showForwardChatSelector = false
-                                            }.onFailure { error ->
-                                                forwardError =
-                                                    error.message
-                                                        ?: "Could not forward this message."
-                                            }
+                                                SupabaseChatRepository.loadMessagesForChat(chat.id)
+                                            }.onSuccess { ChatData.replaceMessages(chat.id, it) }
+                                                .onFailure {
+                                                    Toast.makeText(context, "Unable to forward this message.", Toast.LENGTH_LONG).show()
+                                                }
                                         }
+                                        forwardingMessage = null
+                                        showForwardChatSelector = false
                                     }
                                     .padding(vertical = 10.dp)
                             )
@@ -1076,7 +1194,27 @@ fun OrganisationChatRoomScreen(
     }
 }
 
+/**
+ * DETAILED BEHAVIOUR — chatMessageDate
+ *
+ * Handles the Compose/UI responsibility for chat message date.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
+fun chatMessageDate(timestamp: Long): String =
+    java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.getDefault())
+        .format(java.util.Date(timestamp))
+
 @Composable
+/**
+ * DETAILED BEHAVIOUR — MessageActionRow
+ *
+ * Renders the reusable Message Action Row portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun MessageActionRow(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
@@ -1100,6 +1238,14 @@ private fun MessageActionRow(
     }
 }
 
+/**
+ * DETAILED BEHAVIOUR — messageSummary
+ *
+ * Renders the reusable message Summary portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun messageSummary(message: ChatMessage): String =
     when {
         message.imageUri != null -> "📷 Photo"
@@ -1110,6 +1256,14 @@ private fun messageSummary(message: ChatMessage): String =
     }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — ZoomableFullscreenImage
+ *
+ * Handles the Compose/UI responsibility for zoomable fullscreen image.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun ZoomableFullscreenImage(uri: String) {
     var scale by remember(uri) { mutableStateOf(1f) }
     var offsetX by remember(uri) { mutableStateOf(0f) }
@@ -1152,6 +1306,14 @@ private fun ZoomableFullscreenImage(uri: String) {
  * bubble's own tap/long-press gesture detector and usually lost, so nothing happened.
  */
 @Composable
+/**
+ * DETAILED BEHAVIOUR — VideoMessageContent
+ *
+ * Renders the reusable Video Message Content portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun VideoMessageContent(videoUri: String) {
     Box(
         modifier = Modifier
@@ -1186,6 +1348,14 @@ private fun VideoMessageContent(videoUri: String) {
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — FullscreenVideoPlayer
+ *
+ * Handles the Compose/UI responsibility for fullscreen video player.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun FullscreenVideoPlayer(videoUri: String) {
     var videoView by remember(videoUri) { mutableStateOf<VideoView?>(null) }
     var isPlaying by remember(videoUri) { mutableStateOf(false) }
@@ -1293,12 +1463,28 @@ private fun FullscreenVideoPlayer(videoUri: String) {
     }
 }
 
+/**
+ * DETAILED BEHAVIOUR — formatVideoTime
+ *
+ * Handles the Compose/UI responsibility for format video time.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun formatVideoTime(milliseconds: Int): String {
     val totalSeconds = (milliseconds / 1_000).coerceAtLeast(0)
     return "%d:%02d".format(totalSeconds / 60, totalSeconds % 60)
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — VoiceMessageContent
+ *
+ * Renders the reusable Voice Message Content portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun VoiceMessageContent(
     audioUri: String,
     durationMillis: Long
@@ -1312,6 +1498,14 @@ private fun VoiceMessageContent(
 
     val effectiveDuration = if (durationMillis > 0) durationMillis else (player?.duration?.toLong() ?: 0L)
 
+    /**
+     * DETAILED BEHAVIOUR — ensurePlayer
+     *
+     * Handles the Compose/UI responsibility for ensure player.
+     *
+     * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+     * ViewModel/repository layers.
+     */
     fun ensurePlayer(): MediaPlayer? {
         player?.let { return it }
         val created = MediaPlayer.create(context, Uri.parse(audioUri)) ?: return null
@@ -1397,6 +1591,14 @@ private fun VoiceMessageContent(
     }
 }
 
+/**
+ * DETAILED BEHAVIOUR — formatVoiceDuration
+ *
+ * Handles the Compose/UI responsibility for format voice duration.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun formatVoiceDuration(durationMillis: Long): String {
     val totalSeconds = (durationMillis / 1_000).coerceAtLeast(0)
     return "%d:%02d".format(totalSeconds / 60, totalSeconds % 60)
@@ -1412,9 +1614,33 @@ private val urlPattern = Regex(
 private val emailPattern = Regex("[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}")
 private val phonePattern = Regex("(\\+?\\d{1,3}[-.\\s]?)?(\\(?\\d{2,4}\\)?[-.\\s]?){2,4}\\d{2,4}")
 
+/**
+ * DETAILED DECLARATION — LinkType
+ *
+ * Domain/UI type for Link Type used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 private enum class LinkType { URL, EMAIL, PHONE }
+/**
+ * DETAILED DECLARATION — DetectedLink
+ *
+ * Domain/UI type for Detected Link used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 private data class DetectedLink(val range: IntRange, val type: LinkType, val value: String)
 
+/**
+ * DETAILED BEHAVIOUR — detectLinks
+ *
+ * Handles the Compose/UI responsibility for detect links.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun detectLinks(text: String): List<DetectedLink> {
     val found = mutableListOf<DetectedLink>()
 
@@ -1439,6 +1665,17 @@ private fun detectLinks(text: String): List<DetectedLink> {
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — LinkifiedMessageText
+ *
+ * Handles the Compose/UI responsibility for linkified message text.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ *
+ * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without leaving
+ * the UI in an assumed-success state.
+ */
 private fun LinkifiedMessageText(text: String, fontSize: TextUnit) {
     val context = LocalContext.current
     val links = remember(text) { detectLinks(text) }
@@ -1499,6 +1736,17 @@ private fun LinkifiedMessageText(text: String, fontSize: TextUnit) {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
+/**
+ * DETAILED BEHAVIOUR — MessageBubble
+ *
+ * Handles the Compose/UI responsibility for message bubble.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ *
+ * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without leaving
+ * the UI in an assumed-success state.
+ */
 private fun MessageBubble(
     msg: ChatMessage,
     viewerRole: Role,
@@ -1650,7 +1898,11 @@ private fun MessageBubble(
                     msg.fileUri != null -> {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(vertical = 4.dp)
+                            modifier = Modifier
+                                .widthIn(max = 230.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color.White.copy(alpha = 0.55f))
+                                .padding(horizontal = 10.dp, vertical = 8.dp)
                         ) {
                             Icon(
                                 Icons.Default.Description,
@@ -1659,12 +1911,17 @@ private fun MessageBubble(
                                 modifier = Modifier.size(24.dp)
                             )
                             Spacer(Modifier.width(8.dp))
-                            Text(
-                                text = msg.fileName ?: "Document",
-                                fontSize = 15.sp,
-                                color = Color(0xFF3B6FD6),
-                                textDecoration = TextDecoration.Underline
-                            )
+                            Column {
+                                Text(
+                                    text = msg.fileName ?: "Document",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = DeepGreen,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text("Attachment", fontSize = 10.sp, color = TextMuted)
+                            }
                         }
                     }
                     else -> LinkifiedMessageText(text = msg.text, fontSize = 15.sp)

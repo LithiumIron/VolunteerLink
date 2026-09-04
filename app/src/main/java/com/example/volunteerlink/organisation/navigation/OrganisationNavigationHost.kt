@@ -1,18 +1,28 @@
 package com.example.volunteerlink.organisation.navigation
 
-// FILE OVERVIEW:
-/*
- * OrganisationNavigationHost contains route/navigation definitions for the organisation navigation flow.
- * Centralising destinations and route wiring keeps screen transitions consistent and avoids
- * embedding NavController logic inside reusable screen sections.
- */
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Defines the Organisation account's navigation graph and is the central place where Home, Manage, Create, Chats,
+// Profile and deeper management routes are connected.
+//
+// Bottom-navigation state is derived from the current route, while nested screens such as Post Management,
+// Applicant Review, Impact Weave and profile/certificate views remain inside the same NavHost.
+//
+// It also coordinates route parameters and guarded exits so long-running Create/Review workflows do not lose state
+// simply because the user taps another bottom tab.
+//
+// The navigation layer passes identifiers between screens; repositories still re-check ownership when those
+// identifiers reach the backend.
+//
+// Architectural layer: Navigation layer.
+// ============================================================================
 
 
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.widget.Toast
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
@@ -63,24 +73,20 @@ import com.example.volunteerlink.organisation.screens.OrganisationViewPartnerPro
 import com.example.volunteerlink.organisation.screens.OrganisationViewVolunteerProfileScreen
 import com.example.volunteerlink.organisation.screens.OrganisationVolunteerCertificateScreen
 import com.example.volunteerlink.organisation.screens.OrganisationPromotionScreen
-
 import com.example.volunteerlink.organisation.home.model.HomeAttentionType
 import com.example.volunteerlink.organisation.screens.OrganisationSettingScreen
 import com.example.volunteerlink.chat.repository.SupabaseChatRepository
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.ui.graphics.Color
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
 
 import com.example.volunteerlink.chat.data.ChatData
 import com.example.volunteerlink.chat.data.Role
-import com.example.volunteerlink.data.supabase
 
 import com.example.volunteerlink.organisation.screens.chat.OrganisationChatsHubScreen
 import com.example.volunteerlink.organisation.screens.chat.OrganisationChatRoomScreen
 import com.example.volunteerlink.organisation.screens.chat.OrganisationPartnershipChatRoomScreen
 import com.example.volunteerlink.organisation.screens.chat.OrganisationGroupInfoScreen
-import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.launch
 
 private const val RETURN_TO_PEOPLE_AFTER_APPLICANT_REVIEW =
@@ -96,6 +102,18 @@ private const val OPEN_REVIEW_FROM_HOME = "openReviewFromHome"
  * screen easier to read and avoids mixing UI code with navigation logic.
  */
 @Composable
+/**
+ * DETAILED BEHAVIOUR — OrganisationNavigationHost
+ *
+ * Implements the current VolunteerLink responsibility for organisation navigation host in this support/model
+ * layer.
+ *
+ * Runs asynchronous work in a lifecycle-aware coroutine and exposes progress/error state rather than blocking
+ * the UI thread.
+ *
+ * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without leaving
+ * the UI in an assumed-success state.
+ */
 fun OrganisationNavigationHost(
     onLoggedOut: () -> Unit
 ) {
@@ -109,19 +127,15 @@ fun OrganisationNavigationHost(
     var reviewExitProtected by remember { mutableStateOf(false) }
     var discardReviewSession by remember { mutableStateOf<(() -> Unit)?>(null) }
     var pendingBottomRoute by remember { mutableStateOf<String?>(null) }
-    var showBackLogoutConfirmation by remember { mutableStateOf(false) }
-    var isLoggingOutFromBack by remember { mutableStateOf(false) }
-    val backLogoutScope = rememberCoroutineScope()
-
-    BackHandler(
-        enabled = currentRoute == OrganisationNavigationRoutes.HOME
-    ) {
-        showBackLogoutConfirmation = true
-    }
 
     /**
      * Navigates the bottom for the organisation organisation navigation flow.
      * Centralising the route behaviour keeps every caller consistent.
+     */
+    /**
+     * DETAILED BEHAVIOUR — navigateBottom
+     *
+     * Implements the current VolunteerLink responsibility for navigate bottom in this support/model layer.
      */
     fun navigateBottom(route: String) {
         navController.navigate(route) {
@@ -172,7 +186,7 @@ fun OrganisationNavigationHost(
         onDispose {
             if (window != null) {
                 // The root app also contains the teammate-owned Volunteer
-                // branch, so restore its previous non-edge-to-edge behaviour
+                // branch, so use the intended non-edge-to-edge behaviour for this route
                 // when leaving the Organisation branch.
                 WindowCompat.setDecorFitsSystemWindows(window, true)
             }
@@ -417,7 +431,7 @@ fun OrganisationNavigationHost(
                         )
                     },
                     onDecisionSaved = {
-                        // Tell the previous Manage Post destination which main tab
+                        // Tell the Manage Post destination which main tab
                         // must be shown after its applicant data refreshes.
                         navController.previousBackStackEntry
                             ?.savedStateHandle
@@ -547,7 +561,6 @@ fun OrganisationNavigationHost(
                 )
             }
 
-
             composable(
                 route = OrganisationNavigationRoutes.PARTNERSHIP_CHAT_ROOM,
                 arguments = listOf(
@@ -667,6 +680,8 @@ fun OrganisationNavigationHost(
                     onRefresh = {
                         profileScope.launch {
                             OrganisationSessionStore.updateProfileLoading(true)
+
+
                             val loadedProfile = OrganisationProfileRepository.loadProfile()
                             if (loadedProfile != null) {
                                 OrganisationSessionStore.setProfileData(loadedProfile)
@@ -741,47 +756,15 @@ fun OrganisationNavigationHost(
             containerColor = VolunteerLinkSurface
         )
     }
-    if (showBackLogoutConfirmation) {
-        AlertDialog(
-            onDismissRequest = {
-                if (!isLoggingOutFromBack) showBackLogoutConfirmation = false
-            },
-            title = { Text("Log out?") },
-            text = {
-                Text("You'll need to sign in again to access your organisation profile.")
-            },
-            confirmButton = {
-                TextButton(
-                    enabled = !isLoggingOutFromBack,
-                    onClick = {
-                        backLogoutScope.launch {
-                            isLoggingOutFromBack = true
-                            try {
-                                supabase.auth.signOut()
-                                OrganisationSessionStore.clearProfileData()
-                                showBackLogoutConfirmation = false
-                                onLoggedOut()
-                            } catch (e: Exception) {
-                                e.printStackTrace()
-                            } finally {
-                                isLoggingOutFromBack = false
-                            }
-                        }
-                    }
-                ) { Text("Log out", color = Color(0xFFC62828)) }
-            },
-            dismissButton = {
-                TextButton(
-                    enabled = !isLoggingOutFromBack,
-                    onClick = { showBackLogoutConfirmation = false }
-                ) { Text("Cancel", color = VolunteerLinkPrimaryGreen) }
-            }
-        )
-    }
 }
 
 
 /** Returns the Activity even when Compose is using a ContextWrapper. */
+/**
+ * DETAILED BEHAVIOUR — findActivity
+ *
+ * Implements the current VolunteerLink responsibility for find activity in this support/model layer.
+ */
 private tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
     is ContextWrapper -> baseContext.findActivity()

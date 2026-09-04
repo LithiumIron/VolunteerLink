@@ -1,11 +1,22 @@
 package com.example.volunteerlink.organisation.screens
 
-// FILE OVERVIEW:
-/*
- * OrganisationApplicantReviewScreen contains presentation code for the organisation Manage Post flow.
- * It focuses on rendering state and forwarding user actions through callbacks/ViewModels,
- * keeping database access and business rules outside the composables where possible.
- */
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Presents the exact pending application data that an Organisation is allowed to review for a REVIEW_APPLICANTS
+// role.
+//
+// Submitted screening answers are read-only because the volunteer owns the application content; Organisation
+// actions are Accept, Decline with a required reason, and related profile inspection.
+//
+// Decline input remains editable until confirmation and is validated before the repository RPC is called; the
+// backend also validates the reason so the requirement cannot be bypassed by the client.
+//
+// The screen itself contains presentation logic only. Applicant state changes are performed by
+// OrganisationPostManagementViewModel and the authenticated repository.
+//
+// Architectural layer: Compose presentation layer.
+// ============================================================================
 
 
 import androidx.compose.foundation.BorderStroke
@@ -84,6 +95,15 @@ import java.util.Locale
  * fields, and a fixed bottom action area. Submitted answers are read-only.
  */
 @Composable
+/**
+ * DETAILED BEHAVIOUR — OrganisationApplicantReviewScreen
+ *
+ * Renders the Organisation Applicant Review screen from state supplied by the owning ViewModel/repository-
+ * facing coordinator.
+ *
+ * The composable maps state to Material3 UI and emits callbacks; it does not become the source of truth for
+ * persisted VolunteerLink data.
+ */
 fun OrganisationApplicantReviewScreen(
     postId: String,
     roleTemplateId: String,
@@ -230,6 +250,15 @@ fun OrganisationApplicantReviewScreen(
  * Renders the organisation applicant decline dialog dialog used in the organisation Manage Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
  */
+/**
+ * DETAILED BEHAVIOUR — OrganisationApplicantDeclineDialog
+ *
+ * Renders the Organisation Applicant Decline Dialog modal interaction and keeps temporary form/confirmation UI
+ * separate from the underlying server action.
+ *
+ * The confirm callback is only emitted after the dialog-side input/choice is in an acceptable state; the
+ * ViewModel/repository performs the real mutation.
+ */
 private fun OrganisationApplicantDeclineDialog(
     person: PostManagementPerson,
     reason: String,
@@ -353,6 +382,14 @@ private fun OrganisationApplicantDeclineDialog(
 /**
  * Renders the organisation applicant review content content block used in the organisation Manage Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — OrganisationApplicantReviewContent
+ *
+ * Renders the reusable Organisation Applicant Review Content portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
  */
 private fun OrganisationApplicantReviewContent(
     post: PostManagementPost,
@@ -567,6 +604,14 @@ private fun OrganisationApplicantReviewContent(
  * Renders the UI represented by organisation applicant review top bar for the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — OrganisationApplicantReviewTopBar
+ *
+ * Handles the Compose/UI responsibility for organisation applicant review top bar.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun OrganisationApplicantReviewTopBar(
     person: PostManagementPerson,
     onBack: () -> Unit,
@@ -620,6 +665,14 @@ private fun OrganisationApplicantReviewTopBar(
 /**
  * Renders the organisation application role summary summary block used in the organisation Manage Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — OrganisationApplicationRoleSummary
+ *
+ * Renders the reusable Organisation Application Role Summary portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
  */
 private fun OrganisationApplicationRoleSummary(
     post: PostManagementPost,
@@ -729,6 +782,17 @@ private fun OrganisationApplicationRoleSummary(
 /**
  * Formats the application date used by the organisation Manage Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — formatApplicationDate
+ *
+ * Handles the Compose/UI responsibility for format application date.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ *
+ * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without leaving
+ * the UI in an assumed-success state.
  */
 fun formatApplicationDate(raw: String): String {
     if (raw.isBlank()) return "Date unavailable"

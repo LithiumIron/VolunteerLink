@@ -1,5 +1,20 @@
 package com.example.volunteerlink.data.location
 
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Contains the Android-specific one-time location lookup used to obtain an approximate device coordinate.
+//
+// The helper checks permission/provider availability and returns location data to higher-level resolvers rather
+// than letting Compose call LocationManager directly.
+//
+// Location is used for search bias/current-location convenience; VolunteerLink still lets the organisation search
+// and choose locations elsewhere.
+//
+// Architectural layer: Shared data/support layer.
+// ============================================================================
+
+
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
@@ -17,9 +32,24 @@ import androidx.core.util.Consumer
  * Gets a one-time approximate device location only to improve autocomplete
  * ranking. Geoapify still works globally if permission is denied.
  */
+/**
+ * DETAILED DECLARATION — DeviceLocationHelper
+ *
+ * Single shared instance for Device Location Helper so related rules/state are defined once for the application
+ * process.
+ */
 object DeviceLocationHelper {
 
     @SuppressLint("MissingPermission")
+    /**
+     * DETAILED BEHAVIOUR — getApproximateCurrentLocation
+     *
+     * Implements the current VolunteerLink responsibility for get approximate current location in this
+     * support/model layer.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     fun getApproximateCurrentLocation(
         context: Context,
         onResult: (Location?) -> Unit
@@ -62,6 +92,11 @@ object DeviceLocationHelper {
 
             val handler = Handler(Looper.getMainLooper())
             var completed = false
+            /**
+             * DETAILED BEHAVIOUR — finish
+             *
+             * Implements the current VolunteerLink responsibility for finish in this support/model layer.
+             */
             fun finish(location: Location?) {
                 if (!completed) {
                     completed = true
@@ -69,6 +104,14 @@ object DeviceLocationHelper {
                     onResult(location)
                 }
             }
+            /**
+             * DETAILED BEHAVIOUR — request
+             *
+             * Implements the current VolunteerLink responsibility for request in this support/model layer.
+             *
+             * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up
+             * without leaving the UI in an assumed-success state.
+             */
             fun request(index: Int) {
                 if (index >= providers.size) {
                     val lastKnown = providers.asSequence()

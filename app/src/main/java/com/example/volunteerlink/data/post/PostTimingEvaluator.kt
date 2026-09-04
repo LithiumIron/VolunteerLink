@@ -1,5 +1,21 @@
 package com.example.volunteerlink.data.post
 
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Contains pure business rules that classify a Volunteer Post relative to AppClock, including Draft attention and
+// current/future/past timing state.
+//
+// Create and Manage use the same evaluator so the seven-day publish rule and date-based UI restrictions are not
+// reimplemented differently in multiple screens.
+//
+// The evaluator has no Supabase or Compose dependency: callers provide dates/mode/current time and receive a
+// deterministic result.
+//
+// Architectural layer: Shared data/support layer.
+// ============================================================================
+
+
 import com.example.volunteerlink.data.time.AppClock
 import kotlinx.serialization.Serializable
 import java.text.SimpleDateFormat
@@ -14,6 +30,12 @@ import java.util.Locale
  * separate from these derived timing states. This object only answers things
  * that depend on what VolunteerLink currently considers to be "now".
  */
+/**
+ * DETAILED DECLARATION — PostTimingEvaluator
+ *
+ * Single shared instance for Post Timing Evaluator so related rules/state are defined once for the application
+ * process.
+ */
 object PostTimingEvaluator {
 
     private const val MIN_PUBLISH_LEAD_DAYS = 7
@@ -26,6 +48,18 @@ object PostTimingEvaluator {
      * - either side ongoing -> ONGOING
      * - otherwise, either side still future -> UPCOMING
      * - otherwise -> PAST
+     */
+    /**
+     * DETAILED BEHAVIOUR — evaluatePostTiming
+     *
+     * Evaluates the pure business rule represented by evaluate post timing from the values supplied by the
+     * caller.
+     *
+     * The function does not perform UI or network side effects, which keeps the rule deterministic and reusable
+     * from multiple screens/workflows.
+     *
+     * Uses AppClock for business-date/time decisions so the same code works with the project test clock and
+     * normal device time.
      */
     fun evaluatePostTiming(
         input: PostTimingInput,
@@ -72,6 +106,18 @@ object PostTimingEvaluator {
      * The Draft is never deleted or changed here. This only returns an attention
      * result that Home/Manage/Publish can display or enforce.
      */
+    /**
+     * DETAILED BEHAVIOUR — evaluateDraftAttention
+     *
+     * Evaluates the pure business rule represented by evaluate draft attention from the values supplied by the
+     * caller.
+     *
+     * The function does not perform UI or network side effects, which keeps the rule deterministic and reusable
+     * from multiple screens/workflows.
+     *
+     * Uses AppClock for business-date/time decisions so the same code works with the project test clock and
+     * normal device time.
+     */
     fun evaluateDraftAttention(
         input: PostTimingInput,
         nowMillis: Long = AppClock.nowMillis()
@@ -108,6 +154,15 @@ object PostTimingEvaluator {
     }
 
     /** Earliest actual volunteering start for the post mode. */
+    /**
+     * DETAILED BEHAVIOUR — earliestStartDate
+     *
+     * Evaluates the pure business rule represented by earliest start date from the values supplied by the
+     * caller.
+     *
+     * The function does not perform UI or network side effects, which keeps the rule deterministic and reusable
+     * from multiple screens/workflows.
+     */
     fun earliestStartDate(input: PostTimingInput): String? {
         return when (input.mode) {
             PostMode.PHYSICAL -> input.physicalStartDate
@@ -119,6 +174,14 @@ object PostTimingEvaluator {
         }
     }
 
+    /**
+     * DETAILED BEHAVIOUR — evaluatePeriod
+     *
+     * Evaluates the pure business rule represented by evaluate period from the values supplied by the caller.
+     *
+     * The function does not perform UI or network side effects, which keeps the rule deterministic and reusable
+     * from multiple screens/workflows.
+     */
     private fun evaluatePeriod(
         startDate: String?,
         endDate: String?,
@@ -128,6 +191,15 @@ object PostTimingEvaluator {
             ?: PostTimingState.PAST
     }
 
+    /**
+     * DETAILED BEHAVIOUR — evaluatePeriodOrNull
+     *
+     * Evaluates the pure business rule represented by evaluate period or null from the values supplied by the
+     * caller.
+     *
+     * The function does not perform UI or network side effects, which keeps the rule deterministic and reusable
+     * from multiple screens/workflows.
+     */
     private fun evaluatePeriodOrNull(
         startDate: String?,
         endDate: String?,
@@ -144,6 +216,14 @@ object PostTimingEvaluator {
         }
     }
 
+    /**
+     * DETAILED BEHAVIOUR — earliestDate
+     *
+     * Evaluates the pure business rule represented by earliest date from the values supplied by the caller.
+     *
+     * The function does not perform UI or network side effects, which keeps the rule deterministic and reusable
+     * from multiple screens/workflows.
+     */
     private fun earliestDate(first: String?, second: String?): String? {
         val firstMillis = first?.let(::parseDateAtStartOfDay)
         val secondMillis = second?.let(::parseDateAtStartOfDay)
@@ -156,6 +236,18 @@ object PostTimingEvaluator {
         }
     }
 
+    /**
+     * DETAILED BEHAVIOUR — parseDateAtStartOfDay
+     *
+     * Evaluates the pure business rule represented by parse date at start of day from the values supplied by
+     * the caller.
+     *
+     * The function does not perform UI or network side effects, which keeps the rule deterministic and reusable
+     * from multiple screens/workflows.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     private fun parseDateAtStartOfDay(value: String): Long? {
         val parsed = runCatching {
             dateFormat().parse(value.trim())
@@ -164,6 +256,14 @@ object PostTimingEvaluator {
         return startOfDay(parsed.time)
     }
 
+    /**
+     * DETAILED BEHAVIOUR — startOfDay
+     *
+     * Evaluates the pure business rule represented by start of day from the values supplied by the caller.
+     *
+     * The function does not perform UI or network side effects, which keeps the rule deterministic and reusable
+     * from multiple screens/workflows.
+     */
     private fun startOfDay(timeMillis: Long): Long {
         return Calendar.getInstance().apply {
             this.timeInMillis = timeMillis
@@ -174,6 +274,14 @@ object PostTimingEvaluator {
         }.timeInMillis
     }
 
+    /**
+     * DETAILED BEHAVIOUR — addDays
+     *
+     * Evaluates the pure business rule represented by add days from the values supplied by the caller.
+     *
+     * The function does not perform UI or network side effects, which keeps the rule deterministic and reusable
+     * from multiple screens/workflows.
+     */
     private fun addDays(startDayMillis: Long, days: Int): Long {
         return Calendar.getInstance().apply {
             timeInMillis = startDayMillis
@@ -181,6 +289,14 @@ object PostTimingEvaluator {
         }.timeInMillis
     }
 
+    /**
+     * DETAILED BEHAVIOUR — daysBetween
+     *
+     * Evaluates the pure business rule represented by days between from the values supplied by the caller.
+     *
+     * The function does not perform UI or network side effects, which keeps the rule deterministic and reusable
+     * from multiple screens/workflows.
+     */
     private fun daysBetween(startDayMillis: Long, endDayMillis: Long): Int {
         // Calendar dates are used instead of raw millisecond division so the
         // result remains correct across daylight-saving changes on other devices.
@@ -209,10 +325,26 @@ object PostTimingEvaluator {
         return days
     }
 
+    /**
+     * DETAILED BEHAVIOUR — formatDate
+     *
+     * Evaluates the pure business rule represented by format date from the values supplied by the caller.
+     *
+     * The function does not perform UI or network side effects, which keeps the rule deterministic and reusable
+     * from multiple screens/workflows.
+     */
     private fun formatDate(timeMillis: Long): String {
         return dateFormat().format(Date(timeMillis))
     }
 
+    /**
+     * DETAILED BEHAVIOUR — dateFormat
+     *
+     * Evaluates the pure business rule represented by date format from the values supplied by the caller.
+     *
+     * The function does not perform UI or network side effects, which keeps the rule deterministic and reusable
+     * from multiple screens/workflows.
+     */
     private fun dateFormat(): SimpleDateFormat {
         return SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
             isLenient = false
@@ -220,12 +352,29 @@ object PostTimingEvaluator {
     }
 }
 
+/**
+ * DETAILED DECLARATION — PostMode
+ *
+ * Domain/UI type for Post Mode used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 enum class PostMode {
     PHYSICAL,
     REMOTE,
     HYBRID;
 
     companion object {
+        /**
+         * DETAILED BEHAVIOUR — fromDatabaseValue
+         *
+         * Evaluates the pure business rule represented by from database value from the values supplied by the
+         * caller.
+         *
+         * The function does not perform UI or network side effects, which keeps the rule deterministic and
+         * reusable from multiple screens/workflows.
+         */
         fun fromDatabaseValue(value: String): PostMode? {
             return entries.firstOrNull {
                 it.name.equals(value.trim(), ignoreCase = true)
@@ -235,6 +384,14 @@ enum class PostMode {
 }
 
 @Serializable
+/**
+ * DETAILED DECLARATION — PostTimingState
+ *
+ * Domain/UI type for Post Timing State used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 enum class PostTimingState {
     UPCOMING,
     ONGOING,
@@ -242,6 +399,14 @@ enum class PostTimingState {
 }
 
 /** Only the date fields needed for timing calculations. */
+/**
+ * DETAILED DECLARATION — PostTimingInput
+ *
+ * Domain/UI type for Post Timing Input used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class PostTimingInput(
     val mode: PostMode,
     val physicalStartDate: String? = null,
@@ -250,12 +415,30 @@ data class PostTimingInput(
     val remoteEndDate: String? = null
 )
 
+/**
+ * DETAILED DECLARATION — DraftAttentionType
+ *
+ * Represents editable/incomplete user input for Draft Attention Type before it becomes a server-authoritative
+ * record.
+ *
+ * The draft can contain temporarily incomplete values because validation is applied at step transitions and
+ * final persistence boundaries.
+ */
 enum class DraftAttentionType {
     NONE,
     START_TOO_SOON,
     START_DATE_PASSED
 }
 
+/**
+ * DETAILED DECLARATION — DraftAttention
+ *
+ * Represents editable/incomplete user input for Draft Attention before it becomes a server-authoritative
+ * record.
+ *
+ * The draft can contain temporarily incomplete values because validation is applied at step transitions and
+ * final persistence boundaries.
+ */
 data class DraftAttention(
     val type: DraftAttentionType,
     val startDate: String? = null,
@@ -266,6 +449,14 @@ data class DraftAttention(
         get() = type != DraftAttentionType.NONE
 
     companion object {
+        /**
+         * DETAILED BEHAVIOUR — none
+         *
+         * Evaluates the pure business rule represented by none from the values supplied by the caller.
+         *
+         * The function does not perform UI or network side effects, which keeps the rule deterministic and
+         * reusable from multiple screens/workflows.
+         */
         fun none(
             startDate: String? = null,
             daysUntilStart: Int? = null

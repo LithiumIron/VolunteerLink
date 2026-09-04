@@ -1,11 +1,22 @@
 package com.example.volunteerlink.organisation.viewmodel
 
-// FILE OVERVIEW:
-/*
- * OrganisationHomeViewModel coordinates state and user actions for the organisation Home dashboard flow.
- * It translates UI events into validation/repository operations and exposes observable state
- * back to Compose so the screen can stay declarative.
- */
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Owns the Organisation Home dashboard state and coordinates the data needed for summary cards, attention items
+// and quick navigation.
+//
+// It loads the authenticated organisation context, refreshes application lifecycle state through the repository,
+// and exposes a single Compose-friendly UI state.
+//
+// A successful server snapshot can be cached for read-only offline display; actions that change real
+// application/post data still require a live Supabase request.
+//
+// Date-sensitive dashboard information is recalculated when AppClock refreshes so the dashboard follows the same
+// business date used by Create/Manage flows.
+//
+// Architectural layer: ViewModel / workflow state layer.
+// ============================================================================
 
 
 import android.util.Log
@@ -43,6 +54,15 @@ import java.util.Locale
  * The repository owns Supabase reads. PostTimingEvaluator owns time rules. This
  * ViewModel combines both into one read-only StateFlow for the future Home UI.
  */
+/**
+ * DETAILED DECLARATION — OrganisationHomeViewModel
+ *
+ * Lifecycle-aware state owner for Organisation Home View Model. It survives ordinary Compose recomposition and
+ * coordinates asynchronous repository work.
+ *
+ * UI callbacks enter through methods on this class so validation, loading/error state and dependent business
+ * rules remain centralised.
+ */
 class OrganisationHomeViewModel : ViewModel() {
 
     private val homeRepository: OrganisationHomeRepository =
@@ -62,6 +82,25 @@ class OrganisationHomeViewModel : ViewModel() {
     }
 
     /** Loads saved data first, then tries to sync the latest snapshot from Supabase. */
+    /**
+     * DETAILED BEHAVIOUR — refresh
+     *
+     * Loads or refreshes the data required by refresh and writes the result into observable UI state.
+     *
+     * The coroutine/repository boundary is handled here so Compose only reacts to loading, success and error
+     * state.
+     *
+     * Coordinates account-scoped local persistence only for recoverable/cached UI state; published or
+     * transactional business state continues to come from Supabase.
+     *
+     * Runs asynchronous work in a lifecycle-aware coroutine and exposes progress/error state rather than
+     * blocking the UI thread.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     fun refresh() {
         if (refreshInProgress) return
         refreshInProgress = true
@@ -130,7 +169,24 @@ class OrganisationHomeViewModel : ViewModel() {
     /**
      * Resolves the ORGANISATION ID of whoever is actually signed in right now,
      * via the same two-step lookup used elsewhere (auth.uid() -> user_profiles
-     * -> organisations). Replaces the previous hardcoded prototype organisation identity.
+     * -> organisations). Keeps the authenticated organisation lookup in one reusable data path.
+     */
+    /**
+     * DETAILED BEHAVIOUR — resolveCurrentOrganisationId
+     *
+     * Implements the ViewModel workflow operation for resolve current organisation id.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Uses OrganisationSession so the client operation is associated with the signed-in organisation; server
+     * RLS/RPC ownership checks still make the final authorization decision.
+     *
+     * Uses AppClock for business-date/time decisions so the same code works with the project test clock and
+     * normal device time.
+     *
+     * Runs asynchronous work in a lifecycle-aware coroutine and exposes progress/error state rather than
+     * blocking the UI thread.
      */
     private suspend fun resolveCurrentOrganisationId(): String =
         OrganisationSession.requireOrganisationId()
@@ -139,6 +195,20 @@ class OrganisationHomeViewModel : ViewModel() {
      * AppClock refreshes every few seconds during the current test/demo setup.
      * Recalculate the cached post states immediately when its value changes;
      * there is no reason to query Supabase posts again just because time changed.
+     */
+    /**
+     * DETAILED BEHAVIOUR — observeAppClock
+     *
+     * Implements the ViewModel workflow operation for observe app clock.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Uses AppClock for business-date/time decisions so the same code works with the project test clock and
+     * normal device time.
+     *
+     * Runs asynchronous work in a lifecycle-aware coroutine and exposes progress/error state rather than
+     * blocking the UI thread.
      */
     private fun observeAppClock() {
         viewModelScope.launch {
@@ -152,6 +222,22 @@ class OrganisationHomeViewModel : ViewModel() {
     /**
      * Applies the snapshot used by the organisation Home dashboard flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — applySnapshot
+     *
+     * Implements the ViewModel workflow operation for apply snapshot.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Uses AppClock for business-date/time decisions so the same code works with the project test clock and
+     * normal device time.
+     *
+     * Uses the shared PostTimingEvaluator rather than duplicating the seven-day/timing classification inside
+     * this method.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
      */
     private fun applySnapshot(snapshot: OrganisationHomeSnapshot) {
         val nowMillis = AppClock.nowMillis()
@@ -299,6 +385,14 @@ class OrganisationHomeViewModel : ViewModel() {
      * Derives the organisation impact weave attention value used by the organisation Home dashboard flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — toHomeAttentionItem
+     *
+     * Implements the ViewModel workflow operation for to home attention item.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     private fun OrganisationImpactWeaveAttention.toHomeAttentionItem(): HomeAttentionItem {
         val type = when (attentionType.uppercase(Locale.ROOT)) {
             "READY" -> HomeAttentionType.IMPACT_WEAVE_READY
@@ -332,6 +426,14 @@ class OrganisationHomeViewModel : ViewModel() {
      * Builds the completion review attention used by the organisation Home dashboard flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — buildCompletionReviewAttention
+     *
+     * Implements the ViewModel workflow operation for build completion review attention.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     private fun buildCompletionReviewAttention(
         post: OrganisationHomePost
     ): HomeAttentionItem {
@@ -348,6 +450,14 @@ class OrganisationHomeViewModel : ViewModel() {
     /**
      * Builds the application review attention used by the organisation Home dashboard flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — buildApplicationReviewAttention
+     *
+     * Implements the ViewModel workflow operation for build application review attention.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
      */
     private fun buildApplicationReviewAttention(
         post: OrganisationHomePost,
@@ -424,6 +534,17 @@ class OrganisationHomeViewModel : ViewModel() {
      * Builds the draft attention used by the organisation Home dashboard flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — buildDraftAttention
+     *
+     * Implements the ViewModel workflow operation for build draft attention.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Uses the shared PostTimingEvaluator rather than duplicating the seven-day/timing classification inside
+     * this method.
+     */
     private fun buildDraftAttention(
         post: OrganisationHomePost,
         input: PostTimingInput,
@@ -466,6 +587,14 @@ class OrganisationHomeViewModel : ViewModel() {
      * Derives the organisation home post value used by the organisation Home dashboard flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — toTimingInput
+     *
+     * Implements the ViewModel workflow operation for to timing input.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     private fun OrganisationHomePost.toTimingInput(): PostTimingInput? {
         val postMode = PostMode.fromDatabaseValue(mode) ?: return null
         return PostTimingInput(
@@ -480,6 +609,17 @@ class OrganisationHomeViewModel : ViewModel() {
     /**
      * Derives the organisation home post value used by the organisation Home dashboard flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — toHomePostItem
+     *
+     * Implements the ViewModel workflow operation for to home post item.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Uses the shared PostTimingEvaluator rather than duplicating the seven-day/timing classification inside
+     * this method.
      */
     private fun OrganisationHomePost.toHomePostItem(
         timingState: PostTimingState,
@@ -526,6 +666,17 @@ class OrganisationHomeViewModel : ViewModel() {
      * Derives the evaluate single period state value used by the organisation Home dashboard flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — evaluateSinglePeriodState
+     *
+     * Implements the ViewModel workflow operation for evaluate single period state.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Uses the shared PostTimingEvaluator rather than duplicating the seven-day/timing classification inside
+     * this method.
+     */
     private fun evaluateSinglePeriodState(
         mode: PostMode,
         startDate: String?,
@@ -556,6 +707,14 @@ class OrganisationHomeViewModel : ViewModel() {
      * Formats the home date used by the organisation Home dashboard flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
      */
+    /**
+     * DETAILED BEHAVIOUR — formatHomeDate
+     *
+     * Implements the ViewModel workflow operation for format home date.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     private fun formatHomeDate(value: String): String {
         val parts = value.split("-")
         if (parts.size != 3) return value
@@ -581,6 +740,14 @@ class OrganisationHomeViewModel : ViewModel() {
     /**
      * Returns the latest date value required by the organisation Home dashboard flow.
      * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — latestDate
+     *
+     * Implements the ViewModel workflow operation for latest date.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
      */
     private fun latestDate(first: String?, second: String?): String? {
         return when {

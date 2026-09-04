@@ -1,5 +1,20 @@
 package com.example.volunteerlink.chat.data
 
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Defines shared chat models/state helpers consumed by Organisation chat screens and the chat repository.
+//
+// Conversation/message/member models represent server data in a Compose-friendly form, while unread helpers derive
+// badge counts for the bottom navigation and chat lists.
+//
+// Unsent Organisation text drafts may be stored locally, but sent messages and membership remain Supabase-
+// authoritative.
+//
+// Architectural layer: Shared data/support layer.
+// ============================================================================
+
+
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -7,12 +22,32 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 
 
+/**
+ * DETAILED DECLARATION — MessageListener
+ *
+ * Contract for Message Listener. Callers depend on this abstraction rather than a concrete Supabase
+ * implementation.
+ *
+ * Implementations may perform network/storage work, while ViewModels and Compose remain expressed in
+ * VolunteerLink domain types.
+ */
 interface MessageListener {
+    /**
+     * DETAILED BEHAVIOUR — onNewMessage
+     *
+     * Implements the current VolunteerLink responsibility for on new message in this support/model layer.
+     */
     fun onNewMessage(chatId: String, chatTitle: String, senderName: String, text: String)
 }
+/**
+ * DETAILED DECLARATION — ChatData
+ *
+ * Single shared instance for Chat Data so related rules/state are defined once for the application process.
+ */
 object ChatData {
 
     var messageListener: MessageListener? = null
+    val partnershipAttention = mutableStateOf(0)
 
     // Which role the demo is currently running as. Toggled from the Role select screen
     // and again from each Profile / Manage screen ("Switch account" button).
@@ -84,6 +119,11 @@ object ChatData {
         )
     )
 
+    /**
+     * DETAILED BEHAVIOUR — eventById
+     *
+     * Implements the current VolunteerLink responsibility for event by id in this support/model layer.
+     */
     fun eventById(id: String): VolunteerEvent? = events.find { it.id == id }
 
     // ---------- Chats ----------
@@ -137,6 +177,12 @@ object ChatData {
         )
     )
 
+    /**
+     * DETAILED BEHAVIOUR — updateSignedInProfile
+     *
+     * Implements the current VolunteerLink responsibility for update signed in profile in this support/model
+     * layer.
+     */
     fun updateSignedInProfile(
         role: Role,
         profile: UserProfile
@@ -147,43 +193,42 @@ object ChatData {
         }
     }
 
-    fun replaceChats(
-        chats: List<ChatRoom>
-    ) {
+    /**
+     * DETAILED BEHAVIOUR — replaceChats
+     *
+     * Implements the current VolunteerLink responsibility for replace chats in this support/model layer.
+     */
+    fun replaceChats(chats: List<ChatRoom>) {
         allChats.clear()
         allChats.addAll(chats)
-
-        allMessagesById.clear()
-
-        chats.forEach { chat ->
-            chat.messages.forEach { message ->
-                allMessagesById[message.id] = message
-            }
-        }
+        rebuildMessageIndex()
     }
 
+    /**
+     * DETAILED BEHAVIOUR — replaceMessages
+     *
+     * Implements the current VolunteerLink responsibility for replace messages in this support/model layer.
+     */
     fun replaceMessages(
         chatId: String,
         messages: List<ChatMessage>
     ) {
         val chat = chatById(chatId) ?: return
 
-        chat.messages.forEach { oldMessage ->
-            allMessagesById.remove(oldMessage.id)
-        }
-
         chat.messages.clear()
         chat.messages.addAll(messages)
-
-        messages.forEach { message ->
-            allMessagesById[message.id] = message
-        }
-
         chat.readCounts[currentRole.value] = messages.size
+        rebuildMessageIndex()
     }
 
     // Filters the chat with the newest message appears at the top of the list.
     // But Pinned chat always at the most top
+    /**
+     * DETAILED BEHAVIOUR — chatsForCurrentRole
+     *
+     * Implements the current VolunteerLink responsibility for chats for current role in this support/model
+     * layer.
+     */
     fun chatsForCurrentRole(): List<ChatRoom> {
         return allChats
             .filter { currentRole.value in it.visibleTo }
@@ -193,8 +238,18 @@ object ChatData {
             )
     }
 
+    /**
+     * DETAILED BEHAVIOUR — chatById
+     *
+     * Implements the current VolunteerLink responsibility for chat by id in this support/model layer.
+     */
     fun chatById(id: String): ChatRoom? = allChats.find { it.id == id }
 
+    /**
+     * DETAILED BEHAVIOUR — sendMessage
+     *
+     * Implements the current VolunteerLink responsibility for send message in this support/model layer.
+     */
     fun sendMessage(chatId: String, text: String, replyToId: String? = null) {
         val chat = chatById(chatId) ?: return
         if (text.isBlank()) return
@@ -214,6 +269,11 @@ object ChatData {
         chat.readCounts[currentRole.value] = chat.messages.size
         addMessageToIndex(newMessage)
     }
+    /**
+     * DETAILED BEHAVIOUR — receiveMessage
+     *
+     * Implements the current VolunteerLink responsibility for receive message in this support/model layer.
+     */
     fun receiveMessage(chatId: String, senderId: String, senderName: String, senderInitial: String, senderColor: Long, text: String) {
         val chat = chatById(chatId) ?: return
         val newMessage = ChatMessage(
@@ -232,6 +292,11 @@ object ChatData {
     }
 
     /** Same idea as sendMessage but for a photo captured from the camera icon. */
+    /**
+     * DETAILED BEHAVIOUR — sendImageMessage
+     *
+     * Implements the current VolunteerLink responsibility for send image message in this support/model layer.
+     */
     fun sendImageMessage(chatId: String, imageUri: String) {
         val chat = chatById(chatId) ?: return
         val senderId = meSenderId(currentRole.value)
@@ -251,10 +316,20 @@ object ChatData {
         addMessageToIndex(newMessage)
     }
 
+    /**
+     * DETAILED BEHAVIOUR — sendVideoMessage
+     *
+     * Implements the current VolunteerLink responsibility for send video message in this support/model layer.
+     */
     fun sendVideoMessage(chatId: String, videoUri: String) {
         addMediaMessage(chatId, "🎥 Video", videoUri = videoUri)
     }
 
+    /**
+     * DETAILED BEHAVIOUR — sendVoiceMessage
+     *
+     * Implements the current VolunteerLink responsibility for send voice message in this support/model layer.
+     */
     fun sendVoiceMessage(chatId: String, audioUri: String, durationMillis: Long) {
         addMediaMessage(
             chatId = chatId,
@@ -264,6 +339,11 @@ object ChatData {
         )
     }
 
+    /**
+     * DETAILED BEHAVIOUR — addMediaMessage
+     *
+     * Implements the current VolunteerLink responsibility for add media message in this support/model layer.
+     */
     private fun addMediaMessage(
         chatId: String,
         label: String,
@@ -294,6 +374,11 @@ object ChatData {
         addMessageToIndex(newMessage)   // ✅ index it
     }
 
+    /**
+     * DETAILED BEHAVIOUR — sendFileMessage
+     *
+     * Implements the current VolunteerLink responsibility for send file message in this support/model layer.
+     */
     fun sendFileMessage(chatId: String, uri: String, mimeType: String, fileName: String?) {
         val chat = chatById(chatId) ?: return
         val senderId = meSenderId(currentRole.value)
@@ -315,6 +400,12 @@ object ChatData {
         addMessageToIndex(newMessage)
     }
 
+    /**
+     * DETAILED BEHAVIOUR — getFileNameFromUri
+     *
+     * Implements the current VolunteerLink responsibility for get file name from uri in this support/model
+     * layer.
+     */
     private fun getFileNameFromUri(context: Context, uri: Uri): String {
         var fileName = "Document"
         context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
@@ -328,12 +419,22 @@ object ChatData {
         return fileName
     }
 
+    /**
+     * DETAILED BEHAVIOUR — markChatRead
+     *
+     * Implements the current VolunteerLink responsibility for mark chat read in this support/model layer.
+     */
     fun markChatRead(chatId: String) {
         val chat = chatById(chatId) ?: return
         chat.readCounts[currentRole.value] = chat.messages.size
     }
 
     /** Only the sender can delete their own message - enforce that at the call site (see ChatRoomScreen). */
+    /**
+     * DETAILED BEHAVIOUR — deleteMessage
+     *
+     * Implements the current VolunteerLink responsibility for delete message in this support/model layer.
+     */
     fun deleteMessage(chatId: String, messageId: String) {
         val chat = chatById(chatId) ?: return
         val message = chat.messages.find { it.id == messageId } ?: return
@@ -344,6 +445,11 @@ object ChatData {
     }
 
     /** Only the sender can edit their own message - enforce that at the call site (see ChatRoomScreen). */
+    /**
+     * DETAILED BEHAVIOUR — editMessage
+     *
+     * Implements the current VolunteerLink responsibility for edit message in this support/model layer.
+     */
     fun editMessage(chatId: String, messageId: String, newText: String) {
         if (newText.isBlank()) return
         val chat = chatById(chatId) ?: return
@@ -356,6 +462,11 @@ object ChatData {
         }
     }
 
+    /**
+     * DETAILED BEHAVIOUR — pinMessage
+     *
+     * Implements the current VolunteerLink responsibility for pin message in this support/model layer.
+     */
     fun pinMessage(chatId: String, messageId: String) {
         val chat = chatById(chatId) ?: return
         val index = chat.messages.indexOfFirst { it.id == messageId }
@@ -374,6 +485,11 @@ object ChatData {
         )
     }
 
+    /**
+     * DETAILED BEHAVIOUR — unpinMessage
+     *
+     * Implements the current VolunteerLink responsibility for unpin message in this support/model layer.
+     */
     fun unpinMessage(chatId: String, messageId: String) {
         val chat = chatById(chatId) ?: return
         val index = chat.messages.indexOfFirst { it.id == messageId }
@@ -387,6 +503,11 @@ object ChatData {
         }
     }
 
+    /**
+     * DETAILED BEHAVIOUR — forwardMessage
+     *
+     * Implements the current VolunteerLink responsibility for forward message in this support/model layer.
+     */
     fun forwardMessage(message: ChatMessage, targetChatId: String) {
         val targetChat = chatById(targetChatId) ?: return
 
@@ -412,6 +533,11 @@ object ChatData {
     }
 
     /** Builds a fixed past timestamp (e.g. "yesterday at 9:50 AM") for seed/demo messages. */
+    /**
+     * DETAILED BEHAVIOUR — pastTimestamp
+     *
+     * Implements the current VolunteerLink responsibility for past timestamp in this support/model layer.
+     */
     private fun pastTimestamp(daysAgo: Int, hour: Int, minute: Int): Long {
         val calendar = java.util.Calendar.getInstance()
         calendar.add(java.util.Calendar.DAY_OF_YEAR, -daysAgo)
@@ -422,14 +548,29 @@ object ChatData {
         return calendar.timeInMillis
     }
 
+    /**
+     * DETAILED BEHAVIOUR — toggleMuteChat
+     *
+     * Implements the current VolunteerLink responsibility for toggle mute chat in this support/model layer.
+     */
     fun toggleMuteChat(chatId: String) {
         chatById(chatId)?.let { it.isMuted = !it.isMuted }
     }
 
+    /**
+     * DETAILED BEHAVIOUR — togglePinChat
+     *
+     * Implements the current VolunteerLink responsibility for toggle pin chat in this support/model layer.
+     */
     fun togglePinChat(chatId: String) {
         chatById(chatId)?.let { it.isPinned = !it.isPinned }
     }
 
+    /**
+     * DETAILED BEHAVIOUR — exitGroup
+     *
+     * Implements the current VolunteerLink responsibility for exit group in this support/model layer.
+     */
     fun exitGroup(chatId: String) {
         val chat = chatById(chatId) ?: return
         val currentUserId = meSenderId(currentRole.value)
@@ -449,10 +590,21 @@ object ChatData {
         }
     }
 
+    /**
+     * DETAILED BEHAVIOUR — deleteGroup
+     *
+     * Implements the current VolunteerLink responsibility for delete group in this support/model layer.
+     */
     fun deleteGroup(chatId: String) {
         allChats.removeAll { it.id == chatId }
     }
 
+    /**
+     * DETAILED BEHAVIOUR — createIndividualChat
+     *
+     * Implements the current VolunteerLink responsibility for create individual chat in this support/model
+     * layer.
+     */
     fun createIndividualChat(
         participantId: String,
         participantName: String,
@@ -499,6 +651,12 @@ object ChatData {
         allChats.add(newChat)
     }
 
+    /**
+     * DETAILED BEHAVIOUR — updateGroupDescription
+     *
+     * Implements the current VolunteerLink responsibility for update group description in this support/model
+     * layer.
+     */
     fun updateGroupDescription(chatId: String, newDescription: String) {
         val chat = chatById(chatId) ?: return
         chat.description = newDescription
@@ -507,13 +665,28 @@ object ChatData {
     // ---------- Applied events (Applicant "Skill Path" / applications) ----------
     val appliedEventIds = mutableStateListOf<String>()
 
+    /**
+     * DETAILED BEHAVIOUR — applyToEvent
+     *
+     * Implements the current VolunteerLink responsibility for apply to event in this support/model layer.
+     */
     fun applyToEvent(eventId: String) {
         if (!appliedEventIds.contains(eventId)) appliedEventIds.add(eventId)
     }
 
+    /**
+     * DETAILED BEHAVIOUR — isApplied
+     *
+     * Implements the current VolunteerLink responsibility for is applied in this support/model layer.
+     */
     fun isApplied(eventId: String): Boolean = appliedEventIds.contains(eventId)
 
     // ---------- Organisation created events ----------
+    /**
+     * DETAILED BEHAVIOUR — createEvent
+     *
+     * Implements the current VolunteerLink responsibility for create event in this support/model layer.
+     */
     fun createEvent(title: String, date: String, spots: Int) {
         events.add(
             VolunteerEvent(
@@ -536,11 +709,34 @@ object ChatData {
     private val allMessagesById: MutableMap<String, ChatMessage> = mutableMapOf()
 
     // Ensure every message is added to the map when created
+    /**
+     * DETAILED BEHAVIOUR — addMessageToIndex
+     *
+     * Implements the current VolunteerLink responsibility for add message to index in this support/model layer.
+     */
     private fun addMessageToIndex(message: ChatMessage) {
         allMessagesById[message.id] = message
     }
 
+    /**
+     * DETAILED BEHAVIOUR — rebuildMessageIndex
+     *
+     * Implements the current VolunteerLink responsibility for rebuild message index in this support/model
+     * layer.
+     */
+    fun rebuildMessageIndex() {
+        allMessagesById.clear()
+        allChats.forEach { chat ->
+            chat.messages.forEach(::addMessageToIndex)
+        }
+    }
+
     // Helper to find a message anywhere
+    /**
+     * DETAILED BEHAVIOUR — findMessageById
+     *
+     * Implements the current VolunteerLink responsibility for find message by id in this support/model layer.
+     */
     fun findMessageById(messageId: String): ChatMessage? = allMessagesById[messageId]
 
     // Get all chats (for forwarding dialog)

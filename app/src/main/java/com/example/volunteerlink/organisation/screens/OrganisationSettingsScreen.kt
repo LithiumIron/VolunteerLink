@@ -1,5 +1,23 @@
 package com.example.volunteerlink.organisation.screens
 
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Implements the Organisation UI associated with Organisation Settings Screen.
+//
+// The composable layer is responsible for layout, interaction and displaying loading/error/validation state;
+// business rules and persistence are delegated to ViewModels/repositories.
+//
+// This separation makes it clear during maintenance which code changes appearance versus which code changes real
+// server data.
+//
+// Where the screen displays cached information, server-changing actions remain disabled or routed through a fresh
+// authenticated repository operation.
+//
+// Architectural layer: Compose presentation layer.
+// ============================================================================
+
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -8,12 +26,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
@@ -47,6 +62,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.volunteerlink.data.supabase
 import com.example.volunteerlink.organisation.auth.OrganisationSessionStore
+import com.example.volunteerlink.organisation.data.OrganisationLocalStorage
 import com.example.volunteerlink.organisation.repository.OrganisationProfileRepository
 import com.example.volunteerlink.ui.theme.DeepGreen
 import com.example.volunteerlink.ui.theme.VolunteerLinkBackground
@@ -58,6 +74,14 @@ import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.launch
 
 /** Simple title+message pair shown in the generic info dialog below. */
+/**
+ * DETAILED DECLARATION — SettingsInfoDialogContent
+ *
+ * Domain/UI type for Settings Info Dialog Content used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 private data class SettingsInfoDialogContent(
     val title: String,
     val message: String
@@ -65,10 +89,27 @@ private data class SettingsInfoDialogContent(
 
 // EMAIL removed — the login email now goes through its own two-step OTP
 // flow (see emailChangeStep below), not the generic single-field dialog.
+/**
+ * DETAILED DECLARATION — ContactFieldType
+ *
+ * Domain/UI type for Contact Field Type used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 private enum class ContactFieldType { PHONE, EMAIL, DESCRIPTION }
 
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — OrganisationSettingScreen
+ *
+ * Renders the Organisation Setting screen from state supplied by the owning ViewModel/repository-facing
+ * coordinator.
+ *
+ * The composable maps state to Material3 UI and emits callbacks; it does not become the source of truth for
+ * persisted VolunteerLink data.
+ */
 fun OrganisationSettingScreen(
     onBackSelected: () -> Unit,
     onEditProfileSelected: () -> Unit,
@@ -102,6 +143,13 @@ fun OrganisationSettingScreen(
                         scope.launch {
                             isLoggingOut = true
                             try {
+                                // Clear account-scoped offline snapshots and unsent
+                                // chat/form drafts BEFORE signOut(). The local-storage
+                                // filename uses the current auth-user id, which is no
+                                // longer available after Supabase clears the session.
+                                runCatching {
+                                    OrganisationLocalStorage.clearCurrentOrganisationData()
+                                }
                                 supabase.auth.signOut()
                                 OrganisationSessionStore.clearProfileData()
                                 onLoggedOut()
@@ -263,12 +311,7 @@ fun OrganisationSettingScreen(
             )
         }
 
-        Column(
-            modifier = Modifier
-                .verticalScroll(rememberScrollState())
-                .padding(top = 12.dp)
-                .navigationBarsPadding()
-        ) {
+        Column(modifier = Modifier.padding(top = 12.dp)) {
 
             SettingsSectionLabel("Account")
             SettingsRow(
@@ -368,6 +411,14 @@ fun OrganisationSettingScreen(
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — SettingsSectionLabel
+ *
+ * Renders the reusable Settings Section Label portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun SettingsSectionLabel(label: String) {
     if (label.isNotBlank()) {
         Text(
@@ -383,6 +434,14 @@ private fun SettingsSectionLabel(label: String) {
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — SettingsRow
+ *
+ * Renders the reusable Settings Row portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun SettingsRow(
     icon: ImageVector,
     title: String,

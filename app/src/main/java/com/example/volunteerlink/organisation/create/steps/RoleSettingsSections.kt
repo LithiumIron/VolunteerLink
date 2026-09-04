@@ -1,11 +1,21 @@
 package com.example.volunteerlink.organisation.create.steps
 
-// FILE OVERVIEW:
-/*
- * RoleSettingsSections contains presentation code for the organisation Create/Edit Post flow.
- * It focuses on rendering state and forwarding user actions through callbacks/ViewModels,
- * keeping database access and business rules outside the composables where possible.
- */
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Provides a reusable section used by the Create Post wizard for Role Settings Sections.
+//
+// The composables read CreatePostUiState/CreatePostDraft values and emit callbacks; they do not call Supabase
+// directly.
+//
+// Validation messages are supplied from CreatePostViewModel/CreatePostValidator so the same business rules apply
+// regardless of which UI component displays the field.
+//
+// Breaking large steps into section files keeps layout code readable while the ViewModel remains the single owner
+// of mutable workflow state.
+//
+// Architectural layer: Compose presentation layer.
+// ============================================================================
 
 
 import androidx.compose.foundation.BorderStroke
@@ -70,6 +80,14 @@ import com.example.volunteerlink.ui.theme.RoleSettingsPurpleBackground
  * Renders the role information section section used in the organisation Create/Edit Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
  */
+/**
+ * DETAILED BEHAVIOUR — RoleInformationSection
+ *
+ * Renders the reusable Role Information Section portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun RoleInformationSection(
     template: CreateRoleTemplate
 ) {
@@ -113,6 +131,14 @@ fun RoleInformationSection(
 /**
  * Renders the skills practised section section used in the organisation Create/Edit Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — SkillsPractisedSection
+ *
+ * Renders the reusable Skills Practised Section portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
  */
 fun SkillsPractisedSection(
     template: CreateRoleTemplate,
@@ -199,6 +225,14 @@ fun SkillsPractisedSection(
 /**
  * Renders the required skills section section used in the organisation Create/Edit Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — RequiredSkillsSection
+ *
+ * Renders the reusable Required Skills Section portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
  */
 fun RequiredSkillsSection(
     template: CreateRoleTemplate,
@@ -292,6 +326,14 @@ fun RequiredSkillsSection(
  * Renders the responsibilities section section used in the organisation Create/Edit Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
  */
+/**
+ * DETAILED BEHAVIOUR — ResponsibilitiesSection
+ *
+ * Renders the reusable Responsibilities Section portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun ResponsibilitiesSection(
     responsibilities: List<String>,
     enabled: Boolean = true,
@@ -366,6 +408,14 @@ fun ResponsibilitiesSection(
 /**
  * Renders the applicant method section section used in the organisation Create/Edit Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — ApplicantMethodSection
+ *
+ * Renders the reusable Applicant Method Section portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
  */
 fun ApplicantMethodSection(
     template: CreateRoleTemplate,
@@ -549,6 +599,14 @@ fun ApplicantMethodSection(
  * Renders the UI represented by application method option for the organisation Create/Edit Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
  */
+/**
+ * DETAILED BEHAVIOUR — ApplicationMethodOption
+ *
+ * Handles the Compose/UI responsibility for application method option.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun ApplicationMethodOption(
     method: RoleApplicationMethod,
     description: String,
@@ -647,6 +705,14 @@ fun ApplicationMethodOption(
 /**
  * Renders the role submission and notes section section used in the organisation Create/Edit Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — RoleSubmissionAndNotesSection
+ *
+ * Renders the reusable Role Submission And Notes Section portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
  */
 fun RoleSubmissionAndNotesSection(
     draft: CreatePostDraft,
@@ -797,6 +863,14 @@ fun RoleSubmissionAndNotesSection(
 
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — RoleSettingsSectionCard
+ *
+ * Renders the reusable Role Settings Section Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun RoleSettingsSectionCard(
     iconRes: Int,
     title: String,
@@ -863,6 +937,14 @@ fun RoleSettingsSectionCard(
  * Renders the role identity card card used in the organisation Create/Edit Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
  */
+/**
+ * DETAILED BEHAVIOUR — RoleIdentityCard
+ *
+ * Renders the reusable Role Identity Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun RoleIdentityCard(
     template: CreateRoleTemplate,
     selectedRole: SelectedRoleDraft
@@ -922,6 +1004,14 @@ fun RoleIdentityCard(
 /**
  * Renders the role overview card card used in the organisation Create/Edit Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — RoleOverviewCard
+ *
+ * Renders the reusable Role Overview Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
  */
 fun RoleOverviewCard(
     template: CreateRoleTemplate,
@@ -1037,6 +1127,14 @@ fun RoleOverviewCard(
  * Renders the role level badge badge used in the organisation Create/Edit Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
  */
+/**
+ * DETAILED BEHAVIOUR — RoleLevelBadge
+ *
+ * Renders the reusable Role Level Badge portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun RoleLevelBadge(level: VolunteerRoleLevel) {
     val background: Color
     val foreground: Color
@@ -1077,6 +1175,14 @@ fun RoleLevelBadge(level: VolunteerRoleLevel) {
  * Renders the role application method badge badge used in the organisation Create/Edit Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
  */
+/**
+ * DETAILED BEHAVIOUR — RoleApplicationMethodBadge
+ *
+ * Renders the reusable Role Application Method Badge portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun RoleApplicationMethodBadge(method: RoleApplicationMethod) {
     Surface(
         shape = RoundedCornerShape(999.dp),
@@ -1096,6 +1202,14 @@ fun RoleApplicationMethodBadge(method: RoleApplicationMethod) {
 /**
  * Renders the practised skill row row used in the organisation Create/Edit Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — PractisedSkillRow
+ *
+ * Renders the reusable Practised Skill Row portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
  */
 fun PractisedSkillRow(
     skill: CreateRoleSkill,
@@ -1160,6 +1274,14 @@ fun PractisedSkillRow(
 /**
  * Renders the required skill card card used in the organisation Create/Edit Post flow.
  * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — RequiredSkillCard
+ *
+ * Renders the reusable Required Skill Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
  */
 fun RequiredSkillCard(
     skill: CreateRoleSkill,
@@ -1325,6 +1447,14 @@ fun RequiredSkillCard(
 /**
  * Returns the role area icon res value required by the organisation Create/Edit Post flow.
  * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — roleAreaIconRes
+ *
+ * Handles the Compose/UI responsibility for role area icon res.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
  */
 fun roleAreaIconRes(roleArea: String): Int {
     return when (roleArea) {
