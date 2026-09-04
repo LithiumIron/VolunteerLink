@@ -109,7 +109,7 @@ fun VolunteerRemoteSubmissionCard(
                 if (project.reason.isNotBlank()) Text(project.reason, color = VolunteerLinkTextSecondary)
                 if (project.canSubmit) {
                     VolunteerDetailText("1 file · Maximum 20 MB · Internet required", secondary = true)
-                    VolunteerDetailText("PDF, images (JPG/PNG), Word, Excel or PowerPoint.", secondary = true)
+                    VolunteerDetailText("PDF, images (JPG/PNG), Word, Excel, PowerPoint, TXT or ZIP.", secondary = true)
                     project.history.firstOrNull()?.takeIf { it.status == "REVISION_REQUESTED" }?.let { latest ->
                         Text("Revision requested", fontWeight = FontWeight.Bold, color = VolunteerLinkTextPrimary)
                         Text(latest.feedback.orEmpty(), color = VolunteerLinkTextPrimary)

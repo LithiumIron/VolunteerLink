@@ -150,6 +150,8 @@ fun VolunteerRoleDetailsScreen(
     val activeOtherApplication =
         VolunteerOpportunitySessionStore.activeApplicationForEvent(volunteerEventId)
             ?.takeIf { application -> application.applicationRoleId != volunteerRoleId }
+    val physicalConflict = com.example.volunteerlink.data.VolunteerPhysicalScheduleConflictEvaluator
+        .firstFor(volunteerOpportunityEvent, volunteerOpportunityRole)
 
     Column(
         modifier = Modifier
@@ -289,6 +291,7 @@ fun VolunteerRoleDetailsScreen(
             volunteerCanReapply = volunteerCanReapply,
             volunteerWasRejected = volunteerWasRejected,
             activeOtherApplication = activeOtherApplication,
+            physicalConflict = physicalConflict,
             onJoinRoleSelected = {
                 onJoinRoleSelected(
                     volunteerOpportunityEvent.eventId,
@@ -899,6 +902,7 @@ private fun VolunteerRoleJoinSection(
     volunteerCanReapply: Boolean,
     volunteerWasRejected: Boolean,
     activeOtherApplication: com.example.volunteerlink.model.VolunteerOpportunityApplication?,
+    physicalConflict: com.example.volunteerlink.data.VolunteerPhysicalScheduleConflict?,
     onJoinRoleSelected: () -> Unit
 ) {
     val hasAcceptedOtherRole =
@@ -936,6 +940,8 @@ private fun VolunteerRoleJoinSection(
                         "Already registered — track status in My Applications."
                     } else if (volunteerWasRejected) {
                         "You were not selected for this role. You may choose another open role in this opportunity."
+                    } else if (physicalConflict != null) {
+                        physicalConflict.message() + " Resolve the existing schedule before applying."
                     } else if (activeOtherApplication != null) {
                         "Your current role is ${activeOtherApplication.applicationRoleTitle}. Changing roles gives up that role. You will review and confirm the change before anything is cancelled. Online only."
                     } else when (
@@ -994,6 +1000,7 @@ private fun VolunteerRoleJoinSection(
                             !eligibilityIsLoading &&
                             !volunteerHasApplied &&
                             !volunteerWasRejected &&
+                            physicalConflict == null &&
                             activeOtherApplication?.applicationDatabaseId?.startsWith("offline|") != true,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1021,6 +1028,8 @@ private fun VolunteerRoleJoinSection(
                             "Already Registered"
                         } else if (volunteerWasRejected) {
                             "Not Selected for This Role"
+                        } else if (physicalConflict != null) {
+                            "Schedule Conflict"
                         } else if (activeOtherApplication != null) {
                             "Review Role Change"
                         } else if (volunteerCanReapply) {
