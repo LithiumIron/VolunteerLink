@@ -19,6 +19,7 @@ import java.util.TimeZone
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.JsonNull
 
 @Serializable
 data class PostGroupStatus(
@@ -149,9 +150,10 @@ object SupabaseChatRepository {
                 put("p_conversation_id", JsonPrimitive(conversationId))
                 put("p_message_text", JsonPrimitive(text.trim()))
                 put("p_message_type", JsonPrimitive("TEXT"))
-                replyToMessageId?.let {
-                    put("p_reply_to_message_id", JsonPrimitive(it))
-                }
+                put("p_attachment_path", JsonNull)
+                put("p_attachment_name", JsonNull)
+                put("p_attachment_mime_type", JsonNull)
+                put("p_reply_to_message_id", replyToMessageId?.let(::JsonPrimitive) ?: JsonNull)
             }
         ).decodeAs<String>()
     }
@@ -170,6 +172,24 @@ object SupabaseChatRepository {
         return supabase.postgrest.rpc(
             function = "delete_conversation_message",
             parameters = buildJsonObject { put("p_message_id", JsonPrimitive(messageId)) }
+        ).decodeAs<String>()
+    }
+
+    suspend fun leaveConversation(conversationId: String): String {
+        return supabase.postgrest.rpc(
+            function = "leave_conversation",
+            parameters = buildJsonObject {
+                put("p_conversation_id", JsonPrimitive(conversationId))
+            }
+        ).decodeAs<String>()
+    }
+
+    suspend fun deleteConversationForMe(conversationId: String): String {
+        return supabase.postgrest.rpc(
+            function = "delete_conversation_for_me",
+            parameters = buildJsonObject {
+                put("p_conversation_id", JsonPrimitive(conversationId))
+            }
         ).decodeAs<String>()
     }
 
@@ -347,6 +367,10 @@ private fun String.toChatRole(): Role =
     }
 
 private fun String.toEpochMillis(): Long {
+    val normalisedTimestamp = replace(
+        Regex("(\\.\\d{3})\\d+(?=Z|[+-]\\d{2}:?\\d{2}$)"),
+        "$1"
+    )
     val patterns = listOf(
         "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
         "yyyy-MM-dd'T'HH:mm:ssXXX",
@@ -358,7 +382,7 @@ private fun String.toEpochMillis(): Long {
         runCatching {
             SimpleDateFormat(pattern, Locale.US).apply {
                 timeZone = TimeZone.getTimeZone("UTC")
-            }.parse(this)?.time
+            }.parse(normalisedTimestamp)?.time
         }.getOrNull()
     } ?: System.currentTimeMillis()
 }

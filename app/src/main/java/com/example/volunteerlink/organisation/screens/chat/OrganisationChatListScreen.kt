@@ -1,5 +1,7 @@
 package com.example.volunteerlink.organisation.screens.chat
 
+import android.widget.Toast
+
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -13,12 +15,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsNone
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -31,7 +35,9 @@ import com.example.volunteerlink.chat.data.meSenderId
 import com.example.volunteerlink.chat.data.previewText
 import com.example.volunteerlink.chat.data.previewTime
 import com.example.volunteerlink.chat.data.unreadCountFor
+import com.example.volunteerlink.chat.repository.SupabaseChatRepository
 import com.example.volunteerlink.ui.theme.*
+import kotlinx.coroutines.launch
 
 @Composable
 fun OrganisationChatListScreen(
@@ -41,6 +47,8 @@ fun OrganisationChatListScreen(
     showHeader: Boolean = true
 ) {
     val chats = ChatData.chatsForCurrentRole()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var showNotifications by remember { mutableStateOf(false) }
     val unreadChats = chats.filter { it.unreadCountFor(role) > 0 }
 
@@ -129,7 +137,9 @@ fun OrganisationChatListScreen(
         }
 
         // Chat list
-        LazyColumn {
+        LazyColumn(
+            contentPadding = PaddingValues(bottom = 24.dp)
+        ) {
             items(chats) { chat ->
                 ChatRow(
                     chat = chat,
@@ -163,8 +173,20 @@ fun OrganisationChatListScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
-                                    ChatData.exitGroup(chat.id)
                                     showChatActions = false
+                                    scope.launch {
+                                        runCatching {
+                                            SupabaseChatRepository.leaveConversation(chat.id)
+                                        }.onSuccess {
+                                            ChatData.deleteGroup(chat.id)
+                                        }.onFailure {
+                                            Toast.makeText(
+                                                context,
+                                                chatActionError(it, "Unable to leave this group."),
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        }
+                                    }
                                 }
                                 .padding(vertical = 10.dp)
                         )
@@ -223,14 +245,27 @@ fun OrganisationChatListScreen(
             },
             title = { Text("Delete Chat?") },
             text = {
-                Text("This will permanently delete the group and all messages for everyone. This cannot be undone.")
+                Text("This removes the conversation only from your account. Event groups can be removed after the event is completed.")
             },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        ChatData.deleteGroup(chatToDelete!!.id)
+                        val conversationId = chatToDelete!!.id
                         showDeleteConfirmation = false
                         chatToDelete = null
+                        scope.launch {
+                            runCatching {
+                                SupabaseChatRepository.deleteConversationForMe(conversationId)
+                            }.onSuccess {
+                                ChatData.deleteGroup(conversationId)
+                            }.onFailure {
+                                Toast.makeText(
+                                    context,
+                                    chatActionError(it, "Unable to remove this conversation."),
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        }
                     }
                 ) {
                     Text("Delete", color = Color.Red)
@@ -245,6 +280,17 @@ fun OrganisationChatListScreen(
                 }
             }
         )
+    }
+}
+
+fun chatActionError(error: Throwable, fallback: String): String {
+    val message = error.message.orEmpty()
+    return when {
+        message.contains("EVENT_GROUP_CAN_ONLY_BE_REMOVED_AFTER_COMPLETION", true) ->
+            "This event group can only be removed after the event is completed."
+        message.contains("EVENT_ORGANISER_CANNOT_LEAVE", true) ->
+            "The organiser cannot leave an active event group."
+        else -> fallback
     }
 }
 
@@ -268,7 +314,6 @@ private fun ChatRow(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Avatar – always shows group icon (no pin here)
         Box(
             modifier = Modifier
                 .size(48.dp)
@@ -276,7 +321,7 @@ private fun ChatRow(
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                Icons.Filled.Group,
+                if (chat.isGroup) Icons.Filled.Group else Icons.Filled.Person,
                 contentDescription = chat.title,
                 tint = DeepGreen
             )
@@ -323,6 +368,12 @@ private fun ChatRow(
                 color = TextMuted,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                if (chat.isGroup) "Group chat" else "Private message",
+                color = DeepGreen,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold
             )
         }
 

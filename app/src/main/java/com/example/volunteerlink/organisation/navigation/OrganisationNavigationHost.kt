@@ -178,6 +178,11 @@ fun OrganisationNavigationHost(
                 AppBottomNavigationBar(
                     items = organisationBottomNavigationItems,
                     currentRoute = bottomBarRoute,
+                    showChatNotification =
+                        ChatData.partnershipAttention.value > 0 ||
+                            ChatData.chatsForCurrentRole().any {
+                                (it.readCounts[Role.ORGANISATION] ?: 0) < it.messages.size
+                            },
                     onItemClick = { item ->
                         if (item.route != currentRoute) {
                             if (
@@ -200,13 +205,7 @@ fun OrganisationNavigationHost(
             route = "organisation_root_navigation_graph",
             modifier = Modifier
                 .fillMaxSize()
-                .then(
-                    if (currentRoute == OrganisationNavigationRoutes.CHATS) {
-                        Modifier
-                    } else {
-                        Modifier.padding(innerPadding)
-                    }
-                )
+                .padding(innerPadding)
         ) {
             composable(OrganisationNavigationRoutes.HOME) {
                 OrganisationHomeScreen(

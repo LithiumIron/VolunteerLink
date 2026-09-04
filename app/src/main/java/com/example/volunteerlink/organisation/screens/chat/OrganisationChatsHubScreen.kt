@@ -62,7 +62,7 @@ import java.util.TimeZone
 
 private enum class OrganisationChatHubTab {
     MESSAGES,
-    INVITATIONS
+    PARTNERSHIPS
 }
 
 @Composable
@@ -90,6 +90,11 @@ fun OrganisationChatsHubScreen(
         }.onSuccess { (chats, invitationRows) ->
             partnershipChats = chats
             invitations = invitationRows
+            ChatData.partnershipAttention.value = chats.sumOf { it.unreadCount } +
+                invitationRows.count {
+                    it.direction == "RECEIVED" &&
+                        it.status in setOf("PENDING", "RECONFIRMATION_REQUIRED")
+                }
         }.onFailure { error ->
             partnershipError = safePartnershipUiError(error.message.orEmpty())
         }
@@ -228,7 +233,7 @@ fun OrganisationChatsHubScreen(
                                 },
                                 onClick = {
                                     showNotifications = false
-                                    selectedTab = OrganisationChatHubTab.INVITATIONS
+                                    selectedTab = OrganisationChatHubTab.PARTNERSHIPS
                                 }
                             )
                         }
@@ -239,38 +244,13 @@ fun OrganisationChatsHubScreen(
 
         ChatHubTabs(
             selectedTab = selectedTab,
-            pendingInvitationCount = pendingInvitationCount,
+            messageBadgeCount = eventUnread,
+            partnershipBadgeCount = partnershipUnread + pendingInvitationCount,
             onSelected = { selectedTab = it }
         )
 
         when (selectedTab) {
             OrganisationChatHubTab.MESSAGES -> {
-                PartnershipMessagesSection(
-                    chats = partnershipChats,
-                    isLoading = isLoadingPartnership,
-                    errorMessage = partnershipError,
-                    onRetry = { refreshVersion += 1 },
-                    onOpenChat = onOpenPartnershipChat
-                )
-
-                if (partnershipChats.isNotEmpty()) {
-                    HorizontalDivider(color = Color(0xFFE6E1D4))
-                }
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Event Messages",
-                        fontSize = 12.sp,
-                        color = TextMuted,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
                 OrganisationChatListScreen(
                     role = role,
                     onOpenChat = onOpenEventChat,
@@ -279,14 +259,13 @@ fun OrganisationChatsHubScreen(
                 )
             }
 
-            OrganisationChatHubTab.INVITATIONS -> {
-                PartnershipInvitationsList(
-                    invitations = invitations,
-                    partnershipChats = partnershipChats,
+            OrganisationChatHubTab.PARTNERSHIPS -> {
+                PartnershipMessagesSection(
+                    chats = partnershipChats,
                     isLoading = isLoadingPartnership,
                     errorMessage = partnershipError,
                     onRetry = { refreshVersion += 1 },
-                    onOpenPartnershipChat = onOpenPartnershipChat
+                    onOpenChat = onOpenPartnershipChat
                 )
             }
         }
@@ -296,7 +275,8 @@ fun OrganisationChatsHubScreen(
 @Composable
 private fun ChatHubTabs(
     selectedTab: OrganisationChatHubTab,
-    pendingInvitationCount: Int,
+    messageBadgeCount: Int,
+    partnershipBadgeCount: Int,
     onSelected: (OrganisationChatHubTab) -> Unit
 ) {
     Surface(
@@ -315,16 +295,16 @@ private fun ChatHubTabs(
             ChatHubTabButton(
                 title = "Messages",
                 selected = selectedTab == OrganisationChatHubTab.MESSAGES,
-                badgeCount = 0,
+                badgeCount = messageBadgeCount,
                 modifier = Modifier.weight(1f),
                 onClick = { onSelected(OrganisationChatHubTab.MESSAGES) }
             )
             ChatHubTabButton(
-                title = "Invitations",
-                selected = selectedTab == OrganisationChatHubTab.INVITATIONS,
-                badgeCount = pendingInvitationCount,
+                title = "Partnerships",
+                selected = selectedTab == OrganisationChatHubTab.PARTNERSHIPS,
+                badgeCount = partnershipBadgeCount,
                 modifier = Modifier.weight(1f),
-                onClick = { onSelected(OrganisationChatHubTab.INVITATIONS) }
+                onClick = { onSelected(OrganisationChatHubTab.PARTNERSHIPS) }
             )
         }
     }
