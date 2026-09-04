@@ -2,7 +2,6 @@ package com.example.volunteerlink.organisation.repository
 
 import com.example.volunteerlink.data.supabase
 import com.example.volunteerlink.organisation.auth.OrganisationSession
-import io.github.jan.supabase.auth.OtpType
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.query.Order

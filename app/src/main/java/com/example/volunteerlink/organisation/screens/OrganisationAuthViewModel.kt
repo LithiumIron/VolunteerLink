@@ -319,43 +319,7 @@ class OrganisationAuthViewModel(
         mutableUiState.update { it.copy(errorMessage = null) }
     }
 
-    fun verifySignUpOtp(token: String) {
-        val pendingEmail = mutableUiState.value.pendingVerificationEmail
-        if (pendingEmail.isNullOrBlank()) {
-            showError("No email is pending verification.")
-            return
-        }
-        if (token.isBlank()) {
-            showError("Enter the code sent to your email.")
-            return
-        }
 
-        viewModelScope.launch {
-            mutableUiState.update { it.copy(isSubmitting = true, errorMessage = null) }
-
-            try {
-                supabase.auth.verifyEmailOtp(
-                    type = OtpType.Email.SIGNUP,
-                    email = pendingEmail,
-                    token = token
-                )
-                confirmOrganisationProfile()
-                rememberVerifiedOrganisation()
-                mutableUiState.value = OrganisationAuthUiState(
-                    isCheckingSession = false,
-                    isAuthenticated = true
-                )
-            } catch (exception: Exception) {
-                exception.printStackTrace()
-                mutableUiState.update {
-                    it.copy(
-                        isSubmitting = false,
-                        errorMessage = authErrorMessage(exception)
-                    )
-                }
-            }
-        }
-    }
 
     private fun rememberVerifiedOrganisation() {
         val authUserId = supabase.auth.currentUserOrNull()?.id ?: return

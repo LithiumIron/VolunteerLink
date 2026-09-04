@@ -206,12 +206,5 @@ object VolunteerOpportunitySessionStore {
         volunteerApplications.add(0, application)
     }
 
-    fun replaceApplication(
-        application: VolunteerOpportunityApplication
-    ) {
-        val index = volunteerApplications.indexOfFirst {
-            it.applicationId == application.applicationId
-        }
-        if (index >= 0) volunteerApplications[index] = application
-    }
+
 }
