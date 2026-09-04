@@ -17,6 +17,9 @@ import com.example.volunteerlink.model.VolunteerOpportunityRole
 import com.example.volunteerlink.ui.theme.*
 
 @Composable
+// Purpose: Renders the volunteer role information card from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 fun VolunteerRoleInformationCard(event: VolunteerOpportunityEvent, role: VolunteerOpportunityRole, includeTasks: Boolean = false) {
     val remote = role.roleMode.equals("REMOTE", true)
     val start = if (remote) event.eventRemoteStartDate else event.eventPhysicalStartDate

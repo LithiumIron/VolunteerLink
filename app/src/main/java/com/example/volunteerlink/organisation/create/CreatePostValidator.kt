@@ -1,5 +1,23 @@
 package com.example.volunteerlink.organisation.create
 
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Centralises validation for the complete Create Post draft across all five steps.
+//
+// Validation is mode-aware: Physical, Remote and Hybrid require different date/location/capacity combinations,
+// while roles, role settings and schedules are checked against the selected post context.
+//
+// The validator returns understandable field/step errors without mutating UI or database state, allowing both
+// forward navigation and final publish/save checks to use the same rules.
+//
+// Date-dependent publish policy is kept consistent with shared timing evaluators and AppClock rather than being
+// hidden inside a button handler.
+//
+// Architectural layer: Organisation module.
+// ============================================================================
+
+
 import com.example.volunteerlink.data.time.AppClock
 import com.example.volunteerlink.organisation.create.model.CreatePostDraft
 import com.example.volunteerlink.organisation.create.model.CreatePostErrors
@@ -23,10 +41,32 @@ import java.util.Locale
  * Keeping these rules outside the ViewModel prevents the ViewModel from
  * becoming a giant class as Steps 2-5 are added later.
  */
+/**
+ * DETAILED DECLARATION — CreatePostValidator
+ *
+ * Single shared instance for Create Post Validator so related rules/state are defined once for the application
+ * process.
+ */
 object CreatePostValidator {
 
     const val MINIMUM_LEAD_DAYS = 7
 
+    /**
+     * Starts the of day millis for the organisation Create/Edit Post flow.
+     * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
+     */
+    /**
+     * DETAILED BEHAVIOUR — startOfDayMillis
+     *
+     * Evaluates the pure business rule represented by start of day millis from the values supplied by the
+     * caller.
+     *
+     * The function does not perform UI or network side effects, which keeps the rule deterministic and reusable
+     * from multiple screens/workflows.
+     *
+     * Uses AppClock for business-date/time decisions so the same code works with the project test clock and
+     * normal device time.
+     */
     fun startOfDayMillis(
         timeMillis: Long = AppClock.nowMillis()
     ): Long {
@@ -39,6 +79,22 @@ object CreatePostValidator {
         }.timeInMillis
     }
 
+    /**
+     * Returns the minimum start date millis value required by the organisation Create/Edit Post flow.
+     * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
+     */
+    /**
+     * DETAILED BEHAVIOUR — minimumStartDateMillis
+     *
+     * Evaluates the pure business rule represented by minimum start date millis from the values supplied by the
+     * caller.
+     *
+     * The function does not perform UI or network side effects, which keeps the rule deterministic and reusable
+     * from multiple screens/workflows.
+     *
+     * Uses AppClock for business-date/time decisions so the same code works with the project test clock and
+     * normal device time.
+     */
     fun minimumStartDateMillis(
         todayMillis: Long = AppClock.nowMillis()
     ): Long {
@@ -48,6 +104,18 @@ object CreatePostValidator {
         }.timeInMillis
     }
 
+    /**
+     * Returns the next day millis value required by the organisation Create/Edit Post flow.
+     * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
+     */
+    /**
+     * DETAILED BEHAVIOUR — nextDayMillis
+     *
+     * Evaluates the pure business rule represented by next day millis from the values supplied by the caller.
+     *
+     * The function does not perform UI or network side effects, which keeps the rule deterministic and reusable
+     * from multiple screens/workflows.
+     */
     fun nextDayMillis(dateMillis: Long): Long {
         return Calendar.getInstance().apply {
             timeInMillis = startOfDayMillis(dateMillis)
@@ -59,6 +127,15 @@ object CreatePostValidator {
      * Returns a live publication error only when an already-selected start
      * date has become too close to the current AppClock date. Null/missing
      * dates are handled by the normal Step 1 required-field validation.
+     */
+    /**
+     * DETAILED BEHAVIOUR — minimumLeadTimeError
+     *
+     * Evaluates the pure business rule represented by minimum lead time error from the values supplied by the
+     * caller.
+     *
+     * The function does not perform UI or network side effects, which keeps the rule deterministic and reusable
+     * from multiple screens/workflows.
      */
     fun minimumLeadTimeError(dateMillis: Long?): String? {
         if (dateMillis == null) return null
@@ -75,6 +152,15 @@ object CreatePostValidator {
      * Existing drafts can become outdated while they sit unpublished. Edit Post
      * uses this message immediately so the organiser can see the exact date that
      * needs changing instead of discovering it only after pressing Continue.
+     */
+    /**
+     * DETAILED BEHAVIOUR — draftStartDateAttention
+     *
+     * Evaluates the pure business rule represented by draft start date attention from the values supplied by
+     * the caller.
+     *
+     * The function does not perform UI or network side effects, which keeps the rule deterministic and reusable
+     * from multiple screens/workflows.
      */
     fun draftStartDateAttention(dateMillis: Long?): String? {
         if (dateMillis == null) return null
@@ -95,6 +181,15 @@ object CreatePostValidator {
     /**
      * Message used by Review when Save Draft / Publish discovers that time has
      * moved forward since Step 1 was first completed.
+     */
+    /**
+     * DETAILED BEHAVIOUR — minimumLeadTimeIssueMessage
+     *
+     * Evaluates the pure business rule represented by minimum lead time issue message from the values supplied
+     * by the caller.
+     *
+     * The function does not perform UI or network side effects, which keeps the rule deterministic and reusable
+     * from multiple screens/workflows.
      */
     fun minimumLeadTimeIssueMessage(draft: CreatePostDraft): String? {
         val minimum = minimumStartDateMillis()
@@ -132,8 +227,18 @@ object CreatePostValidator {
     }
 
     /**
-     * Save Draft may keep an old start date. Remove only the 7-day timing
-     * errors while preserving every other Step 1 validation error.
+     * Draft saving is allowed even when the current start date does not yet satisfy
+     * the 7-day publishing lead time. This helper removes only that timing error while
+     * preserving every other Step 1 validation problem.
+     */
+    /**
+     * DETAILED BEHAVIOUR — withoutMinimumLeadTimeErrors
+     *
+     * Evaluates the pure business rule represented by without minimum lead time errors from the values supplied
+     * by the caller.
+     *
+     * The function does not perform UI or network side effects, which keeps the rule deterministic and reusable
+     * from multiple screens/workflows.
      */
     fun withoutMinimumLeadTimeErrors(
         draft: CreatePostDraft,
@@ -154,11 +259,35 @@ object CreatePostValidator {
         )
     }
 
+    /**
+     * Formats the date used by the organisation Create/Edit Post flow.
+     * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
+     */
+    /**
+     * DETAILED BEHAVIOUR — formatDate
+     *
+     * Evaluates the pure business rule represented by format date from the values supplied by the caller.
+     *
+     * The function does not perform UI or network side effects, which keeps the rule deterministic and reusable
+     * from multiple screens/workflows.
+     */
     private fun formatDate(dateMillis: Long): String {
         return SimpleDateFormat("d MMM yyyy", Locale.getDefault())
             .format(dateMillis)
     }
 
+    /**
+     * Returns the end time error used by the organisation Create/Edit Post flow.
+     * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
+     */
+    /**
+     * DETAILED BEHAVIOUR — endTimeError
+     *
+     * Evaluates the pure business rule represented by end time error from the values supplied by the caller.
+     *
+     * The function does not perform UI or network side effects, which keeps the rule deterministic and reusable
+     * from multiple screens/workflows.
+     */
     fun endTimeError(
         startTimeMinutes: Int?,
         endTimeMinutes: Int
@@ -171,6 +300,18 @@ object CreatePostValidator {
         }
     }
 
+    /**
+     * Validates the step one used by the organisation Create/Edit Post flow.
+     * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
+     */
+    /**
+     * DETAILED BEHAVIOUR — validateStepOne
+     *
+     * Evaluates the pure business rule represented by validate step one from the values supplied by the caller.
+     *
+     * The function does not perform UI or network side effects, which keeps the rule deterministic and reusable
+     * from multiple screens/workflows.
+     */
     fun validateStepOne(
         draft: CreatePostDraft
     ): CreatePostErrors {
@@ -340,6 +481,14 @@ object CreatePostValidator {
      * Hybrid posts are checked separately so Physical and Remote capacities
      * cannot accidentally be mixed together.
      */
+    /**
+     * DETAILED BEHAVIOUR — validateStepTwo
+     *
+     * Evaluates the pure business rule represented by validate step two from the values supplied by the caller.
+     *
+     * The function does not perform UI or network side effects, which keeps the rule deterministic and reusable
+     * from multiple screens/workflows.
+     */
     fun validateStepTwo(
         draft: CreatePostDraft,
         roleCatalogue: List<CreateRoleTemplate>
@@ -374,6 +523,19 @@ object CreatePostValidator {
                     VolunteerRoleMode.REMOTE
         }
 
+        /**
+         * Returns the capacity error used by the organisation Create/Edit Post flow.
+         * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
+         */
+        /**
+         * DETAILED BEHAVIOUR — capacityError
+         *
+         * Evaluates the pure business rule represented by capacity error from the values supplied by the
+         * caller.
+         *
+         * The function does not perform UI or network side effects, which keeps the rule deterministic and
+         * reusable from multiple screens/workflows.
+         */
         fun capacityError(
             label: String,
             required: Int?,
@@ -455,6 +617,15 @@ object CreatePostValidator {
      * This is only the initial recommendation shown in Step 3. Organisations
      * can still choose either Instant Join or Review Applicants for any level.
      */
+    /**
+     * DETAILED BEHAVIOUR — recommendedApplicationMethodForLevel
+     *
+     * Evaluates the pure business rule represented by recommended application method for level from the values
+     * supplied by the caller.
+     *
+     * The function does not perform UI or network side effects, which keeps the rule deterministic and reusable
+     * from multiple screens/workflows.
+     */
     fun recommendedApplicationMethodForLevel(
         level: VolunteerRoleLevel
     ): RoleApplicationMethod {
@@ -471,6 +642,15 @@ object CreatePostValidator {
     /**
      * Returns every Step 3 problem for one role configuration.
      * Empty means the role is valid and can be marked Ready.
+     */
+    /**
+     * DETAILED BEHAVIOUR — validateRoleConfiguration
+     *
+     * Evaluates the pure business rule represented by validate role configuration from the values supplied by
+     * the caller.
+     *
+     * The function does not perform UI or network side effects, which keeps the rule deterministic and reusable
+     * from multiple screens/workflows.
      */
     fun validateRoleConfiguration(
         draft: CreatePostDraft,
@@ -555,6 +735,15 @@ object CreatePostValidator {
     }
 
     /** Returns true when Step 3 can move forward. */
+    /**
+     * DETAILED BEHAVIOUR — validateStepThree
+     *
+     * Evaluates the pure business rule represented by validate step three from the values supplied by the
+     * caller.
+     *
+     * The function does not perform UI or network side effects, which keeps the rule deterministic and reusable
+     * from multiple screens/workflows.
+     */
     fun validateStepThree(
         draft: CreatePostDraft,
         roleCatalogue: List<CreateRoleTemplate>
@@ -622,6 +811,15 @@ object CreatePostValidator {
     // ---------------------------------------------------------------------
 
     /** Every Physical event date that can appear in the Step 4 timetable. */
+    /**
+     * DETAILED BEHAVIOUR — physicalScheduleDates
+     *
+     * Evaluates the pure business rule represented by physical schedule dates from the values supplied by the
+     * caller.
+     *
+     * The function does not perform UI or network side effects, which keeps the rule deterministic and reusable
+     * from multiple screens/workflows.
+     */
     fun physicalScheduleDates(
         draft: CreatePostDraft
     ): List<Long> {
@@ -649,6 +847,15 @@ object CreatePostValidator {
     }
 
     /** Returns selected ROLE... IDs that match the schedule side. */
+    /**
+     * DETAILED BEHAVIOUR — applicableScheduleRoleIds
+     *
+     * Evaluates the pure business rule represented by applicable schedule role ids from the values supplied by
+     * the caller.
+     *
+     * The function does not perform UI or network side effects, which keeps the rule deterministic and reusable
+     * from multiple screens/workflows.
+     */
     fun applicableScheduleRoleIds(
         draft: CreatePostDraft,
         scheduleType: ScheduleType,
@@ -672,6 +879,18 @@ object CreatePostValidator {
     }
 
     /** Returns one concise error for a Step 4 item, or null when it is valid. */
+    /**
+     * DETAILED BEHAVIOUR — validateScheduleItem
+     *
+     * Evaluates the pure business rule represented by validate schedule item from the values supplied by the
+     * caller.
+     *
+     * The function does not perform UI or network side effects, which keeps the rule deterministic and reusable
+     * from multiple screens/workflows.
+     *
+     * Uses AppClock for business-date/time decisions so the same code works with the project test clock and
+     * normal device time.
+     */
     fun validateScheduleItem(
         draft: CreatePostDraft,
         item: ScheduleItemDraft,
@@ -768,6 +987,22 @@ object CreatePostValidator {
         return null
     }
 
+    /**
+     * Validates the step four used by the organisation Create/Edit Post flow.
+     * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
+     */
+    /**
+     * DETAILED BEHAVIOUR — validateStepFour
+     *
+     * Evaluates the pure business rule represented by validate step four from the values supplied by the
+     * caller.
+     *
+     * The function does not perform UI or network side effects, which keeps the rule deterministic and reusable
+     * from multiple screens/workflows.
+     *
+     * Uses AppClock for business-date/time decisions so the same code works with the project test clock and
+     * normal device time.
+     */
     fun validateStepFour(
         draft: CreatePostDraft,
         roleCatalogue: List<CreateRoleTemplate>,
@@ -786,6 +1021,18 @@ object CreatePostValidator {
     }
 
     /** Step 4 stays optional; warn only about empty relevant schedule sections. */
+    /**
+     * DETAILED BEHAVIOUR — scheduleProceedWarning
+     *
+     * Evaluates the pure business rule represented by schedule proceed warning from the values supplied by the
+     * caller.
+     *
+     * The function does not perform UI or network side effects, which keeps the rule deterministic and reusable
+     * from multiple screens/workflows.
+     *
+     * Uses AppClock for business-date/time decisions so the same code works with the project test clock and
+     * normal device time.
+     */
     fun scheduleProceedWarning(
         draft: CreatePostDraft,
         nowMillis: Long = AppClock.nowMillis()
@@ -833,6 +1080,19 @@ object CreatePostValidator {
         }
     }
 
+    /**
+     * Checks whether the schedule role targets are valid for the organisation Create/Edit Post flow.
+     * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
+     */
+    /**
+     * DETAILED BEHAVIOUR — scheduleRoleTargetsAreValid
+     *
+     * Evaluates the pure business rule represented by schedule role targets are valid from the values supplied
+     * by the caller.
+     *
+     * The function does not perform UI or network side effects, which keeps the rule deterministic and reusable
+     * from multiple screens/workflows.
+     */
     private fun scheduleRoleTargetsAreValid(
         item: ScheduleItemDraft,
         applicableRoleIds: List<String>
@@ -844,6 +1104,19 @@ object CreatePostValidator {
         return selectedTargets.all { it in validIds }
     }
 
+    /**
+     * Returns the effective schedule role ids value required by the organisation Create/Edit Post flow.
+     * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
+     */
+    /**
+     * DETAILED BEHAVIOUR — effectiveScheduleRoleIds
+     *
+     * Evaluates the pure business rule represented by effective schedule role ids from the values supplied by
+     * the caller.
+     *
+     * The function does not perform UI or network side effects, which keeps the rule deterministic and reusable
+     * from multiple screens/workflows.
+     */
     private fun effectiveScheduleRoleIds(
         draft: CreatePostDraft,
         item: ScheduleItemDraft,
@@ -863,6 +1136,19 @@ object CreatePostValidator {
         }
     }
 
+    /**
+     * Checks whether the current Create/Edit Post state has timed schedule conflict.
+     * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
+     */
+    /**
+     * DETAILED BEHAVIOUR — hasTimedScheduleConflict
+     *
+     * Evaluates the pure business rule represented by has timed schedule conflict from the values supplied by
+     * the caller.
+     *
+     * The function does not perform UI or network side effects, which keeps the rule deterministic and reusable
+     * from multiple screens/workflows.
+     */
     private fun hasTimedScheduleConflict(
         draft: CreatePostDraft,
         item: ScheduleItemDraft,
@@ -889,16 +1175,55 @@ object CreatePostValidator {
         }
     }
 
+    /**
+     * Returns the timed start epoch millis value required by the organisation Create/Edit Post flow.
+     * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
+     */
+    /**
+     * DETAILED BEHAVIOUR — timedStartEpochMillis
+     *
+     * Evaluates the pure business rule represented by timed start epoch millis from the values supplied by the
+     * caller.
+     *
+     * The function does not perform UI or network side effects, which keeps the rule deterministic and reusable
+     * from multiple screens/workflows.
+     */
     private fun timedStartEpochMillis(item: ScheduleItemDraft): Long? {
         val time = item.startTimeMinutes ?: return null
         return timedEpochMillis(item, time)
     }
 
+    /**
+     * Returns the timed end epoch millis value required by the organisation Create/Edit Post flow.
+     * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
+     */
+    /**
+     * DETAILED BEHAVIOUR — timedEndEpochMillis
+     *
+     * Evaluates the pure business rule represented by timed end epoch millis from the values supplied by the
+     * caller.
+     *
+     * The function does not perform UI or network side effects, which keeps the rule deterministic and reusable
+     * from multiple screens/workflows.
+     */
     private fun timedEndEpochMillis(item: ScheduleItemDraft): Long? {
         val time = item.endTimeMinutes ?: return null
         return timedEpochMillis(item, time)
     }
 
+    /**
+     * Returns the timed epoch millis value required by the organisation Create/Edit Post flow.
+     * Centralising the rule ensures every wizard step evaluates the same requirement consistently.
+     */
+    /**
+     * DETAILED BEHAVIOUR — timedEpochMillis
+     *
+     * Evaluates the pure business rule represented by timed epoch millis from the values supplied by the
+     * caller.
+     *
+     * The function does not perform UI or network side effects, which keeps the rule deterministic and reusable
+     * from multiple screens/workflows.
+     */
     private fun timedEpochMillis(
         item: ScheduleItemDraft,
         timeMinutes: Int

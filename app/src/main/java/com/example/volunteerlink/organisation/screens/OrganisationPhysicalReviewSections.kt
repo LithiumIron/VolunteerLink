@@ -1,5 +1,23 @@
 package com.example.volunteerlink.organisation.screens
 
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Implements the Organisation UI associated with Organisation Physical Review Sections.
+//
+// The composable layer is responsible for layout, interaction and displaying loading/error/validation state;
+// business rules and persistence are delegated to ViewModels/repositories.
+//
+// This separation makes it clear during maintenance which code changes appearance versus which code changes real
+// server data.
+//
+// Where the screen displays cached information, server-changing actions remain disabled or routed through a fresh
+// authenticated repository operation.
+//
+// Architectural layer: Compose presentation layer.
+// ============================================================================
+
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -83,6 +101,14 @@ private val ReviewPillShape = RoundedCornerShape(50)
  * feedback remain local to the ViewModel until Finalize Event is pressed.
  */
 @Composable
+/**
+ * DETAILED BEHAVIOUR — PostManagementPhysicalReviewContent
+ *
+ * Renders the reusable Post Management Physical Review Content portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun PostManagementPhysicalReviewContent(
     review: PostManagementPhysicalReview,
     session: PostManagementPhysicalReviewSession,
@@ -236,6 +262,19 @@ fun PostManagementPhysicalReviewContent(
 }
 
 @Composable
+/**
+ * Returns the review dialog title used by the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — ReviewDialogTitle
+ *
+ * Renders the Review Dialog Title modal interaction and keeps temporary form/confirmation UI separate from the
+ * underlying server action.
+ *
+ * The confirm callback is only emitted after the dialog-side input/choice is in an acceptable state; the
+ * ViewModel/repository performs the real mutation.
+ */
 private fun ReviewDialogTitle(text: String) {
     Text(
         text = text,
@@ -247,6 +286,14 @@ private fun ReviewDialogTitle(text: String) {
 
 /** Flat flow header shared by every stage. It is deliberately not another card. */
 @Composable
+/**
+ * DETAILED BEHAVIOUR — ReviewFlowHeader
+ *
+ * Renders the reusable Review Flow Header portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun ReviewFlowHeader(
     stage: PostManagementPhysicalReviewStage,
     finalized: Boolean
@@ -308,6 +355,18 @@ private fun ReviewFlowHeader(
 }
 
 @Composable
+/**
+ * Renders the UI represented by review stage step for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — ReviewStageStep
+ *
+ * Handles the Compose/UI responsibility for review stage step.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun ReviewStageStep(
     number: Int,
     label: String,
@@ -372,6 +431,14 @@ private fun ReviewStageStep(
 
 /** One white container per active stage. Sections inside are kept flat. */
 @Composable
+/**
+ * DETAILED BEHAVIOUR — ReviewStageSurface
+ *
+ * Handles the Compose/UI responsibility for review stage surface.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun ReviewStageSurface(
     title: String,
     subtitle: String,
@@ -384,6 +451,18 @@ private fun ReviewStageSurface(
 }
 
 @Composable
+/**
+ * Renders the UI represented by review section heading for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — ReviewSectionHeading
+ *
+ * Renders the reusable Review Section Heading portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun ReviewSectionHeading(
     title: String,
     subtitle: String? = null,
@@ -393,11 +472,35 @@ private fun ReviewSectionHeading(
 }
 
 @Composable
+/**
+ * Renders the UI represented by review section divider for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — ReviewSectionDivider
+ *
+ * Renders the reusable Review Section Divider portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun ReviewSectionDivider() {
     OrganisationDivider(modifier = Modifier.padding(vertical = 14.dp))
 }
 
 @Composable
+/**
+ * Renders the UI represented by review stage footer for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — ReviewStageFooter
+ *
+ * Handles the Compose/UI responsibility for review stage footer.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun ReviewStageFooter(
     backLabel: String?,
     backEnabled: Boolean = true,
@@ -435,6 +538,18 @@ private fun ReviewStageFooter(
 }
 
 @Composable
+/**
+ * Renders the UI represented by attendance review stage for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — AttendanceReviewStage
+ *
+ * Handles the Compose/UI responsibility for attendance review stage.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun AttendanceReviewStage(
     entries: List<PostManagementPhysicalReviewEntry>,
     busy: Boolean,
@@ -508,6 +623,18 @@ private fun AttendanceReviewStage(
 }
 
 @Composable
+/**
+ * Renders the UI represented by completion review stage for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — CompletionReviewStage
+ *
+ * Handles the Compose/UI responsibility for completion review stage.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun CompletionReviewStage(
     ready: List<PostManagementPhysicalReviewEntry>,
     decisionExceptions: List<PostManagementPhysicalReviewEntry>,
@@ -648,6 +775,18 @@ private fun CompletionReviewStage(
 }
 
 @Composable
+/**
+ * Renders the completion decision card card used in the organisation Manage Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — CompletionDecisionCard
+ *
+ * Renders the reusable Completion Decision Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun CompletionDecisionCard(
     entry: PostManagementPhysicalReviewEntry,
     busy: Boolean,
@@ -746,6 +885,18 @@ private fun CompletionDecisionCard(
 }
 
 @Composable
+/**
+ * Renders the selected decision section section used in the organisation Manage Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — SelectedDecisionSection
+ *
+ * Renders the reusable Selected Decision Section portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun SelectedDecisionSection(
     fullAttendanceCompleted: List<PostManagementPhysicalReviewEntry>,
     individualCompleted: List<Pair<PostManagementPhysicalReviewEntry, PostManagementPendingReviewDecision>>,
@@ -857,6 +1008,18 @@ private fun SelectedDecisionSection(
 }
 
 @Composable
+/**
+ * Renders the selected decision row row used in the organisation Manage Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — SelectedDecisionRow
+ *
+ * Renders the reusable Selected Decision Row portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun SelectedDecisionRow(
     entry: PostManagementPhysicalReviewEntry,
     status: String,
@@ -901,6 +1064,18 @@ private fun SelectedDecisionRow(
 }
 
 @Composable
+/**
+ * Renders the UI represented by work issue finder for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — WorkIssueFinder
+ *
+ * Handles the Compose/UI responsibility for work issue finder.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun WorkIssueFinder(
     candidates: List<PostManagementPhysicalReviewEntry>,
     busy: Boolean,
@@ -1040,6 +1215,18 @@ private fun WorkIssueFinder(
 }
 
 @Composable
+/**
+ * Renders the UI represented by feedback review stage for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — FeedbackReviewStage
+ *
+ * Handles the Compose/UI responsibility for feedback review stage.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun FeedbackReviewStage(
     review: PostManagementPhysicalReview,
     session: PostManagementPhysicalReviewSession,
@@ -1089,6 +1276,18 @@ private fun FeedbackReviewStage(
         .filter { id -> available.any { entry -> entry.person.userId == id } }
         .toSet()
 
+    /**
+     * Resets the composer for the organisation Manage Post flow.
+     * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+     */
+    /**
+     * DETAILED BEHAVIOUR — resetComposer
+     *
+     * Handles the Compose/UI responsibility for reset composer.
+     *
+     * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+     * ViewModel/repository layers.
+     */
     fun resetComposer() {
         onReviewDraftDirtyChanged(false)
         composerOpen = false
@@ -1246,6 +1445,18 @@ private fun FeedbackReviewStage(
 }
 
 @Composable
+/**
+ * Renders the UI represented by feedback composer for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — FeedbackComposer
+ *
+ * Handles the Compose/UI responsibility for feedback composer.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun FeedbackComposer(
     available: List<PostManagementPhysicalReviewEntry>,
     withoutFeedback: List<PostManagementPhysicalReviewEntry>,
@@ -1379,6 +1590,18 @@ private fun FeedbackComposer(
 }
 
 @Composable
+/**
+ * Renders the temporary feedback group row row used in the organisation Manage Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — TemporaryFeedbackGroupRow
+ *
+ * Renders the reusable Temporary Feedback Group Row portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun TemporaryFeedbackGroupRow(
     feedback: String,
     userIds: List<String>,
@@ -1422,6 +1645,18 @@ private fun TemporaryFeedbackGroupRow(
 }
 
 @Composable
+/**
+ * Completes the review stage for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — FinishReviewStage
+ *
+ * Handles the Compose/UI responsibility for finish review stage.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun FinishReviewStage(
     review: PostManagementPhysicalReview,
     session: PostManagementPhysicalReviewSession,
@@ -1556,6 +1791,14 @@ private fun FinishReviewStage(
 
 /** Collapsed optional tool used consistently across Attendance and Completion. */
 @Composable
+/**
+ * DETAILED BEHAVIOUR — ReviewExpandableHeader
+ *
+ * Renders the reusable Review Expandable Header portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun ReviewExpandableHeader(
     title: String,
     subtitle: String,
@@ -1589,6 +1832,18 @@ private fun ReviewExpandableHeader(
 }
 
 @Composable
+/**
+ * Renders the UI represented by attendance browser for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — AttendanceBrowser
+ *
+ * Handles the Compose/UI responsibility for attendance browser.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun AttendanceBrowser(
     title: String,
     subtitle: String,
@@ -1734,6 +1989,18 @@ private fun AttendanceBrowser(
 }
 
 @Composable
+/**
+ * Renders the UI represented by attendance timeline for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — AttendanceTimeline
+ *
+ * Handles the Compose/UI responsibility for attendance timeline.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun AttendanceTimeline(
     entry: PostManagementPhysicalReviewEntry,
     busy: Boolean,
@@ -1767,6 +2034,18 @@ private fun AttendanceTimeline(
 }
 
 @Composable
+/**
+ * Renders the attendance timeline row row used in the organisation Manage Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — AttendanceTimelineRow
+ *
+ * Renders the reusable Attendance Timeline Row portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun AttendanceTimelineRow(
     person: PostManagementPerson,
     status: PostManagementVolunteerAttendanceDateStatus,
@@ -1846,6 +2125,18 @@ private fun AttendanceTimelineRow(
 }
 
 @Composable
+/**
+ * Renders the volunteer identity header header used in the organisation Manage Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — VolunteerIdentityHeader
+ *
+ * Renders the reusable Volunteer Identity Header portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun VolunteerIdentityHeader(
     entry: PostManagementPhysicalReviewEntry,
     trailingLabel: String,
@@ -1907,6 +2198,18 @@ private fun VolunteerIdentityHeader(
 }
 
 @Composable
+/**
+ * Renders the compact volunteer row row used in the organisation Manage Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — CompactVolunteerRow
+ *
+ * Renders the reusable Compact Volunteer Row portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun CompactVolunteerRow(
     entry: PostManagementPhysicalReviewEntry,
     statusText: String,
@@ -1960,6 +2263,18 @@ private fun CompactVolunteerRow(
 }
 
 @Composable
+/**
+ * Renders the role filter row row used in the organisation Manage Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — RoleFilterRow
+ *
+ * Renders the reusable Role Filter Row portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun RoleFilterRow(
     entries: List<PostManagementPhysicalReviewEntry>,
     selectedRoleId: String?,
@@ -1993,6 +2308,18 @@ private fun RoleFilterRow(
 }
 
 @Composable
+/**
+ * Renders the UI represented by feedback role selector for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — FeedbackRoleSelector
+ *
+ * Handles the Compose/UI responsibility for feedback role selector.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun FeedbackRoleSelector(
     entries: List<PostManagementPhysicalReviewEntry>,
     selectedRoleIds: Set<String>,
@@ -2021,6 +2348,18 @@ private fun FeedbackRoleSelector(
 }
 
 @Composable
+/**
+ * Renders the UI represented by review filter pill for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — ReviewFilterPill
+ *
+ * Handles the Compose/UI responsibility for review filter pill.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun ReviewFilterPill(
     label: String,
     selected: Boolean,
@@ -2047,6 +2386,18 @@ private fun ReviewFilterPill(
 }
 
 @Composable
+/**
+ * Renders the UI represented by review status pill for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — ReviewStatusPill
+ *
+ * Handles the Compose/UI responsibility for review status pill.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun ReviewStatusPill(
     text: String,
     color: Color,
@@ -2069,6 +2420,18 @@ private fun ReviewStatusPill(
 }
 
 @Composable
+/**
+ * Renders the UI represented by review message strip for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — ReviewMessageStrip
+ *
+ * Handles the Compose/UI responsibility for review message strip.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun ReviewMessageStrip(message: String) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -2087,6 +2450,18 @@ private fun ReviewMessageStrip(message: String) {
 }
 
 @Composable
+/**
+ * Renders the review summary row row used in the organisation Manage Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — ReviewSummaryRow
+ *
+ * Renders the reusable Review Summary Row portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun ReviewSummaryRow(label: String, value: String) {
     Row(
         modifier = Modifier
@@ -2110,6 +2485,18 @@ private fun ReviewSummaryRow(label: String, value: String) {
 }
 
 @Composable
+/**
+ * Renders the UI represented by review chevron for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — ReviewChevron
+ *
+ * Handles the Compose/UI responsibility for review chevron.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun ReviewChevron(expanded: Boolean) {
     Icon(
         painter = painterResource(
@@ -2123,15 +2510,63 @@ private fun ReviewChevron(expanded: Boolean) {
     )
 }
 
+/**
+ * Derives the review key value used by the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — reviewKey
+ *
+ * Handles the Compose/UI responsibility for review key.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun reviewKey(entry: PostManagementPhysicalReviewEntry): String =
     "${entry.person.roleTemplateId}|${entry.person.userId}"
 
+/**
+ * Derives the decision key value used by the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — decisionKey
+ *
+ * Handles the Compose/UI responsibility for decision key.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun decisionKey(decision: PostManagementPendingReviewDecision): String =
     "${decision.roleTemplateId}|${decision.userId}"
 
+/**
+ * Returns the attendance summary label used by the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — attendanceSummaryLabel
+ *
+ * Renders the reusable attendance Summary Label portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun attendanceSummaryLabel(entry: PostManagementPhysicalReviewEntry): String =
     "${entry.attendanceSummary.attendedDays}/${entry.attendanceSummary.expectedDays} · ${formatMinutesForReview(entry.attendanceSummary.verifiedMinutes)}"
 
+/**
+ * Renders the role summary summary block used in the organisation Manage Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — roleSummary
+ *
+ * Renders the reusable role Summary portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun roleSummary(entries: List<PostManagementPhysicalReviewEntry>): String = entries
     .groupBy { it.person.roleName }
     .entries
@@ -2139,6 +2574,18 @@ private fun roleSummary(entries: List<PostManagementPhysicalReviewEntry>): Strin
     .joinToString(" · ") { (role, people) -> "$role ${people.size}" }
     .ifBlank { "No volunteers" }
 
+/**
+ * Formats the minutes for review used by the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — formatMinutesForReview
+ *
+ * Handles the Compose/UI responsibility for format minutes for review.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun formatMinutesForReview(minutes: Int): String {
     val safe = minutes.coerceAtLeast(0)
     val hours = safe / 60
@@ -2150,6 +2597,21 @@ fun formatMinutesForReview(minutes: Int): String {
     }
 }
 
+/**
+ * Formats the review date used by the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — formatReviewDate
+ *
+ * Handles the Compose/UI responsibility for format review date.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ *
+ * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without leaving
+ * the UI in an assumed-success state.
+ */
 fun formatReviewDate(value: String): String {
     return runCatching {
         val parser = SimpleDateFormat("yyyy-MM-dd", Locale.US)

@@ -1,5 +1,20 @@
 package com.example.volunteerlink.organisation.components
 
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Provides reusable Organisation design/layout components associated with Organisation Design Components.
+//
+// These composables standardise VolunteerLink Organisation spacing, cards, headers and module-page structure
+// without owning repository or ViewModel state.
+//
+// Keeping shared presentation here reduces duplicated Material3 configuration across Home, Manage, Create, Impact
+// Weave and Profile.
+//
+// Architectural layer: Compose presentation layer.
+// ============================================================================
+
+
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -53,6 +68,14 @@ import java.util.Date
  * business logic and callbacks; these components only standardise presentation.
  */
 @Composable
+/**
+ * DETAILED BEHAVIOUR — OrganisationSectionHeader
+ *
+ * Renders the reusable Organisation Section Header portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun OrganisationSectionHeader(
     title: String,
     modifier: Modifier = Modifier,
@@ -98,6 +121,14 @@ fun OrganisationSectionHeader(
 
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — OrganisationSectionSurface
+ *
+ * Renders the reusable Organisation Section Surface portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun OrganisationSectionSurface(
     modifier: Modifier = Modifier,
     contentPadding: androidx.compose.ui.unit.Dp = 16.dp,
@@ -119,6 +150,14 @@ fun OrganisationSectionSurface(
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — OrganisationListRow
+ *
+ * Renders the reusable Organisation List Row portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun OrganisationListRow(
     title: String,
     modifier: Modifier = Modifier,
@@ -225,6 +264,14 @@ fun OrganisationListRow(
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — OrganisationStatusPill
+ *
+ * Handles the Compose/UI responsibility for organisation status pill.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun OrganisationStatusPill(
     text: String,
     color: Color = VolunteerLinkPrimaryGreen,
@@ -248,6 +295,14 @@ fun OrganisationStatusPill(
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — OrganisationDivider
+ *
+ * Handles the Compose/UI responsibility for organisation divider.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun OrganisationDivider(modifier: Modifier = Modifier) {
     HorizontalDivider(
         modifier = modifier,
@@ -258,6 +313,14 @@ fun OrganisationDivider(modifier: Modifier = Modifier) {
 
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — OrganisationOfflineStatusCard
+ *
+ * Renders the reusable Organisation Offline Status Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun OrganisationOfflineStatusCard(
     lastSyncedAtEpochMillis: Long?,
     isSyncing: Boolean,
@@ -316,6 +379,14 @@ fun OrganisationOfflineStatusCard(
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — OrganisationInfoStrip
+ *
+ * Handles the Compose/UI responsibility for organisation info strip.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun OrganisationInfoStrip(
     title: String,
     message: String,
@@ -366,6 +437,14 @@ fun OrganisationInfoStrip(
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — OrganisationPrimaryButton
+ *
+ * Handles the Compose/UI responsibility for organisation primary button.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun OrganisationPrimaryButton(
     text: String,
     onClick: () -> Unit,
@@ -386,6 +465,14 @@ fun OrganisationPrimaryButton(
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — OrganisationMetric
+ *
+ * Handles the Compose/UI responsibility for organisation metric.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun OrganisationMetric(
     value: String,
     label: String,
@@ -412,6 +499,14 @@ fun OrganisationMetric(
 
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — OrganisationMessageButton
+ *
+ * Handles the Compose/UI responsibility for organisation message button.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun OrganisationMessageButton(
     personName: String,
     modifier: Modifier = Modifier,

@@ -1,5 +1,20 @@
 package com.example.volunteerlink.organisation.home.model
 
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Defines immutable Home dashboard data/state associated with Organisation Home Data.
+//
+// The repository/ViewModel fills these models from authenticated Supabase reads and derived timing/application
+// information.
+//
+// Compose consumes these models directly, which keeps raw JSON/table rows out of the Home screen and makes
+// loading/error/cached states explicit.
+//
+// Architectural layer: Domain/UI model layer.
+// ============================================================================
+
+
 import kotlinx.serialization.Serializable
 
 /**
@@ -9,6 +24,14 @@ import kotlinx.serialization.Serializable
  * They are not UI models and they do not calculate date-dependent states.
  */
 @Serializable
+/**
+ * DETAILED DECLARATION — OrganisationHomeSnapshot
+ *
+ * Domain/UI type for Organisation Home Snapshot used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class OrganisationHomeSnapshot(
     val organisationId: String,
     val organisationName: String,
@@ -17,6 +40,18 @@ data class OrganisationHomeSnapshot(
 )
 
 @Serializable
+/**
+ * Holds the values represented by organisation home post as one strongly typed model.
+ * It keeps related Home dashboard values together so callers do not pass disconnected fields around.
+ */
+/**
+ * DETAILED DECLARATION — OrganisationHomePost
+ *
+ * Domain/UI type for Organisation Home Post used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class OrganisationHomePost(
     val postId: String,
     val title: String,
@@ -38,6 +73,18 @@ data class OrganisationHomePost(
 }
 
 @Serializable
+/**
+ * Holds the values represented by organisation home schedule as one strongly typed model.
+ * It keeps related Home dashboard values together so callers do not pass disconnected fields around.
+ */
+/**
+ * DETAILED DECLARATION — OrganisationHomeSchedule
+ *
+ * Domain/UI type for Organisation Home Schedule used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class OrganisationHomeSchedule(
     val scheduleItemId: String,
     val scheduleType: String,
@@ -51,6 +98,14 @@ data class OrganisationHomeSchedule(
  * Detailed applicant profiles remain the responsibility of the application feature.
  */
 @Serializable
+/**
+ * DETAILED DECLARATION — OrganisationHomeRole
+ *
+ * Domain/UI type for Organisation Home Role used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class OrganisationHomeRole(
     val roleTemplateId: String,
     val roleName: String,
@@ -60,6 +115,18 @@ data class OrganisationHomeRole(
 )
 
 @Serializable
+/**
+ * Holds the values represented by organisation home participation as one strongly typed model.
+ * It keeps related Home dashboard values together so callers do not pass disconnected fields around.
+ */
+/**
+ * DETAILED DECLARATION — OrganisationHomeParticipation
+ *
+ * Domain/UI type for Organisation Home Participation used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class OrganisationHomeParticipation(
     val userId: String,
     val applicationStatus: String
@@ -67,6 +134,18 @@ data class OrganisationHomeParticipation(
 
 
 @Serializable
+/**
+ * Holds the values represented by organisation impact weave attention as one strongly typed model.
+ * It keeps related Home dashboard values together so callers do not pass disconnected fields around.
+ */
+/**
+ * DETAILED DECLARATION — OrganisationImpactWeaveAttention
+ *
+ * Domain/UI type for Organisation Impact Weave Attention used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class OrganisationImpactWeaveAttention(
     val draftId: String,
     val title: String,

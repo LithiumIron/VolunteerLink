@@ -80,6 +80,9 @@ private data class VolunteerSkillPathBadge(
 )
 
 @Composable
+// Purpose: Lists verified Skill Paths and lets the volunteer open one path for evidence and progress details.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 fun VolunteerSkillPathScreen(
     onSkillPathSelected: (
         skillPathId: String
@@ -109,6 +112,7 @@ fun VolunteerSkillPathScreen(
     val visibleSkillPaths =
         skillPathUiState.skillPaths
             .filter { volunteerSkillPath ->
+                // Choose one mutually exclusive UI result from the current status or user selection.
                 when (selectedModeFilter) {
                     "Physical" ->
                         volunteerSkillPath.pathMode ==
@@ -122,6 +126,7 @@ fun VolunteerSkillPathScreen(
                 }
             }
 
+    // Arrange the following screen content vertically inside the available space.
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -146,6 +151,7 @@ fun VolunteerSkillPathScreen(
                 )
 
             else ->
+                // Render this content as a lazy scrolling list so only visible items need to be composed.
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(
@@ -180,6 +186,7 @@ fun VolunteerSkillPathScreen(
                         key = "skill_path_filters"
                     ) {
                         Column {
+                            // Display the prepared label; business rules are calculated before reaching this UI call.
                             Text(
                                 text = "Explore Skill Paths",
                                 modifier = Modifier.padding(
@@ -203,6 +210,7 @@ fun VolunteerSkillPathScreen(
                                 horizontalArrangement =
                                     Arrangement.spacedBy(8.dp)
                             ) {
+                                // Render one reusable row/card for each item in the prepared list.
                                 items(
                                     items = modeFilters,
                                     key = { modeFilter ->
@@ -218,6 +226,7 @@ fun VolunteerSkillPathScreen(
                                                 modeFilter
                                         },
                                         label = {
+                                            // Display the prepared label; business rules are calculated before reaching this UI call.
                                             Text(
                                                 text = modeFilter,
                                                 fontSize = 11.sp
@@ -243,10 +252,12 @@ fun VolunteerSkillPathScreen(
                         }
                     }
 
+                    // Check this condition before showing the action, preventing an invalid Volunteer flow from continuing.
                     if (visibleSkillPaths.isEmpty()) {
                         item(
                             key = "skill_path_empty"
                         ) {
+                            // Display the prepared label; business rules are calculated before reaching this UI call.
                             Text(
                                 text =
                                     "No Skill Paths match this filter.",
@@ -259,6 +270,7 @@ fun VolunteerSkillPathScreen(
                             )
                         }
                     } else {
+                        // Render one reusable row/card for each item in the prepared list.
                         items(
                             items = visibleSkillPaths,
                             key = { volunteerSkillPath ->
@@ -283,6 +295,9 @@ fun VolunteerSkillPathScreen(
 }
 
 @Composable
+// Purpose: Shows progress requirements, completed evidence, skills and suitable next roles for one Skill Path.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 fun VolunteerSkillPathDetailsScreen(
     skillPathId: String,
     onBackSelected: () -> Unit,
@@ -297,6 +312,7 @@ fun VolunteerSkillPathDetailsScreen(
         skillPathViewModel.uiState
             .collectAsStateWithLifecycle()
 
+    // Prepare Skill Path data used to explain progress, evidence or the next suitable level.
     val volunteerSkillPath =
         skillPathUiState.skillPaths
             .firstOrNull { skillPath ->
@@ -309,6 +325,7 @@ fun VolunteerSkillPathDetailsScreen(
             mutableStateOf("Progress")
         }
 
+    // Arrange the following screen content vertically inside the available space.
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -340,6 +357,7 @@ fun VolunteerSkillPathDetailsScreen(
                 )
 
             else ->
+                // Render this content as a lazy scrolling list so only visible items need to be composed.
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(
@@ -376,6 +394,7 @@ fun VolunteerSkillPathDetailsScreen(
                         )
                     }
 
+                    // Choose one mutually exclusive UI result from the current status or user selection.
                     when (selectedDetailTab) {
                         "Skills" -> {
                             item(
@@ -419,16 +438,21 @@ fun VolunteerSkillPathDetailsScreen(
 }
 
 @Composable
+// Purpose: Handles volunteer skill path detail tabs as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerSkillPathDetailTabs(
     selectedTab: String,
     onTabSelected: (String) -> Unit
 ) {
+    // Name the calculated tabs value because later UI branches reuse it during this Compose pass.
     val tabs = listOf(
         "Progress",
         "Skills",
         "Roles"
     )
 
+    // Arrange the following controls horizontally and keep their alignment consistent.
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -450,12 +474,14 @@ private fun VolunteerSkillPathDetailTabs(
                     },
                 shape = RoundedCornerShape(9.dp),
                 color =
+                    // Check this condition before showing the action, preventing an invalid Volunteer flow from continuing.
                     if (selectedTab == tab) {
                         VolunteerLinkPrimaryGreen
                     } else {
                         VolunteerLinkSoftGreenSurface
                     }
             ) {
+                // Display the prepared label; business rules are calculated before reaching this UI call.
                 Text(
                     text = tab,
                     modifier = Modifier
@@ -464,6 +490,7 @@ private fun VolunteerSkillPathDetailTabs(
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     color =
+                        // Check this condition before showing the action, preventing an invalid Volunteer flow from continuing.
                         if (selectedTab == tab) {
                             Color.White
                         } else {
@@ -478,9 +505,13 @@ private fun VolunteerSkillPathDetailTabs(
 }
 
 @Composable
+// Purpose: Renders the volunteer skill path header from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerSkillPathHeader(
     onRefreshSelected: () -> Unit
 ) {
+    // Arrange the following controls horizontally and keep their alignment consistent.
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -534,6 +565,9 @@ private fun VolunteerSkillPathHeader(
 }
 
 @Composable
+// Purpose: Handles volunteer skill path details top bar as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerSkillPathDetailsTopBar(
     onBackSelected: () -> Unit
 ) {
@@ -570,6 +604,9 @@ private fun VolunteerSkillPathDetailsTopBar(
 }
 
 @Composable
+// Purpose: Renders the volunteer skill path summary card from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerSkillPathSummaryCard(
     skillPaths: List<VolunteerSkillPath>
 ) {
@@ -581,12 +618,15 @@ private fun VolunteerSkillPathSummaryCard(
                 it.applicationStatus ==
                     VolunteerApplicationStatus.COMPLETED
             }
+    // Resolve or prepare role data used for eligibility, schedule and application controls.
     val verifiedRoles =
         completedApplications.size
+    // Name the calculated verified minutes value because later UI branches reuse it during this Compose pass.
     val verifiedMinutes =
         completedApplications.sumOf { application ->
             application.applicationVerifiedMinutes ?: 0
         }
+    // Name the calculated active paths value because later UI branches reuse it during this Compose pass.
     val activePaths =
         skillPaths.count { skillPath ->
             skillPath.hasVerifiedEvidence
@@ -719,6 +759,9 @@ private fun VolunteerSkillPathSummaryCard(
 }
 
 @Composable
+// Purpose: Handles volunteer skill path stat as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerSkillPathStat(
     value: String,
     label: String,
@@ -754,43 +797,56 @@ private fun VolunteerSkillPathStat(
 }
 
 @Composable
+// Purpose: Renders the volunteer skill path badges section from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerSkillPathBadgesSection(
     skillPaths: List<VolunteerSkillPath>
 ) {
+    // Resolve or prepare the application data used by the next status, cancellation or navigation decision.
     val completedApplications =
         VolunteerOpportunitySessionStore.volunteerApplications
             .filter {
                 it.applicationStatus == VolunteerApplicationStatus.COMPLETED
             }
+    // Resolve or prepare role data used for eligibility, schedule and application controls.
     val verifiedRoles =
         completedApplications.size
+    // Name the calculated verified minutes value because later UI branches reuse it during this Compose pass.
     val verifiedMinutes =
         completedApplications.sumOf {
             it.applicationVerifiedMinutes ?: 0
         }
+    // Name the calculated active paths value because later UI branches reuse it during this Compose pass.
     val activePaths =
         skillPaths.count { it.hasVerifiedEvidence }
+    // Name the calculated intermediate paths value because later UI branches reuse it during this Compose pass.
     val intermediatePaths =
         skillPaths.count { it.currentLevel >= 2 }
+    // Name the calculated advanced paths value because later UI branches reuse it during this Compose pass.
     val advancedPaths =
         skillPaths.count { it.currentLevel >= 3 }
+    // Name the calculated verified organisations value because later UI branches reuse it during this Compose pass.
     val verifiedOrganisations =
         completedApplications
             .map { it.applicationOrganisationName }
             .filter { it.isNotBlank() }
             .distinct()
             .size
+    // Prepare Skill Path data used to explain progress, evidence or the next suitable level.
     val verifiedSkills =
         completedApplications
             .flatMap { it.applicationPractisedSkills }
             .filter { it.isNotBlank() }
             .distinct()
             .size
+    // Prepare certificate evidence that is available only after verified completion.
     val certificates =
         completedApplications.count {
             !it.applicationCertificateId.isNullOrBlank()
         }
 
+    // Name the calculated badges value because later UI branches reuse it during this Compose pass.
     val badges = listOf(
         VolunteerSkillPathBadge(
             title = "First Verified Role",
@@ -1048,6 +1104,9 @@ private fun VolunteerSkillPathBadgesSection(
 }
 
 @Composable
+// Purpose: Renders the volunteer skill path guide card from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerSkillPathGuideCard() {
     Column(
         modifier = Modifier
@@ -1114,6 +1173,9 @@ private fun VolunteerSkillPathGuideCard() {
 }
 
 @Composable
+// Purpose: Handles volunteer skill path guide step as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerSkillPathGuideStep(
     stepNumber: String,
     title: String,
@@ -1187,11 +1249,16 @@ private fun VolunteerSkillPathGuideStep(
 }
 
 @Composable
+// Purpose: Renders the volunteer skill path card from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerSkillPathCard(
     volunteerSkillPath: VolunteerSkillPath,
     onSelected: () -> Unit
 ) {
+    // Read the shared business clock so Today, deadlines and attendance use the same date.
     val businessNow = volunteerBusinessTime()
+    // Resolve or prepare event data from the shared dashboard snapshot for this part of the screen.
     val openEventRoleCount =
         VolunteerOpportunitySessionStore
             .volunteerOpportunityEvents
@@ -1297,6 +1364,7 @@ private fun VolunteerSkillPathCard(
                 modifier = Modifier.height(13.dp)
             )
 
+            // Name the calculated next level value because later UI branches reuse it during this Compose pass.
             val nextLevel = volunteerSkillPath.nextLevel
 
             if (nextLevel == null) {
@@ -1382,11 +1450,15 @@ private fun VolunteerSkillPathCard(
 }
 
 @Composable
+// Purpose: Handles volunteer skill path requirement progress as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerSkillPathRequirementProgress(
     label: String,
     currentValue: Int,
     requiredValue: Int
 ) {
+    // Name the calculated progress value because later UI branches reuse it during this Compose pass.
     val progress =
         if (requiredValue <= 0) {
             1f
@@ -1430,6 +1502,9 @@ private fun VolunteerSkillPathRequirementProgress(
 }
 
 @Composable
+// Purpose: Renders the volunteer skill path detail header from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerSkillPathDetailHeader(
     volunteerSkillPath: VolunteerSkillPath
 ) {
@@ -1509,9 +1584,13 @@ private fun VolunteerSkillPathDetailHeader(
 }
 
 @Composable
+// Purpose: Renders the volunteer skill path progress section from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerSkillPathProgressSection(
     volunteerSkillPath: VolunteerSkillPath
 ) {
+    // Name the calculated next level value because later UI branches reuse it during this Compose pass.
     val nextLevel = volunteerSkillPath.nextLevel
 
     VolunteerSkillPathSectionContainer(
@@ -1610,9 +1689,13 @@ private fun VolunteerSkillPathProgressSection(
 }
 
 @Composable
+// Purpose: Renders the volunteer skill path evidence section from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerSkillPathEvidenceSection(
     volunteerSkillPath: VolunteerSkillPath
 ) {
+    // Name the calculated completed evidence value because later UI branches reuse it during this Compose pass.
     val completedEvidence =
         VolunteerOpportunitySessionStore
             .volunteerApplications
@@ -1772,9 +1855,13 @@ private fun VolunteerSkillPathEvidenceSection(
 }
 
 @Composable
+// Purpose: Renders the volunteer skill path skills section from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerSkillPathSkillsSection(
     volunteerSkillPath: VolunteerSkillPath
 ) {
+    // Name the calculated completed evidence value because later UI branches reuse it during this Compose pass.
     val completedEvidence =
         VolunteerOpportunitySessionStore.volunteerApplications
             .filter { application ->
@@ -1789,6 +1876,7 @@ private fun VolunteerSkillPathSkillsSection(
     ) {
         volunteerSkillPath.skills
             .forEachIndexed { skillIndex, skill ->
+                // Name the calculated evidence count value because later UI branches reuse it during this Compose pass.
                 val evidenceCount = completedEvidence.count { application ->
                     application.applicationPractisedSkills.any { practisedSkill ->
                         practisedSkill.equals(skill.name, ignoreCase = true)
@@ -1883,6 +1971,9 @@ private fun VolunteerSkillPathSkillsSection(
 }
 
 @Composable
+// Purpose: Renders the volunteer skill path roles section from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerSkillPathRolesSection(
     volunteerSkillPath: VolunteerSkillPath,
     onVolunteerRoleSelected: (
@@ -1890,7 +1981,9 @@ private fun VolunteerSkillPathRolesSection(
         roleId: Int
     ) -> Unit
 ) {
+    // Read the shared business clock so Today, deadlines and attendance use the same date.
     val businessNow = volunteerBusinessTime()
+    // Resolve or prepare event data from the shared dashboard snapshot for this part of the screen.
     val matchingEventRoles =
         VolunteerOpportunitySessionStore
             .volunteerOpportunityEvents
@@ -1944,8 +2037,11 @@ private fun VolunteerSkillPathRolesSection(
         } else {
             matchingEventRoles
                 .forEachIndexed { roleIndex, pair ->
+                    // Resolve or prepare event data from the shared dashboard snapshot for this part of the screen.
                     val event = pair.first
+                    // Resolve or prepare role data used for eligibility, schedule and application controls.
                     val role = pair.second
+                    // Calculate whether the following UI or action is allowed before it is rendered or executed.
                     val isEligible =
                         volunteerSkillPath.currentLevel >=
                             role.roleMinimumSkillPathLevel
@@ -2051,6 +2147,9 @@ private fun VolunteerSkillPathRolesSection(
 }
 
 @Composable
+// Purpose: Renders the volunteer skill path section container from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerSkillPathSectionContainer(
     sectionTitle: String,
     sectionContent: @Composable () -> Unit
@@ -2098,6 +2197,9 @@ private fun VolunteerSkillPathSectionContainer(
 }
 
 @Composable
+// Purpose: Handles volunteer skill path label as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerSkillPathLabel(
     labelText: String,
     labelColour: Color
@@ -2120,6 +2222,9 @@ private fun VolunteerSkillPathLabel(
 }
 
 @Composable
+// Purpose: Handles volunteer skill path loading content as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerSkillPathLoadingContent() {
     Box(
         modifier = Modifier.fillMaxSize(),
@@ -2132,6 +2237,9 @@ private fun VolunteerSkillPathLoadingContent() {
 }
 
 @Composable
+// Purpose: Handles volunteer skill path error content as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerSkillPathErrorContent(
     errorMessage: String,
     onRetrySelected: () -> Unit,
@@ -2180,6 +2288,9 @@ private fun VolunteerSkillPathErrorContent(
     }
 }
 
+// Purpose: Handles volunteer level display name as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun volunteerLevelDisplayName(
     level: Int
 ): String {

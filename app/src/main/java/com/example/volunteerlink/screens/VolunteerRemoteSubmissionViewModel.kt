@@ -13,6 +13,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+// Purpose: Handles volunteer remote ui state as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 data class VolunteerRemoteUiState(
     val context: VolunteerRemoteContext? = null,
     val selected: VolunteerRemoteSelectedFile? = null,
@@ -24,6 +27,9 @@ data class VolunteerRemoteUiState(
     val successVersion: Int = 0
 )
 
+// Purpose: Handles volunteer remote submission view model as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 class VolunteerRemoteSubmissionViewModel(application: Application) : AndroidViewModel(application) {
     private val state = MutableStateFlow(VolunteerRemoteUiState())
     val uiState = state.asStateFlow()
@@ -31,6 +37,9 @@ class VolunteerRemoteSubmissionViewModel(application: Application) : AndroidView
     private var roleId = ""
     private var ownerAuthId: String? = null
 
+    // Purpose: Handles load as one reusable step in the Volunteer flow.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     fun load(participationId: String) {
         if (state.value.busy) return
         val parts = participationId.split('|')
@@ -67,6 +76,9 @@ class VolunteerRemoteSubmissionViewModel(application: Application) : AndroidView
         }
     }
 
+    // Purpose: Handles choose as one reusable step in the Volunteer flow.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     fun choose(uri: Uri) {
         if (state.value.busy) return
         if (!requireOnline("select a project file")) return
@@ -92,12 +104,18 @@ class VolunteerRemoteSubmissionViewModel(application: Application) : AndroidView
         }
     }
 
+    // Purpose: Handles remove file as one reusable step in the Volunteer flow.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     fun removeFile() {
         if (state.value.busy) return
         state.value.selected?.file?.delete()
         state.update { it.copy(selected = null, error = null, message = null) }
     }
 
+    // Purpose: Handles validate selection as one reusable step in the Volunteer flow.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     fun validateSelection(): Boolean {
         if (state.value.busy) return false
         if (state.value.selected == null) {
@@ -107,6 +125,9 @@ class VolunteerRemoteSubmissionViewModel(application: Application) : AndroidView
         return true
     }
 
+    // Purpose: Handles submit as one reusable step in the Volunteer flow.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     fun submit() {
         if (!requireOnline("submit project work")) return
         if (!validateSelection()) return
@@ -139,6 +160,9 @@ class VolunteerRemoteSubmissionViewModel(application: Application) : AndroidView
         }
     }
 
+    // Purpose: Creates and safely launches the Android action for open file.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     fun openFile(path: String, onReady: (String) -> Unit) {
         if (state.value.busy) return
         if (!requireOnline("open a submitted file")) return
@@ -155,6 +179,9 @@ class VolunteerRemoteSubmissionViewModel(application: Application) : AndroidView
         }
     }
 
+    // Purpose: Handles check account as one reusable step in the Volunteer flow.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     private suspend fun checkAccount(): Boolean {
         val uid = Repository.readyAccountId()
         if (ownerAuthId == null) {
@@ -172,6 +199,9 @@ class VolunteerRemoteSubmissionViewModel(application: Application) : AndroidView
         return true
     }
 
+    // Purpose: Handles require online as one reusable step in the Volunteer flow.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     private fun requireOnline(action: String): Boolean {
         if (com.example.volunteerlink.data.VolunteerOnline.available(getApplication<Application>())) return true
         state.update { it.copy(error = "Internet connection is required to $action. Connect and try again.") }
@@ -184,6 +214,9 @@ class VolunteerRemoteSubmissionViewModel(application: Application) : AndroidView
     }
 }
 
+// Purpose: Handles remote error as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun remoteError(exception: Exception): String {
     val detail = exception.message.orEmpty()
     val knownMessages = listOf(

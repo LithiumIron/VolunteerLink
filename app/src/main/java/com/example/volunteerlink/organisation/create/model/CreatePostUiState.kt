@@ -1,17 +1,66 @@
 package com.example.volunteerlink.organisation.create.model
 
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Defines the Create Post state/model structures associated with Create Post Ui State.
+//
+// These models are UI/business-layer data: they let the five-step wizard hold incomplete user input before it is
+// converted to a validated repository payload.
+//
+// Database ids/rows are introduced only when a real saved draft or published post is persisted; local autosave
+// serializes the same draft state for recovery without making it authoritative.
+//
+// Architectural layer: Domain/UI model layer.
+// ============================================================================
+
+
 import com.example.volunteerlink.data.location.LocationSuggestion
 import com.example.volunteerlink.organisation.create.PostEditPolicy
 import com.example.volunteerlink.organisation.impactweave.model.ImpactWeavePostPartner
 
 
 /** Which database action the shared post editor represents. */
+/**
+ * DETAILED DECLARATION — CreatePostEditorMode
+ *
+ * Contract for Create Post Editor Mode. Callers depend on this abstraction rather than a concrete Supabase
+ * implementation.
+ *
+ * Implementations may perform network/storage work, while ViewModels and Compose remain expressed in
+ * VolunteerLink domain types.
+ */
 sealed interface CreatePostEditorMode {
+    /**
+     * DETAILED DECLARATION — NewPost
+     *
+     * Single shared instance for New Post so related rules/state are defined once for the application process.
+     */
     data object NewPost : CreatePostEditorMode
+    /**
+     * Holds the values represented by existing post edit as one strongly typed model.
+     * It keeps related Create/Edit Post values together so callers do not pass disconnected fields around.
+     */
+    /**
+     * DETAILED DECLARATION — ExistingPostEdit
+     *
+     * Domain/UI type for Existing Post Edit used by the Organisation module.
+     *
+     * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-
+     * typed maps.
+     */
     data class ExistingPostEdit(val postId: String) : CreatePostEditorMode
 }
 
 /** Field-level validation messages for Create Post Step 1. */
+/**
+ * DETAILED DECLARATION — CreatePostErrors
+ *
+ * Domain/UI type for Create Post Errors used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class CreatePostErrors(
     val postType: String? = null,
     val category: String? = null,
@@ -30,6 +79,15 @@ data class CreatePostErrors(
     val hybridPhysicalCapacity: String? = null,
     val hybridRemoteCapacity: String? = null
 ) {
+    /**
+     * Checks whether the current Create/Edit Post state has errors.
+     * Keeping this transformation near the model makes the data flow easier to understand.
+     */
+    /**
+     * DETAILED BEHAVIOUR — hasErrors
+     *
+     * Implements the current VolunteerLink responsibility for has errors in this support/model layer.
+     */
     fun hasErrors(): Boolean {
         return listOf(
             postType,
@@ -53,11 +111,28 @@ data class CreatePostErrors(
 }
 
 /** Step 2 capacity-allocation messages. */
+/**
+ * DETAILED DECLARATION — RoleSelectionErrors
+ *
+ * Domain/UI type for Role Selection Errors used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class RoleSelectionErrors(
     val general: String? = null,
     val physical: String? = null,
     val remote: String? = null
 ) {
+    /**
+     * Checks whether the current Create/Edit Post state has errors.
+     * Keeping this transformation near the model makes the data flow easier to understand.
+     */
+    /**
+     * DETAILED BEHAVIOUR — hasErrors
+     *
+     * Implements the current VolunteerLink responsibility for has errors in this support/model layer.
+     */
     fun hasErrors(): Boolean {
         return general != null || physical != null || remote != null
     }
@@ -66,6 +141,14 @@ data class RoleSelectionErrors(
 /**
  * Everything the Create Post UI currently needs to display.
  * MutableStateFlow stays private inside CreatePostViewModel.
+ */
+/**
+ * DETAILED DECLARATION — CreatePostUiState
+ *
+ * Immutable snapshot of all UI-visible state required by Create Post Ui State.
+ *
+ * Keeping loading/data/error/action flags together makes recomposition deterministic and avoids hidden mutable
+ * state in individual composables.
  */
 data class CreatePostUiState(
     val draft: CreatePostDraft = CreatePostDraft(),
@@ -161,6 +244,15 @@ data class CreatePostUiState(
             RoleSelectionErrors()
         }
 
+    /**
+     * Checks whether the current Create/Edit Post state has unsaved input.
+     * Keeping this transformation near the model makes the data flow easier to understand.
+     */
+    /**
+     * DETAILED BEHAVIOUR — hasUnsavedInput
+     *
+     * Implements the current VolunteerLink responsibility for has unsaved input in this support/model layer.
+     */
     fun hasUnsavedInput(): Boolean {
         return draft.hasMeaningfulContent()
     }

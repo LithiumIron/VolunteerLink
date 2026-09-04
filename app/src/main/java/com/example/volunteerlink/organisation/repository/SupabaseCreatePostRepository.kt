@@ -1,5 +1,28 @@
 package com.example.volunteerlink.organisation.repository
 
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Implements all Supabase-facing persistence required by the Create/Edit Post wizard.
+//
+// New posts are sent to ownership-checked PostgreSQL RPCs as structured JSON payloads so creation of
+// volunteer_posts and its normalized child records can be coordinated by the database.
+//
+// Thumbnail bytes are uploaded to Supabase Storage separately from the database transaction; the repository
+// therefore tracks uploaded paths and performs best-effort cleanup if a later save step fails.
+//
+// Existing-post editing hydrates the current normalized tables, maps them back into CreatePostDraft, then submits
+// one edit payload through the atomic editor RPC instead of deleting/recreating a published post.
+//
+// The repository always resolves the authenticated OrganisationSession and verification state before write
+// operations; server-side auth.uid(), ownership checks and RLS/RPC rules remain the final security boundary.
+//
+// All PostgREST access uses the shared Supabase client whose default schema is v1_erd_test.
+//
+// Architectural layer: Data/repository layer.
+// ============================================================================
+
+
 import com.example.volunteerlink.data.supabase
 import com.example.volunteerlink.data.location.LocationSuggestion
 import com.example.volunteerlink.organisation.auth.OrganisationSession
@@ -50,8 +73,36 @@ import java.util.UUID
  * RPCs. Storage uploads remain separate because Supabase Storage is outside the
  * database transaction, so failed uploads/DB saves are cleaned up best-effort.
  */
+/**
+ * DETAILED DECLARATION — SupabaseCreatePostRepository
+ *
+ * Data-access implementation/contract for Supabase Create Post Repository, isolating backend details from the
+ * screen and ViewModel layers.
+ *
+ * Protected server state still relies on authenticated Supabase authorization and database rules rather than
+ * trusting client-side checks alone.
+ *
+ * This implementation translates VolunteerLink models to PostgREST/RPC/Storage operations and maps backend
+ * responses back into domain models.
+ */
 class SupabaseCreatePostRepository : CreatePostRepository {
 
+    /**
+     * Saves the draft for the organisation Create/Edit Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — saveDraft
+     *
+     * Persists the current validated Create Post draft as a real Supabase Volunteer Post with database status
+     * DRAFT.
+     *
+     * This is different from the device autosave: Save Draft creates a server record that can appear in Manage,
+     * while device autosave only protects unfinished typing on this phone.
+     *
+     * The method reuses the same normalized save pipeline as publishing but passes publishAfterSave = false so
+     * creation/storage/error-cleanup behaviour remains consistent.
+     */
     override suspend fun saveDraft(
         draft: CreatePostDraft,
         roleCatalogue: List<CreateRoleTemplate>,
@@ -65,6 +116,21 @@ class SupabaseCreatePostRepository : CreatePostRepository {
         )
     }
 
+    /**
+     * Publishes the current Volunteer Post data after the required Create/Edit Post checks pass.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — publishPost
+     *
+     * Persists the current validated Create Post draft and completes the database transition to PUBLISHED.
+     *
+     * When the wizard was opened from Impact Weave, the successful post id is also passed into the conversion
+     * workflow so accepted partnership support is linked to the real Volunteer Post.
+     *
+     * The common save pipeline handles normalized payload creation, optional thumbnail upload and failure
+     * cleanup before this method returns success to the ViewModel.
+     */
     override suspend fun publishPost(
         draft: CreatePostDraft,
         roleCatalogue: List<CreateRoleTemplate>,
@@ -80,6 +146,38 @@ class SupabaseCreatePostRepository : CreatePostRepository {
         )
     }
 
+    /**
+     * Saves the post for the organisation Create/Edit Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — savePost
+     *
+     * Performs the repository/data-layer operation for save post.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Supabase RPC `organisation_create_volunteer_post`: Creates the database-owned post identity and
+     * normalized initial records from the validated Create Post payload; ownership is derived from the
+     * authenticated organisation.
+     *
+     * Supabase RPC `organisation_finish_created_post`: Finalises a newly created post after optional thumbnail
+     * upload by attaching the storage path and deciding whether the database record remains DRAFT or becomes
+     * PUBLISHED.
+     *
+     * Supabase RPC `organisation_prepare_failed_impact_weave_post_cleanup`: Prepares an Impact Weave-linked
+     * create attempt for safe cleanup when the Volunteer Post could not be fully completed.
+     *
+     * Uses OrganisationSession so the client operation is associated with the signed-in organisation; server
+     * RLS/RPC ownership checks still make the final authorization decision.
+     *
+     * Uses Supabase Storage for binary/file content while database rows keep only the controlled storage path
+     * and metadata.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     private suspend fun savePost(
         draft: CreatePostDraft,
         roleCatalogue: List<CreateRoleTemplate>,
@@ -104,6 +202,13 @@ class SupabaseCreatePostRepository : CreatePostRepository {
             // RPCs that return JSONB come back as a JSON object, not a PostgREST row array.
             // Parse the raw RPC response directly instead of using decodeSingle(), which
             // expects an array-shaped SELECT response.
+            // ------------------------------------------------------------------------
+            // SUPABASE RPC: organisation_create_volunteer_post
+            // Creates the database-owned post identity and normalized initial records from the validated Create
+            // Post payload; ownership is derived from the authenticated organisation.
+            // The client sends parameters and waits for the database result; ownership, lifecycle and multi-row
+            // consistency checks belong on the server for this operation.
+            // ------------------------------------------------------------------------
             val createResponse = supabase.postgrest.rpc(
                 function = "organisation_create_volunteer_post",
                 parameters = buildJsonObject {
@@ -135,6 +240,13 @@ class SupabaseCreatePostRepository : CreatePostRepository {
                 uploadedThumbnailPath = storagePath
             }
 
+            // ------------------------------------------------------------------------
+            // SUPABASE RPC: organisation_finish_created_post
+            // Finalises a newly created post after optional thumbnail upload by attaching the storage path and
+            // deciding whether the database record remains DRAFT or becomes PUBLISHED.
+            // The client sends parameters and waits for the database result; ownership, lifecycle and multi-row
+            // consistency checks belong on the server for this operation.
+            // ------------------------------------------------------------------------
             supabase.postgrest.rpc(
                 function = "organisation_finish_created_post",
                 parameters = buildJsonObject {
@@ -169,6 +281,13 @@ class SupabaseCreatePostRepository : CreatePostRepository {
             createdPostId?.let { postId ->
                 if (!impactWeaveDraftId.isNullOrBlank()) {
                     runCatching {
+                        // ------------------------------------------------------------------------
+                        // SUPABASE RPC: organisation_prepare_failed_impact_weave_post_cleanup
+                        // Prepares an Impact Weave-linked create attempt for safe cleanup when the Volunteer
+                        // Post could not be fully completed.
+                        // The client sends parameters and waits for the database result; ownership, lifecycle
+                        // and multi-row consistency checks belong on the server for this operation.
+                        // ------------------------------------------------------------------------
                         supabase.postgrest.rpc(
                             function = "organisation_prepare_failed_impact_weave_post_cleanup",
                             parameters = buildJsonObject {
@@ -179,6 +298,13 @@ class SupabaseCreatePostRepository : CreatePostRepository {
                     }
                 }
                 runCatching {
+                    // ------------------------------------------------------------------------
+                    // SUPABASE RPC: organisation_delete_created_draft
+                    // Removes a newly-created unfinished database draft during failure cleanup so a partially
+                    // completed client workflow does not leave an orphan post.
+                    // The client sends parameters and waits for the database result; ownership, lifecycle and
+                    // multi-row consistency checks belong on the server for this operation.
+                    // ------------------------------------------------------------------------
                     supabase.postgrest.rpc(
                         function = "organisation_delete_created_draft",
                         parameters = buildJsonObject { put("p_post_id", postId) }
@@ -189,6 +315,22 @@ class SupabaseCreatePostRepository : CreatePostRepository {
         }
     }
 
+    /**
+     * Builds the new post payload used by the organisation Create/Edit Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — buildNewPostPayload
+     *
+     * Converts CreatePostDraft plus the fixed role catalogue into the JSON structure expected by the new-post
+     * database RPC.
+     *
+     * The payload contains parent post fields and the normalized child information required for Physical/Remote
+     * details, roles, role skills/responsibilities/questions and schedule items.
+     *
+     * Only values that belong to the selected PHYSICAL/REMOTE/HYBRID mode are included, preventing stale hidden
+     * fields from another mode from being persisted.
+     */
     private fun buildNewPostPayload(
         draft: CreatePostDraft,
         roleCatalogue: List<CreateRoleTemplate>
@@ -296,8 +438,39 @@ class SupabaseCreatePostRepository : CreatePostRepository {
         }
     }
 
+    /**
+     * Loads the existing post for edit needed by the organisation Create/Edit Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — loadExistingPostForEdit
+     *
+     * Reconstructs the editor state for an existing owned post by reading the normalized post, Physical/Remote,
+     * role, screening, schedule and participation-related tables required by edit policy.
+     *
+     * The method maps stored database ids/values back to CreatePostDraft and edit-policy input instead of
+     * making the edit UI understand individual PostgREST rows.
+     *
+     * Participation/submission/history reads are used to decide which fields are safe to edit; they are not
+     * copied into the editable draft as organisation-controlled values.
+     *
+     * Reads/maps Supabase table data from `volunteer_posts` (the parent Volunteer Post record, including owner,
+     * mode, lifecycle status, category and publication metadata); `physical_details` (Physical-side
+     * date/time/location/capacity data for a post); `remote_details` (Remote-side project dates, capacity and
+     * submission configuration); `post_roles` (the selected role instances for a post, including capacity and
+     * application method); `post_role_skills` (required/practised skill settings attached to a selected post
+     * role).
+     *
+     * Uses OrganisationSession so the client operation is associated with the signed-in organisation; server
+     * RLS/RPC ownership checks still make the final authorization decision.
+     *
+     * Works with structured location suggestions/coordinates so free-text search is separated from the final
+     * location fields saved with the post/plan.
+     */
     override suspend fun loadExistingPostForEdit(postId: String): ExistingPostEditData {
         val organisationId = OrganisationSession.requireOrganisationId()
+        // SUPABASE TABLE: volunteer_posts — the parent Volunteer Post record, including owner, mode, lifecycle status, category and publication metadata.
+        // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
         val postRow = supabase.from("volunteer_posts")
             .select(columns = Columns.raw(
                 "post_id,organisation_id,title,description,mode,status,category,thumbnail_path,updated_at"
@@ -311,57 +484,87 @@ class SupabaseCreatePostRepository : CreatePostRepository {
             .firstOrNull()
             ?: error("Volunteer post $postId does not belong to this organisation.")
 
+        // SUPABASE TABLE: physical_details — Physical-side date/time/location/capacity data for a post.
+        // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
         val physicalRow = supabase.from("physical_details")
             .select { filter { eq("post_id", postId) } }
             .decodeList<JsonObject>()
             .firstOrNull()
+        // SUPABASE TABLE: remote_details — Remote-side project dates, capacity and submission configuration.
+        // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
         val remoteRow = supabase.from("remote_details")
             .select { filter { eq("post_id", postId) } }
             .decodeList<JsonObject>()
             .firstOrNull()
+        // SUPABASE TABLE: post_roles — the selected role instances for a post, including capacity and application method.
+        // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
         val roleRows = supabase.from("post_roles")
             .select { filter { eq("post_id", postId) } }
             .decodeList<JsonObject>()
+        // SUPABASE TABLE: post_role_skills — required/practised skill settings attached to a selected post role.
+        // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
         val skillRows = supabase.from("post_role_skills")
             .select { filter { eq("post_id", postId) } }
             .decodeList<JsonObject>()
+        // SUPABASE TABLE: post_role_responsibilities — organisation-defined responsibility text for each selected role.
+        // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
         val responsibilityRows = supabase.from("post_role_responsibilities")
             .select { filter { eq("post_id", postId) } }
             .decodeList<JsonObject>()
+        // SUPABASE TABLE: post_role_screening_questions — screening questions configured for REVIEW_APPLICANTS roles.
+        // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
         val questionRows = supabase.from("post_role_screening_questions")
             .select { filter { eq("post_id", postId) } }
             .decodeList<JsonObject>()
+        // SUPABASE TABLE: schedule_items — Physical activities and Remote milestones belonging to the post schedule.
+        // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
         val scheduleRows = supabase.from("schedule_items")
             .select { filter { eq("post_id", postId) } }
             .decodeList<JsonObject>()
+        // SUPABASE TABLE: schedule_item_roles — many-to-many links between schedule items and the roles affected by them.
+        // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
         val scheduleRoleRows = supabase.from("schedule_item_roles")
             .select { filter { eq("post_id", postId) } }
             .decodeList<JsonObject>()
+        // SUPABASE TABLE: role_participations — volunteer application/join/completion state for one post role.
+        // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
         val participationRows = supabase.from("role_participations")
             .select(columns = Columns.raw(
                 "role_template_id,application_status,completion_status,joined_at"
             )) { filter { eq("post_id", postId) } }
             .decodeList<JsonObject>()
+        // SUPABASE TABLE: role_participation_screening_answers — the volunteer's normalized answers to the role screening questions.
+        // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
         val screeningAnswerRows = supabase.from("role_participation_screening_answers")
             .select(columns = Columns.raw("role_template_id")) {
                 filter { eq("post_id", postId) }
             }.decodeList<JsonObject>()
+        // SUPABASE TABLE: attendance_records — per-volunteer Physical attendance/verified-time records.
+        // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
         val attendanceRows = supabase.from("attendance_records")
             .select(columns = Columns.raw("event_date,role_template_id")) {
                 filter { eq("post_id", postId) }
             }.decodeList<JsonObject>()
+        // SUPABASE TABLE: remote_submissions — Remote deliverable submission status, file/url and review metadata.
+        // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
         val submissionRows = supabase.from("remote_submissions")
             .select(columns = Columns.raw("role_template_id,submission_type")) {
                 filter { eq("post_id", postId) }
             }.decodeList<JsonObject>()
+        // SUPABASE TABLE: volunteer_evaluations — organisation evaluation/feedback results used after participation.
+        // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
         val evaluationRows = supabase.from("volunteer_evaluations")
             .select(columns = Columns.raw("role_template_id")) {
                 filter { eq("post_id", postId) }
             }.decodeList<JsonObject>()
+        // SUPABASE TABLE: volunteer_skill_experiences — verified skill-path evidence accumulated by volunteers.
+        // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
         val skillExperienceRows = supabase.from("volunteer_skill_experiences")
             .select(columns = Columns.raw("role_template_id")) {
                 filter { eq("post_id", postId) }
             }.decodeList<JsonObject>()
+        // SUPABASE TABLE: volunteer_certificates — certificate records made visible only through appropriate profile/certificate access rules.
+        // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
         val certificateRows = supabase.from("volunteer_certificates")
             .select(columns = Columns.raw("role_template_id")) {
                 filter { eq("post_id", postId) }
@@ -369,6 +572,8 @@ class SupabaseCreatePostRepository : CreatePostRepository {
 
         val roleTemplateIds = roleRows.map { it.requiredText("role_template_id") }.distinct()
         val templateRows = if (roleTemplateIds.isEmpty()) emptyList() else {
+            // SUPABASE TABLE: role_templates — the fixed role catalogue used when an organisation chooses volunteer roles.
+            // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
             supabase.from("role_templates")
                 .select(columns = Columns.raw("role_template_id,role_mode")) {
                     filter { isIn("role_template_id", roleTemplateIds) }
@@ -566,6 +771,33 @@ class SupabaseCreatePostRepository : CreatePostRepository {
         )
     }
 
+    /**
+     * Updates the existing post used by the organisation Create/Edit Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — updateExistingPost
+     *
+     * Sends the edited existing-post payload to the atomic organisation_update_volunteer_post_editor RPC.
+     *
+     * The RPC is used instead of a sequence of client-side UPDATE/DELETE/INSERT calls because an existing post
+     * can already have applications, attendance and submissions that must remain relationally consistent.
+     *
+     * Thumbnail replacement is coordinated separately with Supabase Storage, and the database path is changed
+     * only after the upload/save sequence succeeds.
+     *
+     * Supabase RPC `organisation_update_volunteer_post_editor`: Applies Existing Post Edit as one ownership-
+     * checked database transaction so related post/role/schedule changes cannot partially succeed.
+     *
+     * Uses OrganisationSession so the client operation is associated with the signed-in organisation; server
+     * RLS/RPC ownership checks still make the final authorization decision.
+     *
+     * Uses Supabase Storage for binary/file content while database rows keep only the controlled storage path
+     * and metadata.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     override suspend fun updateExistingPost(
         latest: ExistingPostEditData,
         editedDraft: CreatePostDraft,
@@ -614,6 +846,13 @@ class SupabaseCreatePostRepository : CreatePostRepository {
             // details, roles, child role data and schedules. The function locks
             // volunteer_posts first and verifies originalUpdatedAt before any
             // child row is touched.
+            // ------------------------------------------------------------------------
+            // SUPABASE RPC: organisation_update_volunteer_post_editor
+            // Applies Existing Post Edit as one ownership-checked database transaction so related
+            // post/role/schedule changes cannot partially succeed.
+            // The client sends parameters and waits for the database result; ownership, lifecycle and multi-row
+            // consistency checks belong on the server for this operation.
+            // ------------------------------------------------------------------------
             supabase.postgrest.rpc(
                 function = "organisation_update_volunteer_post_editor",
                 parameters = buildJsonObject {
@@ -649,6 +888,18 @@ class SupabaseCreatePostRepository : CreatePostRepository {
         }
     }
 
+    /**
+     * Builds the existing edit payload used by the organisation Create/Edit Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — buildExistingEditPayload
+     *
+     * Performs the repository/data-layer operation for build existing edit payload.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     */
     private fun buildExistingEditPayload(
         latest: ExistingPostEditData,
         editedDraft: CreatePostDraft,
@@ -768,6 +1019,18 @@ class SupabaseCreatePostRepository : CreatePostRepository {
         }
     }
 
+    /**
+     * Loads the role catalogue needed by the organisation Create/Edit Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — loadRoleCatalogue
+     *
+     * Performs the repository/data-layer operation for load role catalogue.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     */
     override suspend fun loadRoleCatalogue(): List<CreateRoleTemplate> {
         // Step 2 now depends on four normalized catalogue tables.
         // Keep the table name in any thrown error so test builds tell us
@@ -842,6 +1105,18 @@ class SupabaseCreatePostRepository : CreatePostRepository {
             .sortedBy { it.roleTemplateId }
     }
 
+    /**
+     * Renders the build physical details row row used in the organisation Create/Edit Post flow.
+     * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+     */
+    /**
+     * DETAILED BEHAVIOUR — buildPhysicalDetailsRow
+     *
+     * Performs the repository/data-layer operation for build physical details row.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     */
     private fun buildPhysicalDetailsRow(
         postId: String,
         draft: CreatePostDraft
@@ -903,6 +1178,18 @@ class SupabaseCreatePostRepository : CreatePostRepository {
         }
     }
 
+    /**
+     * Renders the build remote details row row used in the organisation Create/Edit Post flow.
+     * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+     */
+    /**
+     * DETAILED BEHAVIOUR — buildRemoteDetailsRow
+     *
+     * Performs the repository/data-layer operation for build remote details row.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     */
     private fun buildRemoteDetailsRow(
         postId: String,
         draft: CreatePostDraft
@@ -944,6 +1231,21 @@ class SupabaseCreatePostRepository : CreatePostRepository {
         }
     }
 
+    /**
+     * Builds the schedule publish data used by the organisation Create/Edit Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — buildSchedulePublishData
+     *
+     * Performs the repository/data-layer operation for build schedule publish data.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the
+     * rest of the wizard.
+     */
     private fun buildSchedulePublishData(
         postId: String,
         draft: CreatePostDraft,
@@ -1011,6 +1313,14 @@ class SupabaseCreatePostRepository : CreatePostRepository {
      * Explicit child cleanup is kept even where a test FK currently cascades,
      * so this multi-table client-side save stays understandable and debuggable.
      */
+    /**
+     * DETAILED BEHAVIOUR — sqlDate
+     *
+     * Performs the repository/data-layer operation for sql date.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     */
     private fun sqlDate(dateMillis: Long): String {
         return SimpleDateFormat(
             "yyyy-MM-dd",
@@ -1018,6 +1328,18 @@ class SupabaseCreatePostRepository : CreatePostRepository {
         ).format(Date(dateMillis))
     }
 
+    /**
+     * Returns the sql time value required by the organisation Create/Edit Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — sqlTime
+     *
+     * Performs the repository/data-layer operation for sql time.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     */
     private fun sqlTime(minutesAfterMidnight: Int): String {
         require(minutesAfterMidnight in 0..1439) {
             "Time must be between 00:00 and 23:59."
@@ -1028,10 +1350,37 @@ class SupabaseCreatePostRepository : CreatePostRepository {
         return String.format(Locale.US, "%02d:%02d:00", hour, minute)
     }
 
+    /**
+     * Derives the string value used by the organisation Create/Edit Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — nullIfBlank
+     *
+     * Performs the repository/data-layer operation for null if blank.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     */
     private fun String?.nullIfBlank(): String? {
         return this?.trim()?.takeIf { it.isNotEmpty() }
     }
 
+    /**
+     * Loads the catalogue table needed by the organisation Create/Edit Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — loadCatalogueTable
+     *
+     * Performs the repository/data-layer operation for load catalogue table.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     private suspend fun loadCatalogueTable(
         tableName: String
     ): List<JsonObject> {
@@ -1049,53 +1398,179 @@ class SupabaseCreatePostRepository : CreatePostRepository {
         }
     }
 
+    /**
+     * Derives the json object value used by the organisation Create/Edit Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — requiredText
+     *
+     * Performs the repository/data-layer operation for required text.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     */
     private fun JsonObject.requiredText(key: String): String {
         return optionalText(key)
             ?: error("Missing '$key' in Create Post catalogue data.")
     }
 
+    /**
+     * Derives the json object value used by the organisation Create/Edit Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — optionalText
+     *
+     * Performs the repository/data-layer operation for optional text.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     */
     private fun JsonObject.optionalText(key: String): String? {
         return this[key]
             ?.jsonPrimitive
             ?.contentOrNull
     }
 
+    /**
+     * Derives the json object value used by the organisation Create/Edit Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — optionalBoolean
+     *
+     * Performs the repository/data-layer operation for optional boolean.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     */
     private fun JsonObject.optionalBoolean(key: String): Boolean? {
         return optionalText(key)?.toBooleanStrictOrNull()
     }
 
+    /**
+     * Derives the json object value used by the organisation Create/Edit Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — optionalInt
+     *
+     * Performs the repository/data-layer operation for optional int.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     private fun JsonObject.optionalInt(key: String): Int? {
         val element: JsonElement = this[key] ?: return null
         if (element is JsonNull) return null
         return runCatching { element.jsonPrimitive.intOrNull }.getOrNull()
     }
 
+    /**
+     * Derives the json object value used by the organisation Create/Edit Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — requiredInt
+     *
+     * Performs the repository/data-layer operation for required int.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     */
     private fun JsonObject.requiredInt(key: String): Int {
         return optionalInt(key) ?: error("Missing required integer '$key'.")
     }
 
+    /**
+     * Derives the json object value used by the organisation Create/Edit Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — optionalDouble
+     *
+     * Performs the repository/data-layer operation for optional double.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     private fun JsonObject.optionalDouble(key: String): Double? {
         val element: JsonElement = this[key] ?: return null
         if (element is JsonNull) return null
         return runCatching { element.jsonPrimitive.doubleOrNull }.getOrNull()
     }
 
+    /**
+     * Derives the json object value used by the organisation Create/Edit Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — requiredDouble
+     *
+     * Performs the repository/data-layer operation for required double.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     */
     private fun JsonObject.requiredDouble(key: String): Double {
         return optionalDouble(key) ?: error("Missing required number '$key'.")
     }
 
+    /**
+     * Parses the sql date used by the organisation Create/Edit Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — parseSqlDate
+     *
+     * Performs the repository/data-layer operation for parse sql date.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     */
     private fun parseSqlDate(value: String): Long {
         return SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
             isLenient = false
         }.parse(value)?.time ?: error("Invalid database date: $value")
     }
 
+    /**
+     * Parses the sql time used by the organisation Create/Edit Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — parseSqlTime
+     *
+     * Performs the repository/data-layer operation for parse sql time.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     */
     private fun parseSqlTime(value: String): Int {
         val parts = value.take(5).split(":")
         if (parts.size != 2) error("Invalid database time: $value")
         return parts[0].toInt() * 60 + parts[1].toInt()
     }
 
+    /**
+     * Holds the values represented by schedule publish data as one strongly typed model.
+     * It keeps backend-facing work behind the Create/Edit Post repository boundary.
+     */
+    /**
+     * DETAILED DECLARATION — SchedulePublishData
+     *
+     * Domain/UI type for Schedule Publish Data used by the Organisation module.
+     *
+     * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-
+     * typed maps.
+     */
     private data class SchedulePublishData(
         val row: JsonObject,
         val targetRoleTemplateIds: List<String>

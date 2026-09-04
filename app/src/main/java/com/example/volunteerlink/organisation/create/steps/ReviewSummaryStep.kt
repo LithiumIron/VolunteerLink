@@ -1,5 +1,23 @@
 package com.example.volunteerlink.organisation.create.steps
 
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Step 5: read-only review of all earlier choices plus publish/save/edit actions.
+//
+// The composables read CreatePostUiState/CreatePostDraft values and emit callbacks; they do not call Supabase
+// directly.
+//
+// Validation messages are supplied from CreatePostViewModel/CreatePostValidator so the same business rules apply
+// regardless of which UI component displays the field.
+//
+// Breaking large steps into section files keeps layout code readable while the ViewModel remains the single owner
+// of mutable workflow state.
+//
+// Architectural layer: Compose presentation layer.
+// ============================================================================
+
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -41,6 +59,14 @@ import com.example.volunteerlink.organisation.create.model.CreatePostUiState
  * Save Draft and Publish sit at the end after the organiser has reviewed the post.
  */
 @Composable
+/**
+ * DETAILED BEHAVIOUR — ReviewSummaryStep
+ *
+ * Renders the reusable Review Summary Step portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun ReviewSummaryStep(
     uiState: CreatePostUiState,
     onUp: () -> Unit,
@@ -180,6 +206,18 @@ fun ReviewSummaryStep(
 }
 
 @Composable
+/**
+ * Renders the UI represented by review summary actions for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — ReviewSummaryActions
+ *
+ * Renders the reusable Review Summary Actions portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun ReviewSummaryActions(
     isExistingPostEdit: Boolean,
     isSavingDraft: Boolean,
@@ -262,6 +300,18 @@ fun ReviewSummaryActions(
 }
 
 @Composable
+/**
+ * Renders the review summary header header used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — ReviewSummaryHeader
+ *
+ * Renders the reusable Review Summary Header portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun ReviewSummaryHeader(
     onUp: () -> Unit
 ) {

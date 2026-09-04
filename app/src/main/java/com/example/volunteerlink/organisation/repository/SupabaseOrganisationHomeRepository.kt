@@ -1,5 +1,23 @@
 package com.example.volunteerlink.organisation.repository
 
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Loads Organisation dashboard and Manage summary data from the normalized Supabase schema.
+//
+// It reads the organisation's own posts, roles and participation counts, then maps them into compact home/manage
+// models.
+//
+// Before presenting applicant counts it can invoke the lifecycle RPC so applications that should automatically
+// close are resolved by the database.
+//
+// Read queries are filtered by the authenticated organisation context and backed by database RLS; the client never
+// trusts a UI-supplied organisation id as ownership proof.
+//
+// Architectural layer: Data/repository layer.
+// ============================================================================
+
+
 import com.example.volunteerlink.data.supabase
 import com.example.volunteerlink.organisation.home.model.OrganisationHomeParticipation
 import com.example.volunteerlink.organisation.home.model.OrganisationHomePost
@@ -22,6 +40,18 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 
 @Serializable
+/**
+ * Holds the values represented by partner post summary row as one strongly typed model.
+ * It keeps backend-facing work behind the Home dashboard repository boundary.
+ */
+/**
+ * DETAILED DECLARATION — PartnerPostSummaryRow
+ *
+ * Domain/UI type for Partner Post Summary Row used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class PartnerPostSummaryRow(
     @SerialName("post_id") val postId: String,
     @SerialName("owner_organisation_name") val ownerOrganisationName: String,
@@ -37,6 +67,18 @@ data class PartnerPostSummaryRow(
 )
 
 @Serializable
+/**
+ * Holds the values represented by impact weave attention row as one strongly typed model.
+ * It keeps backend-facing work behind the Home dashboard repository boundary.
+ */
+/**
+ * DETAILED DECLARATION — ImpactWeaveAttentionRow
+ *
+ * Domain/UI type for Impact Weave Attention Row used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 private data class ImpactWeaveAttentionRow(
     @SerialName("draft_id") val draftId: String,
     val title: String,
@@ -55,8 +97,32 @@ private data class ImpactWeaveAttentionRow(
  * one-to-many schedule rows. This avoids placing relational IDs in JSONB and
  * avoids an N+1 query for every post.
  */
+/**
+ * DETAILED DECLARATION — SupabaseOrganisationHomeRepository
+ *
+ * Data-access implementation/contract for Supabase Organisation Home Repository, isolating backend details from
+ * the screen and ViewModel layers.
+ *
+ * Protected server state still relies on authenticated Supabase authorization and database rules rather than
+ * trusting client-side checks alone.
+ *
+ * This implementation translates VolunteerLink models to PostgREST/RPC/Storage operations and maps backend
+ * responses back into domain models.
+ */
 class SupabaseOrganisationHomeRepository : OrganisationHomeRepository {
 
+    /**
+     * Loads the partner posts needed by the organisation Home dashboard flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — loadPartnerPosts
+     *
+     * Performs the repository/data-layer operation for load partner posts.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     */
     override suspend fun loadPartnerPosts(): List<PartnerPostSummary> {
         val response = supabase.postgrest.rpc("organisation_list_partner_posts")
         return Json { ignoreUnknownKeys = true }
@@ -78,15 +144,53 @@ class SupabaseOrganisationHomeRepository : OrganisationHomeRepository {
             }
     }
 
+    /**
+     * Loads the home snapshot needed by the organisation Home dashboard flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — loadHomeSnapshot
+     *
+     * Loads the authenticated organisation dashboard/manage snapshot from Supabase and maps
+     * post/role/participation rows into summary data used by both Home and Manage.
+     *
+     * Application lifecycle resolution is run before counts are trusted so automatically closed/full/started
+     * applications are not displayed as still pending.
+     *
+     * The successful mapped snapshot can later be saved by OrganisationLocalStorage for read-only offline
+     * continuity.
+     *
+     * Supabase RPC `organisation_resolve_application_lifecycle`: Reconciles pending application rows against
+     * current post/role timing and capacity rules before Organisation counts or actions are shown.
+     *
+     * Reads/maps Supabase table data from `organisations` (organisation-specific identity, verification, public
+     * contact/location and partnership availability); `volunteer_posts` (the parent Volunteer Post record,
+     * including owner, mode, lifecycle status, category and publication metadata); `post_roles` (the selected
+     * role instances for a post, including capacity and application method); `role_participations` (volunteer
+     * application/join/completion state for one post role); `role_templates` (the fixed role catalogue used
+     * when an organisation chooses volunteer roles).
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     override suspend fun loadHomeSnapshot(
         organisationId: String
     ): OrganisationHomeSnapshot {
         // Persist role-start/full-capacity application outcomes before Home counts them.
+        // ------------------------------------------------------------------------
+        // SUPABASE RPC: organisation_resolve_application_lifecycle
+        // Reconciles pending application rows against current post/role timing and capacity rules before
+        // Organisation counts or actions are shown.
+        // The client sends parameters and waits for the database result; ownership, lifecycle and multi-row
+        // consistency checks belong on the server for this operation.
+        // ------------------------------------------------------------------------
         supabase.postgrest.rpc(
             function = "organisation_resolve_application_lifecycle"
         )
 
         val organisationRow = supabase
+            // SUPABASE TABLE: organisations — organisation-specific identity, verification, public contact/location and partnership availability.
+            // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
             .from("organisations")
             .select(columns = Columns.raw("organisation_id,organisation_name")) {
                 filter {
@@ -98,6 +202,8 @@ class SupabaseOrganisationHomeRepository : OrganisationHomeRepository {
             ?: error("Organisation $organisationId was not found.")
 
         val postRows = supabase
+            // SUPABASE TABLE: volunteer_posts — the parent Volunteer Post record, including owner, mode, lifecycle status, category and publication metadata.
+            // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
             .from("volunteer_posts")
             .select(
                 columns = Columns.raw(
@@ -181,6 +287,8 @@ class SupabaseOrganisationHomeRepository : OrganisationHomeRepository {
             emptyList()
         } else {
             supabase
+                // SUPABASE TABLE: post_roles — the selected role instances for a post, including capacity and application method.
+                // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
                 .from("post_roles")
                 .select(
                     columns = Columns.raw(
@@ -199,6 +307,8 @@ class SupabaseOrganisationHomeRepository : OrganisationHomeRepository {
             emptyList()
         } else {
             supabase
+                // SUPABASE TABLE: role_participations — volunteer application/join/completion state for one post role.
+                // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
                 .from("role_participations")
                 .select(
                     columns = Columns.raw(
@@ -223,6 +333,8 @@ class SupabaseOrganisationHomeRepository : OrganisationHomeRepository {
             emptyList()
         } else {
             supabase
+                // SUPABASE TABLE: role_templates — the fixed role catalogue used when an organisation chooses volunteer roles.
+                // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
                 .from("role_templates")
                 .select(
                     columns = Columns.raw(
@@ -309,6 +421,14 @@ class SupabaseOrganisationHomeRepository : OrganisationHomeRepository {
      * configurations may still return a one-item array. Accept both shapes so
      * this repository remains stable if the relationship representation changes.
      */
+    /**
+     * DETAILED BEHAVIOUR — firstRelatedObject
+     *
+     * Performs the repository/data-layer operation for first related object.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     */
     private fun JsonObject.firstRelatedObject(key: String): JsonObject? {
         return when (val element = this[key]) {
             is JsonObject -> element
@@ -317,6 +437,18 @@ class SupabaseOrganisationHomeRepository : OrganisationHomeRepository {
         }
     }
 
+    /**
+     * Derives the json object value used by the organisation Home dashboard flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — relatedObjects
+     *
+     * Performs the repository/data-layer operation for related objects.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     */
     private fun JsonObject.relatedObjects(key: String): List<JsonObject> {
         return when (val element = this[key]) {
             is JsonArray -> element.mapNotNull { it as? JsonObject }
@@ -325,11 +457,38 @@ class SupabaseOrganisationHomeRepository : OrganisationHomeRepository {
         }
     }
 
+    /**
+     * Derives the json object value used by the organisation Home dashboard flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — requiredText
+     *
+     * Performs the repository/data-layer operation for required text.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     */
     private fun JsonObject.requiredText(key: String): String {
         return optionalText(key)
             ?: error("Missing required Supabase field: $key")
     }
 
+    /**
+     * Derives the json object value used by the organisation Home dashboard flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — optionalText
+     *
+     * Performs the repository/data-layer operation for optional text.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     private fun JsonObject.optionalText(key: String): String? {
         val element: JsonElement = this[key] ?: return null
         if (element is JsonNull) return null

@@ -12,6 +12,9 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 @Serializable
+// Purpose: Handles the volunteer application profile preview rule in the data layer so screens do not duplicate this business logic.
+// Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+// Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
 data class VolunteerApplicationProfilePreview(
     @SerialName("full_name") val name: String,
     val city: String? = null,
@@ -20,6 +23,9 @@ data class VolunteerApplicationProfilePreview(
 )
 
 @Serializable
+// Purpose: Handles the volunteer preview evidence rule in the data layer so screens do not duplicate this business logic.
+// Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+// Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
 data class VolunteerPreviewEvidence(
     @SerialName("skill_path_id") val pathId: String,
     @SerialName("current_level") val level: Int,
@@ -30,6 +36,9 @@ data class VolunteerPreviewEvidence(
 @Serializable
 private data class VolunteerPreviewPath(@SerialName("skill_path_id") val id: String, val name: String)
 
+// Purpose: Handles the volunteer application preview rule in the data layer so screens do not duplicate this business logic.
+// Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+// Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
 data class VolunteerApplicationPreview(val profile: VolunteerApplicationProfilePreview, val cached: Boolean)
 
 /** Separate, account-scoped preview cache; contains no credentials and never edits a profile. */
@@ -47,6 +56,9 @@ object VolunteerApplicationPreviewRepository {
         check(supabase.auth.currentUserOrNull()?.id == expectedAccount) { "Account changed. Reopen this application." }
         return rows.associate { (paths[it.pathId] ?: it.pathId) to it }
     }
+    // Purpose: Reads  from the data source and returns models that the ViewModel can expose to Compose.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     suspend fun load(context: Context, expectedAccount: String): VolunteerApplicationPreview {
         check(expectedAccount.isNotBlank()) { "Sign in again before reviewing your application." }
         val preferences = context.getSharedPreferences("volunteer_application_preview_v1", Context.MODE_PRIVATE)

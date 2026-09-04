@@ -72,6 +72,9 @@ import kotlinx.coroutines.delay
 import com.example.volunteerlink.R
 
 @Composable
+// Purpose: Filters already-loaded opportunities by text, mode, category and skill level.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 fun VolunteerSearchScreen(
     onBackSelected: () -> Unit,
     onVolunteerOpportunitySelected: (eventId: Int) -> Unit
@@ -95,9 +98,12 @@ fun VolunteerSearchScreen(
         mutableStateOf(false)
     }
 
+    // Name the calculated focus requester value because later UI branches reuse it during this Compose pass.
     val focusRequester = remember { FocusRequester() }
+    // Name the calculated keyboard controller value because later UI branches reuse it during this Compose pass.
     val keyboardController = LocalSoftwareKeyboardController.current
 
+    // Run this side effect only when its Compose keys change, instead of repeating it on every redraw.
     LaunchedEffect(Unit) {
         // Let the destination finish composing before requesting IME focus.
         delay(180)
@@ -105,11 +111,13 @@ fun VolunteerSearchScreen(
         keyboardController?.show()
     }
 
+    // Resolve or prepare event data from the shared dashboard snapshot for this part of the screen.
     val allOpportunities =
         VolunteerOpportunitySessionStore
             .volunteerOpportunityEvents
             .toList()
 
+    // Name the calculated popular search terms value because later UI branches reuse it during this Compose pass.
     val popularSearchTerms =
         remember(allOpportunities) {
             allOpportunities
@@ -121,6 +129,7 @@ fun VolunteerSearchScreen(
                 .take(6)
         }
 
+    // Name the calculated category filters value because later UI branches reuse it during this Compose pass.
     val categoryFilters =
         remember(allOpportunities) {
             listOf("All categories") +
@@ -130,9 +139,12 @@ fun VolunteerSearchScreen(
                     .sorted()
         }
 
+    // Apply the current search/filter choices without changing the original list stored in session state.
     val filteredVolunteerOpportunities =
         allOpportunities.filter { event ->
+            // Name the calculated query value because later UI branches reuse it during this Compose pass.
             val query = volunteerSearchQuery.trim()
+            // Name the calculated matches search query value because later UI branches reuse it during this Compose pass.
             val matchesSearchQuery =
                 query.isBlank() ||
                     event.eventTitle.contains(query, ignoreCase = true) ||
@@ -171,7 +183,9 @@ fun VolunteerSearchScreen(
                             }
                     }
 
+            // Name the calculated matches mode value because later UI branches reuse it during this Compose pass.
             val matchesMode =
+                // Choose one mutually exclusive UI result from the current status or user selection.
                 when (selectedModeFilter) {
                     "Physical" ->
                         event.eventOpportunityType == "Physical"
@@ -185,11 +199,13 @@ fun VolunteerSearchScreen(
                     else -> true
                 }
 
+            // Name the calculated matches category value because later UI branches reuse it during this Compose pass.
             val matchesCategory =
                 selectedCategoryFilter == "All categories" ||
                     event.eventCategory.displayName() ==
                         selectedCategoryFilter
 
+            // Name the calculated matches level value because later UI branches reuse it during this Compose pass.
             val matchesLevel =
                 selectedLevelFilter == "All levels" ||
                     event.eventVolunteerRoles.any { role ->
@@ -206,11 +222,13 @@ fun VolunteerSearchScreen(
                 (!verifiedOnly || event.eventIsVerifiedOrganisation)
         }
 
+    // Arrange the following screen content vertically inside the available space.
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(VolunteerLinkBackground)
     ) {
+        // Arrange the following controls horizontally and keep their alignment consistent.
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -227,6 +245,7 @@ fun VolunteerSearchScreen(
                 )
             }
 
+            // Display an editable Compose field and send each value change back to screen state.
             OutlinedTextField(
                 value = volunteerSearchQuery,
                 onValueChange = { volunteerSearchQuery = it },
@@ -234,6 +253,7 @@ fun VolunteerSearchScreen(
                     .weight(1f)
                     .focusRequester(focusRequester),
                 placeholder = {
+                    // Display the prepared label; business rules are calculated before reaching this UI call.
                     Text(
                         text = "Event, role, skill or organisation",
                         fontSize = 12.sp
@@ -247,6 +267,7 @@ fun VolunteerSearchScreen(
                     )
                 },
                 trailingIcon = {
+                    // Check this condition before showing the action, preventing an invalid Volunteer flow from continuing.
                     if (volunteerSearchQuery.isNotBlank()) {
                         IconButton(
                             onClick = { volunteerSearchQuery = "" }
@@ -277,6 +298,7 @@ fun VolunteerSearchScreen(
             )
         }
 
+        // Render this content as a lazy scrolling list so only visible items need to be composed.
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = 24.dp)
@@ -514,6 +536,9 @@ fun VolunteerSearchScreen(
 }
 
 @Composable
+// Purpose: Renders the volunteer search filter row from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerSearchFilterRow(
     options: List<String>,
     selectedOption: String,
@@ -551,6 +576,9 @@ private fun VolunteerSearchFilterRow(
 }
 
 @Composable
+// Purpose: Handles volunteer search subheading as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerSearchSubheading(text: String) {
     Text(
         text = text,
@@ -567,6 +595,9 @@ private fun VolunteerSearchSubheading(text: String) {
 }
 
 @Composable
+// Purpose: Renders the volunteer search result card from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerSearchResultCard(
     volunteerOpportunityEvent: VolunteerOpportunityEvent,
     onVolunteerOpportunitySelected: () -> Unit

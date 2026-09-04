@@ -1,5 +1,20 @@
 package com.example.volunteerlink.organisation.viewmodel
 
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Coordinates promotion status and payment-related UI for Organisation posts.
+//
+// Display information may be cached for continuity, but creating a promotion/payment remains a server-side
+// operation because it affects real billing and post visibility.
+//
+// The ViewModel exposes loading/result/error state and keeps payment UI logic separate from Supabase table/RPC
+// details.
+//
+// Architectural layer: ViewModel / workflow state layer.
+// ============================================================================
+
+
 import android.app.Application
 import android.content.Context
 import androidx.core.content.edit
@@ -40,6 +55,15 @@ import java.util.Locale
  * goes to Supabase. SharedPreferences only remembers the payment preference,
  * cardholder name and last four digits; full card details are never stored.
  */
+/**
+ * DETAILED DECLARATION — OrganisationPromotionViewModel
+ *
+ * Lifecycle-aware state owner for Organisation Promotion View Model. It survives ordinary Compose recomposition
+ * and coordinates asynchronous repository work.
+ *
+ * UI callbacks enter through methods on this class so validation, loading/error state and dependent business
+ * rules remain centralised.
+ */
 class OrganisationPromotionViewModel(
     application: Application
 ) : AndroidViewModel(application) {
@@ -75,6 +99,33 @@ class OrganisationPromotionViewModel(
         refreshPromotions()
     }
 
+    /**
+     * Reloads the latest data for the organisation promotion management flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — refreshPromotions
+     *
+     * Loads or refreshes the data required by refresh promotions and writes the result into observable UI
+     * state.
+     *
+     * The coroutine/repository boundary is handled here so Compose only reacts to loading, success and error
+     * state.
+     *
+     * Reads/maps Supabase table data from `post_promotions` (normalized VolunteerLink records used by this
+     * workflow).
+     *
+     * Coordinates account-scoped local persistence only for recoverable/cached UI state; published or
+     * transactional business state continues to come from Supabase.
+     *
+     * Runs asynchronous work in a lifecycle-aware coroutine and exposes progress/error state rather than
+     * blocking the UI thread.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     fun refreshPromotions() {
         if (refreshInProgress) return
         refreshInProgress = true
@@ -196,6 +247,20 @@ class OrganisationPromotionViewModel(
         }
     }
 
+    /**
+     * Selects the post used by the organisation promotion management flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — selectPost
+     *
+     * Implements the ViewModel workflow operation for select post.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun selectPost(post: ManagePostItem) {
         if (!isPostEligible(post)) {
             _uiState.value = _uiState.value.copy(
@@ -229,6 +294,20 @@ class OrganisationPromotionViewModel(
         )
     }
 
+    /**
+     * Selects the package used by the organisation promotion management flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — selectPackage
+     *
+     * Implements the ViewModel workflow operation for select package.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun selectPackage(promotionPackage: PromotionPackage) {
         val post = _uiState.value.selectedPost ?: return
         if (!isPackageAvailable(post, promotionPackage)) return
@@ -239,6 +318,21 @@ class OrganisationPromotionViewModel(
         )
     }
 
+    /**
+     * Derives the continue from package value used by the organisation promotion management flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — continueFromPackage
+     *
+     * Controls workflow/navigation state for continue from package while keeping step transitions and
+     * confirmation rules in one place.
+     *
+     * The screen emits the intent, but the ViewModel decides whether the transition is currently valid for the
+     * draft/post state.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun continueFromPackage() {
         val state = _uiState.value
         val post = state.selectedPost ?: return
@@ -263,6 +357,21 @@ class OrganisationPromotionViewModel(
         )
     }
 
+    /**
+     * Derives the continue to payment value used by the organisation promotion management flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — continueToPayment
+     *
+     * Controls workflow/navigation state for continue to payment while keeping step transitions and
+     * confirmation rules in one place.
+     *
+     * The screen emits the intent, but the ViewModel decides whether the transition is currently valid for the
+     * draft/post state.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun continueToPayment() {
         val state = _uiState.value
         val post = state.selectedPost ?: return
@@ -291,6 +400,20 @@ class OrganisationPromotionViewModel(
         )
     }
 
+    /**
+     * Chooses the payment method used by the organisation promotion management flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — choosePaymentMethod
+     *
+     * Implements the ViewModel workflow operation for choose payment method.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun choosePaymentMethod(method: PromotionPaymentMethod) {
         val state = _uiState.value
         val hasSavedCard = !state.savedCardholderName.isNullOrBlank() &&
@@ -315,6 +438,20 @@ class OrganisationPromotionViewModel(
         )
     }
 
+    /**
+     * Renders the use another card card used in the organisation promotion management flow.
+     * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+     */
+    /**
+     * DETAILED BEHAVIOUR — useAnotherCard
+     *
+     * Implements the ViewModel workflow operation for use another card.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun useAnotherCard() {
         val state = _uiState.value
         _uiState.value = state.copy(
@@ -327,6 +464,21 @@ class OrganisationPromotionViewModel(
         )
     }
 
+    /**
+     * Updates the cardholder used by the organisation promotion management flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — updateCardholder
+     *
+     * Receives the UI event for changing cardholder and applies it through the ViewModel instead of mutating
+     * Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun updateCardholder(value: String) {
         val clean = value.filter { character ->
             character.isLetter() || character.isWhitespace() || character == '-' || character == '\''
@@ -334,29 +486,102 @@ class OrganisationPromotionViewModel(
         _uiState.value = _uiState.value.copy(cardholderName = clean.take(60))
     }
 
+    /**
+     * Updates the card number used by the organisation promotion management flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — updateCardNumber
+     *
+     * Receives the UI event for changing card number and applies it through the ViewModel instead of mutating
+     * Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun updateCardNumber(value: String) {
         _uiState.value = _uiState.value.copy(
             cardNumber = value.filter(Char::isDigit).take(16)
         )
     }
 
+    /**
+     * Updates the expiry used by the organisation promotion management flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — updateExpiry
+     *
+     * Receives the UI event for changing expiry and applies it through the ViewModel instead of mutating
+     * Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun updateExpiry(value: String) {
         _uiState.value = _uiState.value.copy(
             cardExpiry = value.filter(Char::isDigit).take(4)
         )
     }
 
+    /**
+     * Updates the cvv used by the organisation promotion management flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — updateCvv
+     *
+     * Receives the UI event for changing cvv and applies it through the ViewModel instead of mutating Compose
+     * state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun updateCvv(value: String) {
         _uiState.value = _uiState.value.copy(
             cardCvv = value.filter(Char::isDigit).take(3)
         )
     }
 
+    /**
+     * Derives the pay with touch ngo value used by the organisation promotion management flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — payWithTouchNGo
+     *
+     * Implements the ViewModel workflow operation for pay with touch n go.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun payWithTouchNGo() {
         if (_uiState.value.isProcessing) return
         beginPayment(PromotionPaymentMethod.TOUCH_N_GO)
     }
 
+    /**
+     * Renders the pay with card card used in the organisation promotion management flow.
+     * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+     */
+    /**
+     * DETAILED BEHAVIOUR — payWithCard
+     *
+     * Implements the ViewModel workflow operation for pay with card.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun payWithCard() {
         val state = _uiState.value
         if (state.isProcessing) return
@@ -369,6 +594,35 @@ class OrganisationPromotionViewModel(
         beginPayment(PromotionPaymentMethod.CARD)
     }
 
+    /**
+     * Derives the begin payment value used by the organisation promotion management flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — beginPayment
+     *
+     * Implements the ViewModel workflow operation for begin payment.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Supabase RPC `organisation_purchase_post_promotion`: Executes this authenticated database operation; the
+     * server remains authoritative for ownership and state changes.
+     *
+     * Uses AppClock for business-date/time decisions so the same code works with the project test clock and
+     * normal device time.
+     *
+     * Coordinates account-scoped local persistence only for recoverable/cached UI state; published or
+     * transactional business state continues to come from Supabase.
+     *
+     * Runs asynchronous work in a lifecycle-aware coroutine and exposes progress/error state rather than
+     * blocking the UI thread.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     fun beginPayment(method: PromotionPaymentMethod) {
         val state = _uiState.value
         val post = state.selectedPost ?: return
@@ -525,6 +779,17 @@ class OrganisationPromotionViewModel(
      * Returns true when an internal Promote page handled Back. Returning false
      * means the caller should leave the Promotions module itself.
      */
+    /**
+     * DETAILED BEHAVIOUR — goBack
+     *
+     * Controls workflow/navigation state for go back while keeping step transitions and confirmation rules in
+     * one place.
+     *
+     * The screen emits the intent, but the ViewModel decides whether the transition is currently valid for the
+     * draft/post state.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun goBack(): Boolean {
         val state = _uiState.value
         if (state.isProcessing) return true
@@ -546,6 +811,20 @@ class OrganisationPromotionViewModel(
         return true
     }
 
+    /**
+     * Completes the success for the organisation promotion management flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — finishSuccess
+     *
+     * Implements the ViewModel workflow operation for finish success.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun finishSuccess() {
         _uiState.value = _uiState.value.copy(
             step = PromotionStep.POST_SELECTION,
@@ -563,29 +842,112 @@ class OrganisationPromotionViewModel(
         )
     }
 
+    /**
+     * Checks whether the post is eligible for the organisation promotion management flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — isPostEligible
+     *
+     * Implements the ViewModel workflow operation for is post eligible.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     fun isPostEligible(post: ManagePostItem): Boolean {
         return post.databaseStatus.equals("PUBLISHED", ignoreCase = true) &&
             post.timingState == PostTimingState.UPCOMING
     }
 
+    /**
+     * Checks whether the organisation promotion management flow allows purchase any package.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — canPurchaseAnyPackage
+     *
+     * Implements the ViewModel workflow operation for can purchase any package.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     fun canPurchaseAnyPackage(post: ManagePostItem): Boolean {
         return PromotionPackage.entries.any { option ->
             isPackageAvailable(post, option)
         }
     }
 
+    /**
+     * Derives the current promotion value used by the organisation promotion management flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — currentPromotion
+     *
+     * Implements the ViewModel workflow operation for current promotion.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun currentPromotion(post: ManagePostItem): PromotionRecord? {
         return _uiState.value.promotionsByPostId[post.postId]
     }
 
+    /**
+     * Checks whether the promotion is active for the organisation promotion management flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — isPromotionActive
+     *
+     * Implements the ViewModel workflow operation for is promotion active.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Uses AppClock for business-date/time decisions so the same code works with the project test clock and
+     * normal device time.
+     */
     fun isPromotionActive(post: ManagePostItem): Boolean {
         val promotion = currentPromotion(post) ?: return false
         val now = AppClock.nowMillis()
         return promotion.startAtMillis <= now && now < promotion.endAtMillis
     }
 
+    /**
+     * Checks the is extension condition for the organisation promotion management flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — isExtension
+     *
+     * Implements the ViewModel workflow operation for is extension.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Uses AppClock for business-date/time decisions so the same code works with the project test clock and
+     * normal device time.
+     */
     fun isExtension(post: ManagePostItem): Boolean = isPromotionActive(post)
 
+    /**
+     * Returns the promotion base millis value required by the organisation promotion management flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — promotionBaseMillis
+     *
+     * Implements the ViewModel workflow operation for promotion base millis.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Uses AppClock for business-date/time decisions so the same code works with the project test clock and
+     * normal device time.
+     */
     fun promotionBaseMillis(post: ManagePostItem): Long {
         val promotion = currentPromotion(post)
         return if (promotion != null && isPromotionActive(post)) {
@@ -595,16 +957,52 @@ class OrganisationPromotionViewModel(
         }
     }
 
+    /**
+     * Returns the promotion cutoff millis value required by the organisation promotion management flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — promotionCutoffMillis
+     *
+     * Implements the ViewModel workflow operation for promotion cutoff millis.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     fun promotionCutoffMillis(post: ManagePostItem): Long? {
         val startDate = post.startDate ?: return null
         return parseDateAtStartOfDay(startDate)
     }
 
+    /**
+     * Returns the remaining promotion millis value required by the organisation promotion management flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — remainingPromotionMillis
+     *
+     * Implements the ViewModel workflow operation for remaining promotion millis.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     fun remainingPromotionMillis(post: ManagePostItem): Long {
         val cutoff = promotionCutoffMillis(post) ?: return 0L
         return (cutoff - promotionBaseMillis(post)).coerceAtLeast(0L)
     }
 
+    /**
+     * Returns the available promotion time label used by the organisation promotion management flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — availablePromotionTimeLabel
+     *
+     * Implements the ViewModel workflow operation for available promotion time label.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     fun availablePromotionTimeLabel(post: ManagePostItem): String {
         val totalMinutes = remainingPromotionMillis(post) / 60_000L
         val days = totalMinutes / (24L * 60L)
@@ -622,6 +1020,18 @@ class OrganisationPromotionViewModel(
         }
     }
 
+    /**
+     * Checks whether the package is available for the organisation promotion management flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — isPackageAvailable
+     *
+     * Implements the ViewModel workflow operation for is package available.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     fun isPackageAvailable(
         post: ManagePostItem,
         promotionPackage: PromotionPackage
@@ -632,8 +1042,32 @@ class OrganisationPromotionViewModel(
         return proposedEnd <= cutoff
     }
 
+    /**
+     * Returns the promotion start millis value required by the organisation promotion management flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — promotionStartMillis
+     *
+     * Implements the ViewModel workflow operation for promotion start millis.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     fun promotionStartMillis(post: ManagePostItem): Long = promotionBaseMillis(post)
 
+    /**
+     * Returns the promotion end millis value required by the organisation promotion management flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — promotionEndMillis
+     *
+     * Implements the ViewModel workflow operation for promotion end millis.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     fun promotionEndMillis(
         post: ManagePostItem,
         promotionPackage: PromotionPackage
@@ -642,6 +1076,20 @@ class OrganisationPromotionViewModel(
         return promotionBaseMillis(post) + promotionPackage.durationMillis
     }
 
+    /**
+     * Checks whether the card is valid for the organisation promotion management flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — isCardValid
+     *
+     * Implements the ViewModel workflow operation for is card valid.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun isCardValid(state: OrganisationPromotionUiState = _uiState.value): Boolean {
         return cardholderError(state.cardholderName) == null &&
             cardNumberError(state.cardNumber) == null &&
@@ -649,6 +1097,18 @@ class OrganisationPromotionViewModel(
             cvvError(state.cardCvv) == null
     }
 
+    /**
+     * Returns the cardholder error used by the organisation promotion management flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — cardholderError
+     *
+     * Implements the ViewModel workflow operation for cardholder error.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     fun cardholderError(value: String): String? {
         val clean = value.trim()
         val letterCount = clean.count(Char::isLetter)
@@ -660,6 +1120,18 @@ class OrganisationPromotionViewModel(
         }
     }
 
+    /**
+     * Returns the card number error used by the organisation promotion management flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — cardNumberError
+     *
+     * Implements the ViewModel workflow operation for card number error.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     fun cardNumberError(value: String): String? {
         val digits = value.filter(Char::isDigit)
         return when {
@@ -669,6 +1141,21 @@ class OrganisationPromotionViewModel(
         }
     }
 
+    /**
+     * Returns the expiry error used by the organisation promotion management flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — expiryError
+     *
+     * Implements the ViewModel workflow operation for expiry error.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Uses AppClock for business-date/time decisions so the same code works with the project test clock and
+     * normal device time.
+     */
     fun expiryError(value: String): String? {
         val digits = value.filter(Char::isDigit)
         if (digits.length != 4) return "Use MM/YY."
@@ -688,6 +1175,18 @@ class OrganisationPromotionViewModel(
         }
     }
 
+    /**
+     * Returns the cvv error used by the organisation promotion management flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — cvvError
+     *
+     * Implements the ViewModel workflow operation for cvv error.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     fun cvvError(value: String): String? {
         return when {
             value.isEmpty() -> "CVV is required."
@@ -696,12 +1195,39 @@ class OrganisationPromotionViewModel(
         }
     }
 
+    /**
+     * Parses the date at start of day used by the organisation promotion management flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — parseDateAtStartOfDay
+     *
+     * Implements the ViewModel workflow operation for parse date at start of day.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     fun parseDateAtStartOfDay(value: String): Long? {
         val parsed = runCatching { promotionDateFormat().parse(value.trim()) }.getOrNull()
             ?: return null
         return startOfDay(parsed.time)
     }
 
+    /**
+     * Starts the of day for the organisation promotion management flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — startOfDay
+     *
+     * Implements the ViewModel workflow operation for start of day.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     fun startOfDay(timeMillis: Long): Long {
         return Calendar.getInstance().apply {
             this.timeInMillis = timeMillis
@@ -712,12 +1238,39 @@ class OrganisationPromotionViewModel(
         }.timeInMillis
     }
 
+    /**
+     * Derives the promotion date format value used by the organisation promotion management flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — promotionDateFormat
+     *
+     * Implements the ViewModel workflow operation for promotion date format.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     fun promotionDateFormat(): SimpleDateFormat {
         return SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
             isLenient = false
         }
     }
 
+    /**
+     * Parses the promotion timestamp used by the organisation promotion management flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — parsePromotionTimestamp
+     *
+     * Implements the ViewModel workflow operation for parse promotion timestamp.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     fun parsePromotionTimestamp(value: String): Long? {
         val normalized = value.trim().replace(
             Regex("""(\.\d{3})\d+(?=Z|[+-]\d{2}:?\d{2}$)"""),
@@ -741,6 +1294,18 @@ class OrganisationPromotionViewModel(
     }
 }
 
+/**
+ * Lists the supported values represented by promotion step.
+ * It supports state coordination and user actions for the promotion management flow.
+ */
+/**
+ * DETAILED DECLARATION — PromotionStep
+ *
+ * Domain/UI type for Promotion Step used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 enum class PromotionStep {
     POST_SELECTION,
     PACKAGE,
@@ -751,11 +1316,35 @@ enum class PromotionStep {
     SUCCESS
 }
 
+/**
+ * Lists the supported values represented by promotion payment method.
+ * It supports state coordination and user actions for the promotion management flow.
+ */
+/**
+ * DETAILED DECLARATION — PromotionPaymentMethod
+ *
+ * Domain/UI type for Promotion Payment Method used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 enum class PromotionPaymentMethod {
     TOUCH_N_GO,
     CARD
 }
 
+/**
+ * Lists the supported values represented by promotion package.
+ * It supports state coordination and user actions for the promotion management flow.
+ */
+/**
+ * DETAILED DECLARATION — PromotionPackage
+ *
+ * Domain/UI type for Promotion Package used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 enum class PromotionPackage(
     val days: Int,
     val price: Double,
@@ -785,6 +1374,18 @@ enum class PromotionPackage(
         get() = days * 24L * 60L * 60L * 1000L
 }
 
+/**
+ * Holds the values represented by promotion record as one strongly typed model.
+ * It supports state coordination and user actions for the promotion management flow.
+ */
+/**
+ * DETAILED DECLARATION — PromotionRecord
+ *
+ * Domain/UI type for Promotion Record used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class PromotionRecord(
     val promotionId: String,
     val postId: String,
@@ -793,6 +1394,18 @@ data class PromotionRecord(
     val createdAtMillis: Long
 )
 
+/**
+ * Holds the values represented by promotion purchase as one strongly typed model.
+ * It supports state coordination and user actions for the promotion management flow.
+ */
+/**
+ * DETAILED DECLARATION — PromotionPurchase
+ *
+ * Domain/UI type for Promotion Purchase used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class PromotionPurchase(
     val promotionId: String,
     val paymentId: String,
@@ -808,6 +1421,18 @@ data class PromotionPurchase(
     val isExtension: Boolean
 )
 
+/**
+ * Holds the values represented by organisation promotion ui state as one strongly typed model.
+ * It supports state coordination and user actions for the promotion management flow.
+ */
+/**
+ * DETAILED DECLARATION — OrganisationPromotionUiState
+ *
+ * Immutable snapshot of all UI-visible state required by Organisation Promotion Ui State.
+ *
+ * Keeping loading/data/error/action flags together makes recomposition deterministic and avoids hidden mutable
+ * state in individual composables.
+ */
 data class OrganisationPromotionUiState(
     val step: PromotionStep = PromotionStep.POST_SELECTION,
     val selectedPost: ManagePostItem? = null,
@@ -832,6 +1457,18 @@ data class OrganisationPromotionUiState(
     val promotionLoadError: String? = null
 )
 
+/**
+ * Derives the json object value used by the organisation promotion management flow.
+ * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+ */
+/**
+ * DETAILED BEHAVIOUR — promotionText
+ *
+ * Implements the ViewModel workflow operation for promotion text.
+ *
+ * It translates screen intent into immutable UI-state changes and/or repository work so presentation code stays
+ * free of backend/business decisions.
+ */
 fun JsonObject.promotionText(key: String): String? {
     return this[key]?.jsonPrimitive?.contentOrNull
 }

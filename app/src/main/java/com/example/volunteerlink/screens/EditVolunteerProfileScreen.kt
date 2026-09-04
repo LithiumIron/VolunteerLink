@@ -58,13 +58,27 @@ import com.example.volunteerlink.R
 import com.example.volunteerlink.data.VolunteerProfileRepository
 import com.example.volunteerlink.data.location.CurrentLocationResolver
 import com.example.volunteerlink.data.saveProfileImage
-import com.example.volunteerlink.organisation.countryStates
 import com.example.volunteerlink.ui.theme.DeepGreen
 import com.example.volunteerlink.ui.theme.VolunteerLinkPrimaryGreen
 import com.example.volunteerlink.ui.theme.VolunteerLinkSoftGreenSurface
 import com.example.volunteerlink.ui.theme.VolunteerLinkTheme
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import android.Manifest
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import com.example.volunteerlink.data.VolunteerProfileRepository.requestVolunteerEmailChange
+import com.example.volunteerlink.data.VolunteerProfileRepository.verifyVolunteerEmailChangeOtp
+import com.example.volunteerlink.shared.countryStates
+import com.example.volunteerlink.shared.isValidAuthPhoneNumber
+
+private enum class EmailChangeStep { NONE, ENTER_EMAIL, ENTER_CODE }
+
+// How long to disable "Send code" / show a countdown after a code is sent
+// (or specifically after a rate-limit error), in seconds. Adjust to match
+// whatever interval is configured under Supabase Auth Rate Limits.
+private const val EMAIL_RESEND_COOLDOWN_SECONDS = 30
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -85,6 +99,7 @@ fun EditVolunteerProfileScreen(
     var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
+    val phoneError = phone.isNotBlank() && !isValidAuthPhoneNumber(phone.trim())
     var city by remember { mutableStateOf("") }
     var stateRegion by remember { mutableStateOf("") }
     var country by remember { mutableStateOf("") }
@@ -121,6 +136,7 @@ fun EditVolunteerProfileScreen(
     var isCountryMenuExpanded by remember { mutableStateOf(false) }
     var isStateMenuExpanded by remember { mutableStateOf(false) }
     var isCityMenuExpanded by remember { mutableStateOf(false) }
+
 
     val availableStates =
         countryStates[country]?.keys?.toList() ?: emptyList()
@@ -196,6 +212,39 @@ fun EditVolunteerProfileScreen(
 
 
     // =========================
+    // EMAIL CHANGE (OTP flow)
+    // =========================
+
+    var emailChangeStep by remember { mutableStateOf(EmailChangeStep.NONE) }
+    var newEmailInput by remember { mutableStateOf("") }
+    var otpCodeInput by remember { mutableStateOf("") }
+    var isProcessingEmailChange by remember { mutableStateOf(false) }
+    var emailChangeError by remember { mutableStateOf<String?>(null) }
+    var resendCooldownSeconds by remember { mutableStateOf(0) }
+
+    val emailInteractionSource = remember { MutableInteractionSource() }
+    LaunchedEffect(emailInteractionSource) {
+        emailInteractionSource.interactions.collect {
+            if (it is PressInteraction.Release) {
+                newEmailInput = ""
+                otpCodeInput = ""
+                emailChangeError = null
+                emailChangeStep = EmailChangeStep.ENTER_EMAIL
+            }
+        }
+    }
+
+    // Ticks resendCooldownSeconds down to 0, one second at a time, whenever
+    // it's above zero (set after a successful send or a rate-limit error).
+    LaunchedEffect(resendCooldownSeconds) {
+        if (resendCooldownSeconds > 0) {
+            delay(1000)
+            resendCooldownSeconds -= 1
+        }
+    }
+
+
+    // =========================
     // SCREEN
     // =========================
 
@@ -264,7 +313,7 @@ fun EditVolunteerProfileScreen(
                     rememberScrollState()
                 )
         ) {
-// =========================
+            // =========================
             // PROFILE PICTURE
             // =========================
 
@@ -381,43 +430,175 @@ fun EditVolunteerProfileScreen(
                 )
 
 
-                // EMAIL (read-only — login email lives in auth.users, not
-                // user_profiles, and changing it requires Supabase's email
-                // change flow with re-confirmation. Editing it here would
-                // silently do nothing, which is worse than not showing it
-                // as editable at all.)
-                Text(
-                    text = "Email",
-                    fontWeight = FontWeight.Bold,
-                    color = DeepGreen
-                )
+                // EMAIL — tap to open the OTP-based email-change flow.
+                Text(text = "Email", fontWeight = FontWeight.Bold, color = DeepGreen)
+                Spacer(modifier = Modifier.height(6.dp))
 
-                Spacer(
-                    modifier = Modifier.height(6.dp)
-                )
+                Box {
+                    OutlinedTextField(
+                        value = email,
+                        onValueChange = {},
+                        readOnly = true,
+                        interactionSource = emailInteractionSource,
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        trailingIcon = { Text("›") },
+                        placeholder = { Text("Your login email") }
+                    )
 
-                OutlinedTextField(
-                    value = email,
-                    onValueChange = {},
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    enabled = false,
-                    placeholder = {
-                        Text("Your login email")
+                    if (emailChangeStep != EmailChangeStep.NONE) {
+                        AlertDialog(
+                            onDismissRequest = {
+                                if (!isProcessingEmailChange) {
+                                    emailChangeStep = EmailChangeStep.NONE
+                                    emailChangeError = null
+                                }
+                            },
+                            title = {
+                                Text(
+                                    if (emailChangeStep == EmailChangeStep.ENTER_EMAIL)
+                                        "Change login email"
+                                    else
+                                        "Enter verification code"
+                                )
+                            },
+                            text = {
+                                Column {
+                                    if (emailChangeStep == EmailChangeStep.ENTER_EMAIL) {
+                                        Text(
+                                            "We'll send a verification code to your new email.",
+                                            fontSize = 12.sp,
+                                            color = Color.Gray
+                                        )
+                                        Spacer(Modifier.height(10.dp))
+                                        OutlinedTextField(
+                                            value = newEmailInput,
+                                            onValueChange = {
+                                                newEmailInput = it
+                                                emailChangeError = null
+                                            },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            singleLine = true,
+                                            enabled = !isProcessingEmailChange,
+                                            label = { Text("New email") }
+                                        )
+                                    } else {
+                                        Text(
+                                            "Enter the code sent to $newEmailInput.",
+                                            fontSize = 12.sp,
+                                            color = Color.Gray
+                                        )
+                                        Spacer(Modifier.height(10.dp))
+                                        OutlinedTextField(
+                                            value = otpCodeInput,
+                                            onValueChange = {
+                                                otpCodeInput = it
+                                                emailChangeError = null
+                                            },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            singleLine = true,
+                                            enabled = !isProcessingEmailChange,
+                                            label = { Text("Verification code") },
+                                            placeholder = { Text("6-digit code") },
+                                            keyboardOptions = KeyboardOptions(
+                                                keyboardType = KeyboardType.Number,
+                                                imeAction = ImeAction.Done
+                                            )
+                                        )
+                                    }
+                                    emailChangeError?.let { message ->
+                                        Spacer(Modifier.height(6.dp))
+                                        Text(message, fontSize = 12.sp, color = Color(0xFFC62828))
+                                    }
+                                }
+                            },
+                            confirmButton = {
+                                TextButton(
+                                    enabled = !isProcessingEmailChange &&
+                                            !(emailChangeStep == EmailChangeStep.ENTER_EMAIL && resendCooldownSeconds > 0),
+                                    onClick = {
+                                        scope.launch {
+                                            if (emailChangeStep == EmailChangeStep.ENTER_EMAIL) {
+                                                val trimmed = newEmailInput.trim()
+                                                if (trimmed.isBlank()) {
+                                                    emailChangeError = "Enter an email address."
+                                                    return@launch
+                                                }
+                                                isProcessingEmailChange = true
+                                                val result = requestVolunteerEmailChange(trimmed)
+                                                isProcessingEmailChange = false
+                                                result.onSuccess {
+                                                    otpCodeInput = ""
+                                                    emailChangeStep = EmailChangeStep.ENTER_CODE
+                                                    resendCooldownSeconds = EMAIL_RESEND_COOLDOWN_SECONDS
+                                                }.onFailure { e ->
+                                                    emailChangeError = when {
+                                                        e.message?.contains("rate limit", ignoreCase = true) == true -> {
+                                                            resendCooldownSeconds = EMAIL_RESEND_COOLDOWN_SECONDS
+                                                            "Too many email requests — please wait a while and try again."
+                                                        }
+                                                        e.message?.contains("already registered", ignoreCase = true) == true ||
+                                                                e.message?.contains("already exists", ignoreCase = true) == true ->
+                                                            "That email is already in use by another account."
+                                                        e.message?.contains("invalid", ignoreCase = true) == true ->
+                                                            "That email address isn't valid."
+                                                        else -> "Couldn't send code: ${e.message ?: "unknown error"}"
+                                                    }
+                                                }
+                                            } else {
+                                                if (otpCodeInput.isBlank()) {
+                                                    emailChangeError = "Enter the code sent to your email."
+                                                    return@launch
+                                                }
+                                                isProcessingEmailChange = true
+                                                val result = verifyVolunteerEmailChangeOtp(
+                                                    newEmailInput.trim(),
+                                                    otpCodeInput.trim()
+                                                )
+                                                isProcessingEmailChange = false
+                                                result.onSuccess { updatedEmail ->
+                                                    email = updatedEmail
+                                                    emailChangeStep = EmailChangeStep.NONE
+                                                    emailChangeError = null
+                                                }.onFailure { e ->
+                                                    emailChangeError = when {
+                                                        e.message?.contains("expired", ignoreCase = true) == true ->
+                                                            "That code has expired — request a new one."
+                                                        e.message?.contains("invalid", ignoreCase = true) == true ->
+                                                            "Incorrect code. Please try again."
+                                                        else -> "Couldn't verify code: ${e.message ?: "unknown error"}"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                ) {
+                                    Text(
+                                        when {
+                                            isProcessingEmailChange -> "Please wait..."
+                                            emailChangeStep == EmailChangeStep.ENTER_EMAIL && resendCooldownSeconds > 0 ->
+                                                "Resend in ${resendCooldownSeconds}s"
+                                            emailChangeStep == EmailChangeStep.ENTER_EMAIL -> "Send code"
+                                            else -> "Verify"
+                                        }
+                                    )
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(
+                                    enabled = !isProcessingEmailChange,
+                                    onClick = {
+                                        emailChangeStep = EmailChangeStep.NONE
+                                        emailChangeError = null
+                                    }
+                                ) { Text("Cancel") }
+                            }
+                        )
                     }
-                )
+                }
 
-                Spacer(
-                    modifier = Modifier.height(4.dp)
-                )
-
-                Text(
-                    text = "Email can't be changed from here.",
-                    fontSize = 11.sp,
-                    color = Color.Gray
-                )
-
-
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(text = "Tap the field to change your login email.", fontSize = 11.sp, color = Color.Gray)
                 Spacer(
                     modifier = Modifier.height(20.dp)
                 )
@@ -436,14 +617,29 @@ fun EditVolunteerProfileScreen(
 
                 OutlinedTextField(
                     value = phone,
-                    onValueChange = {
-                        phone = it
+                    onValueChange = { input ->
+                        phone = input.filterIndexed { index, c ->
+                            c.isDigit() ||
+                                    (c == '+' && index == 0) ||
+                                    ((c == '-' || c == ' ') && index > 0)
+                        }
                     },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    placeholder = {
-                        Text("Enter your phone number")
-                    }
+                    isError = phoneError,
+                    supportingText = {
+                        Text(
+                            text = if (phoneError)
+                                "Enter a valid phone number (e.g. +60 12-456789)."
+                            else
+                                "Must include your country code (e.g. +60 12-456789)."
+                        )
+                    },
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Phone,
+                        imeAction = ImeAction.Next
+                    ),
+                    placeholder = { Text("e.g. +60 12-456789") }
                 )
 
 
@@ -452,7 +648,7 @@ fun EditVolunteerProfileScreen(
                 )
 
                 // USE CURRENT LOCATION (optional shortcut — Location picker below still
-// works exactly as before)
+                // works exactly as before)
                 var isResolvingCurrentLocation by remember { mutableStateOf(false) }
                 var currentLocationMessage by remember { mutableStateOf<String?>(null) }
                 var cancelCurrentLocationRequest by remember { mutableStateOf<(() -> Unit)?>(null) }
@@ -786,8 +982,7 @@ fun EditVolunteerProfileScreen(
                         }
                     },
 
-                    enabled = !isSaving,
-
+                    enabled = !isSaving && !phoneError,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(50.dp)

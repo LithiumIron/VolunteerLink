@@ -103,6 +103,9 @@ import java.text.DateFormat
 import java.util.Date
 
 @Composable
+// Purpose: Builds the Volunteer Home page from dashboard state, filters, recommendations and current activities.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 fun VolunteerHomeScreen(
     onVolunteerOpportunitySelected: (eventId: Int) -> Unit = {},
     onVolunteerRoleSelected: (eventId: Int, roleId: Int) -> Unit = { _, _ -> },
@@ -110,19 +113,21 @@ fun VolunteerHomeScreen(
     onViewAllApplicationsSelected: () -> Unit = {},
     onVolunteerNotificationsSelected: () -> Unit = {},
     onVolunteerFavouritesSelected: () -> Unit = {},
+    onVolunteerProfileSelected: () -> Unit = {},   // NEW
     unreadNotificationCount: Int = 0,
     onVolunteerSearchSelected: () -> Unit = {},
     isShowingCachedData: Boolean = false,
     syncWarning: String? = null,
     lastSyncedAtEpochMillis: Long? = null,
     onSyncSelected: () -> Unit = {},
-    skillPathViewModel:
-        VolunteerSkillPathViewModel = viewModel()
+    skillPathViewModel: VolunteerSkillPathViewModel = viewModel()
 ) {
     // Home uses the same business clock as attendance and application timeline rules.
     val context = LocalContext.current
+    // Read the shared business clock so Today, deadlines and attendance use the same date.
     val businessNow = volunteerBusinessTime()
     val applicationClock by com.example.volunteerlink.data.time.AppClock.state.collectAsStateWithLifecycle()
+    // Name the calculated lifecycle owner value because later UI branches reuse it during this Compose pass.
     val lifecycleOwner = LocalLifecycleOwner.current
     var selectedHomeFilter by rememberSaveable {
         mutableStateOf(VolunteerHomeFeedFilter.FOR_YOU)
@@ -132,6 +137,7 @@ fun VolunteerHomeScreen(
         rememberLauncherForActivityResult(
             ActivityResultContracts.RequestMultiplePermissions()
         ) { permissions ->
+            // Check this condition before showing the action, preventing an invalid Volunteer flow from continuing.
             if (
                 permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
                 permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
@@ -150,6 +156,7 @@ fun VolunteerHomeScreen(
             }
         }
 
+    // Name the calculated request location access value because later UI branches reuse it during this Compose pass.
     val requestLocationAccess: () -> Unit = {
         matchLocationPermissionLauncher.launch(
             arrayOf(
@@ -162,14 +169,17 @@ fun VolunteerHomeScreen(
     // Ask through Android directly on every new For You visit while access is
     // disabled. The app never redirects the volunteer to Settings.
     LaunchedEffect(selectedHomeFilter) {
+        // Name the calculated fine granted value because later UI branches reuse it during this Compose pass.
         val fineGranted = ContextCompat.checkSelfPermission(
             context,
             Manifest.permission.ACCESS_FINE_LOCATION
         ) == PackageManager.PERMISSION_GRANTED
+        // Name the calculated coarse granted value because later UI branches reuse it during this Compose pass.
         val coarseGranted = ContextCompat.checkSelfPermission(
             context,
             Manifest.permission.ACCESS_COARSE_LOCATION
         ) == PackageManager.PERMISSION_GRANTED
+        // Check this condition before showing the action, preventing an invalid Volunteer flow from continuing.
         if (
             selectedHomeFilter == VolunteerHomeFeedFilter.FOR_YOU &&
             !fineGranted &&
@@ -192,8 +202,11 @@ fun VolunteerHomeScreen(
 
     // Refresh distances immediately after the app resumes with location access.
     DisposableEffect(lifecycleOwner) {
+        // Name the calculated observer value because later UI branches reuse it during this Compose pass.
         val observer = LifecycleEventObserver { _, event ->
+            // Check this condition before showing the action, preventing an invalid Volunteer flow from continuing.
             if (event == Lifecycle.Event.ON_RESUME) {
+                // Name the calculated location granted value because later UI branches reuse it during this Compose pass.
                 val locationGranted =
                     ContextCompat.checkSelfPermission(
                         context,
@@ -204,6 +217,7 @@ fun VolunteerHomeScreen(
                             Manifest.permission.ACCESS_COARSE_LOCATION
                         ) == PackageManager.PERMISSION_GRANTED
 
+                // Check this condition before showing the action, preventing an invalid Volunteer flow from continuing.
                 if (locationGranted) {
                     DeviceLocationHelper.getApproximateCurrentLocation(context) {
                             location ->
@@ -224,6 +238,7 @@ fun VolunteerHomeScreen(
         }
     }
 
+    // Name the calculated home filter options value because later UI branches reuse it during this Compose pass.
     val homeFilterOptions =
         VolunteerHomeFeedFilter.entries
 
@@ -231,6 +246,7 @@ fun VolunteerHomeScreen(
         skillPathViewModel.uiState
             .collectAsStateWithLifecycle()
 
+    // Prepare Skill Path data used to explain progress, evidence or the next suitable level.
     val currentSkillPathLevels =
         remember(skillPathUiState.skillPaths) {
             skillPathUiState.skillPaths
@@ -240,21 +256,25 @@ fun VolunteerHomeScreen(
                 }
         }
 
+    // Name the calculated current volunteer initials value because later UI branches reuse it during this Compose pass.
     val currentVolunteerInitials =
         volunteerInitials(
             VolunteerOpportunitySessionStore.profileData?.fullName
         )
 
+    // Resolve or prepare event data from the shared dashboard snapshot for this part of the screen.
     val allVolunteerOpportunityEvents =
         VolunteerOpportunitySessionStore
             .volunteerOpportunityEvents
             .toList()
 
+    // Resolve or prepare the application data used by the next status, cancellation or navigation decision.
     val allVolunteerApplications =
         VolunteerOpportunitySessionStore
             .volunteerApplications
             .toList()
 
+    // Apply the current search/filter choices without changing the original list stored in session state.
     val filteredVolunteerOpportunityEvents =
         remember(
             selectedHomeFilter,
@@ -271,15 +291,20 @@ fun VolunteerHomeScreen(
             )
         }
 
+    // Name the calculated promotion feed value because later UI branches reuse it during this Compose pass.
     val promotionFeed = rememberVolunteerPromotionFeed(isShowingCachedData)
+    // Name the calculated active promotions value because later UI branches reuse it during this Compose pass.
     val activePromotions = VolunteerPromotionEngine.activeByPost(promotionFeed.entries, businessNow)
+    // Resolve or prepare event data from the shared dashboard snapshot for this part of the screen.
     val orderedVolunteerOpportunityEvents = VolunteerPromotionEngine.prioritize(
         filteredVolunteerOpportunityEvents, promotionFeed.entries, businessNow
     )
+    // Resolve or prepare event data from the shared dashboard snapshot for this part of the screen.
     val featuredVolunteerOpportunityEvents = orderedVolunteerOpportunityEvents.filter {
         activePromotions.containsKey(it.eventDatabaseId)
     }
 
+    // Resolve or prepare event data from the shared dashboard snapshot for this part of the screen.
     val recommendedVolunteerOpportunityEvents =
         remember(
             allVolunteerOpportunityEvents,
@@ -299,6 +324,7 @@ fun VolunteerHomeScreen(
             ).take(4)
         }
 
+    // Render this content as a lazy scrolling list so only visible items need to be composed.
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -318,43 +344,32 @@ fun VolunteerHomeScreen(
         ) {
 
             VolunteerHomeCompactHeader(
-
-                onVolunteerSearchSelected =
-                    onVolunteerSearchSelected,
-
-                homeFilterOptions =
-                    homeFilterOptions,
-
-                selectedHomeFilter =
-                    selectedHomeFilter,
-
-                onHomeFilterSelected = {
-                        updatedHomeFilter ->
-
-                    selectedHomeFilter =
-                        updatedHomeFilter
-                },
-
+                onVolunteerSearchSelected = onVolunteerSearchSelected,
+                homeFilterOptions = homeFilterOptions,
+                selectedHomeFilter = selectedHomeFilter,
+                onHomeFilterSelected = { updatedHomeFilter -> selectedHomeFilter = updatedHomeFilter },
                 onVolunteerFavouritesSelected = onVolunteerFavouritesSelected,
-                onVolunteerNotificationsSelected =
-                    onVolunteerNotificationsSelected,
-
-                unreadNotificationCount =
-                    unreadNotificationCount,
-
-                volunteerInitials =
-                    currentVolunteerInitials
+                onVolunteerNotificationsSelected = onVolunteerNotificationsSelected,
+                unreadNotificationCount = unreadNotificationCount,
+                volunteerInitials = currentVolunteerInitials,
+                volunteerProfileImageUrl = VolunteerOpportunitySessionStore.profileData?.profileImageUrl,
+                onAvatarSelected = onVolunteerProfileSelected
             )
         }
 
+        // Check this condition before showing the action, preventing an invalid Volunteer flow from continuing.
         if (syncWarning != null) {
             item(key = "sync_warning") {
+                // Arrange the following screen content vertically inside the available space.
                 Column(Modifier.padding(16.dp)) {
+                    // Display the prepared label; business rules are calculated before reaching this UI call.
                     Text(syncWarning, color = Color(0xFF895B00))
+                    // Connect this visible button to the callback supplied by the parent screen or navigation host.
                     TextButton(onClick = onSyncSelected) { Text("Sync application result") }
                 }
             }
         }
+        // Check this condition before showing the action, preventing an invalid Volunteer flow from continuing.
         if (isShowingCachedData) {
             item(key = "volunteer_home_offline_status") {
                 VolunteerOfflineStatusCard(
@@ -465,10 +480,14 @@ fun VolunteerHomeScreen(
 }
 
 @Composable
+// Purpose: Renders the volunteer offline status card from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerOfflineStatusCard(
     lastSyncedAtEpochMillis: Long?,
     onSyncSelected: () -> Unit
 ) {
+    // Name the calculated last sync text value because later UI branches reuse it during this Compose pass.
     val lastSyncText = remember(lastSyncedAtEpochMillis) {
         lastSyncedAtEpochMillis?.let { timestamp ->
             DateFormat.getDateTimeInstance(
@@ -526,16 +545,20 @@ private fun VolunteerOfflineStatusCard(
 
 
 @Composable
+// Purpose: Renders the volunteer home compact header from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerHomeCompactHeader(
     onVolunteerSearchSelected: () -> Unit,
     homeFilterOptions: List<VolunteerHomeFeedFilter>,
     selectedHomeFilter: VolunteerHomeFeedFilter,
-    onHomeFilterSelected:
-        (VolunteerHomeFeedFilter) -> Unit,
+    onHomeFilterSelected: (VolunteerHomeFeedFilter) -> Unit,
     onVolunteerNotificationsSelected: () -> Unit,
     onVolunteerFavouritesSelected: () -> Unit,
     unreadNotificationCount: Int,
-    volunteerInitials: String
+    volunteerInitials: String,
+    volunteerProfileImageUrl: String?,
+    onAvatarSelected: () -> Unit
 ) {
 
     Column(
@@ -630,24 +653,30 @@ private fun VolunteerHomeCompactHeader(
 
 
                 Surface(
-                    modifier =
-                        Modifier.size(32.dp),
-
+                    onClick = onAvatarSelected,
+                    modifier = Modifier.size(32.dp),
                     shape = CircleShape,
-
                     color = Color.White
                 ) {
-
-                    Box(
-                        contentAlignment =
-                            Alignment.Center
-                    ) {
+                    Box(contentAlignment = Alignment.Center) {
                         Text(
                             text = volunteerInitials,
                             color = VolunteerLinkPrimaryGreen,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
+
+                        volunteerProfileImageUrl
+                            ?.trim()
+                            ?.takeIf { it.isNotEmpty() && !it.equals("null", ignoreCase = true) }
+                            ?.let { safeUrl ->
+                                coil.compose.AsyncImage(
+                                    model = safeUrl,
+                                    contentDescription = "Your profile",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                                )
+                            }
                     }
                 }
             }
@@ -743,6 +772,7 @@ private fun VolunteerHomeCompactHeader(
             ) { homeFilterOption ->
 
 
+                // Keep the volunteer’s current selection so Compose can redraw the matching content.
                 val homeFilterIsSelected =
                     selectedHomeFilter ==
                             homeFilterOption
@@ -800,19 +830,25 @@ private fun VolunteerHomeCompactHeader(
 }
 
 @Composable
+// Purpose: Handles volunteer home impact summary as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerHomeImpactSummary(
     volunteerApplications:
         List<VolunteerOpportunityApplication>
 ) {
+    // Resolve or prepare the application data used by the next status, cancellation or navigation decision.
     val completedApplications =
         volunteerApplications.filter { application ->
             application.applicationStatus ==
                 VolunteerApplicationStatus.COMPLETED
         }
+    // Name the calculated verified minutes value because later UI branches reuse it during this Compose pass.
     val verifiedMinutes =
         completedApplications.sumOf { application ->
             application.applicationVerifiedMinutes ?: 0
         }
+    // Resolve or prepare the application data used by the next status, cancellation or navigation decision.
     val activeApplications =
         volunteerApplications.count { application ->
             application.applicationStatus ==
@@ -925,6 +961,9 @@ private fun VolunteerHomeImpactSummary(
 }
 
 @Composable
+// Purpose: Handles volunteer home impact metric as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerHomeImpactMetric(
     value: String,
     label: String,
@@ -957,6 +996,9 @@ private fun VolunteerHomeImpactMetric(
 }
 
 @Composable
+// Purpose: Renders the volunteer home application section from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerHomeApplicationSection(
     volunteerApplications:
     List<VolunteerOpportunityApplication>,
@@ -1013,6 +1055,9 @@ private fun VolunteerHomeApplicationSection(
 }
 
 @Composable
+// Purpose: Renders the volunteer home recommendation section from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerHomeRecommendationSection(
     sectionTitle: String,
     recommendations: List<VolunteerHomeRecommendation>,
@@ -1101,6 +1146,9 @@ private fun VolunteerHomeRecommendationSection(
 }
 
 @Composable
+// Purpose: Renders the volunteer home opportunity section from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerHomeOpportunitySection(
     sectionTitle: String,
     volunteerOpportunityEvents:
@@ -1155,6 +1203,9 @@ private fun VolunteerHomeOpportunitySection(
 }
 
 @Composable
+// Purpose: Renders the volunteer home section title row from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerHomeSectionTitleRow(
     sectionTitle: String,
     sectionActionText: String? = null,
@@ -1192,6 +1243,9 @@ private fun VolunteerHomeSectionTitleRow(
 }
 
 @Composable
+// Purpose: Renders the volunteer home compact application card from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerHomeCompactApplicationCard(
     volunteerApplication:
     VolunteerOpportunityApplication,
@@ -1264,6 +1318,9 @@ private fun VolunteerHomeCompactApplicationCard(
 }
 
 @Composable
+// Purpose: Renders the volunteer home compact card from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 internal fun VolunteerHomeCompactCard(
     volunteerOpportunityEvent:
     VolunteerOpportunityEvent,
@@ -1274,6 +1331,7 @@ internal fun VolunteerHomeCompactCard(
     isPromoted: Boolean = false,
     onVolunteerOpportunitySelected: () -> Unit
 ) {
+    // Resolve or prepare role data used for eligibility, schedule and application controls.
     val primaryVolunteerRole =
         recommendation?.let { match ->
             volunteerOpportunityEvent
@@ -1285,6 +1343,7 @@ internal fun VolunteerHomeCompactCard(
                 .eventVolunteerRoles
                 .firstOrNull()
 
+    // Resolve or prepare event data from the shared dashboard snapshot for this part of the screen.
     val opportunityCategoryIconResourceId =
         when (
             volunteerOpportunityEvent
@@ -1308,6 +1367,7 @@ internal fun VolunteerHomeCompactCard(
                     .ic_volunteer_physical_event
         }
 
+    // Resolve or prepare event data from the shared dashboard snapshot for this part of the screen.
     val opportunityLocationIconResourceId =
         if (
             volunteerOpportunityEvent.eventOpportunityType ==
@@ -1596,10 +1656,14 @@ internal fun VolunteerHomeCompactCard(
 }
 
 @Composable
+// Purpose: Handles volunteer match score chip as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerMatchScoreChip(
     score: Int,
     onSelected: () -> Unit
 ) {
+    // Choose a visual colour that represents the current status without changing business data.
     val scoreColour = when {
         score >= 75 -> VolunteerLinkSuccess
         score >= 60 -> VolunteerLinkInformation
@@ -1631,6 +1695,9 @@ private fun VolunteerMatchScoreChip(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+// Purpose: Handles volunteer match details sheet as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerMatchDetailsSheet(
     recommendation: VolunteerHomeRecommendation,
     onDismissRequest: () -> Unit,
@@ -1890,9 +1957,13 @@ private fun VolunteerMatchDetailsSheet(
 }
 
 @Composable
+// Purpose: Renders the volunteer match factor row from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerMatchFactorRow(
     factor: VolunteerMatchFactor
 ) {
+    // Choose a visual colour that represents the current status without changing business data.
     val factorColour =
         when (factor.status) {
             VolunteerMatchFactorStatus.STRENGTH ->
@@ -1905,6 +1976,7 @@ private fun VolunteerMatchFactorRow(
                 VolunteerLinkWarning
         }
 
+    // Name the calculated factor label value because later UI branches reuse it during this Compose pass.
     val factorLabel =
         when (factor.status) {
             VolunteerMatchFactorStatus.STRENGTH ->
@@ -1999,6 +2071,9 @@ private fun VolunteerMatchFactorRow(
 }
 
 @Composable
+// Purpose: Renders the volunteer home verified badge from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerHomeVerifiedBadge() {
     Surface(
         shape = RoundedCornerShape(4.dp),
@@ -2034,6 +2109,9 @@ private fun VolunteerHomeVerifiedBadge() {
 }
 
 @Composable
+// Purpose: Handles volunteer home compact tag as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerHomeCompactTag(
     tagText: String,
     tagIsHighlighted: Boolean = false
@@ -2071,9 +2149,13 @@ private fun VolunteerHomeCompactTag(
 }
 
 @Composable
+// Purpose: Renders the volunteer home compact status badge from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerHomeCompactStatusBadge(
     applicationStatus: VolunteerApplicationStatus
 ) {
+    // Translate the stored status into the label, colour or action rules shown to the volunteer.
     val statusText =
         when (applicationStatus) {
             VolunteerApplicationStatus.PENDING ->
@@ -2095,6 +2177,7 @@ private fun VolunteerHomeCompactStatusBadge(
                 "Cancelled"
         }
 
+    // Translate the stored status into the label, colour or action rules shown to the volunteer.
     val statusTextColour =
         when (applicationStatus) {
             VolunteerApplicationStatus.PENDING ->
@@ -2116,6 +2199,7 @@ private fun VolunteerHomeCompactStatusBadge(
                 VolunteerLinkTextSecondary
         }
 
+    // Translate the stored status into the label, colour or action rules shown to the volunteer.
     val statusBackgroundColour =
         when (applicationStatus) {
             VolunteerApplicationStatus.PENDING ->
@@ -2155,6 +2239,9 @@ private fun VolunteerHomeCompactStatusBadge(
 }
 
 @Composable
+// Purpose: Renders the volunteer home empty card from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerHomeEmptyCard(
     emptyCardMessage: String
 ) {
@@ -2178,8 +2265,13 @@ private fun VolunteerHomeEmptyCard(
     }
 }
 
+// Purpose: Converts volunteer impact minutes into the display text expected by the Volunteer UI.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun formatVolunteerImpactMinutes(minutes: Int): String {
+    // Name the calculated hours value because later UI branches reuse it during this Compose pass.
     val hours = minutes / 60
+    // Name the calculated remainder value because later UI branches reuse it during this Compose pass.
     val remainder = minutes % 60
     return when {
         minutes <= 0 -> "0m"
@@ -2189,10 +2281,15 @@ private fun formatVolunteerImpactMinutes(minutes: Int): String {
     }
 }
 
+// Purpose: Handles volunteer initials as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun volunteerInitials(fullName: String?): String {
+    // Name the calculated trimmed value because later UI branches reuse it during this Compose pass.
     val trimmed = fullName?.trim().orEmpty()
     if (trimmed.isEmpty()) return "?"
 
+    // Name the calculated parts value because later UI branches reuse it during this Compose pass.
     val parts = trimmed.split(Regex("\\s+")).filter { it.isNotBlank() }
     return when {
         parts.size >= 2 -> "${parts.first().first()}${parts.last().first()}".uppercase()

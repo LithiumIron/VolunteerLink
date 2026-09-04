@@ -54,6 +54,8 @@ internal fun rememberVolunteerPromotionFeed(usingCachedDashboard: Boolean): Volu
     var entries by remember(account) { mutableStateOf(emptyList<VolunteerPromotion>()) }
     var failed by remember(account) { mutableStateOf(false) }
     var retry by remember { mutableIntStateOf(0) }
+    // Promotions are refreshed while Home is visible because a paid placement can end
+    // during the session. Cached/offline dashboards deliberately show no promotion.
     LaunchedEffect(account, owner, retry, usingCachedDashboard) {
         owner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             var untilNextRefresh = 0
@@ -84,6 +86,9 @@ internal fun rememberVolunteerPromotionFeed(usingCachedDashboard: Boolean): Volu
 }
 
 @Composable
+// Purpose: Renders the volunteer promotion section from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 internal fun VolunteerPromotionSection(events: List<VolunteerOpportunityEvent>, onSelected: (Int) -> Unit) {
     // Match the ordinary Home list's actual container width and shared side margins.
     // Do not narrow cards to expose the next card, or cap tablet widths at 380dp.
@@ -95,6 +100,8 @@ internal fun VolunteerPromotionSection(events: List<VolunteerOpportunityEvent>, 
             Text("Paid promotion · Swipe to explore", fontSize = 12.sp, color = VolunteerLinkTextSecondary)
         }
         LazyRow(contentPadding = PaddingValues(horizontal = VolunteerLinkScreenHorizontalPadding), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            // Only events already passed through normal discovery rules reach this list.
+            // Promotion changes placement; it never bypasses availability or eligibility.
             items(events, key = { it.eventDatabaseId }) { event ->
                 Box(Modifier.width(cardWidth)) {
                     VolunteerHomeCompactCard(event, isPromoted = true, onVolunteerOpportunitySelected = { onSelected(event.eventId) })
@@ -106,6 +113,9 @@ internal fun VolunteerPromotionSection(events: List<VolunteerOpportunityEvent>, 
 }
 
 @Composable
+// Purpose: Handles volunteer promotion load notice as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 internal fun VolunteerPromotionLoadNotice(onRetry: () -> Unit) {
     Column(Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
         Text("Promoted opportunities could not load. You can still browse the other opportunities.", fontSize = 12.sp, color = VolunteerLinkTextSecondary)

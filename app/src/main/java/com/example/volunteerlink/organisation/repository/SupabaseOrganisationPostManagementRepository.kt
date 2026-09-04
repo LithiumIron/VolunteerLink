@@ -1,5 +1,30 @@
 package com.example.volunteerlink.organisation.repository
 
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Implements the Organisation Post Management contract against Supabase PostgREST, RPCs and Storage.
+//
+// Read operations reconstruct one management view from normalized post, role, schedule, participation, attendance
+// and submission records.
+//
+// Business mutations are intentionally routed through authenticated PostgreSQL RPCs because applicant decisions,
+// attendance and completion touch multiple related rows and must be ownership-checked and transactionally
+// consistent.
+//
+// Remote submission files are downloaded from Supabase Storage only after the repository has established the
+// post/submission context used by the Organisation screen.
+//
+// AppClock-aligned timestamps are supplied/used where the project treats business time as testable application
+// time.
+//
+// After a write succeeds the ViewModel reloads server state; this repository does not make local cached data
+// authoritative.
+//
+// Architectural layer: Data/repository layer.
+// ============================================================================
+
+
 import com.example.volunteerlink.data.supabase
 import com.example.volunteerlink.organisation.auth.OrganisationSession
 import com.example.volunteerlink.organisation.manage.model.PostManagementAttendanceDay
@@ -35,10 +60,24 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
 
 @Serializable
+/**
+ * Holds the values represented by post management event contact row as one strongly typed model.
+ * It keeps backend-facing work behind the Manage Post repository boundary.
+ */
+/**
+ * DETAILED DECLARATION — PostManagementEventContactRow
+ *
+ * Domain/UI type for Post Management Event Contact Row used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 private data class PostManagementEventContactRow(
     @SerialName("user_id") val userId: String,
     @SerialName("shared_phone") val sharedPhone: String = "",
@@ -46,6 +85,18 @@ private data class PostManagementEventContactRow(
 )
 
 @Serializable
+/**
+ * Holds the values represented by impact weave post contribution row as one strongly typed model.
+ * It keeps backend-facing work behind the Manage Post repository boundary.
+ */
+/**
+ * DETAILED DECLARATION — ImpactWeavePostContributionRow
+ *
+ * Domain/UI type for Impact Weave Post Contribution Row used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 private data class ImpactWeavePostContributionRow(
     @SerialName("impact_weave_draft_id") val impactWeaveDraftId: String,
     @SerialName("partner_organisation_id") val partnerOrganisationId: String,
@@ -58,24 +109,133 @@ private data class ImpactWeavePostContributionRow(
 )
 
 /** Supabase reader for the Organisation Post Management detail screen. */
+/**
+ * DETAILED DECLARATION — SupabaseOrganisationPostManagementRepository
+ *
+ * Data-access implementation/contract for Supabase Organisation Post Management Repository, isolating backend
+ * details from the screen and ViewModel layers.
+ *
+ * Protected server state still relies on authenticated Supabase authorization and database rules rather than
+ * trusting client-side checks alone.
+ *
+ * This implementation translates VolunteerLink models to PostgREST/RPC/Storage operations and maps backend
+ * responses back into domain models.
+ */
 class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementRepository {
+
+    /**
+     * Publishes the current Volunteer Post data after the required Manage Post checks pass.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — publishSavedDraft
+     *
+     * Performs the repository/data-layer operation for publish saved draft.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Supabase RPC `organisation_publish_saved_draft`: Publishes an existing saved DRAFT after server-side
+     * ownership, verification and timing checks; the database performs the authoritative status/timestamp
+     * transition.
+     *
+     * Uses OrganisationSession so the client operation is associated with the signed-in organisation; server
+     * RLS/RPC ownership checks still make the final authorization decision.
+     */
+    override suspend fun publishSavedDraft(postId: String, appNowMillis: Long) {
+        val organisation = OrganisationSession.requireContext()
+        require(organisation.isVerified) {
+            "Your organisation must be verified before publishing volunteer posts."
+        }
+
+        val appTimestamp = SimpleDateFormat(
+            "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+            Locale.US
+        ).format(Date(appNowMillis))
+        val appToday = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+            .format(Date(appNowMillis))
+
+        // ------------------------------------------------------------------------
+        // SUPABASE RPC: organisation_publish_saved_draft
+        // Publishes an existing saved DRAFT after server-side ownership, verification and timing checks; the
+        // database performs the authoritative status/timestamp transition.
+        // The client sends parameters and waits for the database result; ownership, lifecycle and multi-row
+        // consistency checks belong on the server for this operation.
+        // ------------------------------------------------------------------------
+        supabase.postgrest.rpc(
+            function = "organisation_publish_saved_draft",
+            parameters = buildJsonObject {
+                put("p_post_id", postId)
+                put("p_app_now", appTimestamp)
+                put("p_app_today", appToday)
+            }
+        )
+    }
 
     companion object {
         private const val REMOTE_SUBMISSION_BUCKET = "remote-submissions"
     }
 
+    /**
+     * Loads the post needed by the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — loadPost
+     *
+     * Builds the complete Post Management domain object from normalized Supabase records needed by Overview,
+     * People and Review.
+     *
+     * It combines parent post data with Physical/Remote details, roles, schedules, participations, screening
+     * answers, attendance/submissions and Impact Weave partner support while preserving each table as the
+     * backend source of truth.
+     *
+     * The result is screen-oriented but read-only; mutations use dedicated repository methods/RPCs instead of
+     * modifying this assembled object and writing it back wholesale.
+     *
+     * Supabase RPC `organisation_resolve_application_lifecycle`: Reconciles pending application rows against
+     * current post/role timing and capacity rules before Organisation counts or actions are shown.
+     *
+     * Supabase RPC `organisation_get_post_impact_weave_partners`: Returns accepted Impact Weave partner
+     * organisations and the support linked to this post for the owner Manage Post view.
+     *
+     * Supabase RPC `organisation_list_post_volunteer_event_contacts`: Returns opportunity-scoped volunteer
+     * contact availability that the organisation is currently permitted to use.
+     *
+     * Reads/maps Supabase table data from `volunteer_posts` (the parent Volunteer Post record, including owner,
+     * mode, lifecycle status, category and publication metadata); `physical_details` (Physical-side
+     * date/time/location/capacity data for a post); `remote_details` (Remote-side project dates, capacity and
+     * submission configuration); `schedule_items` (Physical activities and Remote milestones belonging to the
+     * post schedule); `schedule_item_roles` (many-to-many links between schedule items and the roles affected
+     * by them).
+     *
+     * Uses OrganisationSession so the client operation is associated with the signed-in organisation; server
+     * RLS/RPC ownership checks still make the final authorization decision.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     override suspend fun loadPost(postId: String): PostManagementPost {
         val organisationContext = OrganisationSession.requireContext()
         val organisationId = organisationContext.organisationId
 
         // Keep pending applicants truthful before building the screen snapshot.
         // Role-full and role-started applications are persisted as DECLINED, not merely hidden.
+        // ------------------------------------------------------------------------
+        // SUPABASE RPC: organisation_resolve_application_lifecycle
+        // Reconciles pending application rows against current post/role timing and capacity rules before
+        // Organisation counts or actions are shown.
+        // The client sends parameters and waits for the database result; ownership, lifecycle and multi-row
+        // consistency checks belong on the server for this operation.
+        // ------------------------------------------------------------------------
         supabase.postgrest.rpc(
             function = "organisation_resolve_application_lifecycle",
             parameters = buildJsonObject { put("p_post_id", postId) }
         )
 
         val postRow = supabase
+            // SUPABASE TABLE: volunteer_posts — the parent Volunteer Post record, including owner, mode, lifecycle status, category and publication metadata.
+            // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
             .from("volunteer_posts")
             .select(
                 columns = Columns.raw(
@@ -96,6 +256,13 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
             emptyList()
         } else {
             runCatching {
+                // ------------------------------------------------------------------------
+                // SUPABASE RPC: organisation_get_post_impact_weave_partners
+                // Returns accepted Impact Weave partner organisations and the support linked to this post for
+                // the owner Manage Post view.
+                // The client sends parameters and waits for the database result; ownership, lifecycle and
+                // multi-row consistency checks belong on the server for this operation.
+                // ------------------------------------------------------------------------
                 supabase.postgrest.rpc(
                     function = "organisation_get_post_impact_weave_partners",
                     parameters = buildJsonObject { put("p_post_id", postId) }
@@ -121,6 +288,8 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
         }
 
         val physicalRow = supabase
+            // SUPABASE TABLE: physical_details — Physical-side date/time/location/capacity data for a post.
+            // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
             .from("physical_details")
             .select(
                 columns = Columns.raw(
@@ -134,6 +303,8 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
             .firstOrNull()
 
         val remoteRow = supabase
+            // SUPABASE TABLE: remote_details — Remote-side project dates, capacity and submission configuration.
+            // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
             .from("remote_details")
             .select(
                 columns = Columns.raw(
@@ -147,6 +318,8 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
             .firstOrNull()
 
         val scheduleRows = supabase
+            // SUPABASE TABLE: schedule_items — Physical activities and Remote milestones belonging to the post schedule.
+            // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
             .from("schedule_items")
             .select(
                 columns = Columns.raw(
@@ -159,6 +332,8 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
             .decodeList<JsonObject>()
 
         val scheduleRoleRows = supabase
+            // SUPABASE TABLE: schedule_item_roles — many-to-many links between schedule items and the roles affected by them.
+            // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
             .from("schedule_item_roles")
             .select(
                 columns = Columns.raw("schedule_item_id,role_template_id")
@@ -174,6 +349,8 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
             }
 
         val roleRows = supabase
+            // SUPABASE TABLE: post_roles — the selected role instances for a post, including capacity and application method.
+            // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
             .from("post_roles")
             .select(
                 columns = Columns.raw(
@@ -193,6 +370,8 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
             emptyList()
         } else {
             supabase
+                // SUPABASE TABLE: role_templates — the fixed role catalogue used when an organisation chooses volunteer roles.
+                // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
                 .from("role_templates")
                 .select(
                     columns = Columns.raw(
@@ -228,6 +407,8 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
         }.sortedBy { it.roleName }
 
         val participationRows = supabase
+            // SUPABASE TABLE: role_participations — volunteer application/join/completion state for one post role.
+            // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
             .from("role_participations")
             .select(
                 columns = Columns.raw(
@@ -240,6 +421,8 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
             .decodeList<JsonObject>()
 
         val screeningAnswerRows = supabase
+            // SUPABASE TABLE: role_participation_screening_answers — the volunteer's normalized answers to the role screening questions.
+            // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
             .from("role_participation_screening_answers")
             .select(
                 columns = Columns.raw(
@@ -259,6 +442,8 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
             }
 
         val attendanceDayRows = supabase
+            // SUPABASE TABLE: attendance_days — server-prepared Physical attendance day metadata.
+            // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
             .from("attendance_days")
             .select(
                 columns = Columns.raw(
@@ -270,6 +455,8 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
             .decodeList<JsonObject>()
 
         val attendanceRecordRows = supabase
+            // SUPABASE TABLE: attendance_records — per-volunteer Physical attendance/verified-time records.
+            // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
             .from("attendance_records")
             .select(
                 columns = Columns.raw(
@@ -281,6 +468,8 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
             .decodeList<JsonObject>()
 
         val remoteSubmissionRows = supabase
+            // SUPABASE TABLE: remote_submissions — Remote deliverable submission status, file/url and review metadata.
+            // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
             .from("remote_submissions")
             .select(
                 columns = Columns.raw(
@@ -293,6 +482,8 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
             .decodeList<JsonObject>()
 
         val evaluationRows = supabase
+            // SUPABASE TABLE: volunteer_evaluations — organisation evaluation/feedback results used after participation.
+            // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
             .from("volunteer_evaluations")
             .select(
                 columns = Columns.raw(
@@ -311,6 +502,8 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
             emptyList()
         } else {
             supabase
+                // SUPABASE TABLE: user_profiles — account-level profile identity such as volunteer/organisation user id, name and public profile fields.
+                // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
                 .from("user_profiles")
                 .select(
                     columns = Columns.raw(
@@ -333,6 +526,13 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
         // owns the post, the volunteer is accepted and active, and that volunteer
         // explicitly enabled phone sharing for this participation.
         val eventContactsByUserId = runCatching {
+            // ------------------------------------------------------------------------
+            // SUPABASE RPC: organisation_list_post_volunteer_event_contacts
+            // Returns opportunity-scoped volunteer contact availability that the organisation is currently
+            // permitted to use.
+            // The client sends parameters and waits for the database result; ownership, lifecycle and multi-row
+            // consistency checks belong on the server for this operation.
+            // ------------------------------------------------------------------------
             supabase.postgrest.rpc(
                 function = "organisation_list_post_volunteer_event_contacts",
                 parameters = buildJsonObject { put("p_post_id", postId) }
@@ -492,6 +692,21 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
     }
 
 
+    /**
+     * Derives the download remote submission value used by the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — downloadRemoteSubmission
+     *
+     * Performs the repository/data-layer operation for download remote submission.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Uses Supabase Storage for binary/file content while database rows keep only the controlled storage path
+     * and metadata.
+     */
     override suspend fun downloadRemoteSubmission(
         postId: String,
         filePath: String
@@ -511,6 +726,21 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
             .downloadAuthenticated(normalizedPath)
     }
 
+    /**
+     * Derives the review remote submission value used by the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — reviewRemoteSubmission
+     *
+     * Performs the repository/data-layer operation for review remote submission.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Supabase RPC `organisation_review_remote_submission_authenticated`: Reviews a Remote submission through
+     * an authenticated ownership-checked server path and records the resulting submission status/feedback.
+     */
     override suspend fun reviewRemoteSubmission(
         postId: String,
         submissionId: String,
@@ -531,6 +761,13 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
             }
         }
 
+        // ------------------------------------------------------------------------
+        // SUPABASE RPC: organisation_review_remote_submission_authenticated
+        // Reviews a Remote submission through an authenticated ownership-checked server path and records the
+        // resulting submission status/feedback.
+        // The client sends parameters and waits for the database result; ownership, lifecycle and multi-row
+        // consistency checks belong on the server for this operation.
+        // ------------------------------------------------------------------------
         supabase.postgrest.rpc(
             function = "organisation_review_remote_submission_authenticated",
             parameters = buildJsonObject {
@@ -546,6 +783,21 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
         )
     }
 
+    /**
+     * Saves the remote submission review stage for the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — saveRemoteSubmissionReviewStage
+     *
+     * Performs the repository/data-layer operation for save remote submission review stage.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Supabase RPC `organisation_save_remote_submission_review_stage`: Saves the Organisation's staged Remote
+     * submission review decision before the final batch is committed.
+     */
     override suspend fun saveRemoteSubmissionReviewStage(
         postId: String,
         decisions: List<PostManagementRemoteSubmissionDecision>,
@@ -554,6 +806,13 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
     ) {
         requireOwnedPost(postId)
 
+        // ------------------------------------------------------------------------
+        // SUPABASE RPC: organisation_save_remote_submission_review_stage
+        // Saves the Organisation's staged Remote submission review decision before the final batch is
+        // committed.
+        // The client sends parameters and waits for the database result; ownership, lifecycle and multi-row
+        // consistency checks belong on the server for this operation.
+        // ------------------------------------------------------------------------
         supabase.postgrest.rpc(
             function = "organisation_save_remote_submission_review_stage",
             parameters = buildJsonObject {
@@ -602,12 +861,34 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
         )
     }
 
+    /**
+     * Finalises the remote review batch for the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — finalizeRemoteReviewBatch
+     *
+     * Performs the repository/data-layer operation for finalize remote review batch.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Supabase RPC `organisation_finalize_remote_review_batch`: Commits the Remote review batch so
+     * submission/participation outcomes are finalised consistently by the database.
+     */
     override suspend fun finalizeRemoteReviewBatch(
         postId: String,
         feedbackByParticipation: Map<String, String>
     ) {
         requireOwnedPost(postId)
 
+        // ------------------------------------------------------------------------
+        // SUPABASE RPC: organisation_finalize_remote_review_batch
+        // Commits the Remote review batch so submission/participation outcomes are finalised consistently by
+        // the database.
+        // The client sends parameters and waits for the database result; ownership, lifecycle and multi-row
+        // consistency checks belong on the server for this operation.
+        // ------------------------------------------------------------------------
         supabase.postgrest.rpc(
             function = "organisation_finalize_remote_review_batch",
             parameters = buildJsonObject {
@@ -628,12 +909,29 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
         )
     }
 
+    /**
+     * Loads the physical attendance needed by the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — loadPhysicalAttendance
+     *
+     * Performs the repository/data-layer operation for load physical attendance.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Reads/maps Supabase table data from `attendance_days` (server-prepared Physical attendance day metadata);
+     * `attendance_records` (per-volunteer Physical attendance/verified-time records).
+     */
     override suspend fun loadPhysicalAttendance(
         postId: String
     ): PostManagementAttendanceSnapshot {
         requireOwnedPost(postId)
 
         val attendanceDayRows = supabase
+            // SUPABASE TABLE: attendance_days — server-prepared Physical attendance day metadata.
+            // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
             .from("attendance_days")
             .select(
                 columns = Columns.raw(
@@ -645,6 +943,8 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
             .decodeList<JsonObject>()
 
         val attendanceRecordRows = supabase
+            // SUPABASE TABLE: attendance_records — per-volunteer Physical attendance/verified-time records.
+            // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
             .from("attendance_records")
             .select(
                 columns = Columns.raw(
@@ -683,6 +983,21 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
     }
 
 
+    /**
+     * Sets the applicant shortlisted used by the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — setApplicantShortlisted
+     *
+     * Performs the repository/data-layer operation for set applicant shortlisted.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Supabase RPC `organisation_set_applicant_shortlisted`: Persists the organisation's shortlist marker for a
+     * still-reviewable applicant.
+     */
     override suspend fun setApplicantShortlisted(
         postId: String,
         roleTemplateId: String,
@@ -691,6 +1006,12 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
     ) {
         requireOwnedPost(postId)
 
+        // ------------------------------------------------------------------------
+        // SUPABASE RPC: organisation_set_applicant_shortlisted
+        // Persists the organisation's shortlist marker for a still-reviewable applicant.
+        // The client sends parameters and waits for the database result; ownership, lifecycle and multi-row
+        // consistency checks belong on the server for this operation.
+        // ------------------------------------------------------------------------
         supabase.postgrest.rpc(
             function = "organisation_set_applicant_shortlisted",
             parameters = buildJsonObject {
@@ -702,11 +1023,31 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
         )
     }
 
+    /**
+     * Derives the review applicant value used by the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — reviewApplicant
+     *
+     * Calls organisation_review_role_applicant with post id, role id, volunteer id, decision and the required
+     * manual decline reason when applicable.
+     *
+     * The database checks that the post belongs to the signed-in organisation, the role still uses
+     * REVIEW_APPLICANTS, the application is still PENDING and an ACCEPT does not exceed role capacity.
+     *
+     * The returned status is used as confirmation; the client does not directly UPDATE role_participations.
+     *
+     * Supabase RPC `organisation_review_role_applicant`: Accepts or declines one pending REVIEW_APPLICANTS
+     * application after checking ownership, role method, capacity and application lifecycle; decline carries
+     * the organisation reason.
+     */
     override suspend fun reviewApplicant(
         postId: String,
         roleTemplateId: String,
         userId: String,
-        decision: String
+        decision: String,
+        decisionNote: String?
     ) {
         requireOwnedPost(postId)
         val normalizedDecision = decision.trim().uppercase(Locale.US)
@@ -714,6 +1055,20 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
             "Applicant decision must be ACCEPT or DECLINE."
         }
 
+        val normalizedDecisionNote = decisionNote?.trim().orEmpty()
+        if (normalizedDecision == "DECLINE") {
+            require(normalizedDecisionNote.isNotBlank()) {
+                "Enter a reason before declining this application."
+            }
+        }
+
+        // ------------------------------------------------------------------------
+        // SUPABASE RPC: organisation_review_role_applicant
+        // Accepts or declines one pending REVIEW_APPLICANTS application after checking ownership, role method,
+        // capacity and application lifecycle; decline carries the organisation reason.
+        // The client sends parameters and waits for the database result; ownership, lifecycle and multi-row
+        // consistency checks belong on the server for this operation.
+        // ------------------------------------------------------------------------
         supabase.postgrest.rpc(
             function = "organisation_review_role_applicant",
             parameters = buildJsonObject {
@@ -721,13 +1076,39 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
                 put("p_role_template_id", roleTemplateId)
                 put("p_user_id", userId)
                 put("p_decision", normalizedDecision)
+                put(
+                    "p_decision_note",
+                    if (normalizedDecision == "DECLINE") normalizedDecisionNote else ""
+                )
             }
         )
     }
 
+    /**
+     * Starts the physical attendance for the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — startPhysicalAttendance
+     *
+     * Performs the repository/data-layer operation for start physical attendance.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Supabase RPC `organisation_start_physical_attendance`: Initialises/opens the Physical attendance workflow
+     * for an owned post using server-validated event dates and participants.
+     */
     override suspend fun startPhysicalAttendance(postId: String) {
         requireOwnedPost(postId)
 
+        // ------------------------------------------------------------------------
+        // SUPABASE RPC: organisation_start_physical_attendance
+        // Initialises/opens the Physical attendance workflow for an owned post using server-validated event
+        // dates and participants.
+        // The client sends parameters and waits for the database result; ownership, lifecycle and multi-row
+        // consistency checks belong on the server for this operation.
+        // ------------------------------------------------------------------------
         supabase.postgrest.rpc(
             function = "organisation_start_physical_attendance",
             parameters = buildJsonObject {
@@ -736,6 +1117,21 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
         )
     }
 
+    /**
+     * Marks the volunteer present with its new state in the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — markVolunteerPresent
+     *
+     * Performs the repository/data-layer operation for mark volunteer present.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Supabase RPC `organisation_mark_physical_present`: Records one volunteer as present for the selected
+     * Physical attendance day using the server-side attendance rules.
+     */
     override suspend fun markVolunteerPresent(
         postId: String,
         eventDate: String,
@@ -744,6 +1140,13 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
     ) {
         requireOwnedPost(postId)
 
+        // ------------------------------------------------------------------------
+        // SUPABASE RPC: organisation_mark_physical_present
+        // Records one volunteer as present for the selected Physical attendance day using the server-side
+        // attendance rules.
+        // The client sends parameters and waits for the database result; ownership, lifecycle and multi-row
+        // consistency checks belong on the server for this operation.
+        // ------------------------------------------------------------------------
         supabase.postgrest.rpc(
             function = "organisation_mark_physical_present",
             parameters = buildJsonObject {
@@ -755,6 +1158,21 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
         )
     }
 
+    /**
+     * Marks the volunteer absent with its new state in the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — markVolunteerAbsent
+     *
+     * Performs the repository/data-layer operation for mark volunteer absent.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Supabase RPC `organisation_mark_physical_absent`: Records one volunteer as absent for the selected
+     * Physical attendance day using the server-side attendance rules.
+     */
     override suspend fun markVolunteerAbsent(
         postId: String,
         eventDate: String,
@@ -763,6 +1181,13 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
     ) {
         requireOwnedPost(postId)
 
+        // ------------------------------------------------------------------------
+        // SUPABASE RPC: organisation_mark_physical_absent
+        // Records one volunteer as absent for the selected Physical attendance day using the server-side
+        // attendance rules.
+        // The client sends parameters and waits for the database result; ownership, lifecycle and multi-row
+        // consistency checks belong on the server for this operation.
+        // ------------------------------------------------------------------------
         supabase.postgrest.rpc(
             function = "organisation_mark_physical_absent",
             parameters = buildJsonObject {
@@ -774,14 +1199,51 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
         )
     }
 
+    /**
+     * Prepares the physical review for the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — preparePhysicalReview
+     *
+     * Performs the repository/data-layer operation for prepare physical review.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Supabase RPC `organisation_prepare_physical_review`: Builds the Physical completion/review state after
+     * attendance so the organisation reviews consistent server-derived eligibility.
+     */
     override suspend fun preparePhysicalReview(postId: String) {
         requireOwnedPost(postId)
+        // ------------------------------------------------------------------------
+        // SUPABASE RPC: organisation_prepare_physical_review
+        // Builds the Physical completion/review state after attendance so the organisation reviews consistent
+        // server-derived eligibility.
+        // The client sends parameters and waits for the database result; ownership, lifecycle and multi-row
+        // consistency checks belong on the server for this operation.
+        // ------------------------------------------------------------------------
         supabase.postgrest.rpc(
             function = "organisation_prepare_physical_review",
             parameters = buildJsonObject { put("p_post_id", postId) }
         )
     }
 
+    /**
+     * Derives the report physical review issue value used by the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — reportPhysicalReviewIssue
+     *
+     * Performs the repository/data-layer operation for report physical review issue.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Supabase RPC `organisation_report_physical_review_issue`: Records a Physical review issue that prevents
+     * automatic finalisation and preserves the reason for follow-up.
+     */
     override suspend fun reportPhysicalReviewIssue(
         postId: String,
         roleTemplateId: String,
@@ -789,6 +1251,13 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
         reason: String
     ) {
         requireOwnedPost(postId)
+        // ------------------------------------------------------------------------
+        // SUPABASE RPC: organisation_report_physical_review_issue
+        // Records a Physical review issue that prevents automatic finalisation and preserves the reason for
+        // follow-up.
+        // The client sends parameters and waits for the database result; ownership, lifecycle and multi-row
+        // consistency checks belong on the server for this operation.
+        // ------------------------------------------------------------------------
         supabase.postgrest.rpc(
             function = "organisation_report_physical_review_issue",
             parameters = buildJsonObject {
@@ -800,14 +1269,51 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
         )
     }
 
+    /**
+     * Confirms the all ready physical in the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — completeAllReadyPhysical
+     *
+     * Performs the repository/data-layer operation for complete all ready physical.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Supabase RPC `organisation_complete_all_ready_physical`: Finalises all Physical volunteers that currently
+     * satisfy the database readiness rules in one server-controlled operation.
+     */
     override suspend fun completeAllReadyPhysical(postId: String) {
         requireOwnedPost(postId)
+        // ------------------------------------------------------------------------
+        // SUPABASE RPC: organisation_complete_all_ready_physical
+        // Finalises all Physical volunteers that currently satisfy the database readiness rules in one server-
+        // controlled operation.
+        // The client sends parameters and waits for the database result; ownership, lifecycle and multi-row
+        // consistency checks belong on the server for this operation.
+        // ------------------------------------------------------------------------
         supabase.postgrest.rpc(
             function = "organisation_complete_all_ready_physical",
             parameters = buildJsonObject { put("p_post_id", postId) }
         )
     }
 
+    /**
+     * Finalises the physical volunteer for the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — finalizePhysicalVolunteer
+     *
+     * Performs the repository/data-layer operation for finalize physical volunteer.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Supabase RPC `organisation_finalize_physical_volunteer`: Finalises one Physical volunteer's
+     * participation/completion result with ownership and lifecycle checks.
+     */
     override suspend fun finalizePhysicalVolunteer(
         postId: String,
         roleTemplateId: String,
@@ -816,6 +1322,13 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
         note: String?
     ) {
         requireOwnedPost(postId)
+        // ------------------------------------------------------------------------
+        // SUPABASE RPC: organisation_finalize_physical_volunteer
+        // Finalises one Physical volunteer's participation/completion result with ownership and lifecycle
+        // checks.
+        // The client sends parameters and waits for the database result; ownership, lifecycle and multi-row
+        // consistency checks belong on the server for this operation.
+        // ------------------------------------------------------------------------
         supabase.postgrest.rpc(
             function = "organisation_finalize_physical_volunteer",
             parameters = buildJsonObject {
@@ -828,6 +1341,21 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
         )
     }
 
+    /**
+     * Saves the physical feedback for the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — savePhysicalFeedback
+     *
+     * Performs the repository/data-layer operation for save physical feedback.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Supabase RPC `organisation_save_physical_feedback`: Persists Organisation feedback/evaluation data for a
+     * Physical participation without letting the UI update evaluation tables directly.
+     */
     override suspend fun savePhysicalFeedback(
         postId: String,
         userIds: List<String>,
@@ -835,6 +1363,13 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
         replaceExisting: Boolean
     ) {
         requireOwnedPost(postId)
+        // ------------------------------------------------------------------------
+        // SUPABASE RPC: organisation_save_physical_feedback
+        // Persists Organisation feedback/evaluation data for a Physical participation without letting the UI
+        // update evaluation tables directly.
+        // The client sends parameters and waits for the database result; ownership, lifecycle and multi-row
+        // consistency checks belong on the server for this operation.
+        // ------------------------------------------------------------------------
         supabase.postgrest.rpc(
             function = "organisation_save_physical_feedback",
             parameters = buildJsonObject {
@@ -846,14 +1381,50 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
         )
     }
 
+    /**
+     * Finalises the physical review post for the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — finalizePhysicalReviewPost
+     *
+     * Performs the repository/data-layer operation for finalize physical review post.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Supabase RPC `organisation_finalize_physical_review_post`: Finalises the post-level Physical review state
+     * after required participant decisions are complete.
+     */
     override suspend fun finalizePhysicalReviewPost(postId: String) {
         requireOwnedPost(postId)
+        // ------------------------------------------------------------------------
+        // SUPABASE RPC: organisation_finalize_physical_review_post
+        // Finalises the post-level Physical review state after required participant decisions are complete.
+        // The client sends parameters and waits for the database result; ownership, lifecycle and multi-row
+        // consistency checks belong on the server for this operation.
+        // ------------------------------------------------------------------------
         supabase.postgrest.rpc(
             function = "organisation_finalize_physical_review_post",
             parameters = buildJsonObject { put("p_post_id", postId) }
         )
     }
 
+    /**
+     * Finalises the physical review batch for the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — finalizePhysicalReviewBatch
+     *
+     * Performs the repository/data-layer operation for finalize physical review batch.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Supabase RPC `organisation_finalize_physical_review_batch`: Completes a Physical review batch atomically
+     * so the final post/participant states remain consistent.
+     */
     override suspend fun finalizePhysicalReviewBatch(
         postId: String,
         decisions: List<PostManagementPendingReviewDecision>,
@@ -861,6 +1432,12 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
     ) {
         requireOwnedPost(postId)
 
+        // ------------------------------------------------------------------------
+        // SUPABASE RPC: organisation_finalize_physical_review_batch
+        // Completes a Physical review batch atomically so the final post/participant states remain consistent.
+        // The client sends parameters and waits for the database result; ownership, lifecycle and multi-row
+        // consistency checks belong on the server for this operation.
+        // ------------------------------------------------------------------------
         supabase.postgrest.rpc(
             function = "organisation_finalize_physical_review_batch",
             parameters = buildJsonObject {
@@ -877,7 +1454,7 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
                                 put("reason", JsonNull)
                             } else {
                                 // Current SQL uses `note`. Keep `reason` as the same transport
-                                // value too so an older deployed batch RPC cannot silently lose it.
+                                // value too so every batch review save keeps the selected decision consistently.
                                 put("note", reason)
                                 put("reason", reason)
                             }
@@ -896,9 +1473,29 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
         )
     }
 
+    /**
+     * Derives the require owned post value used by the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — requireOwnedPost
+     *
+     * Performs the repository/data-layer operation for require owned post.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Reads/maps Supabase table data from `volunteer_posts` (the parent Volunteer Post record, including owner,
+     * mode, lifecycle status, category and publication metadata).
+     *
+     * Uses OrganisationSession so the client operation is associated with the signed-in organisation; server
+     * RLS/RPC ownership checks still make the final authorization decision.
+     */
     private suspend fun requireOwnedPost(postId: String) {
         val organisationId = OrganisationSession.requireOrganisationId()
         val ownsPost = supabase
+            // SUPABASE TABLE: volunteer_posts — the parent Volunteer Post record, including owner, mode, lifecycle status, category and publication metadata.
+            // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
             .from("volunteer_posts")
             .select(columns = Columns.raw("post_id")) {
                 filter {
@@ -915,29 +1512,98 @@ class SupabaseOrganisationPostManagementRepository : OrganisationPostManagementR
     }
 
 
+    /**
+     * Derives the json object value used by the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — requiredText
+     *
+     * Performs the repository/data-layer operation for required text.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     */
     private fun JsonObject.requiredText(key: String): String {
         return optionalText(key)
             ?: error("Missing required Supabase field: $key")
     }
 
+    /**
+     * Derives the json object value used by the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — optionalText
+     *
+     * Performs the repository/data-layer operation for optional text.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     private fun JsonObject.optionalText(key: String): String? {
         val element: JsonElement = this[key] ?: return null
         if (element is JsonNull) return null
         return runCatching { element.jsonPrimitive.contentOrNull }.getOrNull()
     }
 
+    /**
+     * Derives the json object value used by the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — optionalBoolean
+     *
+     * Performs the repository/data-layer operation for optional boolean.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     private fun JsonObject.optionalBoolean(key: String): Boolean? {
         val element: JsonElement = this[key] ?: return null
         if (element is JsonNull) return null
         return runCatching { element.jsonPrimitive.booleanOrNull }.getOrNull()
     }
 
+    /**
+     * Derives the json object value used by the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — optionalInt
+     *
+     * Performs the repository/data-layer operation for optional int.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     private fun JsonObject.optionalInt(key: String): Int? {
         val element: JsonElement = this[key] ?: return null
         if (element is JsonNull) return null
         return runCatching { element.jsonPrimitive.intOrNull }.getOrNull()
     }
 
+    /**
+     * Derives the json object value used by the organisation Manage Post flow.
+     * Supabase, RPC and storage details stay here so callers work with VolunteerLink models and results.
+     */
+    /**
+     * DETAILED BEHAVIOUR — requiredInt
+     *
+     * Performs the repository/data-layer operation for required int.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     */
     private fun JsonObject.requiredInt(key: String): Int {
         val value = this[key]
             ?.takeUnless { it is JsonNull }

@@ -39,6 +39,9 @@ import androidx.compose.ui.unit.sp
  * Each section of the app provides its own route, label and drawable icon,
  * while AppBottomNavigationBar controls the visual design.
  */
+// Purpose: Handles bottom nav item as one reusable step in the Volunteer flow.
+// Usage: Used by the app navigation graph when the volunteer opens, returns from, or switches a destination.
+// Navigation effect: Route arguments identify the selected event, role, application or certificate.
 data class BottomNavItem(
     val route: String,
     val label: String,
@@ -53,11 +56,15 @@ data class BottomNavItem(
  * without repeating the navigation bar code.
  */
 @Composable
+// Purpose: Handles app bottom navigation bar as one reusable step in the Volunteer flow.
+// Usage: Used by the app navigation graph when the volunteer opens, returns from, or switches a destination.
+// Navigation effect: Route arguments identify the selected event, role, application or certificate.
 fun AppBottomNavigationBar(
     items: List<BottomNavItem>,
     currentRoute: String?,
     onItemClick: (BottomNavItem) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showChatNotification: Boolean = false
 ) {
 
     Surface(
@@ -97,6 +104,7 @@ fun AppBottomNavigationBar(
                 BottomNavigationItem(
                     item = item,
                     selected = currentRoute == item.route,
+                    showNotification = showChatNotification && item.label == "Chats",
                     onClick = {
                         onItemClick(item)
                     }
@@ -116,6 +124,7 @@ fun AppBottomNavigationBar(
 private fun RowScope.BottomNavigationItem(
     item: BottomNavItem,
     selected: Boolean,
+    showNotification: Boolean,
     onClick: () -> Unit
 ) {
 
@@ -168,6 +177,16 @@ private fun RowScope.BottomNavigationItem(
                     Color(0xFF263824)
                 }
             )
+
+            if (showNotification) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 3.dp, end = 7.dp)
+                        .size(9.dp)
+                        .background(Color(0xFFE05B4F), RoundedCornerShape(50))
+                )
+            }
         }
 
         Spacer(

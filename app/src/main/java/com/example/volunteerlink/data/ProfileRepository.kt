@@ -1,6 +1,7 @@
 package com.example.volunteerlink.data
 
 import com.example.volunteerlink.model.VolunteerApplicationStatus
+import io.github.jan.supabase.auth.OtpType
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.from
 import kotlinx.serialization.SerialName
@@ -24,9 +25,40 @@ private data class UserProfileRow(
     val createdAt: String? = null
 )
 
+
 object VolunteerProfileRepository {
 
-    suspend fun loadProfile(): VolunteerProfileData? {
+    suspend fun requestVolunteerEmailChange(newEmail: String): Result<Unit> {
+        return try {
+            supabase.auth.updateUser { email = newEmail.trim() }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Result.failure(e)
+        }
+    }
+
+    suspend fun verifyVolunteerEmailChangeOtp(newEmail: String, token: String): Result<String> {
+        return try {
+            try {
+                supabase.auth.verifyEmailOtp(
+                    type = OtpType.Email.EMAIL_CHANGE,
+                    email = newEmail,
+                    token = token
+                )
+            } catch (e: Exception) {
+                if (e.message?.contains("UserSession") != true) throw e
+            }
+            supabase.auth.refreshCurrentSession()
+            Result.success(supabase.auth.currentUserOrNull()?.email ?: newEmail)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Result.failure(e)
+        }
+    }
+
+
+    suspend fun loadProfile():  VolunteerProfileData? {
         val currentUser = supabase.auth.currentUserOrNull() ?: return null
 
         return try {

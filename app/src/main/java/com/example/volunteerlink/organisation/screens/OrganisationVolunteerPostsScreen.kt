@@ -1,5 +1,23 @@
 package com.example.volunteerlink.organisation.screens
 
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Implements the Organisation UI associated with Organisation Volunteer Posts Screen.
+//
+// The composable layer is responsible for layout, interaction and displaying loading/error/validation state;
+// business rules and persistence are delegated to ViewModels/repositories.
+//
+// This separation makes it clear during maintenance which code changes appearance versus which code changes real
+// server data.
+//
+// Where the screen displays cached information, server-changing actions remain disabled or routed through a fresh
+// authenticated repository operation.
+//
+// Architectural layer: Compose presentation layer.
+// ============================================================================
+
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -30,6 +48,15 @@ import com.example.volunteerlink.ui.theme.VolunteerLinkScreenHorizontalPadding
 
 /** Volunteer Post lifecycle list. Tapping a card opens its Post Management detail. */
 @Composable
+/**
+ * DETAILED BEHAVIOUR — OrganisationVolunteerPostsScreen
+ *
+ * Renders the Organisation Volunteer Posts screen from state supplied by the owning ViewModel/repository-facing
+ * coordinator.
+ *
+ * The composable maps state to Material3 UI and emits callbacks; it does not become the source of truth for
+ * persisted VolunteerLink data.
+ */
 fun OrganisationVolunteerPostsScreen(
     onBack: () -> Unit,
     onPostClick: (String) -> Unit,
@@ -72,6 +99,14 @@ fun OrganisationVolunteerPostsScreen(
 }
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — OrganisationVolunteerPostsContent
+ *
+ * Renders the reusable Organisation Volunteer Posts Content portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun OrganisationVolunteerPostsContent(
     uiState: OrganisationManageUiState,
     onBack: () -> Unit,
@@ -269,5 +304,13 @@ private fun OrganisationVolunteerPostsContent(
     }
 }
 
+/**
+ * DETAILED BEHAVIOUR — attentionItemWordForPosts
+ *
+ * Renders the reusable attention Item Word For Posts portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun attentionItemWordForPosts(count: Int): String =
     if (count == 1) "alert" else "alerts"

@@ -1,5 +1,24 @@
 package com.example.volunteerlink.organisation.screens
 
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Presents the exact pending application data that an Organisation is allowed to review for a REVIEW_APPLICANTS
+// role.
+//
+// Submitted screening answers are read-only because the volunteer owns the application content; Organisation
+// actions are Accept, Decline with a required reason, and related profile inspection.
+//
+// Decline input remains editable until confirmation and is validated before the repository RPC is called; the
+// backend also validates the reason so the requirement cannot be bypassed by the client.
+//
+// The screen itself contains presentation logic only. Applicant state changes are performed by
+// OrganisationPostManagementViewModel and the authenticated repository.
+//
+// Architectural layer: Compose presentation layer.
+// ============================================================================
+
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -39,6 +58,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -75,6 +95,15 @@ import java.util.Locale
  * fields, and a fixed bottom action area. Submitted answers are read-only.
  */
 @Composable
+/**
+ * DETAILED BEHAVIOUR — OrganisationApplicantReviewScreen
+ *
+ * Renders the Organisation Applicant Review screen from state supplied by the owning ViewModel/repository-
+ * facing coordinator.
+ *
+ * The composable maps state to Material3 UI and emits callbacks; it does not become the source of truth for
+ * persisted VolunteerLink data.
+ */
 fun OrganisationApplicantReviewScreen(
     postId: String,
     roleTemplateId: String,
@@ -100,6 +129,9 @@ fun OrganisationApplicantReviewScreen(
     }
 
     var pendingDecision by remember { mutableStateOf<String?>(null) }
+    var declineReason by rememberSaveable(postId, roleTemplateId, userId) {
+        mutableStateOf("")
+    }
 
     when {
         uiState.isLoading -> ManageLoadingState()
@@ -127,31 +159,27 @@ fun OrganisationApplicantReviewScreen(
             onBack = onBack,
             onViewProfile = { onViewVolunteerProfile(person.userId) },
             onAccept = { pendingDecision = "ACCEPT" },
-            onDecline = { pendingDecision = "DECLINE" }
+            onDecline = {
+                declineReason = ""
+                pendingDecision = "DECLINE"
+            }
         )
     }
 
-
-    val decision = pendingDecision
-    if (decision != null && person != null) {
-        val isAccept = decision == "ACCEPT"
+    if (pendingDecision == "ACCEPT" && person != null) {
         AlertDialog(
             onDismissRequest = { pendingDecision = null },
             title = {
                 Text(
-                    text = if (isAccept) "Accept application?" else "Decline application?",
+                    text = "Accept application?",
                     fontWeight = FontWeight.Bold,
                     color = VolunteerLinkTextPrimary
                 )
             },
             text = {
                 Text(
-                    text = if (isAccept) {
-                        "${person.fullName} will become an accepted volunteer for this role. " +
-                            "If this fills the role, the remaining pending applicants for the role will be declined automatically."
-                    } else {
-                        "${person.fullName}'s application will be marked Declined and will leave the active Applicants list."
-                    },
+                    text = "${person.fullName} will become an accepted volunteer for this role. " +
+                        "If this fills the role, the remaining pending applicants for the role will be declined automatically.",
                     fontSize = 14.sp,
                     lineHeight = 20.sp,
                     color = VolunteerLinkTextSecondary
@@ -168,24 +196,201 @@ fun OrganisationApplicantReviewScreen(
                         pendingDecision = null
                         viewModel.reviewApplicant(
                             person = person,
-                            decision = decision,
+                            decision = "ACCEPT",
                             onSuccess = onDecisionSaved
                         )
                     }
                 ) {
                     Text(
-                        text = if (isAccept) "Accept" else "Decline",
+                        text = "Accept",
                         fontWeight = FontWeight.Bold,
-                        color = if (isAccept) VolunteerLinkPrimaryGreen else VolunteerLinkError
+                        color = VolunteerLinkPrimaryGreen
                     )
                 }
             },
             containerColor = VolunteerLinkSurface
         )
     }
+
+    if (pendingDecision == "DECLINE" && person != null) {
+        OrganisationApplicantDeclineDialog(
+            person = person,
+            reason = declineReason,
+            isSaving = uiState.isUpdatingApplicant,
+            errorMessage = uiState.applicantActionMessage,
+            onReasonChanged = { declineReason = it },
+            onDismiss = {
+                if (!uiState.isUpdatingApplicant) {
+                    pendingDecision = null
+                    declineReason = ""
+                }
+            },
+            onConfirm = {
+                val reason = declineReason.trim()
+                if (reason.isNotBlank()) {
+                    viewModel.reviewApplicant(
+                        person = person,
+                        decision = "DECLINE",
+                        decisionNote = reason,
+                        onSuccess = {
+                            pendingDecision = null
+                            declineReason = ""
+                            onDecisionSaved()
+                        }
+                    )
+                }
+            }
+        )
+    }
+
 }
 
 @Composable
+/**
+ * Renders the organisation applicant decline dialog dialog used in the organisation Manage Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — OrganisationApplicantDeclineDialog
+ *
+ * Renders the Organisation Applicant Decline Dialog modal interaction and keeps temporary form/confirmation UI
+ * separate from the underlying server action.
+ *
+ * The confirm callback is only emitted after the dialog-side input/choice is in an acceptable state; the
+ * ViewModel/repository performs the real mutation.
+ */
+private fun OrganisationApplicantDeclineDialog(
+    person: PostManagementPerson,
+    reason: String,
+    isSaving: Boolean,
+    errorMessage: String?,
+    onReasonChanged: (String) -> Unit,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = VolunteerLinkSurface,
+        title = {
+            Text(
+                text = "Decline application?",
+                fontWeight = FontWeight.Bold,
+                color = VolunteerLinkTextPrimary
+            )
+        },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "${person.fullName}'s application will be marked Declined and removed from the active Applicants list.",
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    color = VolunteerLinkTextSecondary
+                )
+
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 14.dp),
+                    shape = RoundedCornerShape(11.dp),
+                    color = VolunteerLinkError.copy(alpha = 0.07f)
+                ) {
+                    Text(
+                        text = "The reason is required and will be shown to the volunteer in My Applications.",
+                        modifier = Modifier.padding(12.dp),
+                        fontSize = 12.sp,
+                        lineHeight = 18.sp,
+                        color = VolunteerLinkTextSecondary
+                    )
+                }
+
+                OutlinedTextField(
+                    value = reason,
+                    onValueChange = onReasonChanged,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 14.dp),
+                    enabled = !isSaving,
+                    label = { Text("Reason for declining") },
+                    placeholder = {
+                        Text(
+                            text = "Explain why this application was not selected",
+                            fontSize = 12.sp
+                        )
+                    },
+                    minLines = 3,
+                    maxLines = 5,
+                    shape = RoundedCornerShape(11.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = VolunteerLinkSurface,
+                        unfocusedContainerColor = VolunteerLinkSurface,
+                        focusedBorderColor = VolunteerLinkError,
+                        unfocusedBorderColor = VolunteerLinkBorderColour,
+                        cursorColor = VolunteerLinkPrimaryGreen
+                    )
+                )
+
+                if (reason.isBlank()) {
+                    Text(
+                        text = "A reason is required before you can decline this applicant.",
+                        modifier = Modifier.padding(top = 7.dp),
+                        fontSize = 11.sp,
+                        lineHeight = 16.sp,
+                        color = VolunteerLinkTextSecondary
+                    )
+                }
+
+                if (!errorMessage.isNullOrBlank()) {
+                    Text(
+                        text = errorMessage,
+                        modifier = Modifier.padding(top = 8.dp),
+                        fontSize = 12.sp,
+                        lineHeight = 17.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = VolunteerLinkError
+                    )
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !isSaving
+            ) {
+                Text("Cancel")
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                enabled = reason.trim().isNotEmpty() && !isSaving,
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = VolunteerLinkError,
+                    contentColor = Color.White
+                )
+            ) {
+                Text(
+                    text = if (isSaving) "Declining..." else "Decline applicant",
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    )
+}
+
+@Composable
+/**
+ * Renders the organisation applicant review content content block used in the organisation Manage Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — OrganisationApplicantReviewContent
+ *
+ * Renders the reusable Organisation Applicant Review Content portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun OrganisationApplicantReviewContent(
     post: PostManagementPost,
     role: PostManagementRole,
@@ -395,6 +600,18 @@ private fun OrganisationApplicantReviewContent(
 }
 
 @Composable
+/**
+ * Renders the UI represented by organisation applicant review top bar for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — OrganisationApplicantReviewTopBar
+ *
+ * Handles the Compose/UI responsibility for organisation applicant review top bar.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun OrganisationApplicantReviewTopBar(
     person: PostManagementPerson,
     onBack: () -> Unit,
@@ -445,6 +662,18 @@ private fun OrganisationApplicantReviewTopBar(
 }
 
 @Composable
+/**
+ * Renders the organisation application role summary summary block used in the organisation Manage Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — OrganisationApplicationRoleSummary
+ *
+ * Renders the reusable Organisation Application Role Summary portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun OrganisationApplicationRoleSummary(
     post: PostManagementPost,
     role: PostManagementRole
@@ -550,6 +779,21 @@ private fun OrganisationApplicationRoleSummary(
     }
 }
 
+/**
+ * Formats the application date used by the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — formatApplicationDate
+ *
+ * Handles the Compose/UI responsibility for format application date.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ *
+ * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without leaving
+ * the UI in an assumed-success state.
+ */
 fun formatApplicationDate(raw: String): String {
     if (raw.isBlank()) return "Date unavailable"
     return runCatching {

@@ -1,5 +1,20 @@
 package com.example.volunteerlink.organisation.components
 
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Provides reusable Organisation design/layout components associated with Organisation Module Page.
+//
+// These composables standardise VolunteerLink Organisation spacing, cards, headers and module-page structure
+// without owning repository or ViewModel state.
+//
+// Keeping shared presentation here reduces duplicated Material3 configuration across Home, Manage, Create, Impact
+// Weave and Profile.
+//
+// Architectural layer: Compose presentation layer.
+// ============================================================================
+
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -25,6 +40,14 @@ import com.example.volunteerlink.ui.theme.VolunteerLinkTextSecondary
  * a growing collection, that page should use LazyColumn or LazyRow as needed.
  */
 @Composable
+/**
+ * DETAILED BEHAVIOUR — OrganisationModulePage
+ *
+ * Handles the Compose/UI responsibility for organisation module page.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun OrganisationModulePage(
     title: String,
     message: String

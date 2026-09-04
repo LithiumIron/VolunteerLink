@@ -1,5 +1,24 @@
 package com.example.volunteerlink.organisation.navigation
 
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Defines the Organisation account's navigation graph and is the central place where Home, Manage, Create, Chats,
+// Profile and deeper management routes are connected.
+//
+// Bottom-navigation state is derived from the current route, while nested screens such as Post Management,
+// Applicant Review, Impact Weave and profile/certificate views remain inside the same NavHost.
+//
+// It also coordinates route parameters and guarded exits so long-running Create/Review workflows do not lose state
+// simply because the user taps another bottom tab.
+//
+// The navigation layer passes identifiers between screens; repositories still re-check ownership when those
+// identifiers reach the backend.
+//
+// Architectural layer: Navigation layer.
+// ============================================================================
+
+
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
@@ -83,6 +102,18 @@ private const val OPEN_REVIEW_FROM_HOME = "openReviewFromHome"
  * screen easier to read and avoids mixing UI code with navigation logic.
  */
 @Composable
+/**
+ * DETAILED BEHAVIOUR — OrganisationNavigationHost
+ *
+ * Implements the current VolunteerLink responsibility for organisation navigation host in this support/model
+ * layer.
+ *
+ * Runs asynchronous work in a lifecycle-aware coroutine and exposes progress/error state rather than blocking
+ * the UI thread.
+ *
+ * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without leaving
+ * the UI in an assumed-success state.
+ */
 fun OrganisationNavigationHost(
     onLoggedOut: () -> Unit
 ) {
@@ -97,6 +128,15 @@ fun OrganisationNavigationHost(
     var discardReviewSession by remember { mutableStateOf<(() -> Unit)?>(null) }
     var pendingBottomRoute by remember { mutableStateOf<String?>(null) }
 
+    /**
+     * Navigates the bottom for the organisation organisation navigation flow.
+     * Centralising the route behaviour keeps every caller consistent.
+     */
+    /**
+     * DETAILED BEHAVIOUR — navigateBottom
+     *
+     * Implements the current VolunteerLink responsibility for navigate bottom in this support/model layer.
+     */
     fun navigateBottom(route: String) {
         navController.navigate(route) {
             popUpTo(OrganisationNavigationRoutes.HOME) {
@@ -146,7 +186,7 @@ fun OrganisationNavigationHost(
         onDispose {
             if (window != null) {
                 // The root app also contains the teammate-owned Volunteer
-                // branch, so restore its previous non-edge-to-edge behaviour
+                // branch, so use the intended non-edge-to-edge behaviour for this route
                 // when leaving the Organisation branch.
                 WindowCompat.setDecorFitsSystemWindows(window, true)
             }
@@ -178,6 +218,10 @@ fun OrganisationNavigationHost(
                 AppBottomNavigationBar(
                     items = organisationBottomNavigationItems,
                     currentRoute = bottomBarRoute,
+                    showChatNotification =
+                        ChatData.chatsForCurrentRole().any {
+                            (it.readCounts[Role.ORGANISATION] ?: 0) < it.messages.size
+                        },
                     onItemClick = { item ->
                         if (item.route != currentRoute) {
                             if (
@@ -200,13 +244,7 @@ fun OrganisationNavigationHost(
             route = "organisation_root_navigation_graph",
             modifier = Modifier
                 .fillMaxSize()
-                .then(
-                    if (currentRoute == OrganisationNavigationRoutes.CHATS) {
-                        Modifier
-                    } else {
-                        Modifier.padding(innerPadding)
-                    }
-                )
+                .padding(innerPadding)
         ) {
             composable(OrganisationNavigationRoutes.HOME) {
                 OrganisationHomeScreen(
@@ -393,7 +431,7 @@ fun OrganisationNavigationHost(
                         )
                     },
                     onDecisionSaved = {
-                        // Tell the previous Manage Post destination which main tab
+                        // Tell the Manage Post destination which main tab
                         // must be shown after its applicant data refreshes.
                         navController.previousBackStackEntry
                             ?.savedStateHandle
@@ -642,6 +680,8 @@ fun OrganisationNavigationHost(
                     onRefresh = {
                         profileScope.launch {
                             OrganisationSessionStore.updateProfileLoading(true)
+
+
                             val loadedProfile = OrganisationProfileRepository.loadProfile()
                             if (loadedProfile != null) {
                                 OrganisationSessionStore.setProfileData(loadedProfile)
@@ -720,6 +760,11 @@ fun OrganisationNavigationHost(
 
 
 /** Returns the Activity even when Compose is using a ContextWrapper. */
+/**
+ * DETAILED BEHAVIOUR — findActivity
+ *
+ * Implements the current VolunteerLink responsibility for find activity in this support/model layer.
+ */
 private tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
     is ContextWrapper -> baseContext.findActivity()

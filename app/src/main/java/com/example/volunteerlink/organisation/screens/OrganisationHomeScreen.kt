@@ -1,5 +1,20 @@
 package com.example.volunteerlink.organisation.screens
 
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Renders the Organisation dashboard using the state produced by OrganisationHomeViewModel.
+//
+// The page combines identity, post/activity summaries and attention items into presentation sections while
+// callbacks handle navigation to deeper workflows.
+//
+// A cached snapshot can be shown as read-only continuity when available; server mutations are never performed
+// directly from this composable.
+//
+// Architectural layer: Compose presentation layer.
+// ============================================================================
+
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -47,16 +62,29 @@ import com.example.volunteerlink.ui.theme.VolunteerLinkTextSecondary
  * date-dependent rules stay in the repository/ViewModel/evaluator layer.
  */
 @Composable
+/**
+ * DETAILED BEHAVIOUR — OrganisationHomeScreen
+ *
+ * Renders the Organisation Home screen from state supplied by the owning ViewModel/repository-facing
+ * coordinator.
+ *
+ * The composable maps state to Material3 UI and emits callbacks; it does not become the source of truth for
+ * persisted VolunteerLink data.
+ */
 fun OrganisationHomeScreen(
     onViewAllPosts: () -> Unit,
     onPostClick: (String) -> Unit,
     onAttentionClick: (HomeAttentionItem) -> Unit,
+    onOrganisationProfileSelected: () -> Unit = {},   // NEW
     viewModel: OrganisationHomeViewModel = viewModel()
 ) {
+    // Collect StateFlow with lifecycle awareness so the dashboard redraws only while the screen is active.
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     val lifecycleOwner = LocalLifecycleOwner.current
     var hasHandledFirstResume by rememberSaveable { mutableStateOf(false) }
+    // Refresh after returning to Home so counts/alerts reflect actions completed on other screens.
+    // The first ON_RESUME is ignored because the ViewModel already performs its initial load.
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
@@ -76,18 +104,39 @@ fun OrganisationHomeScreen(
         onViewAllPosts = onViewAllPosts,
         onPostClick = onPostClick,
         onAttentionClick = onAttentionClick,
-        onRetry = viewModel::refresh
+        onRetry = viewModel::refresh,
+        onOrganisationProfileSelected = onOrganisationProfileSelected   // NEW
     )
 }
 
 @Composable
+/**
+ * Renders the organisation home content content block used in the organisation Home dashboard flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — OrganisationHomeContent
+ *
+ * Renders the reusable Organisation Home Content portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ *
+ * Uses OrganisationSession so the client operation is associated with the signed-in organisation; server
+ * RLS/RPC ownership checks still make the final authorization decision.
+ *
+ * Uses AppClock for business-date/time decisions so the same code works with the project test clock and normal
+ * device time.
+ */
 private fun OrganisationHomeContent(
     uiState: OrganisationHomeUiState,
     onViewAllPosts: () -> Unit,
     onPostClick: (String) -> Unit,
     onAttentionClick: (HomeAttentionItem) -> Unit,
-    onRetry: () -> Unit
+    onRetry: () -> Unit,
+    onOrganisationProfileSelected: () -> Unit   // NEW
 ) {
+    // A single UI state drives the three screen modes: loading, error, or dashboard content.
     when {
         uiState.isLoading -> {
             Column(
@@ -141,6 +190,7 @@ private fun OrganisationHomeContent(
         }
 
         else -> {
+            // LazyColumn keeps the dashboard efficient while allowing independent sections to appear only when needed.
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
@@ -154,7 +204,9 @@ private fun OrganisationHomeContent(
                 item(key = "home_header") {
                     OrganisationHomeHeader(
                         organisationName = uiState.organisationName,
-                        nowMillis = AppClock.nowMillis()
+                        nowMillis = AppClock.nowMillis(),
+                        profileImageUrl = com.example.volunteerlink.organisation.auth.OrganisationSessionStore.profileData?.profileImageUrl,
+                        onAvatarSelected = onOrganisationProfileSelected
                     )
                 }
 

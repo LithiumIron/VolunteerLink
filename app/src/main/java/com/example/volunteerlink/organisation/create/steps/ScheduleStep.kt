@@ -1,5 +1,23 @@
 package com.example.volunteerlink.organisation.create.steps
 
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Step 4: optional Physical activities and/or Remote milestones constrained by the selected post date ranges.
+//
+// The composables read CreatePostUiState/CreatePostDraft values and emit callbacks; they do not call Supabase
+// directly.
+//
+// Validation messages are supplied from CreatePostViewModel/CreatePostValidator so the same business rules apply
+// regardless of which UI component displays the field.
+//
+// Breaking large steps into section files keeps layout code readable while the ViewModel remains the single owner
+// of mutable workflow state.
+//
+// Architectural layer: Compose presentation layer.
+// ============================================================================
+
+
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -51,6 +69,14 @@ import kotlinx.coroutines.delay
 
 /** Step 4 of Create Post: optional Physical and Remote schedules before Review. */
 @Composable
+/**
+ * DETAILED BEHAVIOUR — ScheduleStep
+ *
+ * Handles the Compose/UI responsibility for schedule step.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun ScheduleStep(
     uiState: CreatePostUiState,
     viewModel: CreatePostViewModel,
@@ -74,6 +100,21 @@ fun ScheduleStep(
 }
 
 @Composable
+/**
+ * Renders the UI represented by schedule overview for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — ScheduleOverview
+ *
+ * Handles the Compose/UI responsibility for schedule overview.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ *
+ * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the rest
+ * of the wizard.
+ */
 fun ScheduleOverview(
     uiState: CreatePostUiState,
     viewModel: CreatePostViewModel,
@@ -99,10 +140,46 @@ fun ScheduleOverview(
     val overviewListState = rememberLazyListState()
 
     val editPolicy = uiState.editPolicy
+    /**
+     * Checks whether the schedule can be edited in the current organisation Create/Edit Post state.
+     * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+     */
+    /**
+     * DETAILED BEHAVIOUR — scheduleCanEdit
+     *
+     * Handles the Compose/UI responsibility for schedule can edit.
+     *
+     * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+     * ViewModel/repository layers.
+     */
     fun scheduleCanEdit(itemId: String): Boolean =
         !uiState.isExistingPostEdit || editPolicy?.schedulePolicies?.get(itemId)?.canEdit != false
+    /**
+     * Checks whether the schedule can be deleted in the current organisation Create/Edit Post state.
+     * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+     */
+    /**
+     * DETAILED BEHAVIOUR — scheduleCanDelete
+     *
+     * Handles the Compose/UI responsibility for schedule can delete.
+     *
+     * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+     * ViewModel/repository layers.
+     */
     fun scheduleCanDelete(itemId: String): Boolean =
         !uiState.isExistingPostEdit || editPolicy?.schedulePolicies?.get(itemId)?.canRemove != false
+    /**
+     * Returns the schedule locked reason used by the organisation Create/Edit Post flow.
+     * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+     */
+    /**
+     * DETAILED BEHAVIOUR — scheduleLockedReason
+     *
+     * Handles the Compose/UI responsibility for schedule locked reason.
+     *
+     * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+     * ViewModel/repository layers.
+     */
     fun scheduleLockedReason(itemId: String): String? =
         if (uiState.isExistingPostEdit) editPolicy?.schedulePolicies?.get(itemId)?.reason else null
 
@@ -441,6 +518,19 @@ fun ScheduleOverview(
 }
 
 @Composable
+/**
+ * Renders the schedule item editor screen screen used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — ScheduleItemEditorScreen
+ *
+ * Renders the Schedule Item Editor screen from state supplied by the owning ViewModel/repository-facing
+ * coordinator.
+ *
+ * The composable maps state to Material3 UI and emits callbacks; it does not become the source of truth for
+ * persisted VolunteerLink data.
+ */
 fun ScheduleItemEditorScreen(
     uiState: CreatePostUiState,
     item: ScheduleItemDraft,
@@ -595,6 +685,18 @@ fun ScheduleItemEditorScreen(
 }
 
 @Composable
+/**
+ * Renders the paused schedule draft card card used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — PausedScheduleDraftCard
+ *
+ * Renders the reusable Paused Schedule Draft Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun PausedScheduleDraftCard(
     item: ScheduleItemDraft,
     isEditingExisting: Boolean,
@@ -651,6 +753,18 @@ private fun PausedScheduleDraftCard(
 }
 
 @Composable
+/**
+ * Renders the schedule header header used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — ScheduleHeader
+ *
+ * Renders the reusable Schedule Header portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun ScheduleHeader(
     onBack: () -> Unit,
     isEditingFromReview: Boolean
@@ -688,6 +802,18 @@ fun ScheduleHeader(
 }
 
 @Composable
+/**
+ * Renders the schedule editor header header used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — ScheduleEditorHeader
+ *
+ * Renders the reusable Schedule Editor Header portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun ScheduleEditorHeader(
     item: ScheduleItemDraft,
     isEditingExisting: Boolean,
@@ -739,6 +865,18 @@ fun ScheduleEditorHeader(
 }
 
 @Composable
+/**
+ * Renders the optional schedule info card card used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — OptionalScheduleInfoCard
+ *
+ * Renders the reusable Optional Schedule Info Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun OptionalScheduleInfoCard() {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -774,6 +912,18 @@ fun OptionalScheduleInfoCard() {
 }
 
 @Composable
+/**
+ * Renders the schedule error card card used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — ScheduleErrorCard
+ *
+ * Renders the reusable Schedule Error Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun ScheduleErrorCard(message: String) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -791,6 +941,18 @@ fun ScheduleErrorCard(message: String) {
 }
 
 @Composable
+/**
+ * Renders the schedule warning card card used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — ScheduleWarningCard
+ *
+ * Renders the reusable Schedule Warning Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun ScheduleWarningCard(message: String) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -807,6 +969,18 @@ fun ScheduleWarningCard(message: String) {
     }
 }
 
+/**
+ * Formats the schedule date used by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — formatScheduleDate
+ *
+ * Handles the Compose/UI responsibility for format schedule date.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun formatScheduleDate(dateMillis: Long): String {
     return SimpleDateFormat(
         "dd MMM yyyy",
@@ -814,6 +988,18 @@ fun formatScheduleDate(dateMillis: Long): String {
     ).format(Date(dateMillis))
 }
 
+/**
+ * Derives the schedule sections for post type value used by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — scheduleSectionsForPostType
+ *
+ * Renders the reusable schedule Sections For Post Type portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun scheduleSectionsForPostType(
     postType: VolunteerPostType?
 ): List<ScheduleType> {

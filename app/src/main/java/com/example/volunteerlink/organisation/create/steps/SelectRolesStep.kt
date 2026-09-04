@@ -1,5 +1,23 @@
 package com.example.volunteerlink.organisation.create.steps
 
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Step 2: role catalogue browsing and selection of the roles required by the opportunity.
+//
+// The composables read CreatePostUiState/CreatePostDraft values and emit callbacks; they do not call Supabase
+// directly.
+//
+// Validation messages are supplied from CreatePostViewModel/CreatePostValidator so the same business rules apply
+// regardless of which UI component displays the field.
+//
+// Breaking large steps into section files keeps layout code readable while the ViewModel remains the single owner
+// of mutable workflow state.
+//
+// Architectural layer: Compose presentation layer.
+// ============================================================================
+
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -87,6 +105,14 @@ import kotlinx.coroutines.delay
  * converted into post_roles rows later when the full post is published.
  */
 @Composable
+/**
+ * DETAILED BEHAVIOUR — SelectRolesStep
+ *
+ * Handles the Compose/UI responsibility for select roles step.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun SelectRolesStep(
     uiState: CreatePostUiState,
     viewModel: CreatePostViewModel,
@@ -558,6 +584,18 @@ fun SelectRolesStep(
 }
 
 @Composable
+/**
+ * Renders the role selection header header used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — RoleSelectionHeader
+ *
+ * Renders the reusable Role Selection Header portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun RoleSelectionHeader(
     onBack: () -> Unit,
     isEditingFromReview: Boolean
@@ -599,6 +637,18 @@ fun RoleSelectionHeader(
 }
 
 @Composable
+/**
+ * Renders the role assignment summary card card used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — RoleAssignmentSummaryCard
+ *
+ * Renders the reusable Role Assignment Summary Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun RoleAssignmentSummaryCard(
     draft: CreatePostDraft,
     templatesById: Map<String, CreateRoleTemplate>
@@ -728,6 +778,18 @@ fun RoleAssignmentSummaryCard(
 }
 
 @Composable
+/**
+ * Renders the UI represented by role selection mode assignment line for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — RoleSelectionModeAssignmentLine
+ *
+ * Handles the Compose/UI responsibility for role selection mode assignment line.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun RoleSelectionModeAssignmentLine(
     label: String,
     assigned: Int,
@@ -758,6 +820,18 @@ fun RoleSelectionModeAssignmentLine(
 }
 
 @Composable
+/**
+ * Renders the UI represented by role selection hybrid mode selector for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — RoleSelectionHybridModeSelector
+ *
+ * Handles the Compose/UI responsibility for role selection hybrid mode selector.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun RoleSelectionHybridModeSelector(
     selectedMode: VolunteerRoleMode,
     physicalAssigned: Int,
@@ -803,6 +877,18 @@ fun RoleSelectionHybridModeSelector(
 }
 
 @Composable
+/**
+ * Renders the role selection mode button button used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — RoleSelectionModeButton
+ *
+ * Handles the Compose/UI responsibility for role selection mode button.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun RoleSelectionModeButton(
     title: String,
     progressText: String,
@@ -849,6 +935,18 @@ fun RoleSelectionModeButton(
 }
 
 @Composable
+/**
+ * Renders the role selection area card card used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — RoleSelectionAreaCard
+ *
+ * Renders the reusable Role Selection Area Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun RoleSelectionAreaCard(
     roleArea: String,
     availableCount: Int,
@@ -954,6 +1052,18 @@ fun RoleSelectionAreaCard(
 }
 
 @Composable
+/**
+ * Renders the UI represented by role selection section heading for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — RoleSelectionSectionHeading
+ *
+ * Renders the reusable Role Selection Section Heading portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun RoleSelectionSectionHeading(
     title: String,
     subtitle: String,
@@ -979,6 +1089,18 @@ fun RoleSelectionSectionHeading(
 }
 
 @Composable
+/**
+ * Renders the available role selection card card used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — AvailableRoleSelectionCard
+ *
+ * Renders the reusable Available Role Selection Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun AvailableRoleSelectionCard(
     role: CreateRoleTemplate,
     canAdd: Boolean,
@@ -1052,6 +1174,18 @@ fun AvailableRoleSelectionCard(
 }
 
 @Composable
+/**
+ * Renders the selected role selection card card used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — SelectedRoleSelectionCard
+ *
+ * Renders the reusable Selected Role Selection Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun SelectedRoleSelectionCard(
     role: CreateRoleTemplate,
     selectedRole: SelectedRoleDraft,
@@ -1218,6 +1352,18 @@ fun SelectedRoleSelectionCard(
 }
 
 @Composable
+/**
+ * Renders the role capacity number field input field used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — RoleCapacityNumberField
+ *
+ * Renders the reusable Role Capacity Number Field portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun RoleCapacityNumberField(
     roleTemplateId: String,
     value: Int,
@@ -1308,7 +1454,7 @@ fun RoleCapacityNumberField(
                         hasFocus = focusState.isFocused
 
                         if (justFocused) {
-                            // Select the old value so typing a new number
+                            // Select the current value so typing a replacement number
                             // replaces it instead of turning 1 + 3 into 13.
                             input = input.copy(
                                 selection = TextRange(
@@ -1344,6 +1490,18 @@ fun RoleCapacityNumberField(
 }
 
 @Composable
+/**
+ * Renders the role capacity icon button button used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — RoleCapacityIconButton
+ *
+ * Handles the Compose/UI responsibility for role capacity icon button.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun RoleCapacityIconButton(
     iconRes: Int,
     contentDescription: String,
@@ -1384,6 +1542,18 @@ fun RoleCapacityIconButton(
 }
 
 @Composable
+/**
+ * Renders the role selection level chip chip used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — RoleSelectionLevelChip
+ *
+ * Renders the reusable Role Selection Level Chip portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun RoleSelectionLevelChip(
     level: VolunteerRoleLevel
 ) {
@@ -1417,6 +1587,18 @@ fun RoleSelectionLevelChip(
 }
 
 @Composable
+/**
+ * Renders the UI represented by role selection area icon for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — RoleSelectionAreaIcon
+ *
+ * Handles the Compose/UI responsibility for role selection area icon.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun RoleSelectionAreaIcon(
     roleArea: String
 ) {
@@ -1435,6 +1617,18 @@ fun RoleSelectionAreaIcon(
     }
 }
 
+/**
+ * Returns the role selection area icon res value required by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — roleSelectionAreaIconRes
+ *
+ * Handles the Compose/UI responsibility for role selection area icon res.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun roleSelectionAreaIconRes(
     roleArea: String
 ): Int {
@@ -1456,6 +1650,18 @@ fun roleSelectionAreaIconRes(
 }
 
 @Composable
+/**
+ * Renders the role selection empty card card used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — RoleSelectionEmptyCard
+ *
+ * Renders the reusable Role Selection Empty Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun RoleSelectionEmptyCard(
     text: String
 ) {
@@ -1476,6 +1682,18 @@ fun RoleSelectionEmptyCard(
 }
 
 @Composable
+/**
+ * Renders the UI represented by role selection status for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — RoleSelectionStatus
+ *
+ * Handles the Compose/UI responsibility for role selection status.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun RoleSelectionStatus(
     uiState: CreatePostUiState,
     templatesById: Map<String, CreateRoleTemplate>
@@ -1553,6 +1771,18 @@ fun RoleSelectionStatus(
 }
 
 @Composable
+/**
+ * Renders the role selection loading card card used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — RoleSelectionLoadingCard
+ *
+ * Renders the reusable Role Selection Loading Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun RoleSelectionLoadingCard() {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -1570,6 +1800,18 @@ fun RoleSelectionLoadingCard() {
 }
 
 @Composable
+/**
+ * Renders the role selection catalogue error card card used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — RoleSelectionCatalogueErrorCard
+ *
+ * Renders the reusable Role Selection Catalogue Error Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun RoleSelectionCatalogueErrorCard(
     message: String,
     onRetry: () -> Unit
@@ -1600,6 +1842,18 @@ fun RoleSelectionCatalogueErrorCard(
     }
 }
 
+/**
+ * Checks whether the role selection matches the post type required by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — roleSelectionMatchesPostType
+ *
+ * Handles the Compose/UI responsibility for role selection matches post type.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun roleSelectionMatchesPostType(
     roleMode: VolunteerRoleMode,
     postType: VolunteerPostType?
@@ -1614,6 +1868,18 @@ fun roleSelectionMatchesPostType(
     }
 }
 
+/**
+ * Derives the assigned role capacity for mode value used by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — assignedRoleCapacityForMode
+ *
+ * Handles the Compose/UI responsibility for assigned role capacity for mode.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun assignedRoleCapacityForMode(
     draft: CreatePostDraft,
     mode: VolunteerRoleMode,
@@ -1626,6 +1892,18 @@ fun assignedRoleCapacityForMode(
         .sumOf { selectedRole -> selectedRole.capacity }
 }
 
+/**
+ * Derives the remaining role capacity for mode value used by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — remainingRoleCapacityForMode
+ *
+ * Handles the Compose/UI responsibility for remaining role capacity for mode.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun remainingRoleCapacityForMode(
     draft: CreatePostDraft,
     mode: VolunteerRoleMode,
@@ -1643,6 +1921,18 @@ fun remainingRoleCapacityForMode(
     )
 }
 
+/**
+ * Returns the role capacity completion message used by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — roleCapacityCompletionMessage
+ *
+ * Handles the Compose/UI responsibility for role capacity completion message.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun roleCapacityCompletionMessage(
     label: String,
     assigned: Int,

@@ -27,6 +27,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+// Purpose: Handles volunteer event phone contact ui state as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 data class VolunteerEventPhoneContactUiState(
     val postId: String = "",
     val roleTemplateId: String = "",
@@ -39,6 +42,9 @@ data class VolunteerEventPhoneContactUiState(
     val reason: String? = null
 )
 
+// Purpose: Handles volunteer opportunity ui state as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 data class VolunteerOpportunityUiState(
     val isLoading: Boolean = true,
     val isRefreshing: Boolean = false,
@@ -53,6 +59,9 @@ data class VolunteerOpportunityUiState(
     val dataVersion: Int = 0
 )
 
+// Purpose: Handles volunteer opportunity view model as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 class VolunteerOpportunityViewModel(
     application: Application
 ) : AndroidViewModel(application) {
@@ -89,14 +98,23 @@ class VolunteerOpportunityViewModel(
         super.onCleared()
     }
 
+    // Purpose: Repeats the last failed dashboard load.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     fun retry() {
         loadDashboard()
     }
 
+    // Purpose: Requests a fresh cloud snapshot without discarding the current cached screen immediately.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     fun refresh() {
         loadDashboard(isRefresh = true)
     }
 
+    // Purpose: Loads whether the organiser may call the volunteer for this accepted role.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     fun loadEventPhoneContact(
         postId: String,
         roleTemplateId: String
@@ -159,6 +177,9 @@ class VolunteerOpportunityViewModel(
         }
     }
 
+    // Purpose: Updates the volunteer consent that allows the organiser to view and call their phone number.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     fun setEventPhoneContactEnabled(
         postId: String,
         roleTemplateId: String,
@@ -229,12 +250,18 @@ class VolunteerOpportunityViewModel(
         }
     }
 
+    // Purpose: Handles clear event phone contact as one reusable step in the Volunteer flow.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     fun clearEventPhoneContact() {
         mutableUiState.update {
             it.copy(eventPhoneContact = VolunteerEventPhoneContactUiState())
         }
     }
 
+    // Purpose: Adds or removes an opportunity from Favourites and mirrors the result in session state.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     fun setOpportunitySaved(eventId: Int, shouldSave: Boolean) {
         val event = VolunteerOpportunitySessionStore.findEventById(eventId)
         if (event == null) {
@@ -286,6 +313,9 @@ class VolunteerOpportunityViewModel(
         }
     }
 
+    // Purpose: Validates and sends one role application, then refreshes shared Volunteer state.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     fun submitApplication(
         eventId: Int,
         roleId: Int,
@@ -383,6 +413,9 @@ class VolunteerOpportunityViewModel(
         }
     }
 
+    // Purpose: Cancels an eligible active application and records the selected cancellation reason.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     fun cancelApplication(
         applicationId: Int,
         reason: String,
@@ -458,6 +491,9 @@ class VolunteerOpportunityViewModel(
         }
     }
 
+    // Purpose: Handles update pending application as one reusable step in the Volunteer flow.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     fun updatePendingApplication(
         applicationId: Int,
         answers: List<String>,
@@ -476,6 +512,9 @@ class VolunteerOpportunityViewModel(
         }
     }
 
+    // Purpose: Handles delete application as one reusable step in the Volunteer flow.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     fun deleteApplication(
         applicationId: Int,
         onSuccess: () -> Unit = {}
@@ -496,6 +535,9 @@ class VolunteerOpportunityViewModel(
         }
     }
 
+    // Purpose: Creates a new active application from a previously cancelled participation when the role is still open.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     fun reapplyForRole(
         applicationId: Int,
         answers: List<String>,
@@ -565,6 +607,9 @@ class VolunteerOpportunityViewModel(
         }
     }
 
+    // Purpose: Runs a shared application mutation while preventing duplicate taps and exposing one loading state.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     private fun runApplicationAction(
         applicationId: Int,
         block: suspend (VolunteerOpportunityApplication) -> Unit
@@ -589,6 +634,9 @@ class VolunteerOpportunityViewModel(
         }
     }
 
+    // Purpose: Handles finish local action as one reusable step in the Volunteer flow.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     private fun finishLocalAction() {
         mutableUiState.update {
             it.copy(
@@ -600,6 +648,9 @@ class VolunteerOpportunityViewModel(
         }
     }
 
+    // Purpose: Handles fail application action as one reusable step in the Volunteer flow.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     private fun failApplicationAction(exception: Exception, fallback: String) {
         exception.printStackTrace()
         mutableUiState.update {
@@ -610,12 +661,18 @@ class VolunteerOpportunityViewModel(
         }
     }
 
+    // Purpose: Handles clear application action error as one reusable step in the Volunteer flow.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     fun clearApplicationActionError() {
         mutableUiState.update {
             it.copy(applicationActionError = null)
         }
     }
 
+    // Purpose: Loads cached data, synchronises pending actions and replaces it with the latest cloud state.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     private fun loadDashboard(
         isRefresh: Boolean = false
     ) {
@@ -694,6 +751,9 @@ class VolunteerOpportunityViewModel(
         }
     }
 
+    // Purpose: Handles refresh after action as one reusable step in the Volunteer flow.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     private suspend fun refreshAfterAction() {
         val data = VolunteerDashboardDataSource.refreshFromCloud()
         VolunteerOpportunitySessionStore.replaceWith(data)

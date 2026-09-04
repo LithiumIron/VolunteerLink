@@ -1,5 +1,20 @@
 package com.example.volunteerlink.organisation.navigation
 
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Defines Organisation navigation metadata/behaviour associated with Organisation Bottom Navigation Items.
+//
+// Routes and bottom-nav items are kept outside individual screens so navigation destinations, labels and argument
+// formats remain consistent.
+//
+// Navigation passes identifiers and UI intent only; backend repositories still verify ownership/permissions when a
+// destination loads protected data.
+//
+// Architectural layer: Navigation layer.
+// ============================================================================
+
+
 import androidx.compose.ui.unit.dp
 import com.example.volunteerlink.R
 import com.example.volunteerlink.navigation.BottomNavItem

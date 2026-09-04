@@ -23,6 +23,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
+// Purpose: Handles main activity as one reusable step in the Volunteer flow.
+// Usage: Used by the app entry flow before the related Volunteer interface is displayed.
+// Result: The caller receives a stable value or action for the next Volunteer-flow step.
 class MainActivity : ComponentActivity() {
 
     // While the app is visible, keep checking the tiny one-row test clock table.
@@ -41,6 +44,9 @@ class MainActivity : ComponentActivity() {
         super.onPause()
     }
 
+    // Purpose: Handles start app clock refresh as one reusable step in the Volunteer flow.
+    // Usage: Used by the app entry flow before the related Volunteer interface is displayed.
+    // Result: The caller receives a stable value or action for the next Volunteer-flow step.
     private fun startAppClockRefresh() {
         appClockRefreshJob?.cancel()
         appClockRefreshJob = lifecycleScope.launch {
@@ -95,5 +101,4 @@ class MainActivity : ComponentActivity() {
         private const val APP_CLOCK_REFRESH_INTERVAL_MS = 3_000L
     }
 }
-
 

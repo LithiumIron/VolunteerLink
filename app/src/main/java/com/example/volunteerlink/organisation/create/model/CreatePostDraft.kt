@@ -1,8 +1,33 @@
 package com.example.volunteerlink.organisation.create.model
 
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Defines the Create Post state/model structures associated with Create Post Draft.
+//
+// These models are UI/business-layer data: they let the five-step wizard hold incomplete user input before it is
+// converted to a validated repository payload.
+//
+// Database ids/rows are introduced only when a real saved draft or published post is persisted; local autosave
+// serializes the same draft state for recovery without making it authoritative.
+//
+// Architectural layer: Domain/UI model layer.
+// ============================================================================
+
+
 import com.example.volunteerlink.data.location.LocationSuggestion
+import kotlinx.serialization.Serializable
 
 /** Values match volunteer_posts.mode in Supabase. */
+@Serializable
+/**
+ * DETAILED DECLARATION — VolunteerPostType
+ *
+ * Domain/UI type for Volunteer Post Type used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 enum class VolunteerPostType(
     val displayName: String,
     val shortDescription: String,
@@ -26,6 +51,15 @@ enum class VolunteerPostType(
 }
 
 /** Values match volunteer_posts.category in Supabase. */
+@Serializable
+/**
+ * DETAILED DECLARATION — VolunteerPostCategory
+ *
+ * Domain/UI type for Volunteer Post Category used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 enum class VolunteerPostCategory(
     val displayName: String,
     val databaseValue: String
@@ -42,6 +76,15 @@ enum class VolunteerPostCategory(
 
 
 /** Values match role_templates.role_mode in Supabase. */
+@Serializable
+/**
+ * DETAILED DECLARATION — VolunteerRoleMode
+ *
+ * Domain/UI type for Volunteer Role Mode used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 enum class VolunteerRoleMode(
     val displayName: String,
     val databaseValue: String
@@ -51,6 +94,15 @@ enum class VolunteerRoleMode(
 }
 
 /** Values match role_templates.default_level in Supabase. */
+@Serializable
+/**
+ * DETAILED DECLARATION — VolunteerRoleLevel
+ *
+ * Domain/UI type for Volunteer Role Level used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 enum class VolunteerRoleLevel(
     val displayName: String,
     val databaseValue: String
@@ -61,6 +113,14 @@ enum class VolunteerRoleLevel(
 }
 
 /** One skill shown inside a role template card. */
+/**
+ * DETAILED DECLARATION — CreateRoleSkill
+ *
+ * Domain/UI type for Create Role Skill used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class CreateRoleSkill(
     val skillId: String,
     val name: String
@@ -70,6 +130,14 @@ data class CreateRoleSkill(
  * A fixed role template loaded from Supabase for Step 2.
  *
  * This is catalogue data only. The organiser does not edit these values.
+ */
+/**
+ * DETAILED DECLARATION — CreateRoleTemplate
+ *
+ * Domain/UI type for Create Role Template used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
  */
 data class CreateRoleTemplate(
     val roleTemplateId: String,
@@ -85,6 +153,15 @@ data class CreateRoleTemplate(
 )
 
 /** Values match post_roles.application_method in Supabase. */
+@Serializable
+/**
+ * DETAILED DECLARATION — RoleApplicationMethod
+ *
+ * Domain/UI type for Role Application Method used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 enum class RoleApplicationMethod(
     val displayName: String,
     val databaseValue: String
@@ -105,6 +182,16 @@ enum class RoleApplicationMethod(
  * Step 2 owns roleTemplateId + capacity. Step 3 extends the SAME object with
  * role-specific settings so there is only one source of truth for each role.
  */
+@Serializable
+/**
+ * DETAILED DECLARATION — SelectedRoleDraft
+ *
+ * Represents editable/incomplete user input for Selected Role Draft before it becomes a server-authoritative
+ * record.
+ *
+ * The draft can contain temporarily incomplete values because validation is applied at step transitions and
+ * final persistence boundaries.
+ */
 data class SelectedRoleDraft(
     val roleTemplateId: String,
     val capacity: Int = 1,
@@ -123,6 +210,15 @@ data class SelectedRoleDraft(
 )
 
 /** Values match remote_details.submission_mode in Supabase. */
+@Serializable
+/**
+ * DETAILED DECLARATION — RemoteSubmissionMode
+ *
+ * Domain/UI type for Remote Submission Mode used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 enum class RemoteSubmissionMode(
     val displayName: String,
     val databaseValue: String
@@ -143,6 +239,16 @@ enum class RemoteSubmissionMode(
  * The ViewModel owns this object, so the data survives while the organiser
  * moves around the Create Post flow. Later Steps 2-4 can extend this same
  * draft instead of passing many separate values through navigation.
+ */
+@Serializable
+/**
+ * DETAILED DECLARATION — CreatePostDraft
+ *
+ * Represents editable/incomplete user input for Create Post Draft before it becomes a server-authoritative
+ * record.
+ *
+ * The draft can contain temporarily incomplete values because validation is applied at step transitions and
+ * final persistence boundaries.
  */
 data class CreatePostDraft(
     // Shared post information
@@ -222,6 +328,12 @@ data class CreatePostDraft(
      * the currently selected post type. Shared fields such as title/category
      * are intentionally ignored here.
      */
+    /**
+     * DETAILED BEHAVIOUR — hasModeSpecificInput
+     *
+     * Implements the current VolunteerLink responsibility for has mode specific input in this support/model
+     * layer.
+     */
     fun hasModeSpecificInput(type: VolunteerPostType?): Boolean {
         return when (type) {
             VolunteerPostType.PHYSICAL -> {
@@ -269,6 +381,12 @@ data class CreatePostDraft(
      * Called only after Step 1 has passed validation.
      * Any temporary data belonging to an unused mode is removed here.
      */
+    /**
+     * DETAILED BEHAVIOUR — keepOnlySelectedModeData
+     *
+     * Implements the current VolunteerLink responsibility for keep only selected mode data in this
+     * support/model layer.
+     */
     fun keepOnlySelectedModeData(): CreatePostDraft {
         return when (postType) {
             VolunteerPostType.PHYSICAL -> copy(
@@ -312,6 +430,12 @@ data class CreatePostDraft(
     }
 
     /** Used by the Back button to decide whether a discard warning is needed. */
+    /**
+     * DETAILED BEHAVIOUR — hasMeaningfulContent
+     *
+     * Implements the current VolunteerLink responsibility for has meaningful content in this support/model
+     * layer.
+     */
     fun hasMeaningfulContent(): Boolean {
         return postType != null ||
                 category != null ||

@@ -1,5 +1,23 @@
 package com.example.volunteerlink.organisation.create.steps
 
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Provides a reusable section used by the Create Post wizard for Review Summary Sections.
+//
+// The composables read CreatePostUiState/CreatePostDraft values and emit callbacks; they do not call Supabase
+// directly.
+//
+// Validation messages are supplied from CreatePostViewModel/CreatePostValidator so the same business rules apply
+// regardless of which UI component displays the field.
+//
+// Breaking large steps into section files keeps layout code readable while the ViewModel remains the single owner
+// of mutable workflow state.
+//
+// Architectural layer: Compose presentation layer.
+// ============================================================================
+
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
@@ -41,6 +59,18 @@ import java.util.Locale
 
 
 @Composable
+/**
+ * Renders the UI represented by review paused schedule banner for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — ReviewPausedScheduleBanner
+ *
+ * Handles the Compose/UI responsibility for review paused schedule banner.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun ReviewPausedScheduleBanner() {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -68,6 +98,18 @@ fun ReviewPausedScheduleBanner() {
 
 
 @Composable
+/**
+ * Renders the review section header header used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — ReviewSectionHeader
+ *
+ * Renders the reusable Review Section Header portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun ReviewSectionHeader(
     title: String,
     onEdit: () -> Unit
@@ -107,6 +149,18 @@ fun ReviewSectionHeader(
 
 
 @Composable
+/**
+ * Renders the review meta chip chip used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — ReviewMetaChip
+ *
+ * Renders the reusable Review Meta Chip portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun ReviewMetaChip(
     text: String
 ) {
@@ -129,6 +183,18 @@ fun ReviewMetaChip(
 
 
 @Composable
+/**
+ * Renders the review white card card used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — ReviewWhiteCard
+ *
+ * Renders the reusable Review White Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun ReviewWhiteCard(
     content: @Composable () -> Unit
 ) {
@@ -149,6 +215,18 @@ fun ReviewWhiteCard(
 
 
 @Composable
+/**
+ * Renders the review post mode summary summary block used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — ReviewPostModeSummary
+ *
+ * Renders the reusable Review Post Mode Summary portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun ReviewPostModeSummary(
     title: String,
     firstLine: String,
@@ -183,6 +261,18 @@ fun ReviewPostModeSummary(
 
 
 @Composable
+/**
+ * Renders the UI represented by review compact label value for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — ReviewCompactLabelValue
+ *
+ * Handles the Compose/UI responsibility for review compact label value.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun ReviewCompactLabelValue(
     label: String,
     value: String
@@ -206,6 +296,18 @@ fun ReviewCompactLabelValue(
 
 
 @Composable
+/**
+ * Renders the UI represented by review stat for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — ReviewStat
+ *
+ * Handles the Compose/UI responsibility for review stat.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun ReviewStat(
     value: String,
     label: String
@@ -230,6 +332,18 @@ fun ReviewStat(
 
 
 @Composable
+/**
+ * Renders the UI represented by review chevron for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — ReviewChevron
+ *
+ * Handles the Compose/UI responsibility for review chevron.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun ReviewChevron(
     isExpanded: Boolean
 ) {
@@ -253,6 +367,18 @@ fun ReviewChevron(
 
 
 @Composable
+/**
+ * Renders the UI represented by review detail heading for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — ReviewDetailHeading
+ *
+ * Handles the Compose/UI responsibility for review detail heading.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun ReviewDetailHeading(
     text: String
 ) {
@@ -266,6 +392,18 @@ fun ReviewDetailHeading(
 
 
 @Composable
+/**
+ * Returns the review bullet text used by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — ReviewBulletText
+ *
+ * Handles the Compose/UI responsibility for review bullet text.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun ReviewBulletText(
     text: String
 ) {
@@ -289,6 +427,18 @@ fun ReviewBulletText(
 
 
 @Composable
+/**
+ * Returns the review numbered text used by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — ReviewNumberedText
+ *
+ * Handles the Compose/UI responsibility for review numbered text.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun ReviewNumberedText(
     number: Int,
     text: String
@@ -314,6 +464,18 @@ fun ReviewNumberedText(
 
 
 @Composable
+/**
+ * Returns the review empty text used by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — ReviewEmptyText
+ *
+ * Handles the Compose/UI responsibility for review empty text.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun ReviewEmptyText(
     text: String
 ) {
@@ -325,6 +487,18 @@ fun ReviewEmptyText(
 }
 
 
+/**
+ * Returns the review slot text used by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — reviewSlotText
+ *
+ * Handles the Compose/UI responsibility for review slot text.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun reviewSlotText(
     capacity: Int?
 ): String? {
@@ -334,6 +508,18 @@ fun reviewSlotText(
 }
 
 
+/**
+ * Returns the review date value required by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — reviewDate
+ *
+ * Handles the Compose/UI responsibility for review date.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun reviewDate(
     millis: Long?
 ): String {
@@ -346,6 +532,18 @@ fun reviewDate(
 }
 
 
+/**
+ * Returns the review date range value required by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — reviewDateRange
+ *
+ * Handles the Compose/UI responsibility for review date range.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun reviewDateRange(
     startMillis: Long?,
     endMillis: Long?
@@ -359,6 +557,18 @@ fun reviewDateRange(
 }
 
 
+/**
+ * Returns the review time range value required by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — reviewTimeRange
+ *
+ * Handles the Compose/UI responsibility for review time range.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun reviewTimeRange(
     startMinutes: Int?,
     endMinutes: Int?
@@ -374,6 +584,18 @@ fun reviewTimeRange(
 }
 
 
+/**
+ * Returns the review time value required by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — reviewTime
+ *
+ * Handles the Compose/UI responsibility for review time.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun reviewTime(
     minutes: Int?
 ): String {

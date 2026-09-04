@@ -27,6 +27,9 @@ import java.util.UUID
 import kotlin.time.Duration.Companion.minutes
 
 @Serializable
+// Purpose: Handles the volunteer remote submission rule in the data layer so screens do not duplicate this business logic.
+// Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+// Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
 data class VolunteerRemoteSubmission(
     @SerialName("submission_id") val id: String,
     @SerialName("file_path") val filePath: String? = null,
@@ -36,6 +39,9 @@ data class VolunteerRemoteSubmission(
 )
 
 @Serializable
+// Purpose: Handles the volunteer remote context rule in the data layer so screens do not duplicate this business logic.
+// Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+// Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
 data class VolunteerRemoteContext(
     @SerialName("can_submit") val canSubmit: Boolean,
     val reason: String,
@@ -46,6 +52,9 @@ data class VolunteerRemoteContext(
     val history: List<VolunteerRemoteSubmission> = emptyList()
 )
 
+// Purpose: Handles the volunteer remote file rules rule in the data layer so screens do not duplicate this business logic.
+// Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+// Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
 object VolunteerRemoteFileRules {
     // Keep supported file types and the size limit in one place for the picker and upload checks.
     const val MAX_BYTES = 20_000_000L
@@ -60,14 +69,23 @@ object VolunteerRemoteFileRules {
         "txt" to "text/plain", "zip" to "application/zip"
     )
 
+    // Purpose: Handles the mime type rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     fun mimeType(name: String): String = mimeTypes[name.substringAfterLast('.', "").lowercase(Locale.ROOT)]
         ?: throw IllegalArgumentException("Choose a PDF, image, Word, Excel, PowerPoint, TXT or ZIP file.")
 
+    // Purpose: Handles the check size rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     fun checkSize(bytes: Long) {
         require(bytes > 0) { "The selected file is empty." }
         require(bytes <= MAX_BYTES) { "The selected file exceeds the 20 MB limit." }
     }
 
+    // Purpose: Handles the safe name rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     fun safeName(name: String): String {
         mimeType(name)
         val extension = name.substringAfterLast('.').lowercase(Locale.ROOT)
@@ -77,6 +95,9 @@ object VolunteerRemoteFileRules {
     }
 }
 
+// Purpose: Handles the volunteer remote selected file rule in the data layer so screens do not duplicate this business logic.
+// Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+// Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
 data class VolunteerRemoteSelectedFile(
     val file: File,
     val displayName: String,
@@ -85,9 +106,15 @@ data class VolunteerRemoteSelectedFile(
     val requestId: String = UUID.randomUUID().toString()
 )
 
+// Purpose: Handles the volunteer remote submission repository rule in the data layer so screens do not duplicate this business logic.
+// Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+// Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
 object VolunteerRemoteSubmissionRepository {
     private const val BUCKET = "remote-submissions"
 
+    // Purpose: Handles the signed in id rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     fun signedInId(): String? = supabase.auth.currentUserOrNull()?.id
 
     suspend fun readyAccountId(): String {
@@ -99,6 +126,9 @@ object VolunteerRemoteSubmissionRepository {
         }
     }
 
+    // Purpose: Reads  from the data source and returns models that the ViewModel can expose to Compose.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     suspend fun load(postId: String, roleId: String): VolunteerRemoteContext =
         supabase.postgrest.rpc("volunteer_remote_context_v1", buildJsonObject {
             put("p_post_id", postId)
@@ -107,6 +137,9 @@ object VolunteerRemoteSubmissionRepository {
 
     // Copy through a bounded buffer into private app cache. Never readBytes() a
     // whole document and never trust the provider's reported size alone.
+    // Purpose: Handles the prepare rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     suspend fun prepare(context: Context, uri: Uri): VolunteerRemoteSelectedFile = withContext(Dispatchers.IO) {
         var name = ""
         var reportedSize: Long? = null
@@ -148,6 +181,9 @@ object VolunteerRemoteSubmissionRepository {
         }
     }
 
+    // Purpose: Handles the submit rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     suspend fun submit(postId: String, roleId: String, selected: VolunteerRemoteSelectedFile,
                        expectedAccountId: String,
                        onProgress: (Float) -> Unit) = withContext(Dispatchers.IO) {
@@ -188,5 +224,8 @@ object VolunteerRemoteSubmissionRepository {
         Unit // Success only after the submission record is committed.
     }
 
+    // Purpose: Handles the file url rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     suspend fun fileUrl(path: String): String = supabase.storage.from(BUCKET).createSignedUrl(path, 1.minutes)
 }

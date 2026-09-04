@@ -18,6 +18,9 @@ import com.example.volunteerlink.model.*
 import com.example.volunteerlink.ui.theme.*
 
 @Composable
+// Purpose: Renders the volunteer attendance history section from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 internal fun VolunteerAttendanceHistorySection(event: VolunteerOpportunityEvent, role: VolunteerOpportunityRole,
     data: VolunteerAttendanceData?, now: Long, onHelp: (String) -> Unit) {
     // Rebuild the attendance view only when its input data or the app time changes.

@@ -31,6 +31,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
+// Purpose: Renders the volunteer attendance card from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 fun VolunteerAttendanceCard(event: VolunteerOpportunityEvent, role: VolunteerOpportunityRole,
                             application: VolunteerOpportunityApplication) {
     val context = LocalContext.current
@@ -42,16 +45,27 @@ fun VolunteerAttendanceCard(event: VolunteerOpportunityEvent, role: VolunteerOpp
     var message by remember(event.eventId, role.roleId, account) { mutableStateOf<String?>(null) }
     var showHelp by remember { mutableStateOf(false) }
     var helpDate by remember(event.eventId, role.roleId, account) { mutableStateOf("") }
+    // Refresh local time and connectivity while this card stays visible. This lets a
+    // check-in window open/close without the volunteer leaving and reopening the screen.
     val now by produceState(AppClock.nowMillis()) { while (true) { value = AppClock.nowMillis(); delay(2000) } }
     val online by produceState(VolunteerOnline.available(context)) {
         while (true) { value = VolunteerOnline.available(context); delay(2000) }
     }
     val today = runCatching { VolunteerAttendanceWindow.localDate(now, event.eventTimeZone) }.getOrDefault("")
+    // Purpose: Handles reload as one reusable step in the Volunteer flow.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     suspend fun reload() {
+        // The Volunteer side can read attendance and submit its own check-in only; it
+        // never receives the organiser's PIN or changes organiser-owned attendance setup.
         VolunteerOnline.requireConnection(context, "refresh attendance")
         data = VolunteerAttendanceRepository.load(event.eventDatabaseId, role.roleTemplateId, account)
     }
+    // Purpose: Requests a fresh cloud snapshot without discarding the current cached screen immediately.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     fun refresh() {
+        // One request at a time prevents a manual Refresh and automatic refresh racing.
         if (busy) return
         busy = true
         scope.launch {
@@ -63,6 +77,8 @@ fun VolunteerAttendanceCard(event: VolunteerOpportunityEvent, role: VolunteerOpp
     }
     LaunchedEffect(event.eventId, role.roleId, account, online) { if (online) refresh() }
     val existing = data?.records?.firstOrNull { it.date == today }
+    // Convert all reasons that make check-in unavailable into one message for the UI.
+    // The button is shown only when block is null.
     val block = when {
         !online -> "Internet connection is required to check in. Offline check-in is not recorded or queued."
         application.applicationStatus != VolunteerApplicationStatus.ACCEPTED -> "Check-in is only available for an accepted, unfinished Physical role."
@@ -93,6 +109,8 @@ fun VolunteerAttendanceCard(event: VolunteerOpportunityEvent, role: VolunteerOpp
                             var recorded = false
                             try {
                                 VolunteerOnline.requireConnection(context, "check in")
+                                // Server validates the six-digit code and records the current
+                                // timestamp. The app never decides attendance by itself.
                                 VolunteerAttendanceRepository.checkIn(event.eventDatabaseId, role.roleTemplateId, pin, account)
                                 recorded = true
                                 pin = ""
@@ -122,6 +140,8 @@ fun VolunteerAttendanceCard(event: VolunteerOpportunityEvent, role: VolunteerOpp
             }
         }
     }
+    // Missed-attendance help opens the phone/email client only. It intentionally does
+    // not claim to create an in-app appeal or alter an attendance record.
     if (showHelp) AlertDialog(onDismissRequest = { showHelp = false }, containerColor = Color.White,
         title = { Text("Contact your organiser", fontSize = 20.sp, fontWeight = FontWeight.SemiBold) },
         text = { Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {

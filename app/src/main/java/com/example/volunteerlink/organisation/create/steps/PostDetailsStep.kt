@@ -1,5 +1,23 @@
 package com.example.volunteerlink.organisation.create.steps
 
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Step 1: post identity plus Physical/Remote/Hybrid date, time, location and capacity details.
+//
+// The composables read CreatePostUiState/CreatePostDraft values and emit callbacks; they do not call Supabase
+// directly.
+//
+// Validation messages are supplied from CreatePostViewModel/CreatePostValidator so the same business rules apply
+// regardless of which UI component displays the field.
+//
+// Breaking large steps into section files keeps layout code readable while the ViewModel remains the single owner
+// of mutable workflow state.
+//
+// Architectural layer: Compose presentation layer.
+// ============================================================================
+
+
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -50,6 +68,14 @@ import com.example.volunteerlink.organisation.create.model.VolunteerPostType
 
 /** Full Step 1 UI. Form data is read from and written back to the ViewModel. */
 @Composable
+/**
+ * DETAILED BEHAVIOUR — PostDetailsStep
+ *
+ * Handles the Compose/UI responsibility for post details step.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun PostDetailsStep(
     uiState: CreatePostUiState,
     viewModel: CreatePostViewModel,

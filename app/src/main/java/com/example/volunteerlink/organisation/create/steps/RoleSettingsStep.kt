@@ -1,5 +1,23 @@
 package com.example.volunteerlink.organisation.create.steps
 
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Step 3: per-role capacity, level, skills, responsibilities, application method and screening settings.
+//
+// The composables read CreatePostUiState/CreatePostDraft values and emit callbacks; they do not call Supabase
+// directly.
+//
+// Validation messages are supplied from CreatePostViewModel/CreatePostValidator so the same business rules apply
+// regardless of which UI component displays the field.
+//
+// Breaking large steps into section files keeps layout code readable while the ViewModel remains the single owner
+// of mutable workflow state.
+//
+// Architectural layer: Compose presentation layer.
+// ============================================================================
+
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -54,13 +72,22 @@ import com.example.volunteerlink.organisation.create.model.SelectedRoleDraft
 import com.example.volunteerlink.organisation.create.model.VolunteerPostType
 import com.example.volunteerlink.organisation.create.model.VolunteerRoleMode
 import com.example.volunteerlink.organisation.viewmodel.CreatePostViewModel
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.delay
+
 import com.example.volunteerlink.ui.theme.RoleSettingsBorder
 import com.example.volunteerlink.ui.theme.RoleSettingsOrange
 import com.example.volunteerlink.ui.theme.RoleSettingsOrangeBackground
 
 /** Step 3 of Create Post: configure every role selected in Step 2. */
 @Composable
+/**
+ * DETAILED BEHAVIOUR — RoleSettingsStep
+ *
+ * Handles the Compose/UI responsibility for role settings step.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun RoleSettingsStep(
     uiState: CreatePostUiState,
     viewModel: CreatePostViewModel,
@@ -96,6 +123,18 @@ fun RoleSettingsStep(
 }
 
 @Composable
+/**
+ * Renders the UI represented by role settings overview for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — RoleSettingsOverview
+ *
+ * Handles the Compose/UI responsibility for role settings overview.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun RoleSettingsOverview(
     uiState: CreatePostUiState,
     onBack: () -> Unit,
@@ -241,6 +280,18 @@ fun RoleSettingsOverview(
 }
 
 @Composable
+/**
+ * Renders the UI represented by role configuration editor for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — RoleConfigurationEditor
+ *
+ * Handles the Compose/UI responsibility for role configuration editor.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun RoleConfigurationEditor(
     uiState: CreatePostUiState,
     selectedRole: SelectedRoleDraft,
@@ -292,7 +343,7 @@ fun RoleConfigurationEditor(
     }
 
     // Save & Next swaps the role while this composable remains visible.
-    // Resetting here prevents the next role from opening at the old scroll spot.
+    // Resetting here prevents the next role from opening at the previous role's scroll position.
     LaunchedEffect(selectedRole.roleTemplateId) {
         listState.scrollToItem(0)
     }
@@ -565,6 +616,18 @@ fun RoleConfigurationEditor(
 }
 
 @Composable
+/**
+ * Renders the step three header header used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — StepThreeHeader
+ *
+ * Renders the reusable Step Three Header portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun StepThreeHeader(
     onBack: () -> Unit,
     isEditingFromReview: Boolean
@@ -603,6 +666,18 @@ fun StepThreeHeader(
 }
 
 @Composable
+/**
+ * Renders the setup progress card card used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — SetupProgressCard
+ *
+ * Renders the reusable Setup Progress Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun SetupProgressCard(
     readyCount: Int,
     totalRoles: Int
@@ -687,6 +762,18 @@ fun SetupProgressCard(
 }
 
 @Composable
+/**
+ * Renders the remote submission overview card card used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — RemoteSubmissionOverviewCard
+ *
+ * Renders the reusable Remote Submission Overview Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun RemoteSubmissionOverviewCard(
     draft: CreatePostDraft,
     catalogue: List<CreateRoleTemplate>,
@@ -878,6 +965,18 @@ fun RemoteSubmissionOverviewCard(
     }
 }
 
+/**
+ * Checks whether the remote submission is ready for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — isRemoteSubmissionReady
+ *
+ * Handles the Compose/UI responsibility for is remote submission ready.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun isRemoteSubmissionReady(
     draft: CreatePostDraft,
     catalogue: List<CreateRoleTemplate>
@@ -905,6 +1004,18 @@ fun isRemoteSubmissionReady(
     }
 }
 
+/**
+ * Derives the role save hint value used by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — roleSaveHint
+ *
+ * Handles the Compose/UI responsibility for role save hint.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun roleSaveHint(
     draft: CreatePostDraft,
     template: CreateRoleTemplate,

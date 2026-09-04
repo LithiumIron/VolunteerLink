@@ -1,5 +1,23 @@
 package com.example.volunteerlink.organisation.screens
 
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Implements the Organisation UI associated with Edit Organisation Profile Screen.
+//
+// The composable layer is responsible for layout, interaction and displaying loading/error/validation state;
+// business rules and persistence are delegated to ViewModels/repositories.
+//
+// This separation makes it clear during maintenance which code changes appearance versus which code changes real
+// server data.
+//
+// Where the screen displays cached information, server-changing actions remain disabled or routed through a fresh
+// authenticated repository operation.
+//
+// Architectural layer: Compose presentation layer.
+// ============================================================================
+
+
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -59,16 +77,33 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.volunteerlink.data.location.CurrentLocationResolver
 import com.example.volunteerlink.data.saveProfileImage
-import com.example.volunteerlink.organisation.OrganisationTypeOptions
+import com.example.volunteerlink.shared.OrganisationTypeOptions
 import com.example.volunteerlink.organisation.auth.OrganisationSessionStore
-import com.example.volunteerlink.organisation.countryStates
+import com.example.volunteerlink.shared.countryStates
 import com.example.volunteerlink.organisation.organisationFieldColours
 import com.example.volunteerlink.organisation.repository.OrganisationProfileRepository
 import kotlinx.coroutines.launch
 
+/**
+ * DETAILED DECLARATION — EmailChangeStep
+ *
+ * Domain/UI type for Email Change Step used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 private enum class EmailChangeStep { NONE, ENTER_EMAIL, WAITING_FOR_LINK }
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+/**
+ * DETAILED BEHAVIOUR — EditOrganisationProfileScreen
+ *
+ * Renders the Edit Organisation Profile screen from state supplied by the owning ViewModel/repository-facing
+ * coordinator.
+ *
+ * The composable maps state to Material3 UI and emits callbacks; it does not become the source of truth for
+ * persisted VolunteerLink data.
+ */
 fun EditOrganisationProfileScreen(
     onBack: () -> Unit = {},
     // Called after a successful save. Clears the cached profileData in
@@ -390,6 +425,14 @@ fun EditOrganisationProfileScreen(
                     onDispose { cancelCurrentLocationRequest?.invoke() }
                 }
 
+                /**
+                 * DETAILED BEHAVIOUR — beginCurrentLocationResolution
+                 *
+                 * Handles the Compose/UI responsibility for begin current location resolution.
+                 *
+                 * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+                 * ViewModel/repository layers.
+                 */
                 fun beginCurrentLocationResolution() {
                     if (!CurrentLocationResolver.isLocationEnabled(context)) {
                         isResolvingCurrentLocation = false

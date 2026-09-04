@@ -1,5 +1,23 @@
 package com.example.volunteerlink.organisation.screens
 
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Implements the Organisation UI associated with Organisation Remote Review Sections.
+//
+// The composable layer is responsible for layout, interaction and displaying loading/error/validation state;
+// business rules and persistence are delegated to ViewModels/repositories.
+//
+// This separation makes it clear during maintenance which code changes appearance versus which code changes real
+// server data.
+//
+// Where the screen displays cached information, server-changing actions remain disabled or routed through a fresh
+// authenticated repository operation.
+//
+// Architectural layer: Compose presentation layer.
+// ============================================================================
+
+
 import android.app.DatePickerDialog
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -79,6 +97,18 @@ import java.util.Locale
 private val RemoteReviewPillShape = RoundedCornerShape(50)
 
 @Composable
+/**
+ * Renders the post management remote review content content block used in the organisation Manage Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — PostManagementRemoteReviewContent
+ *
+ * Renders the reusable Post Management Remote Review Content portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun PostManagementRemoteReviewContent(
     review: PostManagementRemoteReview,
     session: PostManagementRemoteReviewSession,
@@ -175,6 +205,18 @@ fun PostManagementRemoteReviewContent(
 }
 
 @Composable
+/**
+ * Renders the remote review flow header header used in the organisation Manage Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — RemoteReviewFlowHeader
+ *
+ * Renders the reusable Remote Review Flow Header portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun RemoteReviewFlowHeader(
     stage: PostManagementRemoteReviewStage,
     finalized: Boolean
@@ -249,6 +291,18 @@ private fun RemoteReviewFlowHeader(
 }
 
 @Composable
+/**
+ * Renders the UI represented by remote submission review stage for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — RemoteSubmissionReviewStage
+ *
+ * Handles the Compose/UI responsibility for remote submission review stage.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun RemoteSubmissionReviewStage(
     review: PostManagementRemoteReview,
     session: PostManagementRemoteReviewSession,
@@ -340,6 +394,18 @@ private fun RemoteSubmissionReviewStage(
 }
 
 @Composable
+/**
+ * Renders the remote submission review item card card used in the organisation Manage Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — RemoteSubmissionReviewItemCard
+ *
+ * Renders the reusable Remote Submission Review Item Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun RemoteSubmissionReviewItemCard(
     item: PostManagementRemoteReviewItem,
     session: PostManagementRemoteReviewSession,
@@ -470,6 +536,18 @@ private fun RemoteSubmissionReviewItemCard(
 }
 
 @Composable
+/**
+ * Renders the UI represented by remote missing work actions for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — RemoteMissingWorkActions
+ *
+ * Handles the Compose/UI responsibility for remote missing work actions.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun RemoteMissingWorkActions(
     selected: PostManagementRemoteMissingAction?,
     revisionWasRequested: Boolean,
@@ -509,6 +587,18 @@ private fun RemoteMissingWorkActions(
 }
 
 @Composable
+/**
+ * Renders the UI represented by remote action choice for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — RemoteActionChoice
+ *
+ * Handles the Compose/UI responsibility for remote action choice.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun RemoteActionChoice(
     title: String,
     subtitle: String,
@@ -549,6 +639,18 @@ private fun RemoteActionChoice(
 }
 
 @Composable
+/**
+ * Renders the remote deadline extension panel panel used in the organisation Manage Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — RemoteDeadlineExtensionPanel
+ *
+ * Handles the Compose/UI responsibility for remote deadline extension panel.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun RemoteDeadlineExtensionPanel(
     review: PostManagementRemoteReview,
     selectedDate: String?,
@@ -614,6 +716,18 @@ private fun RemoteDeadlineExtensionPanel(
 }
 
 @Composable
+/**
+ * Renders the UI represented by remote feedback review stage for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — RemoteFeedbackReviewStage
+ *
+ * Handles the Compose/UI responsibility for remote feedback review stage.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun RemoteFeedbackReviewStage(
     review: PostManagementRemoteReview,
     session: PostManagementRemoteReviewSession,
@@ -646,6 +760,18 @@ private fun RemoteFeedbackReviewStage(
         .sortedBy { it.key.lowercase(Locale.US) }
     val withoutFeedback = completed.filter { feedbackFor(it).isBlank() }
 
+    /**
+     * Resets the composer for the organisation Manage Post flow.
+     * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+     */
+    /**
+     * DETAILED BEHAVIOUR — resetComposer
+     *
+     * Handles the Compose/UI responsibility for reset composer.
+     *
+     * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+     * ViewModel/repository layers.
+     */
     fun resetComposer() {
         composerOpen = false
         composerText = ""
@@ -862,6 +988,18 @@ private fun RemoteFeedbackReviewStage(
 }
 
 @Composable
+/**
+ * Renders the remote feedback group row row used in the organisation Manage Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — RemoteFeedbackGroupRow
+ *
+ * Renders the reusable Remote Feedback Group Row portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun RemoteFeedbackGroupRow(
     feedback: String,
     recipients: List<PostManagementPerson>,
@@ -902,6 +1040,18 @@ private fun RemoteFeedbackGroupRow(
 }
 
 @Composable
+/**
+ * Renders the remote filter chip chip used in the organisation Manage Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — RemoteFilterChip
+ *
+ * Renders the reusable Remote Filter Chip portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 private fun RemoteFilterChip(
     text: String,
     selected: Boolean,
@@ -925,6 +1075,18 @@ private fun RemoteFilterChip(
 }
 
 @Composable
+/**
+ * Renders the UI represented by remote finish review stage for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — RemoteFinishReviewStage
+ *
+ * Handles the Compose/UI responsibility for remote finish review stage.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun RemoteFinishReviewStage(
     review: PostManagementRemoteReview,
     session: PostManagementRemoteReviewSession,
@@ -999,6 +1161,18 @@ private fun RemoteFinishReviewStage(
 }
 
 @Composable
+/**
+ * Renders the UI represented by remote review stage surface for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — RemoteReviewStageSurface
+ *
+ * Handles the Compose/UI responsibility for remote review stage surface.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun RemoteReviewStageSurface(
     title: String,
     subtitle: String,
@@ -1011,6 +1185,18 @@ private fun RemoteReviewStageSurface(
 }
 
 @Composable
+/**
+ * Renders the UI represented by remote draft decision notice for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — RemoteDraftDecisionNotice
+ *
+ * Handles the Compose/UI responsibility for remote draft decision notice.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun RemoteDraftDecisionNotice(
     title: String,
     detail: String?,
@@ -1030,6 +1216,18 @@ private fun RemoteDraftDecisionNotice(
 }
 
 @Composable
+/**
+ * Renders the UI represented by remote review message strip for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — RemoteReviewMessageStrip
+ *
+ * Handles the Compose/UI responsibility for remote review message strip.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun RemoteReviewMessageStrip(message: String) {
     OrganisationInfoStrip(
         title = "Review update",
@@ -1039,6 +1237,18 @@ private fun RemoteReviewMessageStrip(message: String) {
 }
 
 @Composable
+/**
+ * Renders the UI represented by remote submission status pill for the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — RemoteSubmissionStatusPill
+ *
+ * Handles the Compose/UI responsibility for remote submission status pill.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun RemoteSubmissionStatusPill(status: String) {
     val normalized = status.uppercase(Locale.US)
     val (label, foreground) = when (normalized) {
@@ -1061,19 +1271,74 @@ private fun RemoteSubmissionStatusPill(status: String) {
 }
 
 @Composable
+/**
+ * Returns the remote review dialog title used by the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — RemoteReviewDialogTitle
+ *
+ * Renders the Remote Review Dialog Title modal interaction and keeps temporary form/confirmation UI separate
+ * from the underlying server action.
+ *
+ * The confirm callback is only emitted after the dialog-side input/choice is in an acceptable state; the
+ * ViewModel/repository performs the real mutation.
+ */
 private fun RemoteReviewDialogTitle(text: String) {
     Text(text, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = VolunteerLinkTextPrimary)
 }
 
+/**
+ * Parses the remote date used by the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — parseRemoteDate
+ *
+ * Handles the Compose/UI responsibility for parse remote date.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ *
+ * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without leaving
+ * the UI in an assumed-success state.
+ */
 fun parseRemoteDate(value: String): Date? = runCatching {
     SimpleDateFormat("yyyy-MM-dd", Locale.US).apply { isLenient = false }.parse(value)
 }.getOrNull()
 
+/**
+ * Formats the remote date used by the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — formatRemoteDate
+ *
+ * Handles the Compose/UI responsibility for format remote date.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun formatRemoteDate(value: String): String {
     val date = parseRemoteDate(value) ?: return value
     return SimpleDateFormat("d MMM yyyy", Locale.getDefault()).format(date)
 }
 
+/**
+ * Formats the remote date time used by the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — formatRemoteDateTime
+ *
+ * Handles the Compose/UI responsibility for format remote date time.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ *
+ * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without leaving
+ * the UI in an assumed-success state.
+ */
 fun formatRemoteDateTime(value: String): String {
     val patterns = listOf(
         "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
@@ -1087,6 +1352,18 @@ fun formatRemoteDateTime(value: String): String {
     return SimpleDateFormat("d MMM yyyy · h:mm a", Locale.getDefault()).format(parsed)
 }
 
+/**
+ * Adds the remote days to the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — addRemoteDays
+ *
+ * Handles the Compose/UI responsibility for add remote days.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun addRemoteDays(value: String, days: Int): String {
     val date = parseRemoteDate(value) ?: return value
     val calendar = Calendar.getInstance().apply {
@@ -1096,6 +1373,18 @@ private fun addRemoteDays(value: String, days: Int): String {
     return SimpleDateFormat("yyyy-MM-dd", Locale.US).format(calendar.time)
 }
 
+/**
+ * Returns the max remote date value required by the organisation Manage Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — maxRemoteDate
+ *
+ * Handles the Compose/UI responsibility for max remote date.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun maxRemoteDate(first: String, second: String): String {
     val a = parseRemoteDate(first) ?: return second
     val b = parseRemoteDate(second) ?: return first

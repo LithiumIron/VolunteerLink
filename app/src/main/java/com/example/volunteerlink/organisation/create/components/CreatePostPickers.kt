@@ -1,5 +1,20 @@
 package com.example.volunteerlink.organisation.create.components
 
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Contains reusable Create Post UI building blocks for Create Post Pickers.
+//
+// Components are intentionally presentation-focused: values and callbacks come from the parent step/ViewModel, so
+// a reusable field does not secretly own business state or perform database writes.
+//
+// Shared components keep spacing, colours, validation presentation and interaction patterns consistent across
+// Physical, Remote and Hybrid forms.
+//
+// Architectural layer: Compose presentation layer.
+// ============================================================================
+
+
 import android.app.DatePickerDialog
 import android.content.Intent
 import android.graphics.BitmapFactory
@@ -55,7 +70,8 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withContext
+
 import com.example.volunteerlink.ui.theme.CreateGreen
 
 /**
@@ -66,6 +82,14 @@ import com.example.volunteerlink.ui.theme.CreateGreen
  */
 
 @Composable
+/**
+ * DETAILED BEHAVIOUR — DateSelectionField
+ *
+ * Renders the reusable Date Selection Field portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun DateSelectionField(
     label: String,
     selectedDateMillis: Long?,
@@ -88,7 +112,7 @@ fun DateSelectionField(
         enabled = enabled,
         onClick = {
             // Keep an outdated date visible in the form so the organiser can
-            // see what needs fixing, but open the picker on the first valid
+            // keep the current invalid value visible, while opening the picker on the first valid
             // date instead of focusing a now-disabled day.
             val initialDate = selectedDateMillis
                 ?.takeIf { selected ->
@@ -128,6 +152,18 @@ fun DateSelectionField(
 }
 
 @Composable
+/**
+ * Renders the time selection field input field used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — TimeSelectionField
+ *
+ * Renders the reusable Time Selection Field portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun TimeSelectionField(
     label: String,
     selectedTimeMinutes: Int?,
@@ -166,6 +202,18 @@ fun TimeSelectionField(
     }
 }
 
+/**
+ * Formats the date used by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — formatDate
+ *
+ * Handles the Compose/UI responsibility for format date.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun formatDate(dateMillis: Long?): String {
     if (dateMillis == null) return ""
 
@@ -175,6 +223,18 @@ private fun formatDate(dateMillis: Long?): String {
     ).format(Date(dateMillis))
 }
 
+/**
+ * Formats the time used by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — formatTime
+ *
+ * Handles the Compose/UI responsibility for format time.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun formatTime(minutesAfterMidnight: Int?): String {
     if (minutesAfterMidnight == null) return ""
 
@@ -189,12 +249,36 @@ fun formatTime(minutesAfterMidnight: Int?): String {
     ).format(calendar.time)
 }
 
+/**
+ * Returns the minimum create post start date millis value required by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — minimumCreatePostStartDateMillis
+ *
+ * Handles the Compose/UI responsibility for minimum create post start date millis.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ *
+ * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the rest
+ * of the wizard.
+ */
 fun minimumCreatePostStartDateMillis(): Long {
     return CreatePostValidator.minimumStartDateMillis()
 }
 
 /** Keyboard-first 12-hour time input used instead of the clock-face picker. */
 @Composable
+/**
+ * DETAILED BEHAVIOUR — KeyboardTimeInputDialog
+ *
+ * Renders the Keyboard Time Input Dialog modal interaction and keeps temporary form/confirmation UI separate
+ * from the underlying server action.
+ *
+ * The confirm callback is only emitted after the dialog-side input/choice is in an acceptable state; the
+ * ViewModel/repository performs the real mutation.
+ */
 private fun KeyboardTimeInputDialog(
     title: String,
     initialTimeMinutes: Int?,
@@ -370,6 +454,18 @@ private fun KeyboardTimeInputDialog(
 }
 
 @Composable
+/**
+ * Renders the UI represented by time period option for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — TimePeriodOption
+ *
+ * Handles the Compose/UI responsibility for time period option.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 private fun TimePeriodOption(
     text: String,
     selected: Boolean,
@@ -406,6 +502,17 @@ private fun TimePeriodOption(
 
 /** Optional thumbnail picker with a real preview and visible file name. */
 @Composable
+/**
+ * DETAILED BEHAVIOUR — ThumbnailPickerSection
+ *
+ * Renders the reusable Thumbnail Picker Section portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ *
+ * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without leaving
+ * the UI in an assumed-success state.
+ */
 fun ThumbnailPickerSection(
     thumbnailUri: String?,
     onThumbnailChanged: (String?) -> Unit,
@@ -512,6 +619,23 @@ fun ThumbnailPickerSection(
 }
 
 @Composable
+/**
+ * Renders the UI represented by remember image bitmap for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — rememberImageBitmap
+ *
+ * Handles the Compose/UI responsibility for remember image bitmap.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ *
+ * Runs blocking file/network-oriented work off the main UI thread to avoid freezing Compose interactions.
+ *
+ * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without leaving
+ * the UI in an assumed-success state.
+ */
 private fun rememberImageBitmap(
     uri: Uri
 ): androidx.compose.runtime.State<ImageBitmap?> {
@@ -533,6 +657,21 @@ private fun rememberImageBitmap(
     }
 }
 
+/**
+ * Returns the display name used by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — getDisplayName
+ *
+ * Handles the Compose/UI responsibility for get display name.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ *
+ * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without leaving
+ * the UI in an assumed-success state.
+ */
 private fun getDisplayName(
     context: android.content.Context,
     uri: Uri

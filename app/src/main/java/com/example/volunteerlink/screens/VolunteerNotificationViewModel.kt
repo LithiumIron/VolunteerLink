@@ -11,6 +11,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+// Purpose: Handles volunteer notification ui state as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 data class VolunteerNotificationUiState(
     val isLoading: Boolean = true,
     val isMarkingRead: Boolean = false,
@@ -18,10 +21,15 @@ data class VolunteerNotificationUiState(
     val notifications: List<VolunteerNotification> = emptyList(),
     val errorMessage: String? = null
 ) {
+    // Calculated from the current list so the badge updates after refresh, read and clear actions.
     val unreadCount: Int
         get() = notifications.count { !it.isRead }
 }
 
+/**
+ * Keeps notification network actions out of the Composable and exposes one observable
+ * state object. AndroidViewModel is used here because online checks need application context.
+ */
 class VolunteerNotificationViewModel(application: Application) : AndroidViewModel(application) {
     private val mutableUiState =
         MutableStateFlow(VolunteerNotificationUiState())
@@ -33,7 +41,11 @@ class VolunteerNotificationViewModel(application: Application) : AndroidViewMode
         refresh()
     }
 
+    // Purpose: Requests a fresh cloud snapshot without discarding the current cached screen immediately.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     fun refresh() {
+        // Notifications are online-only; do not pretend cached/empty data is a successful refresh.
         if (!checkOnline()) return
         viewModelScope.launch {
             mutableUiState.update {
@@ -67,7 +79,11 @@ class VolunteerNotificationViewModel(application: Application) : AndroidViewMode
         }
     }
 
+    // Purpose: Handles mark all read as one reusable step in the Volunteer flow.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     fun markAllRead() {
+        // Avoid an unnecessary RPC when every notification is already read.
         if (!checkOnline()) return
         if (mutableUiState.value.unreadCount == 0) return
 
@@ -104,7 +120,11 @@ class VolunteerNotificationViewModel(application: Application) : AndroidViewMode
         }
     }
 
+    // Purpose: Handles dismiss as one reusable step in the Volunteer flow.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     fun dismiss(notification: VolunteerNotification) {
+        // stableKey identifies one notification consistently across a refreshed list.
         if (!checkOnline()) return
         if (mutableUiState.value.isClearing) return
         viewModelScope.launch {
@@ -132,7 +152,12 @@ class VolunteerNotificationViewModel(application: Application) : AndroidViewMode
         }
     }
 
+    // Purpose: Handles dismiss all as one reusable step in the Volunteer flow.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     fun dismissAll() {
+        // Save the exact keys before the request. The success handler removes only the
+        // notifications that were present when the volunteer pressed "Clear all".
         if (!checkOnline()) return
         if (mutableUiState.value.isClearing) return
         val current = mutableUiState.value.notifications
@@ -161,7 +186,11 @@ class VolunteerNotificationViewModel(application: Application) : AndroidViewMode
         }
     }
 
+    // Purpose: Handles check online as one reusable step in the Volunteer flow.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     private fun checkOnline(): Boolean {
+        // Central guard gives every action the same user-facing offline explanation.
         if (com.example.volunteerlink.data.VolunteerOnline.available(getApplication<Application>())) return true
         mutableUiState.update { it.copy(isLoading = false, errorMessage =
             "Internet connection is required to refresh or clear notifications. Connect and try again.") }

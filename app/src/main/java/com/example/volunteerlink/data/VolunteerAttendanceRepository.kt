@@ -11,6 +11,9 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.json.*
 
 @Serializable
+// Purpose: Handles the volunteer attendance record rule in the data layer so screens do not duplicate this business logic.
+// Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+// Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
 data class VolunteerAttendanceRecord(
     @SerialName("event_date") val date: String,
     @SerialName("attendance_status") val status: String,
@@ -19,15 +22,26 @@ data class VolunteerAttendanceRecord(
 )
 
 @Serializable
+// Purpose: Handles the volunteer attendance day rule in the data layer so screens do not duplicate this business logic.
+// Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+// Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
 data class VolunteerAttendanceDay(
     @SerialName("event_date") val date: String,
     @SerialName("is_active") val active: Boolean
 )
 
+// Purpose: Handles the volunteer attendance data rule in the data layer so screens do not duplicate this business logic.
+// Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+// Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
 data class VolunteerAttendanceData(val records: List<VolunteerAttendanceRecord>, val days: List<VolunteerAttendanceDay>)
 
 object VolunteerAttendanceRepository {
+    // Purpose: Reads  from the data source and returns models that the ViewModel can expose to Compose.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     suspend fun load(post: String, role: String, expectedAccount: String): VolunteerAttendanceData {
+        // Keep the account check at both ends of the request so a late response from a
+        // previous login cannot populate attendance for the next person using the phone.
         check(VolunteerRemoteSubmissionRepository.readyAccountId() == expectedAccount) { "Account changed. Reopen this application." }
         val profile = supabase.from("user_profiles").select(columns = Columns.raw("user_id")) {
             filter { eq("auth_user_id", expectedAccount); eq("account_type", "VOLUNTEER") }
@@ -45,7 +59,12 @@ object VolunteerAttendanceRepository {
         return VolunteerAttendanceData(records, days)
     }
 
+    // Purpose: Handles the check in rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     suspend fun checkIn(post: String, role: String, pin: String, expectedAccount: String) {
+        // PIN validation and attendance recording happen in Supabase. The device only
+        // sends the volunteer's entered code; it never stores or compares the PIN locally.
         require(pin.matches(Regex("[0-9]{6}"))) { "Enter the six-digit code provided by the organisation." }
         check(VolunteerRemoteSubmissionRepository.readyAccountId() == expectedAccount) { "Account changed. Reopen this application." }
         supabase.postgrest.rpc("check_in_with_attendance_pin", buildJsonObject {
@@ -54,6 +73,9 @@ object VolunteerAttendanceRepository {
         check(supabase.auth.currentUserOrNull()?.id == expectedAccount) { "Account changed. Reopen this application." }
     }
 
+    // Purpose: Handles the message rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     fun message(error: Throwable): String {
         val raw = error.message.orEmpty()
         val messages = listOf(

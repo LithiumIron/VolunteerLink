@@ -10,8 +10,12 @@ import com.example.volunteerlink.model.VolunteerRoleApplicationMethod
 import com.example.volunteerlink.model.VolunteerRoleScheduleItem
 import androidx.compose.runtime.mutableStateListOf
 
+// Purpose: Handles the volunteer opportunity sample data rule in the data layer so screens do not duplicate this business logic.
+// Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+// Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
 object VolunteerOpportunitySampleData {
 
+    // Resolve or prepare event data from the shared dashboard snapshot for this part of the screen.
     val volunteerOpportunityEvents =
         listOf(
 
@@ -373,6 +377,7 @@ object VolunteerOpportunitySampleData {
             )
         )
 
+    // Resolve or prepare the application data used by the next status, cancellation or navigation decision.
     val volunteerApplications =
     mutableStateListOf(
 
@@ -413,10 +418,14 @@ object VolunteerOpportunitySampleData {
             )
         )
 
+    // Purpose: Handles the has application for role rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     fun hasApplicationForRole(
         eventId: Int,
         roleId: Int
     ): Boolean {
+        // Return the calculated result to the caller without changing unrelated Volunteer state.
         return volunteerApplications
             .any { volunteerApplication ->
                 volunteerApplication
@@ -428,20 +437,26 @@ object VolunteerOpportunitySampleData {
             }
     }
 
+    // Purpose: Validates and sends one role application, then refreshes shared Volunteer state.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     fun submitApplication(
         eventId: Int,
         roleId: Int
     ): VolunteerOpportunityApplication? {
+        // Resolve or prepare event data from the shared dashboard snapshot for this part of the screen.
         val volunteerOpportunityEvent =
             findEventById(eventId)
                 ?: return null
 
+        // Resolve or prepare event data from the shared dashboard snapshot for this part of the screen.
         val volunteerOpportunityRole =
             findRoleById(
                 eventId = eventId,
                 roleId = roleId
             ) ?: return null
 
+        // Resolve or prepare the application data used by the next status, cancellation or navigation decision.
         val existingApplication =
             volunteerApplications
                 .firstOrNull {
@@ -455,10 +470,12 @@ object VolunteerOpportunitySampleData {
                             roleId
                 }
 
+        // Check this condition before showing the action, preventing an invalid Volunteer flow from continuing.
         if (existingApplication != null) {
             return existingApplication
         }
 
+        // Resolve or prepare the application data used by the next status, cancellation or navigation decision.
         val nextApplicationId =
             (
                     volunteerApplications
@@ -470,6 +487,7 @@ object VolunteerOpportunitySampleData {
                         } ?: 0
                     ) + 1
 
+        // Resolve or prepare the application data used by the next status, cancellation or navigation decision.
         val newVolunteerApplication =
             VolunteerOpportunityApplication(
                 applicationId =
@@ -524,6 +542,9 @@ object VolunteerOpportunitySampleData {
         return newVolunteerApplication
     }
 
+    // Purpose: Handles the find event by id rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     fun findEventById(
         eventId: Int
     ): VolunteerOpportunityEvent? {
@@ -534,6 +555,9 @@ object VolunteerOpportunitySampleData {
             }
     }
 
+    // Purpose: Handles the find role by id rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     fun findRoleById(
         eventId: Int,
         roleId: Int
@@ -546,6 +570,9 @@ object VolunteerOpportunitySampleData {
             }
     }
 
+    // Purpose: Handles the find application by id rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     fun findApplicationById(
         applicationId: Int
     ): VolunteerOpportunityApplication? {
@@ -557,9 +584,13 @@ object VolunteerOpportunitySampleData {
             }
     }
 
+    // Purpose: Cancels an eligible active application and records the selected cancellation reason.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     fun cancelApplication(
         applicationId: Int
     ): Boolean {
+        // Resolve or prepare the application data used by the next status, cancellation or navigation decision.
         val applicationIndex =
             volunteerApplications.indexOfFirst {
                     volunteerOpportunityApplication ->
@@ -571,6 +602,7 @@ object VolunteerOpportunitySampleData {
             return false
         }
 
+        // Resolve or prepare the application data used by the next status, cancellation or navigation decision.
         val existingApplication =
             volunteerApplications[applicationIndex]
 

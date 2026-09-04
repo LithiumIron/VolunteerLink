@@ -1,5 +1,23 @@
 package com.example.volunteerlink.organisation.create.steps
 
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Provides a reusable section used by the Create Post wizard for Review Summary Schedule Sections.
+//
+// The composables read CreatePostUiState/CreatePostDraft values and emit callbacks; they do not call Supabase
+// directly.
+//
+// Validation messages are supplied from CreatePostViewModel/CreatePostValidator so the same business rules apply
+// regardless of which UI component displays the field.
+//
+// Breaking large steps into section files keeps layout code readable while the ViewModel remains the single owner
+// of mutable workflow state.
+//
+// Architectural layer: Compose presentation layer.
+// ============================================================================
+
+
 import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.compose.foundation.BorderStroke
@@ -59,6 +77,18 @@ import java.util.Date
 import java.util.Locale
 
 @Composable
+/**
+ * Renders the review schedule section section used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — ReviewScheduleSection
+ *
+ * Renders the reusable Review Schedule Section portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun ReviewScheduleSection(
     uiState: CreatePostUiState,
     onEdit: () -> Unit
@@ -141,6 +171,18 @@ fun ReviewScheduleSection(
 
 
 @Composable
+/**
+ * Renders the UI represented by review schedule stats for the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — ReviewScheduleStats
+ *
+ * Handles the Compose/UI responsibility for review schedule stats.
+ *
+ * UI-only work stays here; business validation and Supabase persistence remain delegated to the
+ * ViewModel/repository layers.
+ */
 fun ReviewScheduleStats(
     physicalCount: Int,
     remoteCount: Int
@@ -164,6 +206,18 @@ fun ReviewScheduleStats(
 
 
 @Composable
+/**
+ * Renders the review schedule group card card used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — ReviewScheduleGroupCard
+ *
+ * Renders the reusable Review Schedule Group Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun ReviewScheduleGroupCard(
     uiState: CreatePostUiState,
     type: ScheduleType,
@@ -238,6 +292,21 @@ fun ReviewScheduleGroupCard(
 
 
 @Composable
+/**
+ * Renders the review schedule item card card used in the organisation Create/Edit Post flow.
+ * It receives state and callbacks from its caller so presentation code stays separate from database operations.
+ */
+/**
+ * DETAILED BEHAVIOUR — ReviewScheduleItemCard
+ *
+ * Renders the reusable Review Schedule Item Card portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ *
+ * Runs the shared CreatePostValidator so navigation/save behaviour uses the same validation rules as the rest
+ * of the wizard.
+ */
 fun ReviewScheduleItemCard(
     uiState: CreatePostUiState,
     item: ScheduleItemDraft,
@@ -334,6 +403,18 @@ fun ReviewScheduleItemCard(
 }
 
 
+/**
+ * Derives the review schedule summary line value used by the organisation Create/Edit Post flow.
+ * Keeping this helper close to the screen makes the presentation logic easier to follow while business rules remain outside Compose.
+ */
+/**
+ * DETAILED BEHAVIOUR — reviewScheduleSummaryLine
+ *
+ * Renders the reusable review Schedule Summary Line portion of the Organisation UI.
+ *
+ * It receives values and event callbacks from its parent, which keeps this component reusable and prevents
+ * nested UI elements from owning database state.
+ */
 fun reviewScheduleSummaryLine(
     item: ScheduleItemDraft
 ): String {

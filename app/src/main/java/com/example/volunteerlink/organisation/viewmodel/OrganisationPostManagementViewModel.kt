@@ -1,5 +1,27 @@
 package com.example.volunteerlink.organisation.viewmodel
 
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Owns one post's complete Organisation management state: overview, roles, applicants, attendance, Remote
+// submissions, review workflow, partnership support and publish-draft actions.
+//
+// The ViewModel is the boundary between Compose callbacks and the OrganisationPostManagementRepository, so the
+// screen never constructs database mutations directly.
+//
+// It keeps AppClock-derived timing information beside the loaded post so Edit/Publish/Review availability follows
+// the same current business date everywhere.
+//
+// It preserves read-only cached post detail for temporary offline viewing, while actions such as Accept/Decline,
+// attendance, completion, publishing and submission review require the server.
+//
+// After a successful mutation it refreshes the affected state so the UI is driven by the database result rather
+// than assuming a local action succeeded.
+//
+// Architectural layer: ViewModel / workflow state layer.
+// ============================================================================
+
+
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -54,6 +76,15 @@ import java.util.Locale
 import java.util.TimeZone
 
 /** ViewModel for one post opened from the Organisation Manage module. */
+/**
+ * DETAILED DECLARATION — OrganisationPostManagementViewModel
+ *
+ * Lifecycle-aware state owner for Organisation Post Management View Model. It survives ordinary Compose
+ * recomposition and coordinates asynchronous repository work.
+ *
+ * UI callbacks enter through methods on this class so validation, loading/error state and dependent business
+ * rules remain centralised.
+ */
 class OrganisationPostManagementViewModel : ViewModel() {
 
     private val repository: OrganisationPostManagementRepository =
@@ -73,6 +104,20 @@ class OrganisationPostManagementViewModel : ViewModel() {
         observeAppClock()
     }
 
+    /**
+     * Loads the required data needed by the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — load
+     *
+     * Loads or refreshes the data required by load and writes the result into observable UI state.
+     *
+     * The coroutine/repository boundary is handled here so Compose only reacts to loading, success and error
+     * state.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun load(postId: String) {
         if (loadedPostId == postId && cachedPost != null) return
         stopAttendancePolling()
@@ -85,6 +130,19 @@ class OrganisationPostManagementViewModel : ViewModel() {
     /**
      * Lightweight polling for live attendance only. It is started by the
      * Physical Volunteers UI and stopped as soon as that UI is no longer active.
+     */
+    /**
+     * DETAILED BEHAVIOUR — startAttendancePolling
+     *
+     * Implements the ViewModel workflow operation for start attendance polling.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Runs asynchronous work in a lifecycle-aware coroutine and exposes progress/error state rather than
+     * blocking the UI thread.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
      */
     fun startAttendancePolling() {
         if (attendancePollingJob?.isActive == true) return
@@ -109,12 +167,32 @@ class OrganisationPostManagementViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Derives the stop attendance polling value used by the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — stopAttendancePolling
+     *
+     * Implements the ViewModel workflow operation for stop attendance polling.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     fun stopAttendancePolling() {
         attendancePollingJob?.cancel()
         attendancePollingJob = null
     }
 
     /** Downloads a Remote submission through the management repository. */
+    /**
+     * DETAILED BEHAVIOUR — downloadRemoteSubmission
+     *
+     * Implements the ViewModel workflow operation for download remote submission.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     suspend fun downloadRemoteSubmission(
         submission: PostManagementRemoteSubmission
     ): ByteArray {
@@ -133,6 +211,24 @@ class OrganisationPostManagementViewModel : ViewModel() {
     /**
      * Accepts a Remote submission or requests revision, then reloads the post so
      * the organisation immediately sees the new submission state.
+     */
+    /**
+     * DETAILED BEHAVIOUR — reviewRemoteSubmission
+     *
+     * Coordinates one Remote submission review action and forwards the selected review outcome/feedback through
+     * the repository authenticated review path.
+     *
+     * Remote submission status is server-authoritative because it controls revision/completion workflow and may
+     * affect volunteer progression.
+     *
+     * The ViewModel refreshes/rebuilds review state after the operation rather than leaving a local decision as
+     * the final result.
+     *
+     * Coordinates account-scoped local persistence only for recoverable/cached UI state; published or
+     * transactional business state continues to come from Supabase.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
      */
     suspend fun reviewRemoteSubmission(
         submission: PostManagementRemoteSubmission,
@@ -158,6 +254,17 @@ class OrganisationPostManagementViewModel : ViewModel() {
     }
 
     /** Stores a Needs Review submission decision locally until the whole Submission stage is saved. */
+    /**
+     * DETAILED BEHAVIOUR — setRemoteSubmissionDecision
+     *
+     * Receives the UI event for changing remote submission decision and applies it through the ViewModel
+     * instead of mutating Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun setRemoteSubmissionDecision(
         submission: PostManagementRemoteSubmission,
         action: String,
@@ -215,6 +322,20 @@ class OrganisationPostManagementViewModel : ViewModel() {
         _uiState.value = _uiState.value.copy(remoteReviewActionMessage = null)
     }
 
+    /**
+     * Clears the remote submission decision for the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — clearRemoteSubmissionDecision
+     *
+     * Implements the ViewModel workflow operation for clear remote submission decision.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun clearRemoteSubmissionDecision(itemKey: String) {
         val review = _uiState.value.post?.remoteReview ?: return
         val session = _uiState.value.remoteReviewSession
@@ -227,6 +348,17 @@ class OrganisationPostManagementViewModel : ViewModel() {
     }
 
     /** Missing Remote work can either stay open under one extension or be finalized as Not Completed. */
+    /**
+     * DETAILED BEHAVIOUR — setRemoteMissingAction
+     *
+     * Receives the UI event for changing remote missing action and applies it through the ViewModel instead of
+     * mutating Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun setRemoteMissingAction(
         itemKey: String,
         giveMoreTime: Boolean
@@ -258,6 +390,21 @@ class OrganisationPostManagementViewModel : ViewModel() {
         _uiState.value = _uiState.value.copy(remoteReviewActionMessage = null)
     }
 
+    /**
+     * Sets the remote review new end date used by the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — setRemoteReviewNewEndDate
+     *
+     * Receives the UI event for changing remote review new end date and applies it through the ViewModel
+     * instead of mutating Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun setRemoteReviewNewEndDate(value: String?) {
         val session = _uiState.value.remoteReviewSession
         updateRemoteReviewSession(session.copy(newEndDate = value?.trim()?.takeIf { it.isNotEmpty() }))
@@ -267,6 +414,26 @@ class OrganisationPostManagementViewModel : ViewModel() {
     /**
      * Applies every draft submission decision together. If extra time is needed,
      * one new Remote deadline is written for the whole project in the same RPC.
+     */
+    /**
+     * DETAILED BEHAVIOUR — saveRemoteSubmissionReviewStage
+     *
+     * Coordinates the user-confirmed business action for save remote submission review stage from UI state to
+     * the repository and back.
+     *
+     * The ViewModel does not mark the action successful until the backend operation completes; afterwards it
+     * refreshes/updates state from the authoritative result.
+     *
+     * Coordinates account-scoped local persistence only for recoverable/cached UI state; published or
+     * transactional business state continues to come from Supabase.
+     *
+     * Runs asynchronous work in a lifecycle-aware coroutine and exposes progress/error state rather than
+     * blocking the UI thread.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
      */
     fun saveRemoteSubmissionReviewStage() {
         val currentPost = cachedPost ?: return
@@ -398,6 +565,21 @@ class OrganisationPostManagementViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Sets the remote feedback used by the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — setRemoteFeedback
+     *
+     * Receives the UI event for changing remote feedback and applies it through the ViewModel instead of
+     * mutating Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun setRemoteFeedback(person: PostManagementPerson, feedback: String) {
         val review = _uiState.value.post?.remoteReview ?: return
         if (!review.canEdit) return
@@ -412,16 +594,57 @@ class OrganisationPostManagementViewModel : ViewModel() {
         updateRemoteReviewSession(session.copy(feedbackByParticipation = updated, touched = false))
     }
 
+    /**
+     * Sets the remote review stage used by the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — setRemoteReviewStage
+     *
+     * Receives the UI event for changing remote review stage and applies it through the ViewModel instead of
+     * mutating Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun setRemoteReviewStage(stage: PostManagementRemoteReviewStage) {
         val session = _uiState.value.remoteReviewSession
         updateRemoteReviewSession(session.copy(stage = stage, touched = false))
         _uiState.value = _uiState.value.copy(remoteReviewActionMessage = null)
     }
 
+    /**
+     * Derives the discard remote review session value used by the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — discardRemoteReviewSession
+     *
+     * Implements the ViewModel workflow operation for discard remote review session.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     fun discardRemoteReviewSession() {
         updateRemoteReviewSession(PostManagementRemoteReviewSession())
     }
 
+    /**
+     * Derives the discard review sessions value used by the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — discardReviewSessions
+     *
+     * Implements the ViewModel workflow operation for discard review sessions.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun discardReviewSessions() {
         _uiState.value = _uiState.value.copy(
             physicalReviewSession = PostManagementPhysicalReviewSession(),
@@ -429,10 +652,48 @@ class OrganisationPostManagementViewModel : ViewModel() {
         )
     }
 
+    /**
+     * Closes or clears the remote review finalize success in the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — dismissRemoteReviewFinalizeSuccess
+     *
+     * Implements the ViewModel workflow operation for dismiss remote review finalize success.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun dismissRemoteReviewFinalizeSuccess() {
         _uiState.value = _uiState.value.copy(remoteReviewFinalizeSucceeded = false)
     }
 
+    /**
+     * Finalises the remote review post for the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — finalizeRemoteReviewPost
+     *
+     * Coordinates the user-confirmed business action for finalize remote review post from UI state to the
+     * repository and back.
+     *
+     * The ViewModel does not mark the action successful until the backend operation completes; afterwards it
+     * refreshes/updates state from the authoritative result.
+     *
+     * Coordinates account-scoped local persistence only for recoverable/cached UI state; published or
+     * transactional business state continues to come from Supabase.
+     *
+     * Runs asynchronous work in a lifecycle-aware coroutine and exposes progress/error state rather than
+     * blocking the UI thread.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     fun finalizeRemoteReviewPost() {
         val currentPost = cachedPost ?: return
         val review = _uiState.value.post?.remoteReview ?: return
@@ -518,10 +779,37 @@ class OrganisationPostManagementViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Updates the remote review session used by the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — updateRemoteReviewSession
+     *
+     * Receives the UI event for changing remote review session and applies it through the ViewModel instead of
+     * mutating Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     private fun updateRemoteReviewSession(session: PostManagementRemoteReviewSession) {
         _uiState.value = _uiState.value.copy(remoteReviewSession = session)
     }
 
+    /**
+     * Derives the remote extension required value used by the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — remoteExtensionRequired
+     *
+     * Implements the ViewModel workflow operation for remote extension required.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     private fun remoteExtensionRequired(
         review: PostManagementRemoteReview,
         session: PostManagementRemoteReviewSession
@@ -533,6 +821,21 @@ class OrganisationPostManagementViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Returns the minimum remote extension date value required by the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — minimumRemoteExtensionDate
+     *
+     * Implements the ViewModel workflow operation for minimum remote extension date.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     private fun minimumRemoteExtensionDate(review: PostManagementRemoteReview): String {
         val parser = SimpleDateFormat(DATE_PATTERN, Locale.US).apply { isLenient = false }
         val current = runCatching { parser.parse(review.currentDeadline) }.getOrNull()
@@ -544,6 +847,21 @@ class OrganisationPostManagementViewModel : ViewModel() {
         }.let { parser.format(it.time) }
     }
 
+    /**
+     * Checks whether the valid remote extension is date for the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — isValidRemoteExtensionDate
+     *
+     * Implements the ViewModel workflow operation for is valid remote extension date.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     private fun isValidRemoteExtensionDate(
         currentDeadline: String,
         todayDate: String,
@@ -556,6 +874,27 @@ class OrganisationPostManagementViewModel : ViewModel() {
         return selected.after(current) && selected.after(today)
     }
 
+    /**
+     * Toggles the applicant shortlist used by the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — toggleApplicantShortlist
+     *
+     * Implements the ViewModel workflow operation for toggle applicant shortlist.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Coordinates account-scoped local persistence only for recoverable/cached UI state; published or
+     * transactional business state continues to come from Supabase.
+     *
+     * Runs asynchronous work in a lifecycle-aware coroutine and exposes progress/error state rather than
+     * blocking the UI thread.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     fun toggleApplicantShortlist(person: PostManagementPerson) {
         if (!person.applicationStatus.equals("PENDING", ignoreCase = true)) return
 
@@ -595,9 +934,25 @@ class OrganisationPostManagementViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Derives the review applicant value used by the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — reviewApplicant
+     *
+     * Coordinates Accept or Decline for one pending REVIEW_APPLICANTS application.
+     *
+     * Decline requires the organisation-entered reason and passes it to the repository; Accept does not
+     * fabricate a decision note.
+     *
+     * The server RPC re-checks post ownership, application method, capacity and pending status, then this
+     * ViewModel reloads the post so applicant counts/status are based on the committed database result.
+     */
     fun reviewApplicant(
         person: PostManagementPerson,
         decision: String,
+        decisionNote: String? = null,
         onSuccess: () -> Unit = {}
     ) {
         val post = cachedPost ?: return
@@ -606,6 +961,14 @@ class OrganisationPostManagementViewModel : ViewModel() {
         if (!person.applicationStatus.equals("PENDING", ignoreCase = true)) {
             _uiState.value = _uiState.value.copy(
                 applicantActionMessage = "This application is no longer pending."
+            )
+            return
+        }
+
+        val normalizedDecisionNote = decisionNote?.trim().orEmpty()
+        if (normalizedDecision == "DECLINE" && normalizedDecisionNote.isBlank()) {
+            _uiState.value = _uiState.value.copy(
+                applicantActionMessage = "Enter a reason before declining this application."
             )
             return
         }
@@ -620,7 +983,8 @@ class OrganisationPostManagementViewModel : ViewModel() {
                     postId = post.postId,
                     roleTemplateId = person.roleTemplateId,
                     userId = person.userId,
-                    decision = normalizedDecision
+                    decision = normalizedDecision,
+                    decisionNote = normalizedDecisionNote.takeIf { normalizedDecision == "DECLINE" }
                 )
 
                 val refreshedPost = repository.loadPost(post.postId)
@@ -654,6 +1018,26 @@ class OrganisationPostManagementViewModel : ViewModel() {
      * Opens today's Physical attendance lazily. The SQL function is the final
      * authority for the current event date, live time window, ownership and
      * eligible volunteer count.
+     */
+    /**
+     * DETAILED BEHAVIOUR — startPhysicalAttendance
+     *
+     * Requests the server to open/prepare Physical attendance for the selected event date and then reloads
+     * attendance state.
+     *
+     * Attendance is never started by simply toggling local UI state because the database must establish the
+     * authoritative day/participant records used for verified volunteer time.
+     *
+     * Uses AppClock for business-date/time decisions so the same code works with the project test clock and
+     * normal device time.
+     *
+     * Runs asynchronous work in a lifecycle-aware coroutine and exposes progress/error state rather than
+     * blocking the UI thread.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
      */
     fun startPhysicalAttendance() {
         val currentPost = cachedPost ?: return
@@ -689,6 +1073,23 @@ class OrganisationPostManagementViewModel : ViewModel() {
     }
 
     /** Organisation may correct current or past valid Physical attendance. */
+    /**
+     * DETAILED BEHAVIOUR — markVolunteerPresent
+     *
+     * Records a Physical volunteer as present through the authenticated attendance RPC and refreshes
+     * attendance/review data after the server confirms it.
+     *
+     * The resulting attendance record contributes to later completion and verified-time calculations, so it is
+     * intentionally not cached as a locally editable decision.
+     *
+     * Runs asynchronous work in a lifecycle-aware coroutine and exposes progress/error state rather than
+     * blocking the UI thread.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     fun markVolunteerPresent(
         person: PostManagementPerson,
         eventDate: String
@@ -730,6 +1131,23 @@ class OrganisationPostManagementViewModel : ViewModel() {
     /**
      * Persists an explicit ABSENT attendance decision. The confirmation dialog is
      * an organisation UI responsibility; SQL still validates ownership and date.
+     */
+    /**
+     * DETAILED BEHAVIOUR — markVolunteerAbsent
+     *
+     * Records a Physical volunteer as absent through the authenticated attendance RPC and refreshes
+     * attendance/review data after the server confirms it.
+     *
+     * Absence is a real participation outcome, therefore the ViewModel waits for the database result instead of
+     * mutating the displayed volunteer row optimistically.
+     *
+     * Runs asynchronous work in a lifecycle-aware coroutine and exposes progress/error state rather than
+     * blocking the UI thread.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
      */
     fun markVolunteerAbsent(
         person: PostManagementPerson,
@@ -773,9 +1191,29 @@ class OrganisationPostManagementViewModel : ViewModel() {
      * Physical review classification is now derived entirely from attendance and the
      * local review session. Entering Review must not mutate role_participations.
      */
+    /**
+     * DETAILED BEHAVIOUR — preparePhysicalReview
+     *
+     * Implements the ViewModel workflow operation for prepare physical review.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun preparePhysicalReview() = Unit
 
     /** Selects every currently full-attendance Ready volunteer for completion locally. */
+    /**
+     * DETAILED BEHAVIOUR — completeAllReadyPhysical
+     *
+     * Implements the ViewModel workflow operation for complete all ready physical.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun completeAllReadyPhysical() {
         val review = _uiState.value.post?.physicalReview ?: return
         if (review.ready.isEmpty()) return
@@ -808,6 +1246,14 @@ class OrganisationPostManagementViewModel : ViewModel() {
      * A reported work issue is already the organisation's Not Completed decision.
      * It is temporary until Finalize Event and can still be changed before then.
      */
+    /**
+     * DETAILED BEHAVIOUR — reportPhysicalReviewIssue
+     *
+     * Implements the ViewModel workflow operation for report physical review issue.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     fun reportPhysicalReviewIssue(
         person: PostManagementPerson,
         reason: String
@@ -823,6 +1269,15 @@ class OrganisationPostManagementViewModel : ViewModel() {
     }
 
     /** Stores a temporary individual decision. Nothing is written to Supabase yet. */
+    /**
+     * DETAILED BEHAVIOUR — finalizePhysicalVolunteer
+     *
+     * Coordinates the user-confirmed business action for finalize physical volunteer from UI state to the
+     * repository and back.
+     *
+     * The ViewModel does not mark the action successful until the backend operation completes; afterwards it
+     * refreshes/updates state from the authoritative result.
+     */
     fun finalizePhysicalVolunteer(
         person: PostManagementPerson,
         completed: Boolean,
@@ -843,6 +1298,16 @@ class OrganisationPostManagementViewModel : ViewModel() {
     }
 
     /** Removes a temporary choice and returns the volunteer to their natural review bucket. */
+    /**
+     * DETAILED BEHAVIOUR — changePhysicalReviewDecision
+     *
+     * Implements the ViewModel workflow operation for change physical review decision.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun changePhysicalReviewDecision(person: PostManagementPerson) {
         val session = _uiState.value.physicalReviewSession
         val updated = session.decisions.filterNot {
@@ -858,6 +1323,17 @@ class OrganisationPostManagementViewModel : ViewModel() {
     }
 
     /** Local feedback only. The database receives it together with final decisions. */
+    /**
+     * DETAILED BEHAVIOUR — savePhysicalFeedback
+     *
+     * Coordinates the user-confirmed business action for save physical feedback from UI state to the repository
+     * and back.
+     *
+     * The ViewModel does not mark the action successful until the backend operation completes; afterwards it
+     * refreshes/updates state from the authoritative result.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun savePhysicalFeedback(
         userIds: List<String>,
         feedback: String,
@@ -885,6 +1361,17 @@ class OrganisationPostManagementViewModel : ViewModel() {
      * or a feedback message that has not been applied yet). Attendance is persisted
      * immediately and must never mark the review as discardable.
      */
+    /**
+     * DETAILED BEHAVIOUR — setPhysicalReviewDraftDirty
+     *
+     * Receives the UI event for changing physical review draft dirty and applies it through the ViewModel
+     * instead of mutating Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun setPhysicalReviewDraftDirty(hasDraft: Boolean) {
         val session = _uiState.value.physicalReviewSession
         if (session.touched != hasDraft) {
@@ -892,20 +1379,72 @@ class OrganisationPostManagementViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Sets the physical review stage used by the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — setPhysicalReviewStage
+     *
+     * Receives the UI event for changing physical review stage and applies it through the ViewModel instead of
+     * mutating Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun setPhysicalReviewStage(stage: PostManagementPhysicalReviewStage) {
         val session = _uiState.value.physicalReviewSession
         updateReviewSession(session.copy(stage = stage))
     }
 
+    /**
+     * Derives the discard physical review session value used by the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — discardPhysicalReviewSession
+     *
+     * Implements the ViewModel workflow operation for discard physical review session.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     fun discardPhysicalReviewSession() {
         updateReviewSession(PostManagementPhysicalReviewSession())
     }
 
     /** Dismisses the one-time success confirmation shown after a committed review. */
+    /**
+     * DETAILED BEHAVIOUR — dismissPhysicalReviewFinalizeSuccess
+     *
+     * Implements the ViewModel workflow operation for dismiss physical review finalize success.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     fun dismissPhysicalReviewFinalizeSuccess() {
         _uiState.value = _uiState.value.copy(reviewFinalizeSucceeded = false)
     }
 
+    /**
+     * Sets the pending decision used by the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — setPendingDecision
+     *
+     * Receives the UI event for changing pending decision and applies it through the ViewModel instead of
+     * mutating Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     private fun setPendingDecision(
         person: PostManagementPerson,
         decision: PostManagementPendingDecisionType,
@@ -936,10 +1475,170 @@ class OrganisationPostManagementViewModel : ViewModel() {
         )
     }
 
+    /**
+     * Updates the review session used by the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — updateReviewSession
+     *
+     * Receives the UI event for changing review session and applies it through the ViewModel instead of
+     * mutating Compose state inside the screen.
+     *
+     * Centralising the mutation here allows dependent validation, mode-specific cleanup and navigation rules to
+     * run together with the value change.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     private fun updateReviewSession(session: PostManagementPhysicalReviewSession) {
         _uiState.value = _uiState.value.copy(physicalReviewSession = session)
     }
 
+    /**
+     * Publishes the current Volunteer Post data after the required Manage Post checks pass.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — publishSavedDraft
+     *
+     * Publishes an existing Manage-side DRAFT after the client-side AppClock timing check confirms it is
+     * currently eligible.
+     *
+     * The repository RPC performs the authoritative ownership/verification/seven-day check and status/timestamp
+     * update; the client check exists for immediate UX rather than as security.
+     *
+     * After success the post is reloaded so Manage changes from Draft behaviour to the normal published-post
+     * tabs/actions.
+     *
+     * Uses AppClock for business-date/time decisions so the same code works with the project test clock and
+     * normal device time.
+     *
+     * Coordinates account-scoped local persistence only for recoverable/cached UI state; published or
+     * transactional business state continues to come from Supabase.
+     *
+     * Uses the shared PostTimingEvaluator rather than duplicating the seven-day/timing classification inside
+     * this method.
+     *
+     * Runs asynchronous work in a lifecycle-aware coroutine and exposes progress/error state rather than
+     * blocking the UI thread.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
+    fun publishSavedDraft() {
+        val post = cachedPost ?: return
+        val state = _uiState.value
+
+        if (state.isPublishingDraft) return
+        if (post.databaseStatus.trim().uppercase(Locale.US) != "DRAFT") return
+
+        if (state.isShowingCachedData) {
+            _uiState.value = state.copy(
+                draftPublishMessage = null,
+                draftPublishError = "Reconnect to the internet before publishing this draft."
+            )
+            return
+        }
+
+        val mode = PostMode.fromDatabaseValue(post.mode)
+        if (mode == null) {
+            _uiState.value = state.copy(
+                draftPublishMessage = null,
+                draftPublishError = "This draft has an unsupported post type."
+            )
+            return
+        }
+
+        val appNowMillis = AppClock.nowMillis()
+        val attention = PostTimingEvaluator.evaluateDraftAttention(
+            input = PostTimingInput(
+                mode = mode,
+                physicalStartDate = post.physical?.startDate,
+                physicalEndDate = post.physical?.endDate,
+                remoteStartDate = post.remote?.startDate,
+                remoteEndDate = post.remote?.effectiveEndDate
+            ),
+            nowMillis = appNowMillis
+        )
+
+        if (attention.needsAttention) {
+            _uiState.value = state.copy(
+                draftPublishMessage = null,
+                draftPublishError = "Update the volunteering start date before publishing this draft."
+            )
+            return
+        }
+
+        _uiState.value = state.copy(
+            isPublishingDraft = true,
+            draftPublishMessage = null,
+            draftPublishError = null
+        )
+
+        viewModelScope.launch {
+            try {
+                repository.publishSavedDraft(post.postId, appNowMillis)
+
+                val refreshedPost = repository.loadPost(post.postId)
+                val syncedAt = System.currentTimeMillis()
+
+                runCatching {
+                    OrganisationLocalStorage.savePost(
+                        post = refreshedPost,
+                        syncedAtEpochMillis = syncedAt
+                    )
+                }
+
+                cachedPost = refreshedPost
+                _uiState.value = _uiState.value.copy(
+                    isShowingCachedData = false,
+                    lastSyncedAtEpochMillis = syncedAt,
+                    isRefreshing = false
+                )
+                applyTiming(refreshedPost)
+                _uiState.value = _uiState.value.copy(
+                    isPublishingDraft = false,
+                    draftPublishMessage = "Volunteer Post published successfully.",
+                    draftPublishError = null
+                )
+                refreshPostGroupStatus(post.postId)
+            } catch (exception: Exception) {
+                Log.e(TAG, "Could not publish saved draft.", exception)
+                _uiState.value = _uiState.value.copy(
+                    isPublishingDraft = false,
+                    draftPublishMessage = null,
+                    draftPublishError = exception.message
+                        ?: "Unable to publish this draft."
+                )
+            }
+        }
+    }
+
+    /**
+     * Reloads the latest data for the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — refresh
+     *
+     * Loads or refreshes the data required by refresh and writes the result into observable UI state.
+     *
+     * The coroutine/repository boundary is handled here so Compose only reacts to loading, success and error
+     * state.
+     *
+     * Coordinates account-scoped local persistence only for recoverable/cached UI state; published or
+     * transactional business state continues to come from Supabase.
+     *
+     * Runs asynchronous work in a lifecycle-aware coroutine and exposes progress/error state rather than
+     * blocking the UI thread.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     fun refresh() {
         val postId = loadedPostId ?: return
         if (refreshInProgress) return
@@ -1015,6 +1714,26 @@ class OrganisationPostManagementViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Adds the all accepted volunteers to group to the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — addAllAcceptedVolunteersToGroup
+     *
+     * Implements the ViewModel workflow operation for add all accepted volunteers to group.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Runs asynchronous work in a lifecycle-aware coroutine and exposes progress/error state rather than
+     * blocking the UI thread.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     fun addAllAcceptedVolunteersToGroup() {
         val postId = loadedPostId ?: return
         val state = _uiState.value
@@ -1049,6 +1768,24 @@ class OrganisationPostManagementViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Reloads the latest data for the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — refreshPostGroupStatus
+     *
+     * Loads or refreshes the data required by refresh post group status and writes the result into observable
+     * UI state.
+     *
+     * The coroutine/repository boundary is handled here so Compose only reacts to loading, success and error
+     * state.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     private suspend fun refreshPostGroupStatus(postId: String) {
         _uiState.value = _uiState.value.copy(isLoadingPostGroup = true)
         runCatching {
@@ -1066,6 +1803,20 @@ class OrganisationPostManagementViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Applies the post group status used by the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — applyPostGroupStatus
+     *
+     * Implements the ViewModel workflow operation for apply post group status.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     private fun applyPostGroupStatus(status: PostGroupStatus, message: String? = null) {
         _uiState.value = _uiState.value.copy(
             isLoadingPostGroup = false,
@@ -1083,6 +1834,18 @@ class OrganisationPostManagementViewModel : ViewModel() {
     /**
      * Poll target: only the two normalized attendance tables are fetched.
      * Poll failures are logged but never replace a working screen with an error.
+     */
+    /**
+     * DETAILED BEHAVIOUR — refreshAttendanceOnly
+     *
+     * Loads or refreshes the data required by refresh attendance only and writes the result into observable UI
+     * state.
+     *
+     * The coroutine/repository boundary is handled here so Compose only reacts to loading, success and error
+     * state.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
      */
     private suspend fun refreshAttendanceOnly(postId: String) {
         attendanceRefreshMutex.withLock {
@@ -1106,6 +1869,24 @@ class OrganisationPostManagementViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Reloads the latest data for the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — reloadAfterAttendanceAction
+     *
+     * Implements the ViewModel workflow operation for reload after attendance action.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Coordinates account-scoped local persistence only for recoverable/cached UI state; published or
+     * transactional business state continues to come from Supabase.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     private suspend fun reloadAfterAttendanceAction(postId: String) {
         // Attendance corrections are already final database writes. Review grouping is
         // derived locally from attendance, so correcting attendance must not mutate
@@ -1123,6 +1904,24 @@ class OrganisationPostManagementViewModel : ViewModel() {
         )
     }
 
+    /**
+     * Reloads the latest data for the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — reloadAfterReviewAction
+     *
+     * Implements the ViewModel workflow operation for reload after review action.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Coordinates account-scoped local persistence only for recoverable/cached UI state; published or
+     * transactional business state continues to come from Supabase.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     private suspend fun reloadAfterReviewAction(postId: String) {
         val refreshedPost = repository.loadPost(postId)
         runCatching {
@@ -1143,6 +1942,26 @@ class OrganisationPostManagementViewModel : ViewModel() {
     /**
      * Final commit. All temporary decisions and feedback are sent in one RPC so
      * the database either finalizes the whole event or changes nothing.
+     */
+    /**
+     * DETAILED BEHAVIOUR — finalizePhysicalReviewPost
+     *
+     * Coordinates the user-confirmed business action for finalize physical review post from UI state to the
+     * repository and back.
+     *
+     * The ViewModel does not mark the action successful until the backend operation completes; afterwards it
+     * refreshes/updates state from the authoritative result.
+     *
+     * Coordinates account-scoped local persistence only for recoverable/cached UI state; published or
+     * transactional business state continues to come from Supabase.
+     *
+     * Runs asynchronous work in a lifecycle-aware coroutine and exposes progress/error state rather than
+     * blocking the UI thread.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
      */
     fun finalizePhysicalReviewPost() {
         val currentPost = cachedPost ?: return
@@ -1290,6 +2109,24 @@ class OrganisationPostManagementViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Derives the observe app clock value used by the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — observeAppClock
+     *
+     * Implements the ViewModel workflow operation for observe app clock.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Uses AppClock for business-date/time decisions so the same code works with the project test clock and
+     * normal device time.
+     *
+     * Runs asynchronous work in a lifecycle-aware coroutine and exposes progress/error state rather than
+     * blocking the UI thread.
+     */
     private fun observeAppClock() {
         viewModelScope.launch {
             AppClock.state.collect { clockState ->
@@ -1299,6 +2136,29 @@ class OrganisationPostManagementViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Applies the timing used by the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — applyTiming
+     *
+     * Implements the ViewModel workflow operation for apply timing.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Uses AppClock for business-date/time decisions so the same code works with the project test clock and
+     * normal device time.
+     *
+     * Uses the shared PostTimingEvaluator rather than duplicating the seven-day/timing classification inside
+     * this method.
+     *
+     * Uses the shared role application-window evaluator so Organisation and Volunteer flows interpret
+     * application timing consistently.
+     *
+     * Updates observable state immutably so Compose recomposes from one explicit source of truth.
+     */
     private fun applyTiming(
         post: PostManagementPost,
         isStartingAttendance: Boolean = _uiState.value.isStartingAttendance,
@@ -1395,6 +2255,9 @@ class OrganisationPostManagementViewModel : ViewModel() {
             isShowingCachedData = currentState.isShowingCachedData,
             lastSyncedAtEpochMillis = currentState.lastSyncedAtEpochMillis,
             isRefreshing = currentState.isRefreshing,
+            isPublishingDraft = currentState.isPublishingDraft,
+            draftPublishMessage = currentState.draftPublishMessage,
+            draftPublishError = currentState.draftPublishError,
             isStartingAttendance = isStartingAttendance,
             isUpdatingAttendance = isUpdatingAttendance,
             attendanceActionMessage = attendanceActionMessage,
@@ -1420,6 +2283,18 @@ class OrganisationPostManagementViewModel : ViewModel() {
         )
     }
 
+    /**
+     * Builds the remote review used by the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — buildRemoteReview
+     *
+     * Implements the ViewModel workflow operation for build remote review.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     private fun buildRemoteReview(
         post: PostManagementPost,
         nowMillis: Long
@@ -1442,12 +2317,36 @@ class OrganisationPostManagementViewModel : ViewModel() {
             person.completionStatus.uppercase(Locale.US) in setOf("IN_PROGRESS", "NEEDS_REVIEW")
         }
 
+        /**
+         * Derives the latest value used by the organisation Manage Post flow.
+         * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+         */
+        /**
+         * DETAILED BEHAVIOUR — latest
+         *
+         * Implements the ViewModel workflow operation for latest.
+         *
+         * It translates screen intent into immutable UI-state changes and/or repository work so presentation
+         * code stays free of backend/business decisions.
+         */
         fun latest(rows: List<PostManagementRemoteSubmission>): PostManagementRemoteSubmission? =
             rows.maxWithOrNull(
                 compareBy<PostManagementRemoteSubmission> { it.submittedAt.orEmpty() }
                     .thenBy { it.submissionId }
             )
 
+        /**
+         * Checks the is resubmission condition for the organisation Manage Post flow.
+         * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+         */
+        /**
+         * DETAILED BEHAVIOUR — isResubmission
+         *
+         * Implements the ViewModel workflow operation for is resubmission.
+         *
+         * It translates screen intent into immutable UI-state changes and/or repository work so presentation
+         * code stays free of backend/business decisions.
+         */
         fun isResubmission(submission: PostManagementRemoteSubmission): Boolean {
             if (!submission.status.equals("PENDING_REVIEW", ignoreCase = true)) return false
             return post.remoteSubmissions.any { previous ->
@@ -1529,6 +2428,18 @@ class OrganisationPostManagementViewModel : ViewModel() {
         )
     }
 
+    /**
+     * Builds the physical attendance used by the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — buildPhysicalAttendance
+     *
+     * Implements the ViewModel workflow operation for build physical attendance.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     private fun buildPhysicalAttendance(
         post: PostManagementPost,
         nowMillis: Long
@@ -1671,6 +2582,18 @@ class OrganisationPostManagementViewModel : ViewModel() {
         )
     }
 
+    /**
+     * Builds the physical review used by the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — buildPhysicalReview
+     *
+     * Implements the ViewModel workflow operation for build physical review.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     private fun buildPhysicalReview(
         post: PostManagementPost,
         attendance: PostManagementPhysicalAttendance?
@@ -1782,6 +2705,14 @@ class OrganisationPostManagementViewModel : ViewModel() {
     }
 
     /** Keeps PostgREST request metadata out of user-facing review errors. */
+    /**
+     * DETAILED BEHAVIOUR — friendlyReviewError
+     *
+     * Implements the ViewModel workflow operation for friendly review error.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     private fun friendlyReviewError(exception: Exception): String {
         val raw = exception.message?.trim().orEmpty()
         if (raw.isBlank()) return "Unable to complete this review."
@@ -1793,6 +2724,21 @@ class OrganisationPostManagementViewModel : ViewModel() {
             .ifBlank { "Unable to complete this review." }
     }
 
+    /**
+     * Derives the evaluate live window value used by the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — evaluateLiveWindow
+     *
+     * Implements the ViewModel workflow operation for evaluate live window.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     private fun evaluateLiveWindow(
         nowMillis: Long,
         today: String,
@@ -1806,6 +2752,18 @@ class OrganisationPostManagementViewModel : ViewModel() {
             this.timeZone = timeZone
         }
 
+        /**
+         * Normalises the time into the consistent form used by the organisation Manage Post flow.
+         * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+         */
+        /**
+         * DETAILED BEHAVIOUR — normalizeTime
+         *
+         * Implements the ViewModel workflow operation for normalize time.
+         *
+         * It translates screen intent into immutable UI-state changes and/or repository work so presentation
+         * code stays free of backend/business decisions.
+         */
         fun normalizeTime(value: String): String {
             val parts = value.split(":")
             return when (parts.size) {
@@ -1841,6 +2799,18 @@ class OrganisationPostManagementViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Formats the date for physical post used by the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — formatDateForPhysicalPost
+     *
+     * Implements the ViewModel workflow operation for format date for physical post.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     private fun formatDateForPhysicalPost(
         nowMillis: Long,
         timeZoneId: String?
@@ -1853,6 +2823,21 @@ class OrganisationPostManagementViewModel : ViewModel() {
         }.format(Date(nowMillis))
     }
 
+    /**
+     * Derives the calendar dates inclusive value used by the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — calendarDatesInclusive
+     *
+     * Implements the ViewModel workflow operation for calendar dates inclusive.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     private fun calendarDatesInclusive(
         startDate: String,
         endDate: String,
@@ -1879,6 +2864,18 @@ class OrganisationPostManagementViewModel : ViewModel() {
         return dates
     }
 
+    /**
+     * Resolves the time zone used by the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — resolveTimeZone
+     *
+     * Implements the ViewModel workflow operation for resolve time zone.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     private fun resolveTimeZone(timeZoneId: String?): TimeZone {
         return timeZoneId
             ?.takeIf { it.isNotBlank() }
@@ -1886,6 +2883,18 @@ class OrganisationPostManagementViewModel : ViewModel() {
             ?: TimeZone.getDefault()
     }
 
+    /**
+     * Derives the string value used by the organisation Manage Post flow.
+     * The ViewModel updates observable UI state so Compose can react without managing repository details directly.
+     */
+    /**
+     * DETAILED BEHAVIOUR — toDisplayTime
+     *
+     * Implements the ViewModel workflow operation for to display time.
+     *
+     * It translates screen intent into immutable UI-state changes and/or repository work so presentation code
+     * stays free of backend/business decisions.
+     */
     private fun String.toDisplayTime(): String {
         val parts = split(":")
         if (parts.size < 2) return this
@@ -1900,6 +2909,18 @@ class OrganisationPostManagementViewModel : ViewModel() {
         return "$displayHour:$minute $suffix"
     }
 
+    /**
+     * Holds the values represented by live window result as one strongly typed model.
+     * It supports state coordination and user actions for the Manage Post flow.
+     */
+    /**
+     * DETAILED DECLARATION — LiveWindowResult
+     *
+     * Domain/UI type for Live Window Result used by the Organisation module.
+     *
+     * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-
+     * typed maps.
+     */
     private data class LiveWindowResult(
         val isOpen: Boolean,
         val message: String

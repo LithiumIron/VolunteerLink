@@ -1,5 +1,20 @@
 package com.example.volunteerlink.organisation.repository
 
+// ============================================================================
+// DETAILED FILE RESPONSIBILITY
+// ============================================================================
+// Reads and updates the authenticated organisation's own public/profile information using normalized
+// user_profiles, organisations, organisation_supports and volunteer_posts data.
+//
+// Profile editing is separate from Volunteer Post management: it updates organisation identity/contact/support
+// metadata, while verification and ownership remain backend-controlled.
+//
+// The repository maps Supabase rows into profile models so Compose does not depend on raw JSON or table schemas.
+//
+// Architectural layer: Data/repository layer.
+// ============================================================================
+
+
 import com.example.volunteerlink.data.supabase
 import com.example.volunteerlink.organisation.auth.OrganisationSession
 import io.github.jan.supabase.auth.auth
@@ -11,6 +26,14 @@ import java.text.SimpleDateFormat
 import java.util.Locale
 
 @Serializable
+/**
+ * DETAILED DECLARATION — UserProfileRow
+ *
+ * Domain/UI type for User Profile Row used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 private data class UserProfileRow(
     @SerialName("user_id")
     val userId: String,
@@ -27,6 +50,14 @@ private data class UserProfileRow(
 )
 
 @Serializable
+/**
+ * DETAILED DECLARATION — OrganisationRow
+ *
+ * Domain/UI type for Organisation Row used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 private data class OrganisationRow(
     @SerialName("organisation_id")
     val organisationId: String,
@@ -59,6 +90,14 @@ private data class OrganisationRow(
 )
 
 @Serializable
+/**
+ * DETAILED DECLARATION — VolunteerPostSummaryRow
+ *
+ * Domain/UI type for Volunteer Post Summary Row used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 private data class VolunteerPostSummaryRow(
     @SerialName("post_id")
     val postId: String,
@@ -71,6 +110,14 @@ private data class VolunteerPostSummaryRow(
 )
 
 @Serializable
+/**
+ * DETAILED DECLARATION — OrganisationSupportRow
+ *
+ * Domain/UI type for Organisation Support Row used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 private data class OrganisationSupportRow(
     @SerialName("support_id")
     val supportId: String,
@@ -97,6 +144,14 @@ private data class OrganisationSupportRow(
 )
 
 @Serializable
+/**
+ * DETAILED DECLARATION — OrganisationSupportInsert
+ *
+ * Domain/UI type for Organisation Support Insert used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 private data class OrganisationSupportInsert(
     @SerialName("organisation_id")
     val organisationId: String,
@@ -120,12 +175,28 @@ private data class OrganisationSupportInsert(
     val longitude: Double? = null
 )
 
+/**
+ * DETAILED DECLARATION — RecentPostSummary
+ *
+ * Domain/UI type for Recent Post Summary used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class RecentPostSummary(
     val postId: String,
     val title: String,
     val status: String
 )
 
+/**
+ * DETAILED DECLARATION — OrganisationSupportData
+ *
+ * Domain/UI type for Organisation Support Data used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class OrganisationSupportData(
     val supportId: String,
     val supportDescription: String,
@@ -139,6 +210,14 @@ data class OrganisationSupportData(
     val longitude: Double?
 )
 
+/**
+ * DETAILED DECLARATION — OrganisationProfileData
+ *
+ * Domain/UI type for Organisation Profile Data used by the Organisation module.
+ *
+ * The type makes the data shape explicit so screens/repositories exchange named fields instead of loosely-typed
+ * maps.
+ */
 data class OrganisationProfileData(
     val organisationId: String,
     val userId: String,
@@ -171,14 +250,49 @@ data class OrganisationProfileData(
     val recentPosts: List<RecentPostSummary>
 )
 
+/**
+ * DETAILED DECLARATION — OrganisationProfileRepository
+ *
+ * Data-access implementation/contract for Organisation Profile Repository, isolating backend details from the
+ * screen and ViewModel layers.
+ *
+ * Protected server state still relies on authenticated Supabase authorization and database rules rather than
+ * trusting client-side checks alone.
+ */
 object OrganisationProfileRepository {
 
+    /**
+     * DETAILED BEHAVIOUR — loadProfile
+     *
+     * Loads the signed-in organisation profile by joining the account-level user profile with organisation-
+     * specific public information, support records and recent post data.
+     *
+     * The method returns one profile model for Compose rather than exposing four separate Supabase table result
+     * shapes.
+     *
+     * Profile visibility/editability is still governed by the authenticated account and database policies.
+     *
+     * Reads/maps Supabase table data from `organisations` (organisation-specific identity, verification, public
+     * contact/location and partnership availability); `user_profiles` (account-level profile identity such as
+     * volunteer/organisation user id, name and public profile fields); `organisation_supports`
+     * (resources/services an organisation has declared it can provide to partnership activities);
+     * `volunteer_posts` (the parent Volunteer Post record, including owner, mode, lifecycle status, category
+     * and publication metadata).
+     *
+     * Uses OrganisationSession so the client operation is associated with the signed-in organisation; server
+     * RLS/RPC ownership checks still make the final authorization decision.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     suspend fun loadProfile(): OrganisationProfileData? {
         return try {
             val currentUser = supabase.auth.currentUserOrNull() ?: return null
             val context = OrganisationSession.requireContext()
 
             val organisation = supabase
+                // SUPABASE TABLE: organisations — organisation-specific identity, verification, public contact/location and partnership availability.
+                // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
                 .from("organisations")
                 .select {
                     filter { eq("organisation_id", context.organisationId) }
@@ -187,6 +301,8 @@ object OrganisationProfileRepository {
                 .firstOrNull() ?: return null
 
             val profile = supabase
+                // SUPABASE TABLE: user_profiles — account-level profile identity such as volunteer/organisation user id, name and public profile fields.
+                // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
                 .from("user_profiles")
                 .select {
                     filter { eq("user_id", organisation.userId) }
@@ -196,6 +312,8 @@ object OrganisationProfileRepository {
 
             val supports = try {
                 supabase
+                    // SUPABASE TABLE: organisation_supports — resources/services an organisation has declared it can provide to partnership activities.
+                    // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
                     .from("organisation_supports")
                     .select {
                         filter { eq("organisation_id", context.organisationId) }
@@ -209,6 +327,8 @@ object OrganisationProfileRepository {
 
             val recentPosts = try {
                 supabase
+                    // SUPABASE TABLE: volunteer_posts — the parent Volunteer Post record, including owner, mode, lifecycle status, category and publication metadata.
+                    // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
                     .from("volunteer_posts")
                     .select {
                         filter { eq("organisation_id", context.organisationId) }
@@ -265,10 +385,29 @@ object OrganisationProfileRepository {
         }
     }
 
+    /**
+     * DETAILED BEHAVIOUR — updateOpenToPartnership
+     *
+     * Performs the repository/data-layer operation for update open to partnership.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Reads/maps Supabase table data from `organisations` (organisation-specific identity, verification, public
+     * contact/location and partnership availability).
+     *
+     * Uses OrganisationSession so the client operation is associated with the signed-in organisation; server
+     * RLS/RPC ownership checks still make the final authorization decision.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     suspend fun updateOpenToPartnership(openToPartnership: Boolean): Boolean {
         return try {
             val organisationId = OrganisationSession.requireOrganisationId()
             supabase
+                // SUPABASE TABLE: organisations — organisation-specific identity, verification, public contact/location and partnership availability.
+                // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
                 .from("organisations")
                 .update({
                     set("open_to_partnership", openToPartnership)
@@ -282,6 +421,17 @@ object OrganisationProfileRepository {
         }
     }
 
+    /**
+     * DETAILED BEHAVIOUR — requestEmailChange
+     *
+     * Performs the repository/data-layer operation for request email change.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     suspend fun requestEmailChange(newEmail: String): Boolean {
         return try {
             supabase.auth.updateUser {
@@ -294,6 +444,17 @@ object OrganisationProfileRepository {
         }
     }
 
+    /**
+     * DETAILED BEHAVIOUR — refreshLoginEmail
+     *
+     * Performs the repository/data-layer operation for refresh login email.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     suspend fun refreshLoginEmail(): String? {
         return try {
             supabase.auth.refreshCurrentSession()
@@ -303,6 +464,23 @@ object OrganisationProfileRepository {
             null
         }
     }
+    /**
+     * DETAILED BEHAVIOUR — addSupport
+     *
+     * Performs the repository/data-layer operation for add support.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Reads/maps Supabase table data from `organisation_supports` (resources/services an organisation has
+     * declared it can provide to partnership activities).
+     *
+     * Uses OrganisationSession so the client operation is associated with the signed-in organisation; server
+     * RLS/RPC ownership checks still make the final authorization decision.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     suspend fun addSupport(
         supportDescription: String,
         supportType: String,
@@ -318,6 +496,8 @@ object OrganisationProfileRepository {
             val isVenue = supportType == "VENUE"
 
             val row = supabase
+                // SUPABASE TABLE: organisation_supports — resources/services an organisation has declared it can provide to partnership activities.
+                // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
                 .from("organisation_supports")
                 .insert(
                     OrganisationSupportInsert(
@@ -344,6 +524,14 @@ object OrganisationProfileRepository {
         }
     }
 
+    /**
+     * DETAILED BEHAVIOUR — updateSupport
+     *
+     * Performs the repository/data-layer operation for update support.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     */
     suspend fun updateSupport(
         supportId: String,
         supportDescription: String,
@@ -360,6 +548,8 @@ object OrganisationProfileRepository {
             val isVenue = supportType == "VENUE"
 
             val row = supabase
+                // SUPABASE TABLE: organisation_supports — resources/services an organisation has declared it can provide to partnership activities.
+                // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
                 .from("organisation_supports")
                 .update({
                     set("support_description", supportDescription.trim())
@@ -387,10 +577,29 @@ object OrganisationProfileRepository {
         }
     }
 
+    /**
+     * DETAILED BEHAVIOUR — removeSupport
+     *
+     * Performs the repository/data-layer operation for remove support.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Reads/maps Supabase table data from `organisation_supports` (resources/services an organisation has
+     * declared it can provide to partnership activities).
+     *
+     * Uses OrganisationSession so the client operation is associated with the signed-in organisation; server
+     * RLS/RPC ownership checks still make the final authorization decision.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     suspend fun removeSupport(supportId: String): Boolean {
         return try {
             val organisationId = OrganisationSession.requireOrganisationId()
             supabase
+                // SUPABASE TABLE: organisation_supports — resources/services an organisation has declared it can provide to partnership activities.
+                // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
                 .from("organisation_supports")
                 .delete {
                     filter {
@@ -409,9 +618,28 @@ object OrganisationProfileRepository {
     // SETTINGS SCREEN — public-facing fields on `organisations`
     // =========================================================
 
+    /**
+     * DETAILED BEHAVIOUR — updateContactPhone
+     *
+     * Performs the repository/data-layer operation for update contact phone.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Reads/maps Supabase table data from `organisations` (organisation-specific identity, verification, public
+     * contact/location and partnership availability).
+     *
+     * Uses OrganisationSession so the client operation is associated with the signed-in organisation; server
+     * RLS/RPC ownership checks still make the final authorization decision.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     suspend fun updateContactPhone(contactPhone: String): Boolean {
         return try {
             val organisationId = OrganisationSession.requireOrganisationId()
+            // SUPABASE TABLE: organisations — organisation-specific identity, verification, public contact/location and partnership availability.
+            // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
             supabase.from("organisations").update({
                 set("contact_phone", contactPhone)
             }) {
@@ -424,9 +652,28 @@ object OrganisationProfileRepository {
         }
     }
 
+    /**
+     * DETAILED BEHAVIOUR — updateContactEmail
+     *
+     * Performs the repository/data-layer operation for update contact email.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Reads/maps Supabase table data from `organisations` (organisation-specific identity, verification, public
+     * contact/location and partnership availability).
+     *
+     * Uses OrganisationSession so the client operation is associated with the signed-in organisation; server
+     * RLS/RPC ownership checks still make the final authorization decision.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     suspend fun updateContactEmail(contactEmail: String): Boolean {
         return try {
             val organisationId = OrganisationSession.requireOrganisationId()
+            // SUPABASE TABLE: organisations — organisation-specific identity, verification, public contact/location and partnership availability.
+            // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
             supabase.from("organisations").update({
                 set("contact_email", contactEmail)
             }) {
@@ -439,9 +686,28 @@ object OrganisationProfileRepository {
         }
     }
 
+    /**
+     * DETAILED BEHAVIOUR — updateDescription
+     *
+     * Performs the repository/data-layer operation for update description.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Reads/maps Supabase table data from `organisations` (organisation-specific identity, verification, public
+     * contact/location and partnership availability).
+     *
+     * Uses OrganisationSession so the client operation is associated with the signed-in organisation; server
+     * RLS/RPC ownership checks still make the final authorization decision.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     suspend fun updateDescription(description: String): Boolean {
         return try {
             val organisationId = OrganisationSession.requireOrganisationId()
+            // SUPABASE TABLE: organisations — organisation-specific identity, verification, public contact/location and partnership availability.
+            // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
             supabase.from("organisations").update({
                 set("description", description)
             }) {
@@ -460,6 +726,24 @@ object OrganisationProfileRepository {
     // functions above.
     // =========================================================
 
+    /**
+     * DETAILED BEHAVIOUR — updateProfile
+     *
+     * Performs the repository/data-layer operation for update profile.
+     *
+     * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+     * decoding and backend-specific errors.
+     *
+     * Reads/maps Supabase table data from `user_profiles` (account-level profile identity such as
+     * volunteer/organisation user id, name and public profile fields); `organisations` (organisation-specific
+     * identity, verification, public contact/location and partnership availability).
+     *
+     * Uses OrganisationSession so the client operation is associated with the signed-in organisation; server
+     * RLS/RPC ownership checks still make the final authorization decision.
+     *
+     * Handles failure explicitly so network/storage/database errors can be surfaced or cleaned up without
+     * leaving the UI in an assumed-success state.
+     */
     suspend fun updateProfile(
         organisationName: String,
         registeredPhone: String,
@@ -474,6 +758,8 @@ object OrganisationProfileRepository {
             val organisationId = OrganisationSession.requireOrganisationId()
 
             supabase
+                // SUPABASE TABLE: user_profiles — account-level profile identity such as volunteer/organisation user id, name and public profile fields.
+                // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
                 .from("user_profiles")
                 .update({
                     set("full_name", organisationName)
@@ -485,6 +771,8 @@ object OrganisationProfileRepository {
                 }
 
             supabase
+                // SUPABASE TABLE: organisations — organisation-specific identity, verification, public contact/location and partnership availability.
+                // This is a data-layer read/write; Compose receives the mapped result rather than the raw PostgREST row.
                 .from("organisations")
                 .update({
                     set("organisation_name", organisationName)
@@ -504,6 +792,14 @@ object OrganisationProfileRepository {
     }
 }
 
+/**
+ * DETAILED BEHAVIOUR — toData
+ *
+ * Performs the repository/data-layer operation for to data.
+ *
+ * The caller works with VolunteerLink models while this method is responsible for Supabase request shape,
+ * decoding and backend-specific errors.
+ */
 private fun OrganisationSupportRow.toData(): OrganisationSupportData {
     return OrganisationSupportData(
         supportId = supportId,
