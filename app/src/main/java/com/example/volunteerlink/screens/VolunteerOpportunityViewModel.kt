@@ -10,6 +10,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.volunteerlink.data.VolunteerOpportunitySessionStore
 import com.example.volunteerlink.data.VolunteerDashboardDataSource
 import com.example.volunteerlink.data.VolunteerOpportunityRepository
+import com.example.volunteerlink.data.VolunteerEventContactRepository
 import com.example.volunteerlink.model.VolunteerApplicationStatus
 import com.example.volunteerlink.model.VolunteerOpportunityApplication
 import kotlinx.serialization.json.buildJsonObject
@@ -24,6 +25,18 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+data class VolunteerEventPhoneContactUiState(
+    val postId: String = "",
+    val roleTemplateId: String = "",
+    val isLoading: Boolean = false,
+    val isUpdating: Boolean = false,
+    val eligible: Boolean = false,
+    val enabled: Boolean = false,
+    val availableUntilLabel: String? = null,
+    val errorMessage: String? = null,
+    val reason: String? = null
+)
+
 data class VolunteerOpportunityUiState(
     val isLoading: Boolean = true,
     val isRefreshing: Boolean = false,
@@ -34,6 +47,7 @@ data class VolunteerOpportunityUiState(
     val syncWarning: String? = null,
     val isShowingCachedData: Boolean = false,
     val lastSyncedAtEpochMillis: Long? = null,
+    val eventPhoneContact: VolunteerEventPhoneContactUiState = VolunteerEventPhoneContactUiState(),
     val dataVersion: Int = 0
 )
 
@@ -79,6 +93,144 @@ class VolunteerOpportunityViewModel(
 
     fun refresh() {
         loadDashboard(isRefresh = true)
+    }
+
+    fun loadEventPhoneContact(
+        postId: String,
+        roleTemplateId: String
+    ) {
+        if (postId.isBlank() || roleTemplateId.isBlank()) return
+
+        mutableUiState.update {
+            it.copy(
+                eventPhoneContact = VolunteerEventPhoneContactUiState(
+                    postId = postId,
+                    roleTemplateId = roleTemplateId,
+                    isLoading = true
+                )
+            )
+        }
+
+        viewModelScope.launch {
+            try {
+                val status = VolunteerEventContactRepository.loadPhoneContactStatus(
+                    postId = postId,
+                    roleTemplateId = roleTemplateId
+                )
+                mutableUiState.update { current ->
+                    if (
+                        current.eventPhoneContact.postId != postId ||
+                        current.eventPhoneContact.roleTemplateId != roleTemplateId
+                    ) {
+                        current
+                    } else {
+                        current.copy(
+                            eventPhoneContact = current.eventPhoneContact.copy(
+                                isLoading = false,
+                                eligible = status.eligible,
+                                enabled = status.enabled,
+                                availableUntilLabel = status.availableUntilLabel,
+                                errorMessage = null,
+                                reason = status.reason
+                            )
+                        )
+                    }
+                }
+            } catch (exception: Exception) {
+                exception.printStackTrace()
+                mutableUiState.update { current ->
+                    if (
+                        current.eventPhoneContact.postId != postId ||
+                        current.eventPhoneContact.roleTemplateId != roleTemplateId
+                    ) {
+                        current
+                    } else {
+                        current.copy(
+                            eventPhoneContact = current.eventPhoneContact.copy(
+                                isLoading = false,
+                                errorMessage = "Phone contact preference could not be loaded. Please try again."
+                            )
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun setEventPhoneContactEnabled(
+        postId: String,
+        roleTemplateId: String,
+        enabled: Boolean
+    ) {
+        val contactState = mutableUiState.value.eventPhoneContact
+        if (
+            contactState.postId != postId ||
+            contactState.roleTemplateId != roleTemplateId ||
+            contactState.isUpdating
+        ) return
+
+        mutableUiState.update {
+            it.copy(
+                eventPhoneContact = it.eventPhoneContact.copy(
+                    isUpdating = true,
+                    errorMessage = null
+                )
+            )
+        }
+
+        viewModelScope.launch {
+            try {
+                val status = VolunteerEventContactRepository.setPhoneContactEnabled(
+                    postId = postId,
+                    roleTemplateId = roleTemplateId,
+                    enabled = enabled
+                )
+                mutableUiState.update { current ->
+                    if (
+                        current.eventPhoneContact.postId != postId ||
+                        current.eventPhoneContact.roleTemplateId != roleTemplateId
+                    ) {
+                        current
+                    } else {
+                        current.copy(
+                            eventPhoneContact = current.eventPhoneContact.copy(
+                                isUpdating = false,
+                                eligible = status.eligible,
+                                enabled = status.enabled,
+                                availableUntilLabel = status.availableUntilLabel,
+                                errorMessage = null,
+                                reason = status.reason
+                            )
+                        )
+                    }
+                }
+            } catch (exception: Exception) {
+                exception.printStackTrace()
+                mutableUiState.update { current ->
+                    if (
+                        current.eventPhoneContact.postId != postId ||
+                        current.eventPhoneContact.roleTemplateId != roleTemplateId
+                    ) {
+                        current
+                    } else {
+                        current.copy(
+                            eventPhoneContact = current.eventPhoneContact.copy(
+                                isUpdating = false,
+                                errorMessage = exception.message
+                                    ?.takeIf { it.isNotBlank() }
+                                    ?: "Phone contact preference could not be updated."
+                            )
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun clearEventPhoneContact() {
+        mutableUiState.update {
+            it.copy(eventPhoneContact = VolunteerEventPhoneContactUiState())
+        }
     }
 
     fun setOpportunitySaved(eventId: Int, shouldSave: Boolean) {

@@ -9,6 +9,12 @@ object OrganisationNavigationRoutes {
     const val MANAGE_POST_EDIT = "organisation_manage_post/{postId}/edit"
     const val MANAGE_APPLICANT_REVIEW =
         "organisation_manage_post/{postId}/applicant/{roleTemplateId}/{userId}"
+    const val VIEW_VOLUNTEER_PROFILE =
+        "organisation_view_volunteer_profile/{postId}/{userId}"
+    const val VIEW_VOLUNTEER_CERTIFICATE =
+        "organisation_view_volunteer_certificate/{userId}/{postId}/{roleTemplateId}"
+    const val VIEW_PARTNER_PROFILE =
+        "organisation_view_partner_profile/{organisationId}"
     const val MANAGE_IMPACT_WEAVE = "organisation_manage_impact_weave"
     const val MANAGE_PROMOTIONS = "organisation_manage_promotions"
     const val CREATE = "organisation_create"
@@ -41,6 +47,19 @@ object OrganisationNavigationRoutes {
         userId: String
     ): String =
         "organisation_manage_post/$postId/applicant/$roleTemplateId/$userId"
+
+    fun viewVolunteerProfile(postId: String, userId: String): String =
+        "organisation_view_volunteer_profile/$postId/$userId"
+
+    fun viewVolunteerCertificate(
+        userId: String,
+        postId: String,
+        roleTemplateId: String
+    ): String =
+        "organisation_view_volunteer_certificate/$userId/$postId/$roleTemplateId"
+
+    fun viewPartnerProfile(organisationId: String): String =
+        "organisation_view_partner_profile/$organisationId"
 
     fun chatRoom(chatId: String): String =
         "organisation_chat_room/$chatId"

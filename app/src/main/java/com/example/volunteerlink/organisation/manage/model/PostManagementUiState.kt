@@ -170,6 +170,8 @@ data class PostManagementPerson(
     val city: String? = null,
     val bio: String? = null,
     val avatarPath: String? = null,
+    val eventSharedPhone: String? = null,
+    val eventPhoneContactUntilLabel: String? = null,
     val roleTemplateId: String,
     val roleName: String,
     val roleMode: String,
