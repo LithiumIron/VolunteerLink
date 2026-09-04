@@ -92,6 +92,9 @@ import com.example.volunteerlink.ui.theme.VolunteerLinkWarning
 import kotlinx.coroutines.launch
 
 @Composable
+// Purpose: Displays one event and sends the selected role to the role-details route.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 fun VolunteerOpportunityDetailsScreen(
     volunteerEventId: Int,
     recommendedRoleId: Int = -1,
@@ -104,6 +107,7 @@ fun VolunteerOpportunityDetailsScreen(
         roleId: Int
     ) -> Unit
 ) {
+    // Use the current Android context for permissions, files, resources or external intents.
     val context = LocalContext.current
     // The same ViewModel is shared with application screens so save/apply errors are
     // displayed consistently even when the volunteer navigates back to this page.
@@ -116,6 +120,7 @@ fun VolunteerOpportunityDetailsScreen(
         mutableStateOf<OrganisationPublicProfile?>(null)
     }
     var isLoadingOrganisationPreview by remember { mutableStateOf(false) }
+    // Create a lifecycle-aware coroutine scope for asynchronous work started by this Compose screen.
     val previewScope = rememberCoroutineScope()
 
     // Event objects are loaded once into the Volunteer session store. Navigation passes
@@ -130,9 +135,11 @@ fun VolunteerOpportunityDetailsScreen(
         VolunteerOpportunityNotFoundScreen(
             onBackSelected = onBackSelected
         )
+        // Keep this Compose block separate so its visual state follows the value prepared above.
         return
     }
 
+    // Arrange the following screen content vertically inside the available space.
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -156,6 +163,7 @@ fun VolunteerOpportunityDetailsScreen(
             }
         )
 
+        // Render this content as a lazy scrolling list so only visible items need to be composed.
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
@@ -164,6 +172,7 @@ fun VolunteerOpportunityDetailsScreen(
         ) {
             actionState.applicationActionError?.let { message ->
                 item(key = "action_error") {
+                    // Display the prepared label; business rules are calculated before reaching this UI call.
                     Text(message, color = VolunteerLinkError, modifier = Modifier.padding(16.dp))
                 }
             }
@@ -214,6 +223,7 @@ fun VolunteerOpportunityDetailsScreen(
 
             if (recommendedRoleId != -1) {
                 item(key = "recommended_role") {
+                    // Name the calculated recommended value because later UI branches reuse it during this Compose pass.
                     val recommended = volunteerOpportunityEvent.eventVolunteerRoles
                         .firstOrNull { it.roleId == recommendedRoleId }
                     Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp)) {
@@ -287,12 +297,16 @@ fun VolunteerOpportunityDetailsScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+// Purpose: Handles organisation preview sheet as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun OrganisationPreviewSheet(
     profile: OrganisationPublicProfile?,
     isLoading: Boolean,
     fallbackName: String,
     onDismissRequest: () -> Unit
 ) {
+    // Use the current Android context for permissions, files, resources or external intents.
     val context = LocalContext.current
 
     ModalBottomSheet(
@@ -390,6 +404,7 @@ private fun OrganisationPreviewSheet(
                 )
             }
 
+            // Name the calculated location value because later UI branches reuse it during this Compose pass.
             val location = listOf(
                 profile.locationName, profile.stateRegion, profile.country
             ).filter { it.isNotBlank() }.joinToString(", ")
@@ -403,6 +418,7 @@ private fun OrganisationPreviewSheet(
                 )
             }
 
+            // Calculate whether the following UI or action is allowed before it is rendered or executed.
             val hasContact = profile.websiteUrl.isNotBlank() ||
                     profile.contactPhone.isNotBlank() ||
                     profile.contactEmail.isNotBlank()
@@ -417,6 +433,7 @@ private fun OrganisationPreviewSheet(
                         label = "Website",
                         value = profile.websiteUrl,
                         onClick = {
+                            // Name the calculated url value because later UI branches reuse it during this Compose pass.
                             val url = if (
                                 profile.websiteUrl.startsWith("http://") ||
                                 profile.websiteUrl.startsWith("https://")
@@ -455,6 +472,9 @@ private fun OrganisationPreviewSheet(
 }
 
 @Composable
+// Purpose: Handles organisation preview contact row as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun OrganisationPreviewContactRow(
     label: String,
     value: String,
@@ -492,6 +512,9 @@ private fun OrganisationPreviewContactRow(
 }
 
 @Composable
+// Purpose: Handles volunteer opportunity details top bar as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerOpportunityDetailsTopBar(
     onBackSelected: () -> Unit,
     isSaved: Boolean,
@@ -557,12 +580,16 @@ private fun VolunteerOpportunityDetailsTopBar(
 }
 
 @Composable
+// Purpose: Renders the volunteer opportunity summary section from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerOpportunitySummarySection(
     volunteerOpportunityEvent:
     VolunteerOpportunityEvent,
     onLocationSelected: () -> Unit,
     onOrganisationSelected: () -> Unit
 ) {
+    // Name the calculated category icon resource id value because later UI branches reuse it during this Compose pass.
     val categoryIconResourceId =
         when (volunteerOpportunityEvent.eventCategory) {
             VolunteerOpportunityCategory.SPORTS ->
@@ -759,6 +786,9 @@ private fun VolunteerOpportunitySummarySection(
 }
 
 @Composable
+// Purpose: Renders the volunteer opportunity about section from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerOpportunityAboutSection(
     volunteerOpportunityEvent:
     VolunteerOpportunityEvent
@@ -860,6 +890,9 @@ private fun VolunteerOpportunityAboutSection(
 }
 
 @Composable
+// Purpose: Renders the volunteer opportunity roles section from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerOpportunityRolesSection(
     volunteerOpportunityEvent:
     VolunteerOpportunityEvent,
@@ -932,9 +965,13 @@ private fun VolunteerOpportunityRolesSection(
 }
 
 @Composable
+// Purpose: Renders the volunteer opportunity partnership section from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerOpportunityPartnershipSection(
     volunteerOpportunityEvent: VolunteerOpportunityEvent
 ) {
+    // Name the calculated partners value because later UI branches reuse it during this Compose pass.
     val partners = volunteerOpportunityEvent.eventPartnershipPartners
 
     Column(
@@ -1022,14 +1059,19 @@ private fun VolunteerOpportunityPartnershipSection(
 }
 
 @Composable
+// Purpose: Renders the volunteer opportunity partnership contribution row from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerOpportunityPartnershipContributionRow(
     contribution: VolunteerOpportunityPartnershipContribution
 ) {
+    // Name the calculated amount value because later UI branches reuse it during this Compose pass.
     val amount = if (contribution.supportType.equals("VENUE", ignoreCase = true)) {
         contribution.capacityProvided?.let { "Capacity $it" }
     } else {
         contribution.quantityProvided?.let { "×$it" }
     }
+    // Name the calculated provider value because later UI branches reuse it during this Compose pass.
     val provider = contribution.providerResourceName
         ?.takeIf { it.isNotBlank() }
         ?: contribution.needResourceName
@@ -1071,20 +1113,27 @@ private fun VolunteerOpportunityPartnershipContributionRow(
 }
 
 @Composable
+// Purpose: Renders the volunteer opportunity role card from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerOpportunityRoleCard(
     volunteerEventId: Int,
     volunteerOpportunityRole:
     VolunteerOpportunityRole,
     onRoleSelected: () -> Unit
 ) {
+    // Resolve or prepare event data from the shared dashboard snapshot for this part of the screen.
     val event = VolunteerOpportunitySessionStore.findEventById(volunteerEventId)
+    // Read the shared business clock so Today, deadlines and attendance use the same date.
     val businessNow = volunteerBusinessTime()
+    // Name the calculated unavailable reason value because later UI branches reuse it during this Compose pass.
     val unavailableReason = when {
         !com.example.volunteerlink.data.VolunteerApplicationWindow.canApply(event, volunteerOpportunityRole, businessNow) ->
             com.example.volunteerlink.data.VolunteerApplicationWindow.reason(event, volunteerOpportunityRole)
         volunteerOpportunityRole.roleVacancies <= 0 -> "Full: no places are available for this role."
         else -> null
     }
+    // Resolve or prepare the application data used by the next status, cancellation or navigation decision.
     val existingApplication =
         VolunteerOpportunitySessionStore
             .volunteerApplications
@@ -1094,6 +1143,7 @@ private fun VolunteerOpportunityRoleCard(
                     application.applicationRoleId ==
                     volunteerOpportunityRole.roleId
             }
+    // Resolve or prepare role data used for eligibility, schedule and application controls.
     val roleLevelColour =
         when (volunteerOpportunityRole.roleLevel) {
             "Beginner" -> VolunteerLinkSuccess
@@ -1102,6 +1152,7 @@ private fun VolunteerOpportunityRoleCard(
             else -> VolunteerLinkTextSecondary
         }
 
+    // Resolve or prepare role data used for eligibility, schedule and application controls.
     val roleLevelBackgroundColour =
         when (volunteerOpportunityRole.roleLevel) {
             "Beginner" -> Color(0xFFE8F5E9)
@@ -1156,6 +1207,7 @@ private fun VolunteerOpportunityRoleCard(
                 modifier = Modifier.height(6.dp)
             )
 
+            // Resolve or prepare role data used for eligibility, schedule and application controls.
             val roleDescription =
                 volunteerOpportunityRole
                     .roleSpecificAssignment
@@ -1306,6 +1358,9 @@ private fun VolunteerOpportunityRoleCard(
     }
 }
 
+// Purpose: Handles opportunity skill path level name as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun opportunitySkillPathLevelName(
     level: Int
 ): String {
@@ -1318,6 +1373,9 @@ private fun opportunitySkillPathLevelName(
 }
 
 @Composable
+// Purpose: Renders the volunteer opportunity contact section from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerOpportunityContactSection(
     volunteerOpportunityEvent:
     VolunteerOpportunityEvent,
@@ -1468,6 +1526,9 @@ private fun VolunteerOpportunityContactSection(
 }
 
 @Composable
+// Purpose: Renders the volunteer opportunity information row from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerOpportunityInformationRow(
     @DrawableRes
     iconResourceId: Int,
@@ -1546,6 +1607,9 @@ private fun VolunteerOpportunityInformationRow(
 }
 
 @Composable
+// Purpose: Renders the volunteer opportunity section title from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerOpportunitySectionTitle(
     sectionTitle: String,
     sectionSupportingText: String? = null
@@ -1574,6 +1638,9 @@ private fun VolunteerOpportunitySectionTitle(
 }
 
 @Composable
+// Purpose: Handles verified organisation badge as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VerifiedOrganisationBadge() {
     Surface(
         shape = RoundedCornerShape(5.dp),
@@ -1609,6 +1676,9 @@ private fun VerifiedOrganisationBadge() {
 }
 
 @Composable
+// Purpose: Handles opportunity badge as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun OpportunityBadge(
     badgeText: String,
     badgeTextColour: Color,
@@ -1632,6 +1702,9 @@ private fun OpportunityBadge(
 }
 
 @Composable
+// Purpose: Renders the volunteer opportunity not found screen and connects user actions to navigation or its ViewModel.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerOpportunityNotFoundScreen(
     onBackSelected: () -> Unit
 ) {
@@ -1680,6 +1753,9 @@ private fun VolunteerOpportunityNotFoundScreen(
     }
 }
 
+// Purpose: Creates and safely launches the Android action for open volunteer email.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun openVolunteerEmail(
     context: Context,
     emailAddress: String
@@ -1693,6 +1769,7 @@ private fun openVolunteerEmail(
         return
     }
 
+    // Name the calculated email intent value because later UI branches reuse it during this Compose pass.
     val emailIntent =
         Intent(
             Intent.ACTION_SENDTO,
@@ -1707,6 +1784,9 @@ private fun openVolunteerEmail(
     )
 }
 
+// Purpose: Creates and safely launches the Android action for open volunteer phone.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun openVolunteerPhone(
     context: Context,
     phoneNumber: String
@@ -1720,6 +1800,7 @@ private fun openVolunteerPhone(
         return
     }
 
+    // Name the calculated phone intent value because later UI branches reuse it during this Compose pass.
     val phoneIntent =
         Intent(
             Intent.ACTION_DIAL,
@@ -1736,11 +1817,15 @@ private fun openVolunteerPhone(
     )
 }
 
+// Purpose: Handles share volunteer opportunity as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun shareVolunteerOpportunity(
     context: Context,
     volunteerOpportunityEvent:
     VolunteerOpportunityEvent
 ) {
+    // Name the calculated share text value because later UI branches reuse it during this Compose pass.
     val shareText =
         buildString {
             append(
@@ -1773,6 +1858,7 @@ private fun shareVolunteerOpportunity(
             }
         }
 
+    // Name the calculated share intent value because later UI branches reuse it during this Compose pass.
     val shareIntent =
         Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
@@ -1794,6 +1880,9 @@ private fun shareVolunteerOpportunity(
     )
 }
 
+// Purpose: Creates and safely launches the Android action for start volunteer intent.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun startVolunteerIntent(
     context: Context,
     intent: Intent,

@@ -81,6 +81,9 @@ private enum class VolunteerNotificationCategory {
 }
 
 @Composable
+// Purpose: Displays volunteer notifications and routes each notification to its related feature.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 fun VolunteerNotificationsScreen(
     onBackSelected: () -> Unit,
     onApplicationsSelected: () -> Unit,
@@ -90,6 +93,7 @@ fun VolunteerNotificationsScreen(
 ) {
     val uiState by notificationViewModel.uiState.collectAsStateWithLifecycle()
     var showClearConfirmation by rememberSaveable { mutableStateOf(false) }
+    // Check this condition before showing the action, preventing an invalid Volunteer flow from continuing.
     if (showClearConfirmation) {
         androidx.compose.material3.AlertDialog(
             containerColor = Color.White,
@@ -99,6 +103,7 @@ fun VolunteerNotificationsScreen(
             title = { Text("Clear all notifications?") },
             text = { Text("This clears all current notifications, including those outside the selected filter. Your applications, favourites and achievements will not be deleted.") },
             confirmButton = {
+                // Connect this visible button to the callback supplied by the parent screen or navigation host.
                 TextButton(
                     enabled = !uiState.isClearing,
                     onClick = {
@@ -108,7 +113,9 @@ fun VolunteerNotificationsScreen(
                 ) { Text("Clear all", color = Color(0xFFC62828)) }
             },
             dismissButton = {
+                // Connect this visible button to the callback supplied by the parent screen or navigation host.
                 TextButton(onClick = { showClearConfirmation = false }) {
+                    // Display the prepared label; business rules are calculated before reaching this UI call.
                     Text("Keep notifications", color = VolunteerLinkPrimaryGreen)
                 }
             }
@@ -124,7 +131,9 @@ fun VolunteerNotificationsScreen(
         mutableStateOf(VolunteerNotificationFilter.ALL)
     }
 
+    // Build the subset that is allowed to appear for the volunteer in the current screen state.
     val visibleNotifications = uiState.notifications.filter { notification ->
+        // Choose one mutually exclusive UI result from the current status or user selection.
         when (selectedFilter) {
             VolunteerNotificationFilter.ALL -> true
             VolunteerNotificationFilter.APPLICATIONS ->
@@ -275,18 +284,24 @@ fun VolunteerNotificationsScreen(
 }
 
 @Composable
+// Purpose: Handles notification card as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun NotificationCard(
     notification: VolunteerNotification,
     onDismiss: () -> Unit,
     onClick: () -> Unit
 ) {
+    // Name the calculated category value because later UI branches reuse it during this Compose pass.
     val category = notification.category()
+    // Choose a visual colour that represents the current status without changing business data.
     val accentColour = when (category) {
         VolunteerNotificationCategory.APPLICATION -> VolunteerLinkInformation
         VolunteerNotificationCategory.REMINDER -> VolunteerLinkWarning
         VolunteerNotificationCategory.ACHIEVEMENT -> VolunteerLinkSuccess
         VolunteerNotificationCategory.SYSTEM -> VolunteerLinkPrimaryGreen
     }
+    // Name the calculated action label value because later UI branches reuse it during this Compose pass.
     val actionLabel = when (category) {
         VolunteerNotificationCategory.APPLICATION -> "View applications"
         VolunteerNotificationCategory.REMINDER ->
@@ -403,6 +418,9 @@ private fun NotificationCard(
 }
 
 @Composable
+// Purpose: Handles notification state message as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun NotificationStateMessage(
     title: String,
     message: String,
@@ -453,6 +471,7 @@ private fun NotificationStateMessage(
 }
 
 private fun VolunteerNotification.category(): VolunteerNotificationCategory {
+    // Name the calculated type value because later UI branches reuse it during this Compose pass.
     val type = notificationType.uppercase()
     return when {
         type.contains("APPLICATION") || type.contains("PARTICIPATION") ->
@@ -466,5 +485,8 @@ private fun VolunteerNotification.category(): VolunteerNotificationCategory {
     }
 }
 
+// Purpose: Converts notification time into the display text expected by the Volunteer UI.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun formatNotificationTime(timestamp: String): String =
     timestamp.take(16).replace('T', ' ')

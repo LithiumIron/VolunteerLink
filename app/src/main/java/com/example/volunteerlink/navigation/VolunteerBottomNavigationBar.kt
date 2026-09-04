@@ -38,6 +38,9 @@ import com.example.volunteerlink.ui.theme.VolunteerLinkPrimaryGreen
 import com.example.volunteerlink.ui.theme.VolunteerLinkSoftGreenSurface
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextSecondary
 
+// Purpose: Handles volunteer bottom navigation item as one reusable step in the Volunteer flow.
+// Usage: Used by the app navigation graph when the volunteer opens, returns from, or switches a destination.
+// Navigation effect: Route arguments identify the selected event, role, application or certificate.
 data class VolunteerBottomNavigationItem(
     val navigationRoute: String,
     val navigationLabel: String,
@@ -47,15 +50,20 @@ data class VolunteerBottomNavigationItem(
 )
 
 @Composable
+// Purpose: Handles volunteer bottom navigation bar as one reusable step in the Volunteer flow.
+// Usage: Used by the app navigation graph when the volunteer opens, returns from, or switches a destination.
+// Navigation effect: Route arguments identify the selected event, role, application or certificate.
 fun VolunteerBottomNavigationBar(
     currentVolunteerNavigationRoute: String?,
     onVolunteerNavigationItemSelected: (
         navigationRoute: String
     ) -> Unit
 ) {
+    // Calculate whether the following UI or action is allowed before it is rendered or executed.
     val showChatNotification = ChatData.chatsForCurrentRole().any { chat ->
         (chat.readCounts[Role.APPLICANT] ?: 0) < chat.messages.size
     }
+    // Name the calculated volunteer bottom navigation items value because later UI branches reuse it during this Compose pass.
     val volunteerBottomNavigationItems =
         listOf(
             VolunteerBottomNavigationItem(
@@ -138,6 +146,7 @@ fun VolunteerBottomNavigationBar(
             shadowElevation = 10.dp,
             tonalElevation = 3.dp
         ) {
+            // Arrange the following controls horizontally and keep their alignment consistent.
             Row(
                 modifier = Modifier
                     .fillMaxSize()
@@ -152,6 +161,7 @@ fun VolunteerBottomNavigationBar(
                     .forEach {
                             volunteerBottomNavigationItem ->
 
+                        // Keep the volunteer’s current selection so Compose can redraw the matching content.
                         val navigationItemIsSelected =
                             currentVolunteerNavigationRoute ==
                                     volunteerBottomNavigationItem
@@ -185,7 +195,9 @@ private fun RowScope.VolunteerFloatingNavigationItem(
     showNotification: Boolean,
     onNavigationItemSelected: () -> Unit
 ) {
+    // Choose a visual colour that represents the current status without changing business data.
     val navigationContentColour =
+        // Check this condition before showing the action, preventing an invalid Volunteer flow from continuing.
         if (navigationItemIsSelected) {
             VolunteerLinkPrimaryGreen
         } else {
@@ -194,6 +206,7 @@ private fun RowScope.VolunteerFloatingNavigationItem(
             )
         }
 
+    // Arrange the following screen content vertically inside the available space.
     Column(
         modifier = Modifier
             .weight(1f)
@@ -217,6 +230,7 @@ private fun RowScope.VolunteerFloatingNavigationItem(
                 .size(37.dp)
                 .background(
                     color =
+                        // Check this condition before showing the action, preventing an invalid Volunteer flow from continuing.
                         if (navigationItemIsSelected) {
                             VolunteerLinkPrimaryGreen
                                 .copy(alpha = 0.14f)

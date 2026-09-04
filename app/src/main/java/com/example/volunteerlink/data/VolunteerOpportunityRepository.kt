@@ -31,6 +31,9 @@ import java.util.Locale
 import java.util.TimeZone
 
 @Serializable
+// Purpose: Handles the volunteer opportunity dashboard data rule in the data layer so screens do not duplicate this business logic.
+// Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+// Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
 data class VolunteerOpportunityDashboardData(
     val events: List<VolunteerOpportunityEvent>,
     val applications: List<VolunteerOpportunityApplication>
@@ -43,6 +46,9 @@ data class VolunteerOpportunityDashboardData(
  */
 object VolunteerOpportunityRepository {
 
+    // Purpose: Loads cached data, synchronises pending actions and replaces it with the latest cloud state.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     suspend fun loadDashboard(): VolunteerOpportunityDashboardData {
         // Refresh, but never modify, the organisation's shared business clock.
         com.example.volunteerlink.data.time.AppClock.refreshFromDatabase()
@@ -198,6 +204,9 @@ object VolunteerOpportunityRepository {
         )
     }
 
+    // Purpose: Validates and sends one role application, then refreshes shared Volunteer state.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     suspend fun submitApplication(
         roleDatabaseId: String,
         questions: List<String>,
@@ -226,6 +235,9 @@ object VolunteerOpportunityRepository {
         )
     }
 
+    // Purpose: Cancels an eligible active application and records the selected cancellation reason.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     suspend fun cancelApplication(
         applicationDatabaseId: String,
         reason: String,
@@ -248,6 +260,9 @@ object VolunteerOpportunityRepository {
         )
     }
 
+    // Purpose: Applies the update pending application data operation and returns only after local/shared state can be updated consistently.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     suspend fun updatePendingApplication(
         applicationDatabaseId: String,
         answers: List<String>
@@ -263,6 +278,9 @@ object VolunteerOpportunityRepository {
         )
     }
 
+    // Purpose: Applies the delete application data operation and returns only after local/shared state can be updated consistently.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     suspend fun deleteApplication(applicationDatabaseId: String) {
         supabase.postgrest.rpc(
             function = "volunteer_delete_application",
@@ -272,6 +290,9 @@ object VolunteerOpportunityRepository {
         )
     }
 
+    // Purpose: Creates a new active application from a previously cancelled participation when the role is still open.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     suspend fun reapplyForRole(
         roleDatabaseId: String,
         answers: List<String>
@@ -289,6 +310,9 @@ object VolunteerOpportunityRepository {
         )
     }
 
+    // Purpose: Adds or removes an opportunity from Favourites and mirrors the result in session state.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     suspend fun setOpportunitySaved(
         postId: String,
         shouldSave: Boolean
@@ -305,6 +329,9 @@ object VolunteerOpportunityRepository {
         )
     }
 
+    // Purpose: Applies the replay pending action data operation and returns only after local/shared state can be updated consistently.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     suspend fun replayPendingAction(
         actionType: String,
         targetId: String,
@@ -360,6 +387,9 @@ object VolunteerOpportunityRepository {
         }
     }
 
+    // Purpose: Reads saved opportunity ids safely from the data source and returns models that the ViewModel can expose to Compose.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     private suspend fun loadSavedOpportunityIdsSafely(): Set<String> =
         runCatching {
             supabase.postgrest
@@ -369,6 +399,9 @@ object VolunteerOpportunityRepository {
                 .toSet()
         }.getOrDefault(emptySet())
 
+    // Purpose: Reads metrics safely from the data source and returns models that the ViewModel can expose to Compose.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     private suspend fun loadMetricsSafely():
             Map<String, OpportunityMetricRow> {
         return try {
@@ -383,6 +416,9 @@ object VolunteerOpportunityRepository {
         }
     }
 
+    // Purpose: Reads role metrics safely from the data source and returns models that the ViewModel can expose to Compose.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     private suspend fun loadRoleMetricsSafely():
             Map<String, RoleMetricRow> {
         return try {
@@ -395,6 +431,9 @@ object VolunteerOpportunityRepository {
         }
     }
 
+    // Purpose: Reads achievements safely from the data source and returns models that the ViewModel can expose to Compose.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     private suspend fun loadAchievementsSafely():
             Map<String, VolunteerAchievementRow> {
         return try {
@@ -409,6 +448,9 @@ object VolunteerOpportunityRepository {
         }
     }
 
+    // Purpose: Reads applications from rpc safely from the data source and returns models that the ViewModel can expose to Compose.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     private suspend fun loadApplicationsFromRpcSafely():
             List<MyVolunteerApplicationRow>? {
         return try {
@@ -426,6 +468,9 @@ object VolunteerOpportunityRepository {
         }
     }
 
+    // Purpose: Joins post, organisation, role, skill, schedule and metric rows into event models used by Compose.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     private fun mapEvents(
         posts: List<VolunteerPostRow>,
         organisations: List<OrganisationRow>,
@@ -786,6 +831,9 @@ object VolunteerOpportunityRepository {
             }
     }
 
+    // Purpose: Converts participation rows into application history models and attaches completion evidence.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     private fun mapApplications(
         participationRows: List<RoleParticipationRow>,
         events: List<VolunteerOpportunityEvent>,
@@ -906,6 +954,9 @@ object VolunteerOpportunityRepository {
             }
     }
 
+    // Purpose: Transforms database rows into the safer rpc applications structure used by Volunteer screens.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     private fun mapRpcApplications(
         applicationRows: List<MyVolunteerApplicationRow>,
         events: List<VolunteerOpportunityEvent>
@@ -977,6 +1028,9 @@ object VolunteerOpportunityRepository {
     }
 }
 
+// Purpose: Handles the application status rule in the data layer so screens do not duplicate this business logic.
+// Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+// Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
 private fun applicationStatus(
     applicationStatus: String,
     completionStatus: String
@@ -996,6 +1050,9 @@ private fun applicationStatus(
     }
 }
 
+// Purpose: Handles the stable navigation id rule in the data layer so screens do not duplicate this business logic.
+// Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+// Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
 private fun stableNavigationId(databaseId: String): Int {
     // Hash the complete database identifier. Extracting only digits made
     // DEMO_POST_003 and POST003 both navigate as event 3, which mixed map
@@ -1010,6 +1067,9 @@ private fun String.toDisplayWords(): String =
             word.replaceFirstChar(Char::uppercase)
         }
 
+// Purpose: Handles the level number rule in the data layer so screens do not duplicate this business logic.
+// Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+// Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
 private fun levelNumber(databaseLevel: String?): Int =
     when (databaseLevel?.uppercase()) {
         "INTERMEDIATE" -> 2
@@ -1017,6 +1077,9 @@ private fun levelNumber(databaseLevel: String?): Int =
         else -> 1
     }
 
+// Purpose: Handles the parse category rule in the data layer so screens do not duplicate this business logic.
+// Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+// Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
 private fun parseCategory(
     databaseCategory: String?
 ): VolunteerOpportunityCategory {
@@ -1027,6 +1090,9 @@ private fun parseCategory(
     }.getOrDefault(VolunteerOpportunityCategory.COMMUNITY)
 }
 
+// Purpose: Converts database date into the display text expected by the Volunteer UI.
+// Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+// Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
 private fun formatDatabaseDate(databaseDate: String): String {
     val parts = databaseDate.split('-')
     if (parts.size != 3) return databaseDate.ifBlank { "To be confirmed" }
@@ -1040,6 +1106,9 @@ private fun formatDatabaseDate(databaseDate: String): String {
     return "${parts[2].toIntOrNull() ?: parts[2]} $month ${parts[0]}"
 }
 
+// Purpose: Converts database time into the display text expected by the Volunteer UI.
+// Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+// Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
 private fun formatDatabaseTime(databaseTime: String): String {
     val parts = databaseTime.split(':')
     val hour24 = parts.firstOrNull()?.toIntOrNull() ?: return databaseTime
@@ -1052,6 +1121,9 @@ private fun formatDatabaseTime(databaseTime: String): String {
     return "$hour12:$minute $suffix"
 }
 
+// Purpose: Converts submitted date into the display text expected by the Volunteer UI.
+// Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+// Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
 private fun formatSubmittedDate(timestamp: String): String {
     val normalizedTimestamp = timestamp
         .trim()
@@ -1078,6 +1150,9 @@ private fun formatSubmittedDate(timestamp: String): String {
     }.format(parsedDate)
 }
 
+// Purpose: Handles the status message rule in the data layer so screens do not duplicate this business logic.
+// Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+// Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
 private fun statusMessage(
     status: VolunteerApplicationStatus,
     decisionNote: String? = null

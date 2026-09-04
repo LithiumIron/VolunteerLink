@@ -16,6 +16,9 @@ enum class VolunteerAttendanceDayState {
     NOT_STARTED, NOT_SCHEDULED, OPEN, NOT_OPENED, NO_RECORD, PRESENT, ABSENT, UNKNOWN, DATE_REVIEW
 }
 
+// Purpose: Handles the volunteer attendance history day rule in the data layer so screens do not duplicate this business logic.
+// Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+// Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
 data class VolunteerAttendanceHistoryDay(
     val date: String,
     val dayNumber: Int,
@@ -39,11 +42,17 @@ object VolunteerAttendanceHistory {
         return date
     }
 
+    // Purpose: Handles the hours rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     private fun hours(raw: String): String {
         require(raw.matches(Regex("\\d{2}:\\d{2}(:\\d{2}(\\.\\d+)?)?")))
         return if (raw.length == 5) "$raw:00" else raw.substringBefore('.')
     }
 
+    // Purpose: Handles the build rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     fun build(event: VolunteerOpportunityEvent, role: VolunteerOpportunityRole,
               records: List<VolunteerAttendanceRecord>?, days: List<VolunteerAttendanceDay>,
               now: Long): List<VolunteerAttendanceHistoryDay> {
@@ -103,6 +112,9 @@ object VolunteerAttendanceHistory {
         }
     }
 
+    // Purpose: Handles the timestamp millis rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     fun timestampMillis(raw: String): Long? = runCatching {
         val normal = raw.replace(' ', 'T').replace(Regex("\\.(\\d+)(?=Z|[+-])")) {
             "." + it.groupValues[1].take(3).padEnd(3, '0')
@@ -111,6 +123,9 @@ object VolunteerAttendanceHistory {
             TimeZone.getTimeZone("UTC")).time
     }.getOrNull()
 
+    // Purpose: Handles the recorded time rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     fun recordedTime(raw: String?, zoneId: String): String {
         val millis = raw?.let(::timestampMillis) ?: return "Time not recorded"
         if (zoneId !in TimeZone.getAvailableIDs()) return "Time unavailable"
@@ -119,6 +134,9 @@ object VolunteerAttendanceHistory {
         }.format(Date(millis))
     }
 
+    // Purpose: Handles the preview rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     fun preview(rows: List<VolunteerAttendanceHistoryDay>, today: String): List<VolunteerAttendanceHistoryDay> {
         // The summary card is deliberately short; the full History section remains the
         // source for every event day, including past and future dates.

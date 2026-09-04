@@ -2,6 +2,9 @@ package com.example.volunteerlink.navigation
 
 // Defines route names and route arguments used by the volunteer navigation host.
 
+// Purpose: Handles volunteer opportunity navigation routes as one reusable step in the Volunteer flow.
+// Usage: Used by the app navigation graph when the volunteer opens, returns from, or switches a destination.
+// Navigation effect: Route arguments identify the selected event, role, application or certificate.
 object VolunteerOpportunityNavigationRoutes {
     const val VOLUNTEER_FAVOURITES_ROUTE = "volunteer_favourites"
 
@@ -60,6 +63,9 @@ object VolunteerOpportunityNavigationRoutes {
         "volunteer_opportunity_details/" +
                 "{$VOLUNTEER_EVENT_ID_ARGUMENT}?recommendedRoleId={recommendedRoleId}&source={source}"
 
+    // Purpose: Handles create volunteer opportunity details route as one reusable step in the Volunteer flow.
+    // Usage: Used by the app navigation graph when the volunteer opens, returns from, or switches a destination.
+    // Navigation effect: Route arguments identify the selected event, role, application or certificate.
     fun createVolunteerOpportunityDetailsRoute(
         volunteerEventId: Int,
         recommendedRoleId: Int = -1,
@@ -77,6 +83,9 @@ object VolunteerOpportunityNavigationRoutes {
                 "{$VOLUNTEER_EVENT_ID_ARGUMENT}/" +
                 "{$VOLUNTEER_ROLE_ID_ARGUMENT}"
 
+    // Purpose: Handles create volunteer role details route as one reusable step in the Volunteer flow.
+    // Usage: Used by the app navigation graph when the volunteer opens, returns from, or switches a destination.
+    // Navigation effect: Route arguments identify the selected event, role, application or certificate.
     fun createVolunteerRoleDetailsRoute(
         volunteerEventId: Int,
         volunteerRoleId: Int
@@ -93,6 +102,9 @@ object VolunteerOpportunityNavigationRoutes {
                 "{$VOLUNTEER_EVENT_ID_ARGUMENT}/" +
                 "{$VOLUNTEER_ROLE_ID_ARGUMENT}"
 
+    // Purpose: Handles create volunteer role application route as one reusable step in the Volunteer flow.
+    // Usage: Used by the app navigation graph when the volunteer opens, returns from, or switches a destination.
+    // Navigation effect: Route arguments identify the selected event, role, application or certificate.
     fun createVolunteerRoleApplicationRoute(
         volunteerEventId: Int,
         volunteerRoleId: Int
@@ -108,6 +120,9 @@ object VolunteerOpportunityNavigationRoutes {
         "volunteer_application_details/" +
                 "{$VOLUNTEER_APPLICATION_ID_ARGUMENT}"
 
+    // Purpose: Handles create volunteer application details route as one reusable step in the Volunteer flow.
+    // Usage: Used by the app navigation graph when the volunteer opens, returns from, or switches a destination.
+    // Navigation effect: Route arguments identify the selected event, role, application or certificate.
     fun createVolunteerApplicationDetailsRoute(
         volunteerApplicationId: Int
     ): String {
@@ -121,6 +136,9 @@ object VolunteerOpportunityNavigationRoutes {
         "volunteer_certificate/" +
                 "{$VOLUNTEER_APPLICATION_ID_ARGUMENT}"
 
+    // Purpose: Handles create volunteer certificate route as one reusable step in the Volunteer flow.
+    // Usage: Used by the app navigation graph when the volunteer opens, returns from, or switches a destination.
+    // Navigation effect: Route arguments identify the selected event, role, application or certificate.
     fun createVolunteerCertificateRoute(
         volunteerApplicationId: Int
     ): String {
@@ -134,6 +152,9 @@ object VolunteerOpportunityNavigationRoutes {
         "volunteer_skill_path_details/" +
                 "{$VOLUNTEER_SKILL_PATH_ID_ARGUMENT}"
 
+    // Purpose: Handles create volunteer skill path details route as one reusable step in the Volunteer flow.
+    // Usage: Used by the app navigation graph when the volunteer opens, returns from, or switches a destination.
+    // Navigation effect: Route arguments identify the selected event, role, application or certificate.
     fun createVolunteerSkillPathDetailsRoute(
         volunteerSkillPathId: String
     ): String {
@@ -149,9 +170,15 @@ object VolunteerOpportunityNavigationRoutes {
     const val VOLUNTEER_GROUP_INFO_ROUTE =
         "volunteer_group_info/{$VOLUNTEER_CHAT_ID_ARGUMENT}"
 
+    // Purpose: Handles create volunteer chat room route as one reusable step in the Volunteer flow.
+    // Usage: Used by the app navigation graph when the volunteer opens, returns from, or switches a destination.
+    // Navigation effect: Route arguments identify the selected event, role, application or certificate.
     fun createVolunteerChatRoomRoute(chatId: String) =
         "volunteer_chat_room/$chatId"
 
+    // Purpose: Handles create volunteer group info route as one reusable step in the Volunteer flow.
+    // Usage: Used by the app navigation graph when the volunteer opens, returns from, or switches a destination.
+    // Navigation effect: Route arguments identify the selected event, role, application or certificate.
     fun createVolunteerGroupInfoRoute(chatId: String) =
         "volunteer_group_info/$chatId"
 }

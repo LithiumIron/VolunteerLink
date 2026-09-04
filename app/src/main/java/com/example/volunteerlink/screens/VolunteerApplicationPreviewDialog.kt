@@ -19,6 +19,9 @@ import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.CancellationException
 
 @Composable
+// Purpose: Handles volunteer application preview dialog as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 fun VolunteerApplicationPreviewDialog(event: VolunteerOpportunityEvent, role: VolunteerOpportunityRole,
     answers: List<String>, busy: Boolean, actionError: String?, onBack: () -> Unit, onConfirm: () -> Unit) {
     val context = LocalContext.current

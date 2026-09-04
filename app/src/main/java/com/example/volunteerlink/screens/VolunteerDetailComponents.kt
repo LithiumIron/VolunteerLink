@@ -36,12 +36,18 @@ internal fun VolunteerDetailCard(title: String, icon: ImageVector, content: @Com
 }
 
 @Composable
+// Purpose: Handles volunteer detail text as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 internal fun VolunteerDetailText(text: String, secondary: Boolean = false) {
     Text(text, fontSize = 14.sp, lineHeight = 21.sp, fontWeight = FontWeight.Normal,
         color = if (secondary) VolunteerLinkTextSecondary else VolunteerLinkTextPrimary)
 }
 
 @Composable
+// Purpose: Handles volunteer detail field as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 internal fun VolunteerDetailField(label: String, value: String, icon: ImageVector? = null) {
     if (value.isBlank()) return
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -54,6 +60,9 @@ internal fun VolunteerDetailField(label: String, value: String, icon: ImageVecto
 }
 
 @Composable
+// Purpose: Handles volunteer detail notice as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 internal fun VolunteerDetailNotice(text: String) {
     Surface(shape = RoundedCornerShape(10.dp), color = VolunteerLinkSoftGreenSurface) {
         Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -64,6 +73,9 @@ internal fun VolunteerDetailNotice(text: String) {
 }
 
 @Composable
+// Purpose: Handles volunteer event schedule as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 internal fun VolunteerEventSchedule(event: VolunteerOpportunityEvent) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         if (event.eventPhysicalStartDate.isNotBlank()) {

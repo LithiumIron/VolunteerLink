@@ -31,6 +31,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
+// Purpose: Renders the volunteer attendance card from values prepared by the parent screen; it does not load Supabase data itself.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 fun VolunteerAttendanceCard(event: VolunteerOpportunityEvent, role: VolunteerOpportunityRole,
                             application: VolunteerOpportunityApplication) {
     val context = LocalContext.current
@@ -49,12 +52,18 @@ fun VolunteerAttendanceCard(event: VolunteerOpportunityEvent, role: VolunteerOpp
         while (true) { value = VolunteerOnline.available(context); delay(2000) }
     }
     val today = runCatching { VolunteerAttendanceWindow.localDate(now, event.eventTimeZone) }.getOrDefault("")
+    // Purpose: Handles reload as one reusable step in the Volunteer flow.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     suspend fun reload() {
         // The Volunteer side can read attendance and submit its own check-in only; it
         // never receives the organiser's PIN or changes organiser-owned attendance setup.
         VolunteerOnline.requireConnection(context, "refresh attendance")
         data = VolunteerAttendanceRepository.load(event.eventDatabaseId, role.roleTemplateId, account)
     }
+    // Purpose: Requests a fresh cloud snapshot without discarding the current cached screen immediately.
+    // Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+    // State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
     fun refresh() {
         // One request at a time prevents a manual Refresh and automatic refresh racing.
         if (busy) return

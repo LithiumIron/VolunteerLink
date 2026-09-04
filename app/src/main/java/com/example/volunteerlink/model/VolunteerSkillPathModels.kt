@@ -4,6 +4,9 @@ package com.example.volunteerlink.model
 import kotlinx.serialization.Serializable
 
 @Serializable
+// Purpose: Handles volunteer skill path as one reusable step in the Volunteer flow.
+// Usage: Read by repositories, ViewModels and Compose screens as shared Volunteer state.
+// Result: The caller receives a stable value or action for the next Volunteer-flow step.
 data class VolunteerSkillPath(
     val skillPathId: String,
     val name: String,
@@ -67,6 +70,9 @@ data class VolunteerSkillPath(
             }
         }
 
+    // Purpose: Handles level is reached as one reusable step in the Volunteer flow.
+    // Usage: Read by repositories, ViewModels and Compose screens as shared Volunteer state.
+    // Result: The caller receives a stable value or action for the next Volunteer-flow step.
     fun levelIsReached(
         skillPathLevel: VolunteerSkillPathLevel
     ): Boolean {
@@ -86,6 +92,9 @@ data class VolunteerSkillPath(
 }
 
 @Serializable
+// Purpose: Handles volunteer skill path level as one reusable step in the Volunteer flow.
+// Usage: Read by repositories, ViewModels and Compose screens as shared Volunteer state.
+// Result: The caller receives a stable value or action for the next Volunteer-flow step.
 data class VolunteerSkillPathLevel(
     val pathLevelId: String,
     val levelNumber: Int,
@@ -95,10 +104,12 @@ data class VolunteerSkillPathLevel(
 )
 
 @Serializable
+// Purpose: Handles volunteer skill as one reusable step in the Volunteer flow.
+// Usage: Read by repositories, ViewModels and Compose screens as shared Volunteer state.
+// Result: The caller receives a stable value or action for the next Volunteer-flow step.
 data class VolunteerSkill(
     val skillId: String,
     val name: String,
     val description: String?
 )
-
 

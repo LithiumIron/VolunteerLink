@@ -22,10 +22,15 @@ import com.example.volunteerlink.model.VolunteerApplicationStatus
 import com.example.volunteerlink.ui.theme.*
 
 @Composable
+// Purpose: Renders the volunteer all certificates screen and connects user actions to navigation or its ViewModel.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 fun VolunteerAllCertificatesScreen(
     onBackSelected: () -> Unit,
     onCertificateSelected: (applicationId: Int) -> Unit
 ) {
+    // Resolve or prepare the application data used by the next status, cancellation or navigation decision.
+    // A certificate is listed only when the participation is COMPLETED and a certificate ID was issued.
     val certificatedApplications = VolunteerOpportunitySessionStore
         .volunteerApplications
         .filter {
@@ -33,6 +38,7 @@ fun VolunteerAllCertificatesScreen(
                     !it.applicationCertificateId.isNullOrBlank()
         }
 
+    // Arrange the following screen content vertically inside the available space.
     Column(modifier = Modifier.fillMaxSize().background(VolunteerLinkBackground)) {
         Row(
             modifier = Modifier

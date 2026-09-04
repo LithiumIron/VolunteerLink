@@ -13,6 +13,9 @@ import com.example.volunteerlink.model.VolunteerOpportunityEvent
 import com.example.volunteerlink.model.VolunteerOpportunityRole
 import com.example.volunteerlink.model.VolunteerSkillPath
 
+// Purpose: Handles the volunteer profile data rule in the data layer so screens do not duplicate this business logic.
+// Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+// Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
 data class VolunteerProfileData(
     val userId: String,
     val fullName: String,
@@ -59,10 +62,16 @@ object VolunteerOpportunitySessionStore {
 
     var isProfileLoading by mutableStateOf(false)
         private set
+    // Purpose: Applies the update profile loading data operation and returns only after local/shared state can be updated consistently.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     fun updateProfileLoading(loading: Boolean) {
         isProfileLoading = loading
     }
 
+    // Purpose: Applies the set profile data data operation and returns only after local/shared state can be updated consistently.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     fun setProfileData(data: VolunteerProfileData) {
         _profileData = data
         isProfileLoading = false
@@ -70,10 +79,16 @@ object VolunteerOpportunitySessionStore {
 
     // Called from EditVolunteerProfileScreen's onSaved so the next visit to
     // VolunteerProfileScreen refetches instead of showing stale cached data.
+    // Purpose: Handles the clear profile data rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     fun clearProfileData() {
         _profileData = null
     }
 
+    // Purpose: Handles the replace with rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     fun replaceWith(data: VolunteerOpportunityDashboardData) {
         volunteerOpportunityEvents.clear()
         volunteerOpportunityEvents.addAll(data.events)
@@ -122,11 +137,17 @@ object VolunteerOpportunitySessionStore {
         volunteerOpportunityEvents.addAll(updatedEvents)
     }
 
+    // Purpose: Handles the find event by id rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     fun findEventById(eventId: Int): VolunteerOpportunityEvent? =
         volunteerOpportunityEvents.firstOrNull {
             it.eventId == eventId
         }
 
+    // Purpose: Applies the set event saved data operation and returns only after local/shared state can be updated consistently.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     fun setEventSaved(eventId: Int, isSaved: Boolean) {
         val index = volunteerOpportunityEvents.indexOfFirst {
             it.eventId == eventId
@@ -139,6 +160,9 @@ object VolunteerOpportunitySessionStore {
         }
     }
 
+    // Purpose: Handles the find role by id rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     fun findRoleById(
         eventId: Int,
         roleId: Int
@@ -147,6 +171,9 @@ object VolunteerOpportunitySessionStore {
             ?.eventVolunteerRoles
             ?.firstOrNull { it.roleId == roleId }
 
+    // Purpose: Handles the find application by id rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     fun findApplicationById(
         applicationId: Int
     ): VolunteerOpportunityApplication? =
@@ -154,6 +181,9 @@ object VolunteerOpportunitySessionStore {
             it.applicationId == applicationId
         }
 
+    // Purpose: Handles the has application for role rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     fun hasApplicationForRole(
         eventId: Int,
         roleId: Int
@@ -167,6 +197,9 @@ object VolunteerOpportunitySessionStore {
             )
         }
 
+    // Purpose: Handles the active application for event rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     fun activeApplicationForEvent(
         eventId: Int
     ): VolunteerOpportunityApplication? =
@@ -184,6 +217,9 @@ object VolunteerOpportunitySessionStore {
             }
             .firstOrNull()
 
+    // Purpose: Handles the pending application for event rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     fun pendingApplicationForEvent(
         eventId: Int
     ): VolunteerOpportunityApplication? =
@@ -192,12 +228,18 @@ object VolunteerOpportunitySessionStore {
                 application.applicationStatus == VolunteerApplicationStatus.PENDING
         }
 
+    // Purpose: Handles the snapshot rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     fun snapshot(): VolunteerOpportunityDashboardData =
         VolunteerOpportunityDashboardData(
             events = volunteerOpportunityEvents.toList(),
             applications = volunteerApplications.toList()
         )
 
+    // Purpose: Handles the add offline pending application rule in the data layer so screens do not duplicate this business logic.
+    // Usage: Called by a Volunteer ViewModel or another data-layer coordinator, not directly by a UI button.
+    // Data effect: The returned value is mapped before Compose reads it, keeping database details outside the UI.
     fun addOfflinePendingApplication(
         application: VolunteerOpportunityApplication
     ) {

@@ -73,6 +73,9 @@ import kotlinx.coroutines.launch
 
 
 @Composable
+// Purpose: Controls the selected role application, profile preview, submission request and final success state.
+// Called from this screen, its ViewModel, or the Volunteer navigation host during the related user action.
+// It changes only local UI/ViewModel state; persistent changes still go through Supabase repositories.
 fun VolunteerApplicationScreen(
     volunteerEventId: Int,
     volunteerRoleId: Int,
@@ -93,6 +96,7 @@ fun VolunteerApplicationScreen(
             volunteerEventId
         )
 
+    // Resolve the selected role so eligibility and application-method rules use the correct role.
     val volunteerOpportunityRole =
         VolunteerOpportunitySessionStore.findRoleById(
             eventId = volunteerEventId,
@@ -124,6 +128,7 @@ fun VolunteerApplicationScreen(
         mutableStateOf<List<String>?>(null)
     }
 
+    // Resolve the current application state before deciding whether to show the form, existing record or success page.
     val existingApplication =
         VolunteerOpportunitySessionStore
             .volunteerApplications
@@ -168,7 +173,9 @@ fun VolunteerApplicationScreen(
         }
 
         else -> {
+            // Keep the calculated answers to review value because later validation or Compose content reuses it.
             val answersToReview = reviewAnswers
+            // Reject this branch early when its requirement is not met, preventing an invalid request or navigation.
             if (answersToReview != null) {
                 // The preview is a confirmation step; it does not submit until Confirm is pressed.
                 VolunteerApplicationPreviewDialog(
@@ -205,6 +212,9 @@ fun VolunteerApplicationScreen(
 }
 
 @Composable
+// Purpose: Collects required screening answers and decides whether the volunteer may submit or instantly join.
+// Called from this screen, its ViewModel, or the Volunteer navigation host during the related user action.
+// It changes only local UI/ViewModel state; persistent changes still go through Supabase repositories.
 private fun VolunteerApplicationFormScreen(
     volunteerOpportunityEvent:
     VolunteerOpportunityEvent,
@@ -215,6 +225,7 @@ private fun VolunteerApplicationFormScreen(
     serverErrorMessage: String?,
     onApplicationSubmitted: (List<String>) -> Unit
 ) {
+    // Keep the calculated extra questions value because later validation or Compose content reuses it.
     val extraQuestions =
         volunteerOpportunityRole
             .roleExtraApplicationQuestions
@@ -243,12 +254,14 @@ private fun VolunteerApplicationFormScreen(
         mutableStateOf<String?>(null)
     }
 
+    // Resolve the current application state before deciding whether to show the form, existing record or success page.
     val applicationNeedsAdditionalForm =
         volunteerOpportunityRole
             .roleApplicationFlow ==
                 VolunteerRoleApplicationFlow
                     .ADDITIONAL_FORM
 
+    // Check the role application method because only Instant Join participants receive immediate chat access.
     val applicationIsInstantJoin =
         volunteerOpportunityRole
             .roleApplicationMethod ==
@@ -300,6 +313,7 @@ private fun VolunteerApplicationFormScreen(
 
             Text(
                 text =
+                    // Reject this branch early when its requirement is not met, preventing an invalid request or navigation.
                     if (
                         applicationNeedsAdditionalForm
                     ) {
@@ -318,6 +332,7 @@ private fun VolunteerApplicationFormScreen(
 
             Text(
                 text =
+                    // Reject this branch early when its requirement is not met, preventing an invalid request or navigation.
                     if (
                         applicationNeedsAdditionalForm
                     ) {
@@ -325,6 +340,7 @@ private fun VolunteerApplicationFormScreen(
                                 "additional information before " +
                                 "reviewing your application."
                     } else {
+                        // Reject this branch early when its requirement is not met, preventing an invalid request or navigation.
                         if (applicationIsInstantJoin) {
                             "This role supports instant joining. " +
                                     "Confirm your availability to secure the role."
@@ -337,6 +353,7 @@ private fun VolunteerApplicationFormScreen(
                 color = VolunteerLinkTextSecondary
             )
 
+            // Reject this branch early when its requirement is not met, preventing an invalid request or navigation.
             if (applicationNeedsAdditionalForm) {
                 Spacer(
                     modifier = Modifier.height(16.dp)
@@ -372,6 +389,7 @@ private fun VolunteerApplicationFormScreen(
                             onValueChange = {
                                     updatedAnswer ->
 
+                                // Keep the calculated updated answers value because later validation or Compose content reuses it.
                                 val updatedAnswers =
                                     ArrayList(
                                         questionAnswers
@@ -465,6 +483,7 @@ private fun VolunteerApplicationFormScreen(
 
                         Text(
                             text =
+                                // Reject this branch early when its requirement is not met, preventing an invalid request or navigation.
                                 if (applicationIsInstantJoin) {
                                     "Your place will be confirmed immediately. " +
                                             "The role will appear in My Applications."
@@ -590,8 +609,10 @@ private fun VolunteerApplicationFormScreen(
             color = VolunteerLinkSurface,
             shadowElevation = 8.dp
         ) {
+            // Connect this button to the validated action prepared above; loading state prevents duplicate requests.
             Button(
                 onClick = {
+                    // Calculate this Boolean once so every following UI branch uses the same decision.
                     val hasEmptyRequiredAnswer =
                         applicationNeedsAdditionalForm &&
                                 questionAnswers.any {
@@ -601,6 +622,7 @@ private fun VolunteerApplicationFormScreen(
                                 }
 
                     validationErrorMessage =
+                        // Choose one result from the current state so incompatible UI outcomes are never shown together.
                         when {
                             hasEmptyRequiredAnswer ->
                                 "Please answer every " +
@@ -613,6 +635,7 @@ private fun VolunteerApplicationFormScreen(
                             else -> null
                         }
 
+                    // Reject this branch early when its requirement is not met, preventing an invalid request or navigation.
                     if (
                         validationErrorMessage == null
                     ) {
@@ -646,6 +669,7 @@ private fun VolunteerApplicationFormScreen(
             ) {
                 Text(
                     text =
+                        // Reject this branch early when its requirement is not met, preventing an invalid request or navigation.
                         if (isSubmitting) {
                             "Submitting..."
                         } else if (applicationIsInstantJoin) {
@@ -662,6 +686,9 @@ private fun VolunteerApplicationFormScreen(
 }
 
 @Composable
+// Purpose: Displays the application title and sends Back to the navigation callback.
+// Called from this screen, its ViewModel, or the Volunteer navigation host during the related user action.
+// It changes only local UI/ViewModel state; persistent changes still go through Supabase repositories.
 private fun VolunteerApplicationTopBar(
     applicationNeedsAdditionalForm: Boolean,
     applicationIsInstantJoin: Boolean,
@@ -695,6 +722,7 @@ private fun VolunteerApplicationTopBar(
 
         Text(
             text =
+                // Reject this branch early when its requirement is not met, preventing an invalid request or navigation.
                 if (
                     applicationNeedsAdditionalForm
                 ) {
@@ -712,6 +740,9 @@ private fun VolunteerApplicationTopBar(
 }
 
 @Composable
+// Purpose: Shows the event and role being applied for so the volunteer can verify the selection.
+// Called from this screen, its ViewModel, or the Volunteer navigation host during the related user action.
+// It changes only local UI/ViewModel state; persistent changes still go through Supabase repositories.
 private fun VolunteerApplicationRoleSummary(
     volunteerOpportunityEvent:
     VolunteerOpportunityEvent,
@@ -858,6 +889,9 @@ private fun VolunteerApplicationRoleSummary(
 }
 
 @Composable
+// Purpose: Keeps the successful result visible and offers Return Home or Join Group Chat for an Instant Join role.
+// Called from this screen, its ViewModel, or the Volunteer navigation host during the related user action.
+// It changes only local UI/ViewModel state; persistent changes still go through Supabase repositories.
 private fun VolunteerApplicationSuccessScreen(
     volunteerOpportunityEvent:
     VolunteerOpportunityEvent,
@@ -866,12 +900,14 @@ private fun VolunteerApplicationSuccessScreen(
     onReturnHomeSelected: () -> Unit,
     onJoinGroupChat: suspend (String) -> Unit
 ) {
+    // Check the role application method because only Instant Join participants receive immediate chat access.
     val applicationIsInstantJoin =
         volunteerOpportunityRole
             .roleApplicationMethod ==
                 VolunteerRoleApplicationMethod
                     .INSTANT_JOIN
 
+    // Use a Compose-aware coroutine scope for the suspend Join Group Chat request.
     val scope = rememberCoroutineScope()
 
     var isJoiningGroupChat by rememberSaveable {
@@ -911,6 +947,7 @@ private fun VolunteerApplicationSuccessScreen(
                     imageVector =
                         Icons.Filled.CheckCircle,
                     contentDescription =
+                        // Reject this branch early when its requirement is not met, preventing an invalid request or navigation.
                         if (applicationIsInstantJoin) {
                             "Role joined"
                         } else {
@@ -929,6 +966,7 @@ private fun VolunteerApplicationSuccessScreen(
 
         Text(
             text =
+                // Reject this branch early when its requirement is not met, preventing an invalid request or navigation.
                 if (applicationIsInstantJoin) {
                     "Role Joined"
                 } else {
@@ -945,6 +983,7 @@ private fun VolunteerApplicationSuccessScreen(
 
         Text(
             text =
+                // Reject this branch early when its requirement is not met, preventing an invalid request or navigation.
                 if (applicationIsInstantJoin) {
                     "Your place for " +
                             volunteerOpportunityRole
@@ -983,15 +1022,19 @@ private fun VolunteerApplicationSuccessScreen(
             modifier = Modifier.height(28.dp)
         )
 
+        // Connect this button to the validated action prepared above; loading state prevents duplicate requests.
         Button(
             onClick = {
+                // Reject this branch early when its requirement is not met, preventing an invalid request or navigation.
                 if (!applicationIsInstantJoin) {
                     onReturnHomeSelected()
                     return@Button
                 }
 
+                // Keep the calculated post id value because later validation or Compose content reuses it.
                 val postId = volunteerOpportunityEvent.eventDatabaseId
 
+                // Reject this branch early when its requirement is not met, preventing an invalid request or navigation.
                 if (postId.isBlank()) {
                     joinGroupChatError =
                         "This event is still loading. Please try again shortly."
@@ -1047,6 +1090,9 @@ private fun VolunteerApplicationSuccessScreen(
 }
 
 @Composable
+// Purpose: Prevents duplicate applications and directs the volunteer to the existing application record.
+// Called from this screen, its ViewModel, or the Volunteer navigation host during the related user action.
+// It changes only local UI/ViewModel state; persistent changes still go through Supabase repositories.
 private fun VolunteerExistingApplicationScreen(
     volunteerOpportunityEvent:
     VolunteerOpportunityEvent,
@@ -1057,7 +1103,9 @@ private fun VolunteerExistingApplicationScreen(
     onBackSelected: () -> Unit,
     onReturnHomeSelected: () -> Unit
 ) {
+    // Keep the calculated status text value because later validation or Compose content reuses it.
     val statusText =
+        // Choose one result from the current state so incompatible UI outcomes are never shown together.
         when (
             volunteerApplication.applicationStatus
         ) {
@@ -1080,7 +1128,9 @@ private fun VolunteerExistingApplicationScreen(
                 "Cancelled"
         }
 
+    // Keep the calculated status colour value because later validation or Compose content reuses it.
     val statusColour =
+        // Choose one result from the current state so incompatible UI outcomes are never shown together.
         when (
             volunteerApplication.applicationStatus
         ) {
@@ -1285,6 +1335,7 @@ private fun VolunteerExistingApplicationScreen(
                         }
                     }
 
+                    // Reject this branch early when its requirement is not met, preventing an invalid request or navigation.
                     if (
                         volunteerApplication
                             .applicationStatusMessage
@@ -1312,6 +1363,7 @@ private fun VolunteerExistingApplicationScreen(
                 modifier = Modifier.height(24.dp)
             )
 
+            // Connect this button to the validated action prepared above; loading state prevents duplicate requests.
             Button(
                 onClick =
                     onReturnHomeSelected,
@@ -1339,6 +1391,9 @@ private fun VolunteerExistingApplicationScreen(
 }
 
 @Composable
+// Purpose: Shows a safe fallback when route IDs no longer match an event or role in the shared session.
+// Called from this screen, its ViewModel, or the Volunteer navigation host during the related user action.
+// It changes only local UI/ViewModel state; persistent changes still go through Supabase repositories.
 private fun VolunteerApplicationNotFoundScreen(
     onBackSelected: () -> Unit
 ) {
@@ -1378,6 +1433,7 @@ private fun VolunteerApplicationNotFoundScreen(
             modifier = Modifier.height(18.dp)
         )
 
+        // Connect this button to the validated action prepared above; loading state prevents duplicate requests.
         Button(
             onClick = onBackSelected,
             colors =

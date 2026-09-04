@@ -69,6 +69,9 @@ import com.example.volunteerlink.shared.countryCallingCodes
 import com.example.volunteerlink.shared.countryStates
 import com.example.volunteerlink.shared.isValidAuthPhoneNumber
 
+// Purpose: Checks is volunteer sign up form valid before allowing the next authentication or application step.
+// Called from this screen, its ViewModel, or the Volunteer navigation host during the related user action.
+// It changes only local UI/ViewModel state; persistent changes still go through Supabase repositories.
 private fun isVolunteerSignUpFormValid(
     fullName: String,
     email: String,
@@ -82,6 +85,9 @@ private fun isVolunteerSignUpFormValid(
 }
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+// Purpose: Collects volunteer identity, location, phone and password, then confirms the password before registration.
+// Called from this screen, its ViewModel, or the Volunteer navigation host during the related user action.
+// It changes only local UI/ViewModel state; persistent changes still go through Supabase repositories.
 fun VolunteerSignUpScreen(
     onBackSelected: () -> Unit,
     onSignedUp: () -> Unit,
@@ -119,19 +125,24 @@ fun VolunteerSignUpScreen(
     var isStateMenuExpanded by rememberSaveable { mutableStateOf(false) }
     var isCityMenuExpanded by rememberSaveable { mutableStateOf(false) }
 
+    // Keep the selected location level so the next dependent location/phone choice can be validated.
     val availableStates =
         countryStates[country]?.keys?.toList() ?: emptyList()
 
+    // Keep the calculated available cities value because later validation or Compose content reuses it.
     val availableCities =
         countryStates[country]?.get(stateRegion) ?: emptyList()
 
+    // Keep the selected location level so the next dependent location/phone choice can be validated.
     val locationContext = LocalContext.current
+    // Keep the selected location level so the next dependent location/phone choice can be validated.
     val locationScope = rememberCoroutineScope()
 
     DisposableEffect(Unit) {
         onDispose { cancelCurrentLocationRequest?.invoke() }
     }
 
+    // Keep the selected location level so the next dependent location/phone choice can be validated.
     val locationInteractionSource = remember { MutableInteractionSource() }
     LaunchedEffect(locationInteractionSource) {
         locationInteractionSource.interactions.collect {
@@ -139,12 +150,18 @@ fun VolunteerSignUpScreen(
         }
     }
 
+    // Prepare the phone value and country calling code before validation and account creation.
     val phoneCallingCode = countryCallingCodes[country] ?: ""
 
+    // Prepare the phone value and country calling code before validation and account creation.
     val combinedPhone = "$phoneCallingCode $phone".trim()
 
+    // Prepare the phone value and country calling code before validation and account creation.
     val phoneError = phone.isNotBlank() && !isValidAuthPhoneNumber(combinedPhone)
 
+    // Purpose: Handles begin current location resolution as a focused step shared by this Volunteer flow.
+    // Called from this screen, its ViewModel, or the Volunteer navigation host during the related user action.
+    // It changes only local UI/ViewModel state; persistent changes still go through Supabase repositories.
     fun beginCurrentLocationResolution() {
         if (!CurrentLocationResolver.isLocationEnabled(locationContext)) {
             isResolvingCurrentLocation = false
@@ -169,6 +186,7 @@ fun VolunteerSignUpScreen(
         }
     }
 
+    // Keep the selected location level so the next dependent location/phone choice can be validated.
     val currentLocationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -186,8 +204,10 @@ fun VolunteerSignUpScreen(
         if (uiState.isAuthenticated) onSignedUp()
     }
 
+    // Calculate this Boolean once so every following UI branch uses the same decision.
     val isBusy = uiState.isSubmitting || uiState.isCheckingSession
 
+    // Calculate this Boolean once so every following UI branch uses the same decision.
     val isFormValid = isVolunteerSignUpFormValid(
         fullName = fullName,
         email = email,

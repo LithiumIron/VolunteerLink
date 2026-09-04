@@ -62,16 +62,22 @@ import com.example.volunteerlink.ui.theme.VolunteerLinkTextPrimary
 import com.example.volunteerlink.ui.theme.VolunteerLinkTextSecondary
 
 @Composable
+// Purpose: Creates the certificate screen only for a verified completed participation and supports PDF export.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 fun VolunteerCertificateScreen(
     volunteerApplicationId: Int,
     onBackSelected: () -> Unit
 ) {
+    // Use the current Android context for permissions, files, resources or external intents.
     val context = LocalContext.current
+    // Resolve or prepare the application data used by the next status, cancellation or navigation decision.
     val volunteerApplication =
         VolunteerOpportunitySessionStore.findApplicationById(
             volunteerApplicationId
         )
 
+    // Check this condition before showing the action, preventing an invalid Volunteer flow from continuing.
     if (
         volunteerApplication == null ||
         volunteerApplication.applicationStatus !=
@@ -80,20 +86,25 @@ fun VolunteerCertificateScreen(
         VolunteerCertificateUnavailableScreen(
             onBackSelected = onBackSelected
         )
+        // Keep this Compose block separate so its visual state follows the value prepared above.
         return
     }
 
+    // Prepare certificate evidence that is available only after verified completion.
     val certificateId =
         volunteerApplication.applicationCertificateId
             ?: "VL-${volunteerApplication.applicationDatabaseId}"
 
+    // Register an Android activity-result launcher so the system response returns safely to this screen.
     val downloadLauncher =
         rememberLauncherForActivityResult(
             contract = ActivityResultContracts.CreateDocument(
                 "application/pdf"
             )
         ) { destinationUri ->
+            // Check this condition before showing the action, preventing an invalid Volunteer flow from continuing.
             if (destinationUri != null) {
+                // Name the calculated was saved value because later UI branches reuse it during this Compose pass.
                 val wasSaved = saveVolunteerCertificatePdf(
                     context = context,
                     destinationUri = destinationUri,
@@ -102,6 +113,7 @@ fun VolunteerCertificateScreen(
                 )
                 Toast.makeText(
                     context,
+                    // Check this condition before showing the action, preventing an invalid Volunteer flow from continuing.
                     if (wasSaved) {
                         "Certificate PDF saved successfully."
                     } else {
@@ -382,6 +394,9 @@ fun VolunteerCertificateScreen(
 }
 
 @Composable
+// Purpose: Handles certificate metric as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun CertificateMetric(
     label: String,
     value: String
@@ -406,6 +421,9 @@ private fun CertificateMetric(
 }
 
 @Composable
+// Purpose: Renders the volunteer certificate unavailable screen and connects user actions to navigation or its ViewModel.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun VolunteerCertificateUnavailableScreen(
     onBackSelected: () -> Unit
 ) {
@@ -446,8 +464,13 @@ private fun VolunteerCertificateUnavailableScreen(
     }
 }
 
+// Purpose: Converts certificate minutes into the display text expected by the Volunteer UI.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun formatCertificateMinutes(minutes: Int): String {
+    // Name the calculated hours value because later UI branches reuse it during this Compose pass.
     val hours = minutes / 60
+    // Name the calculated remainder value because later UI branches reuse it during this Compose pass.
     val remainder = minutes % 60
     return when {
         minutes <= 0 -> "Verified"
@@ -457,18 +480,26 @@ private fun formatCertificateMinutes(minutes: Int): String {
     }
 }
 
+// Purpose: Draws the visible certificate data into a PDF and writes it to the user-selected document.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun saveVolunteerCertificatePdf(
     context: Context,
     destinationUri: Uri,
     volunteerApplication: VolunteerOpportunityApplication,
     certificateId: String
 ): Boolean {
+    // Name the calculated document value because later UI branches reuse it during this Compose pass.
     val document = PdfDocument()
     return try {
+        // Name the calculated page info value because later UI branches reuse it during this Compose pass.
         val pageInfo =
             PdfDocument.PageInfo.Builder(1120, 792, 1).create()
+        // Name the calculated page value because later UI branches reuse it during this Compose pass.
         val page = document.startPage(pageInfo)
+        // Calculate whether the following UI or action is allowed before it is rendered or executed.
         val canvas = page.canvas
+        // Name the calculated paint value because later UI branches reuse it during this Compose pass.
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
         canvas.drawColor(android.graphics.Color.rgb(250, 252, 248))

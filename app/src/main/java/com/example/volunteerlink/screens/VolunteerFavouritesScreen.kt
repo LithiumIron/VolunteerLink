@@ -28,9 +28,12 @@ fun VolunteerFavouritesScreen(
     opportunityViewModel: VolunteerOpportunityViewModel
 ) {
     val state by opportunityViewModel.uiState.collectAsStateWithLifecycle()
+    // Name the calculated favourites value because later UI branches reuse it during this Compose pass.
     val favourites = VolunteerOpportunitySessionStore.volunteerOpportunityEvents
         .filter { it.eventIsSaved }
+    // Arrange the following screen content vertically inside the available space.
     Column(Modifier.fillMaxSize().background(VolunteerLinkBackground)) {
+        // Arrange the following controls horizontally and keep their alignment consistent.
         Row(
             Modifier.fillMaxWidth().background(VolunteerLinkPrimaryGreen).statusBarsPadding(),
             verticalAlignment = Alignment.CenterVertically

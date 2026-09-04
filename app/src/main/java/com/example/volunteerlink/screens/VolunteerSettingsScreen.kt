@@ -56,11 +56,15 @@ private data class SettingsInfoDialogContent(
 )
 
 @Composable
+// Purpose: Renders the volunteer settings screen and connects user actions to navigation or its ViewModel.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 fun VolunteerSettingsScreen(
     onBackSelected: () -> Unit,
     onEditProfileSelected: () -> Unit,
     onLoggedOut: () -> Unit
 ) {
+    // Create a lifecycle-aware coroutine scope for asynchronous work started by this Compose screen.
     val scope = rememberCoroutineScope()
     var isLoggingOut by remember { mutableStateOf(false) }
     var showLogoutConfirmation by rememberSaveable { mutableStateOf(false) }
@@ -72,6 +76,7 @@ fun VolunteerSettingsScreen(
         mutableStateOf<SettingsInfoDialogContent?>(null)
     }
 
+    // Check this condition before showing the action, preventing an invalid Volunteer flow from continuing.
     if (showLogoutConfirmation) {
         AlertDialog(
             onDismissRequest = { showLogoutConfirmation = false },
@@ -212,6 +217,9 @@ fun VolunteerSettingsScreen(
 }
 
 @Composable
+// Purpose: Handles settings section label as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun SettingsSectionLabel(label: String) {
     if (label.isNotBlank()) {
         Text(
@@ -227,6 +235,9 @@ private fun SettingsSectionLabel(label: String) {
 }
 
 @Composable
+// Purpose: Handles settings row as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 private fun SettingsRow(
     icon: ImageVector,
     title: String,

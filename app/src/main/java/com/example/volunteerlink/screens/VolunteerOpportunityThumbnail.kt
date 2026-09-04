@@ -68,6 +68,9 @@ private suspend fun loadVolunteerThumbnail(
 }
 
 @Composable
+// Purpose: Handles volunteer opportunity thumbnail as one reusable step in the Volunteer flow.
+// Usage: Called by the parent Volunteer screen or navigation callback during Compose rendering.
+// State effect: Its callbacks update screen state or navigate; this UI helper does not own database records.
 fun VolunteerOpportunityThumbnail(
     storagePath: String?,
     @DrawableRes fallbackIconResourceId: Int,
