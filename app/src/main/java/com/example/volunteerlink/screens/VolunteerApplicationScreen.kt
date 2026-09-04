@@ -109,14 +109,22 @@ fun VolunteerApplicationScreen(
         mutableStateOf(false)
     }
 
+    // Keep validated answers while the volunteer checks the profile summary before submission.
+    var reviewAnswers by rememberSaveable(volunteerEventId, volunteerRoleId) {
+        mutableStateOf<List<String>?>(null)
+    }
+
     val existingApplication =
         VolunteerOpportunitySessionStore
             .volunteerApplications
             .firstOrNull { volunteerApplication ->
                 volunteerApplication.applicationEventId ==
                         volunteerEventId &&
-                        volunteerApplication.applicationRoleId ==
-                        volunteerRoleId
+                volunteerApplication.applicationRoleId ==
+                        volunteerRoleId &&
+                // A cancelled record is historical. Let the volunteer review and submit again.
+                volunteerApplication.applicationStatus !=
+                        VolunteerApplicationStatus.CANCELLED
             }
 
     when {
@@ -147,32 +155,38 @@ fun VolunteerApplicationScreen(
         }
 
         else -> {
-            VolunteerApplicationFormScreen(
-                volunteerOpportunityEvent =
-                    volunteerOpportunityEvent,
-                volunteerOpportunityRole =
-                    volunteerOpportunityRole,
-                onBackSelected =
-                    onBackSelected,
-                isSubmitting =
-                    opportunityUiState
-                        .isApplicationActionRunning,
-                serverErrorMessage =
-                    opportunityUiState
-                        .applicationActionError,
-                onApplicationSubmitted = {
-                        submittedAnswers ->
-                    volunteerOpportunityViewModel
-                        .submitApplication(
+            val answersToReview = reviewAnswers
+            if (answersToReview != null) {
+                // The preview is a confirmation step; it does not submit until Confirm is pressed.
+                VolunteerApplicationPreviewDialog(
+                    event = volunteerOpportunityEvent,
+                    role = volunteerOpportunityRole,
+                    answers = answersToReview,
+                    busy = opportunityUiState.isApplicationActionRunning,
+                    actionError = opportunityUiState.applicationActionError,
+                    onBack = { reviewAnswers = null },
+                    onConfirm = {
+                        volunteerOpportunityViewModel.submitApplication(
                             eventId = volunteerEventId,
                             roleId = volunteerRoleId,
-                            answers = submittedAnswers,
-                            onSuccess = {
-                                applicationWasSubmitted = true
-                            }
+                            answers = answersToReview,
+                            onSuccess = { applicationWasSubmitted = true }
                         )
-                }
-            )
+                    }
+                )
+            } else {
+                VolunteerApplicationFormScreen(
+                    volunteerOpportunityEvent = volunteerOpportunityEvent,
+                    volunteerOpportunityRole = volunteerOpportunityRole,
+                    onBackSelected = onBackSelected,
+                    isSubmitting = opportunityUiState.isApplicationActionRunning,
+                    serverErrorMessage = opportunityUiState.applicationActionError,
+                    onApplicationSubmitted = { submittedAnswers ->
+                        // Form validation has passed; show the volunteer what the organiser will review.
+                        reviewAnswers = submittedAnswers
+                    }
+                )
+            }
         }
     }
 }
